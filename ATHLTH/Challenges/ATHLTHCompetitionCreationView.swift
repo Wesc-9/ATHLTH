@@ -128,6 +128,7 @@ struct ATHLTHCompetitionCreationView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var challenges: ChallengeStore
+    @EnvironmentObject private var messaging: MessagingStore
 
     let initialActivity: ATHLTHQuickStartActivity
     let advanced: Bool
@@ -146,7 +147,9 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var chosenRoute: TrainingRoute?
     @State private var durationMinutes = 30.0
     @State private var exerciseName = ""
+    @State private var startsAt = Date().addingTimeInterval(86_400)
     @State private var endsAt = Date().addingTimeInterval(7 * 86_400)
+    @State private var duelAgreement = ATHLTHCompetitionAgreement()
     @State private var multipleAttempts = true
     @State private var roundsPerWeek = 7
     @State private var reviewHours = 48
@@ -183,7 +186,9 @@ struct ATHLTHCompetitionCreationView: View {
             hasRoute: chosenRoute != nil,
             endsAt: endsAt,
             now: Date()
-        ) && selectedPeople.count == chosenIDs.count
+        ) && selectedPeople.count == chosenIDs.count &&
+        startsAt >= Date().addingTimeInterval(-60) &&
+        startsAt < endsAt && duelAgreement.isValid
     }
 
     var body: some View {
@@ -647,6 +652,10 @@ struct ATHLTHCompetitionCreationView: View {
             }
 
             if format == .duel {
+                DatePicker(tr("Competition starts", "Konkurransen starter"),
+                           selection: $startsAt, in: Date()...,
+                           displayedComponents: [.date, .hourAndMinute])
+                    .font(.subheadline)
                 DatePicker(tr("Competition ends", "Konkurransen avsluttes"),
                            selection: $endsAt, in: Date().addingTimeInterval(600)...,
                            displayedComponents: [.date, .hourAndMinute])
@@ -705,6 +714,7 @@ struct ATHLTHCompetitionCreationView: View {
                                 tr("Allow multiple attempts", "Tillat flere forsøk"),
                                 isOn: $multipleAttempts
                             )
+                            duelAgreementEditor
                         } else {
                             Stepper(
                                 tr("New round every \(roundsPerWeek) days",
@@ -746,6 +756,29 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .padding(15)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var duelAgreementEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Hva er lov og ikke lov?")
+                .font(.subheadline.weight(.semibold))
+            TextField("Dette er lov", text: $duelAgreement.allowed,
+                      axis: .vertical)
+                .lineLimit(1...3)
+            TextField("Dette er ikke lov", text: $duelAgreement.prohibited,
+                      axis: .vertical)
+                .lineLimit(1...3)
+            Divider()
+            TextField("Premie til vinner (valgfritt)",
+                      text: $duelAgreement.firstPrize, axis: .vertical)
+                .lineLimit(1...3)
+            TextField("Frivillig konsekvens for taper (valgfritt)",
+                      text: $duelAgreement.loserConsequence, axis: .vertical)
+                .lineLimit(1...3)
+            Text("Begge må godta reglene. Premier og konsekvenser må være trygge og frivillige.")
+                .font(.caption)
+                .foregroundStyle(muted)
+        }
     }
 
     private var duelMetrics: [ATHLTHChallengeScoring] {
@@ -820,7 +853,15 @@ struct ATHLTHCompetitionCreationView: View {
             exerciseName: initialActivity == .strength &&
                 scoring != .workoutVolume ? exerciseName : nil,
             fixedWeightKilograms: nil,
-            startsAt: now,
+            allowedActions: duelAgreement.allowed.isEmpty
+                ? nil : duelAgreement.allowed,
+            prohibitedActions: duelAgreement.prohibited.isEmpty
+                ? nil : duelAgreement.prohibited,
+            firstPrize: duelAgreement.firstPrize.isEmpty
+                ? nil : duelAgreement.firstPrize,
+            loserConsequence: duelAgreement.loserConsequence.isEmpty
+                ? nil : duelAgreement.loserConsequence,
+            startsAt: startsAt,
             endsAt: endsAt,
             allowMultipleAttempts: multipleAttempts,
             lockRulesAtStart: true,
@@ -856,6 +897,33 @@ struct ATHLTHCompetitionCreationView: View {
             )
         }
         challenges.mergeRemoteChallenges([challenge])
+        // A duel is a private inbox conversation, not a new group chat.
+        // The challenge invitation itself already exists independently
+        // if the message cannot be delivered.
+        do {
+            let conversationID = try await messaging.openConversation(
+                with: rival.userID
+            )
+            let attachment = try MessageShareDraft(
+                kind: .challenge,
+                title: challenge.title,
+                subtitle: "Duell · \(initialActivity.title)",
+                snapshot: challenge,
+                sourceObjectID: challenge.id,
+                sourceOwnerID: session.profile.userID,
+                requiresMutualFollow: true
+            )
+            _ = await messaging.send(
+                to: rival.userID, conversationID: conversationID,
+                body: "Invitasjon til duell: \(challenge.title)",
+                attachment: attachment
+            )
+        } catch {
+            // Do not retry creating the already-published duel just
+            // because a private message failed. The inbox event remains.
+            errorMessage = "Duellen er opprettet, men chatmeldingen kunne ikke sendes: " +
+                error.localizedDescription
+        }
     }
 
     @MainActor
