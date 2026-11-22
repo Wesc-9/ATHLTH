@@ -77,12 +77,27 @@ enum ATHLTHCompoundExerciseProgress {
         for exercise: ATHLTHCompoundExercise,
         in record: ATHLTHCompletedRunningPerformance
     ) -> Result? {
+        result(
+            for: exercise, steps: record.steps,
+            id: record.id, date: record.completedAt, source: record.source
+        )
+    }
+
+    /// Direct evidence matcher also allows fixture tests without creating a
+    /// synthetic HealthKit workout. Never substitute planned targets here.
+    static func result(
+        for exercise: ATHLTHCompoundExercise,
+        steps: [ATHLTHRecordedRunningStep],
+        id: UUID,
+        date: Date,
+        source: String
+    ) -> Result? {
         let expected = expectedProtocol(exercise)
         guard exercise.isRunning, expected.count >= 2,
               expected.contains(where: {
                   $0.kind == .run && !$0.isActiveRecovery
               }) else { return nil }
-        let actual = record.steps.sorted { $0.index < $1.index }.filter {
+        let actual = steps.sorted { $0.index < $1.index }.filter {
             !["warmup", "cooldown"].contains(($0.phase ?? "").lowercased())
         }
         guard actual.count >= expected.count else { return nil }
@@ -99,7 +114,7 @@ enum ATHLTHCompoundExerciseProgress {
             return nil
         }
         return Result(
-            id: record.id, date: record.completedAt, source: record.source,
+            id: id, date: date, source: source,
             protocolID: exercise.protocolID,
             workSeconds: seconds, workDistanceMeters: distance,
             efforts: work.count,
