@@ -308,3 +308,5 @@ ATHLTH 2.2.7: validate ownership checks and account isolation regression tests 5
 ATHLTH 2.2.7: batched library portability, creator-aware import deduplication, regression suite at 6e147b5. Require passing gates before TestFlight.
 
 ATHLTH 2.2.7 build 135 authorized TestFlight upload 2026-11-22; release-gated exact commit d2bb6e92e00ea2675cbc05c4e715035dc02e8001
+
+ATHLTH 2.2.7 build 135 retry TestFlight after fixing missing startedOnWatch iPhone calendar launch parameter

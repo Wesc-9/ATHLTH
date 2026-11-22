@@ -6965,7 +6965,9 @@ struct ATHLTHTrainView: View {
         )
         if let active = phoneWorkout.active {
             _ = session.recordPlannedWorkoutStarted(
-                workoutID: workout.id, startedAt: active.start
+                workoutID: workout.id,
+                startedAt: active.start,
+                startedOnWatch: false
             )
             watchConnection.updateLocalWorkoutActivity(
                 isActive: true, title: workout.title
