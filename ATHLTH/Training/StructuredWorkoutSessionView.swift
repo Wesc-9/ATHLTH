@@ -253,10 +253,17 @@ struct StructuredWorkoutSessionView: View {
         "structuredWorkoutInProgress.v1.\(workout.id.uuidString)"
     }
 
+    /// Quick, planned and catalog sessions all enter the exact same
+    /// canonical execution recipe. The checkpoint remains the only mutable
+    /// live cursor, so a resumed workout cannot re-import duplicate stages.
+    private var executionRecipe: ATHLTHUniversalWorkoutExecutionRecipe {
+        ATHLTHUniversalWorkoutExecutionRecipe(workout: workout)
+    }
+
     private var blocks: [WorkoutTemplateBlock] {
         activeExecutionBlocks.isEmpty
             ? ATHLTHStructuredAMRAPProgression.initialSteps(
-                from: workout.resolvedWorkoutBlocks
+                from: executionRecipe.blocks
             )
             : activeExecutionBlocks
     }
@@ -488,7 +495,7 @@ struct StructuredWorkoutSessionView: View {
                         return
                     }
                     activeExecutionBlocks = ATHLTHStructuredAMRAPProgression.initialSteps(
-                        from: workout.resolvedWorkoutBlocks
+                        from: executionRecipe.blocks
                     )
                     startedAt = Date()
                     activeSourcePlanID = linkedPlanID
