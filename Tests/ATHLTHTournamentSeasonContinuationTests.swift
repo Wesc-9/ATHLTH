@@ -75,6 +75,7 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
             completedAt: status == "completed" ? Date() : nil,
             plannedStartsAt: nil,
             startMode: "manual",
+            raceRules: ATHLTHCompetitionRaceRules(),
             requiredEnvironment: "any",
             meetingPlace: nil,
             meetingLat: nil,
