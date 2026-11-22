@@ -377,6 +377,38 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         })
     }
 
+    func testPrivateCustomExportRetainsTitleButRemovesForeignIdentity() {
+        let privateExercise = entry(
+            "Personal row", id: UUID(), source: .custom,
+            shareable: false, visibility: .privateOnly
+        )
+        var linked = block("Personal row")
+        linked.exerciseID = privateExercise.id
+        linked.exerciseSlug = "private-personal-row"
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            linked, from: [privateExercise]
+        )
+        XCTAssertEqual(exported.title, linked.title)
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertNil(exported.exerciseSlug)
+        XCTAssertNil(exported.exerciseSnapshot)
+    }
+
+    func testFriendsOnlyCustomExportRemovesIdentityFromPublicPlan() {
+        let friendsExercise = entry(
+            "Friends row", id: UUID(), source: .custom,
+            shareable: true, visibility: .friends
+        )
+        var linked = block("Friends row")
+        linked.exerciseID = friendsExercise.id
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            linked, from: [friendsExercise]
+        )
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertNil(exported.exerciseSlug)
+        XCTAssertNil(exported.exerciseSnapshot)
+    }
+
     func testUnknownPrivateExerciseReferenceIsRemovedFromPublicExport() {
         var unknown = block("Personal strength movement")
         unknown.exerciseID = UUID()
