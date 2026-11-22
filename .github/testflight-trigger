@@ -312,3 +312,5 @@ ATHLTH 2.2.7 build 135 authorized TestFlight upload 2026-11-22; release-gated ex
 ATHLTH 2.2.7 build 135 retry TestFlight after fixing missing startedOnWatch iPhone calendar launch parameter
 
 ATHLTH 2.2.7 build 135 gated TestFlight retry after TrainToday layout test initializer fix; 2026-11-22
+
+ATHLTH 2.2.7 build 135 gated TestFlight retry after compound identity, retired exercises, 4x4 progress fixture and simulator boot recovery fixes; source=cccaea9f18fa4b6af3cce3ed7cc751ae63a2b84f
