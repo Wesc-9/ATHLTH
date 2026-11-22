@@ -54,10 +54,16 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
             estimatedMinutes: 20, to: &source
         )
 
-        // Quick Train, an independently planned workout, a calendar
-        // workout and a copied library workout use the same saved model.
-        // Their entry context must not create a second motor or stage graph.
-        for candidate in [source, source, source, source] {
+        // The same source can arrive as a quick session, scheduled entry,
+        // linked plan day or private library copy. Only its presentation
+        // metadata changes; the live recipe and source ID do not.
+        var scheduled = source
+        scheduled.scheduledStart = Date(timeIntervalSince1970: 1_900_000_000)
+        var planDay = source
+        planDay.notes = "Day 1 of training plan"
+        var libraryCopy = source
+        libraryCopy.workoutTemplateID = UUID()
+        for candidate in [source, scheduled, planDay, libraryCopy] {
             let recipe = ATHLTHUniversalWorkoutExecutionRecipe(
                 workout: candidate
             )
