@@ -172,12 +172,15 @@ enum ATHLTHLiveActivityDisplayPolicy {
         return "\(reps)×"
     }
 
+    /// Always show the complete distance unit, including when Dynamic Island
+    /// shares its compact area with music or another Live Activity.
+    /// The short "k" suffix looked like a truncated "km" on newer iPhones.
     static func compactDistance(_ meters: Double) -> String {
         guard meters.isFinite, meters >= 0 else { return "—" }
         if meters < 1_000 {
             return "\(Int(meters.rounded()))m"
         }
-        return String(format: "%.1fk", meters / 1_000)
+        return String(format: "%.1f km", meters / 1_000)
     }
 
     static func compactDuration(_ seconds: TimeInterval) -> String {
