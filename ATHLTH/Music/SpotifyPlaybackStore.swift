@@ -204,6 +204,11 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     private var intervalTrackPlayedStepIndexes = Set<Int>()
     private var intervalTrackLatestRequestedStepIndex = -1
     private var intervalTrackGeneration = UUID()
+    // Independent of interval-wide song automation. These are explicit
+    // selections attached to individual execution steps, including rests.
+    private var stepSongWorkoutID: UUID?
+    private var playedStepSongs = Set<Int>()
+    private var stepSongGeneration = UUID()
     private var intervalCueObserver: NSObjectProtocol?
     private var pkceSession: SpotifyPKCESession?
     private var webAuthenticationSession: ASWebAuthenticationSession?
@@ -612,6 +617,62 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                     if let self,
                        self.intervalTrackWorkoutID == workoutID,
                        self.intervalTrackGeneration == generation {
+                        if let error {
+                            self.lastErrorMessage = error.localizedDescription
+                        } else {
+                            self.lastErrorMessage = nil
+                            self.isPlaying = true
+                            self.watchTrackTitle = track.title
+                            self.watchArtistName = track.artist
+                            self.lastStartedAt = Date()
+                        }
+                    }
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    /// Reset exactly once when a new iPhone-owned structured recording starts.
+    /// Navigation/re-rendering must not restart a song for the same step.
+    func prepareWorkoutStepSongs(workoutID: UUID) {
+        guard stepSongWorkoutID != workoutID else { return }
+        stepSongWorkoutID = workoutID
+        playedStepSongs.removeAll()
+        stepSongGeneration = UUID()
+    }
+
+    /// Best effort: the recording/step engine never awaits Spotify. A song
+    /// belongs to one exact step, so even recovery and timed strength segments
+    /// may select different tracks. Never force Spotify Connect output.
+    func playWorkoutStepSong(
+        _ track: ATHLTHSpotifyIntervalTrack?,
+        workoutID: UUID,
+        stepIndex: Int
+    ) async {
+        guard stepSongWorkoutID == workoutID,
+              let track,
+              ATHLTHSpotifyIntervalCuePolicy.validSpotifyTrackID(track.uri) != nil,
+              stepIndex >= 0,
+              !playedStepSongs.contains(stepIndex),
+              !workoutAutoplayGate.wasManuallyPaused
+        else { return }
+
+        let generation = stepSongGeneration
+        guard await connectAppRemoteForControls(),
+              stepSongWorkoutID == workoutID,
+              stepSongGeneration == generation,
+              !playedStepSongs.contains(stepIndex),
+              !workoutAutoplayGate.wasManuallyPaused,
+              let player = appRemote?.playerAPI
+        else { return }
+
+        playedStepSongs.insert(stepIndex)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            player.play(track.uri) { [weak self] _, error in
+                Task { @MainActor in
+                    if let self, self.stepSongWorkoutID == workoutID,
+                       self.stepSongGeneration == generation {
                         if let error {
                             self.lastErrorMessage = error.localizedDescription
                         } else {
