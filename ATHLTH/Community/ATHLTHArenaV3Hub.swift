@@ -608,19 +608,13 @@ struct ATHLTHArenaV3HomeView: View {
             Button("Cup") { creation = .cup }
             Button("Avbryt", role: .cancel) {}
         }
-        .sheet(item: $creation) { action in
-            switch action {
-            case .duel:
-                ChallengeCreationView()
-            case .league, .cup:
-                ATHLTHTournamentCreator(
-                    preset: action == .cup ? .cup : .league,
-                    fixedClubID: nil,
-                    onPublished: { _ in Task { await reload() } }
-                ) { draft in
-                    save(draft)
-                }
-            }
+        .sheet(item: $creation, onDismiss: {
+            Task { await reload() }
+        }) { action in
+            ATHLTHCompetitionEntryView(initialFormat:
+                action == .cup ? .cup :
+                action == .league ? .league : .duel
+            )
         }
     }
 
