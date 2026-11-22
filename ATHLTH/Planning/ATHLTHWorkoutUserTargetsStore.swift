@@ -11,6 +11,9 @@ enum ATHLTHWorkoutUserTargetsStore {
         let incline: Double?
         let heartRateZone: Int?
         let effortRPE: Int?
+        /// Full personal step override for editable details introduced in 2.2.7.
+        /// Older target-only payloads decode with nil and keep their behavior.
+        let editedBlock: WorkoutTemplateBlock?
     }
 
     private struct Payload: Codable {
@@ -44,6 +47,18 @@ enum ATHLTHWorkoutUserTargetsStore {
               !payload.overrides.isEmpty else { return nil }
         var blocks = original
         for target in payload.overrides where blocks.indices.contains(target.index) {
+            if let edit = target.editedBlock {
+                let source = blocks[target.index]
+                // Never let a personal overlay replace the underlying library
+                // exercise identity or reorder a published recipe.
+                guard edit.sequence == source.sequence,
+                      edit.kind == source.kind,
+                      edit.exerciseID == source.exerciseID,
+                      edit.exerciseSlug == source.exerciseSlug
+                else { continue }
+                blocks[target.index] = edit
+                continue
+            }
             if let pace = target.pace, pace.isFinite, (120...959).contains(pace) {
                 blocks[target.index].targetPaceSecondsPerKilometer = pace
             }
@@ -78,7 +93,9 @@ enum ATHLTHWorkoutUserTargetsStore {
             let edit = customized[index]
             // Never store a target on a different step or a changed prescription.
             guard base.sequence == edit.sequence, base.kind == edit.kind,
-                  base.title == edit.title else { return false }
+                  base.exerciseID == edit.exerciseID,
+                  base.exerciseSlug == edit.exerciseSlug else { return false }
+            if edit == base { continue }
             let pace = edit.targetPaceSecondsPerKilometer != base.targetPaceSecondsPerKilometer
                 ? edit.targetPaceSecondsPerKilometer : nil
             let weight = edit.targetWeightKilograms != base.targetWeightKilograms
@@ -99,12 +116,10 @@ enum ATHLTHWorkoutUserTargetsStore {
                 weight: weight,
                 incline: incline,
                 heartRateZone: zone,
-                effortRPE: rpe
+                effortRPE: rpe,
+                editedBlock: edit
             )
-            if pace != nil || weight != nil || incline != nil ||
-                zone != nil || rpe != nil {
-                overrides.append(target)
-            }
+            overrides.append(target)
         }
         if overrides.isEmpty {
             reset(userID: userID, workoutID: workoutID, defaults: defaults)
