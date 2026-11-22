@@ -4,6 +4,46 @@ import XCTest
 
 final class TrainingPlanLibraryBrowseTests: XCTestCase {
     @MainActor
+    func testInvalidRemotePlanCannotHideBundledPlanAndDuplicateRemoteIsDeduplicated() throws {
+        let bundled = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first)
+        let invalid = TrainingPlanCatalogEntry(
+            id: UUID(), slug: bundled.slug, title: "Invalid replacement",
+            summary: "Bad remote plan", category: "running", goal: "Run",
+            level: "Beginner", durationWeeks: 8, sessionsPerWeek: 3,
+            workoutPattern: ["easy_run"], tags: [],
+            sortOrder: 0, catalogVersion: 99
+        )
+        let valid = TrainingPlanCatalogEntry(
+            id: UUID(), slug: "verified-one-day-remote", title: "Remote plan",
+            summary: "", category: "running", goal: "Run",
+            level: "Beginner", durationWeeks: 8, sessionsPerWeek: 1,
+            workoutPattern: ["easy_run"], tags: [],
+            sortOrder: 1, catalogVersion: 3
+        )
+        let olderDuplicate = TrainingPlanCatalogEntry(
+            id: UUID(), slug: valid.slug, title: "Old remote revision",
+            summary: "", category: "running", goal: "Run",
+            level: "Beginner", durationWeeks: 8, sessionsPerWeek: 1,
+            workoutPattern: ["easy_run"], tags: [],
+            sortOrder: 2, catalogVersion: 1
+        )
+        let tooLong = TrainingPlanCatalogEntry(
+            id: UUID(), slug: "invalid-53-week-remote", title: "Too long",
+            summary: "", category: "running", goal: "Run",
+            level: "Beginner", durationWeeks: 53, sessionsPerWeek: 1,
+            workoutPattern: ["easy_run"], tags: [],
+            sortOrder: 3, catalogVersion: 1
+        )
+        let merged = TrainingPlanLibraryStore.mergeValidatedCatalog(
+            remote: [olderDuplicate, invalid, tooLong, valid]
+        )
+        XCTAssertEqual(merged.first { $0.slug == bundled.slug }?.id, bundled.id)
+        XCTAssertEqual(merged.filter { $0.slug == valid.slug }.count, 1)
+        XCTAssertEqual(merged.first { $0.slug == valid.slug }?.id, valid.id)
+        XCTAssertFalse(merged.contains { $0.slug == tooLong.slug })
+    }
+
+    @MainActor
     func testStrengthFocusPlanIsIdentifiedAsStrengthNotGenericMuscleCategory() throws {
         let entry = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
             $0.slug == "focus-back-biceps"
