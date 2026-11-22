@@ -4225,30 +4225,6 @@ struct MyTrainingPlansLibraryView: View {
         }
     }
 
-    // One alphabetized window across reusable and scheduled plans keeps
-    // A–Å navigation consistent when both groups contain similar titles.
-    private var sortedPersonalPlans: [TrainingPlan] {
-        ATHLTHLibraryAlphabetSort.sorted(
-            displayedTemplates + displayedPlans
-        ) { $0.title }
-    }
-
-    private var visiblePersonalPlans: [TrainingPlan] {
-        ATHLTHLibraryAlphabetWindow.visible(
-            sortedPersonalPlans, start: visibleStartIndex, limit: visibleLimit
-        )
-    }
-
-    private var pageTemplates: [TrainingPlan] {
-        let templateIDs = Set(displayedTemplates.map(\.id))
-        return visiblePersonalPlans.filter { templateIDs.contains($0.id) }
-    }
-
-    private var pagePlans: [TrainingPlan] {
-        let planIDs = Set(displayedPlans.map(\.id))
-        return visiblePersonalPlans.filter { planIDs.contains($0.id) }
-    }
-
     private var cardColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
             mode: displayMode,
@@ -5715,28 +5691,6 @@ struct LibraryFavoritesView: View {
         }
         // Favorites also uses alphabetic order across the complete collection.
         return ATHLTHLibraryAlphabetSort.sorted(visible) { $0.title }
-    }
-
-    private var pageFavorites: [LibraryFavoriteRecord] {
-        ATHLTHLibraryAlphabetWindow.visible(
-            displayedFavorites, start: visibleStartIndex, limit: visibleLimit
-        )
-    }
-
-    /// Resolve only favorited exercise IDs against the already cached offline
-    /// catalog. Avoid one full library scan or an extra network call per row.
-    private var favoriteExerciseEntriesByID: [UUID: ExerciseLibraryEntry] {
-        let ids = Set(pageFavorites.compactMap { favorite -> UUID? in
-            guard favorite.itemType == .exercise else { return nil }
-            return UUID(uuidString: favorite.itemID)
-        })
-        guard !ids.isEmpty else { return [:] }
-
-        return Dictionary(uniqueKeysWithValues:
-            exerciseLibrary.allExercises.lazy
-                .filter { ids.contains($0.id) }
-                .map { ($0.id, $0) }
-        )
     }
 
     var body: some View {
