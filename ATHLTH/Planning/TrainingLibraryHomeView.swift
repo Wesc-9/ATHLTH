@@ -4207,24 +4207,22 @@ struct MyTrainingPlansLibraryView: View {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // Filter each source once; sort only the combined collection below.
+    // Sorting each source and then sorting their union did redundant work.
     private var displayedTemplates: [TrainingPlan] {
-        ATHLTHLibraryAlphabetSort.sorted(
-            session.planTemplates.filter {
-                (normalizedQuery.isEmpty ||
-                 $0.title.localizedStandardContains(normalizedQuery)) &&
-                (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
-            }
-        ) { $0.title }
+        session.planTemplates.filter {
+            (normalizedQuery.isEmpty ||
+             $0.title.localizedStandardContains(normalizedQuery)) &&
+            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+        }
     }
 
     private var displayedPlans: [TrainingPlan] {
-        ATHLTHLibraryAlphabetSort.sorted(
-            session.trainingPlans.filter {
-                (normalizedQuery.isEmpty ||
-                 $0.title.localizedStandardContains(normalizedQuery)) &&
-                (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
-            }
-        ) { $0.title }
+        session.trainingPlans.filter {
+            (normalizedQuery.isEmpty ||
+             $0.title.localizedStandardContains(normalizedQuery)) &&
+            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+        }
     }
 
     // One alphabetized window across reusable and scheduled plans keeps
@@ -4261,7 +4259,11 @@ struct MyTrainingPlansLibraryView: View {
     }
 
     var body: some View {
-        let plans = sortedPersonalPlans
+        let templates = displayedTemplates
+        let scheduled = displayedPlans
+        let plans = ATHLTHLibraryAlphabetSort.sorted(
+            templates + scheduled
+        ) { $0.title }
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: plans, id: { $0.id }, title: { $0.title }
         )
@@ -4269,8 +4271,8 @@ struct MyTrainingPlansLibraryView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 10) {
                     Text(ATHLTHLocalization.choose(
-                        english: "\(displayedTemplates.count + displayedPlans.count) plans",
-                        norwegian: "\(displayedTemplates.count + displayedPlans.count) planer"
+                        english: "\(templates.count + scheduled.count) plans",
+                        norwegian: "\(templates.count + scheduled.count) planer"
                     ))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
