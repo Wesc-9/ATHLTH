@@ -18,13 +18,14 @@ enum ATHLTHPlusGrantNotificationCopy {
 
         let prefix = "You have received ATHLTH+ for "
         let divider = " days. Valid until "
-        guard canonical.hasPrefix(prefix),
+        guard let prefixRange = canonical.range(of: prefix, options: .anchored),
               let range = canonical.range(of: divider),
+              prefixRange.upperBound <= range.lowerBound,
               canonical.hasSuffix(" UTC.") else {
             return canonical
         }
 
-        let days = String(canonical[prefix.endIndex..<range.lowerBound])
+        let days = String(canonical[prefixRange.upperBound..<range.lowerBound])
         guard let dayCount = Int(days), [7, 30, 90, 365].contains(dayCount)
         else { return canonical }
         let expiry = String(canonical[range.upperBound...].dropLast(5))
