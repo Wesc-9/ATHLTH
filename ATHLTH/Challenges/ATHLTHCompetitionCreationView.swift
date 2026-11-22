@@ -92,6 +92,7 @@ enum ATHLTHCompetitionCreationPolicy {
               !opponents.contains(ownerID),
               opponents.count >= minOpponents(format),
               opponents.count <= 20,
+              (format != .duel || opponents.count == 1),
               (format != .duel ||
                (endsAt > now.addingTimeInterval(600) &&
                 endsAt <= now.addingTimeInterval(90 * 86_400)))
@@ -319,6 +320,11 @@ struct ATHLTHCompetitionCreationView: View {
     private func formatOption(_ option: ATHLTHCompetitionFormat) -> some View {
         Button {
             format = option
+            if option == .duel && chosenIDs.count > 1 {
+                chosenIDs = Set(chosenIDs.sorted {
+                    $0.uuidString < $1.uuidString
+                }.prefix(1))
+            }
             if competitionTitle.isEmpty ||
                 competitionTitle.hasPrefix("Duell ·") ||
                 competitionTitle.hasPrefix("Liga ·") ||
