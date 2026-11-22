@@ -326,6 +326,37 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
     }
 
     @MainActor
+    func testAnonymousMarketplaceImportCannotReuseKnownCreatorsCopy() {
+        let owner = UUID()
+        let creator = UUID()
+        let sourceID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(owner)
+        defer { library.switchAccount(nil) }
+        let snapshot = ExerciseSnapshot(
+            name: "Anonymous shared row", instructions: [],
+            primaryMuscles: ["Back"], secondaryMuscles: [],
+            equipment: [], imageURL: nil
+        )
+        let known = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID,
+            originalCreatorID: creator
+        )
+        let anonymous = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID
+        )
+        XCTAssertNotNil(known)
+        XCTAssertNotNil(anonymous)
+        XCTAssertNotEqual(known?.id, anonymous?.id)
+        let repeated = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: sourceID
+        )
+        XCTAssertEqual(anonymous?.id, repeated?.id)
+        if let known { library.deleteCustomExercise(known.id) }
+        if let anonymous { library.deleteCustomExercise(anonymous.id) }
+    }
+
+    @MainActor
     func testMarketplaceImportRejectsOtherAccount() {
         let activeAccount = UUID()
         let otherAccount = UUID()
