@@ -168,48 +168,19 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 15) {
                     identity
 
-                    VStack(alignment: .leading, spacing: 11) {
-                        Text(tr("PERSONAL TARGET", "PERSONLIG MÅL"))
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.5)
-                            .foregroundStyle(tint)
+                    // Show the real workout prescription BEFORE personal
+                    // targets. Every warm-up, work and recovery step is visible.
+                    workoutInformation
 
-                        Text(isRunning
-                            ? tr(
-                                "Choose a target for the work sections, or keep the workout open.",
-                                "Velg et mål for arbeidsdelene, eller behold økten uten personlig mål."
-                            )
-                            : tr(
-                                "You can add personal weight, repetitions and rest in Advanced, or continue without targets.",
-                                "Du kan legge inn vekt, repetisjoner og pauser i Avansert, eller fortsette uten mål."
-                            ))
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        if isRunning {
-                            HStack(spacing: 8) {
-                                goalChip(
-                                    tr("No target", "Uten mål"),
-                                    symbol: "circle.dashed",
-                                    kind: .none
-                                )
-                                goalChip(
-                                    tr("Target pace", "Målfart"),
-                                    symbol: "speedometer",
-                                    kind: .pace
-                                )
-                                goalChip(
-                                    tr("HR zone", "Pulssone"),
-                                    symbol: "heart",
-                                    kind: .heartRateZone
-                                )
-                            }
-                            .accessibilityIdentifier("athlth-quick-goal-choices")
-
+                    if isRunning && selectedKind != .none {
+                        VStack(alignment: .leading, spacing: 11) {
+                            Text(tr("PERSONAL TARGET", "PERSONLIG MÅL"))
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.4)
+                                .foregroundStyle(tint)
                             if selectedKind == .pace {
                                 paceControls
                                 if !workoutSteps.isEmpty {
@@ -226,28 +197,24 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                                 zoneControls
                             }
                         }
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.94),
+                                    in: RoundedRectangle(cornerRadius: 21))
                     }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        Color.white.opacity(0.91),
-                        in: RoundedRectangle(cornerRadius: 21)
-                    )
 
                     Label(
                         tr(
-                            "Your choices only apply to your copy. The original workout and its recovery times stay unchanged.",
-                            "Valgene gjelder bare din kopi. Originaløkten og pausene forblir uendret."
+                            "Personal targets apply only to your copy. The original workout and recoveries stay unchanged.",
+                            "Personlige mål gjelder bare din kopi. Originaløkten og pausene forblir uendret."
                         ),
                         systemImage: "checkmark.shield"
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-
                 }
                 .padding(.horizontal, 19)
-                .padding(.vertical, 20)
+                .padding(.vertical, 18)
                 .frame(maxWidth: 540)
                 .frame(maxWidth: .infinity)
             }
@@ -255,7 +222,7 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 actionBar
             }
-            .navigationTitle(tr("Make it yours", "Tilpass økten"))
+            .navigationTitle(tr("Workout details", "Øktinnhold"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -265,8 +232,6 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                 }
             }
         }
-        // The pace-by-step editor must open at a stable readable height.
-        // Avoid an intermediate half-sheet layout for long interval recipes.
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .accessibilityIdentifier("athlth-quick-goal-sheet")
@@ -279,37 +244,54 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
         }
     }
 
-    /// A persistent action rail keeps the optional "no target" path visible
-    /// even in the medium detent and with larger accessibility text.
+    /// One fixed rail for the three decisions. "Without target" is itself
+    /// the continue action; never display another "Continue without target"
+    /// button alongside it.
     private var actionBar: some View {
         VStack(spacing: 9) {
-            Button {
-                onDecision(.continueWith(currentGoal))
-            } label: {
-                Label(
-                    selectedKind == .none
-                        ? (savingToLibrary
-                            ? tr("Save without target", "Lagre uten mål")
-                            : tr("Continue without target", "Fortsett uten mål"))
-                        : (savingToLibrary
-                            ? tr("Save with target", "Lagre med mål")
-                            : tr("Add with target", "Legg til med mål")),
-                    systemImage: "checkmark"
+            HStack(spacing: 8) {
+                goalChip(
+                    tr("No target", "Uten mål"),
+                    symbol: "circle.dashed", kind: .none
                 )
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 49)
+                if isRunning {
+                    goalChip(
+                        tr("Target pace", "Målfart"),
+                        symbol: "speedometer", kind: .pace
+                    )
+                    goalChip(
+                        tr("HR zone", "Pulssone"),
+                        symbol: "heart", kind: .heartRateZone
+                    )
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(tint)
-            .disabled(
-                selectedKind == .pace &&
+            .accessibilityIdentifier("athlth-quick-goal-choices")
+
+            if isRunning && selectedKind != .none {
+                Button {
+                    onDecision(.continueWith(currentGoal))
+                } label: {
+                    Label(
+                        savingToLibrary
+                            ? tr("Save personal target", "Lagre personlig mål")
+                            : tr("Use personal target", "Bruk personlig mål"),
+                        systemImage: "checkmark"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(tint)
+                .disabled(
+                    selectedKind == .pace &&
                     paceScope != .allWork &&
                     !workoutSteps.isEmpty &&
                     selectedPaceIndices.intersection(
                         Set(ATHLTHWorkoutPacePlan.eligibleIndices(in: workoutSteps))
                     ).isEmpty
-            )
-            .accessibilityIdentifier("athlth-quick-goal-continue")
+                )
+                .accessibilityIdentifier("athlth-quick-goal-continue")
+            }
 
             Button {
                 onDecision(.advanced)
@@ -319,17 +301,160 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                     systemImage: "slider.horizontal.3"
                 )
                 .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 46)
+                .frame(maxWidth: .infinity, minHeight: 43)
             }
             .buttonStyle(.bordered)
             .tint(tint)
             .accessibilityIdentifier("athlth-quick-goal-advanced")
         }
         .padding(.horizontal, 19)
-        .padding(.vertical, 11)
+        .padding(.vertical, 10)
         .frame(maxWidth: 540)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial)
+    }
+
+    /// Read-only preview: the same ordered source blocks used when adding the
+    /// workout. Recovery stays alongside work within the main section.
+    private var workoutInformation: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text(tr("EXERCISES AND WORKOUT STEPS", "ØVELSER OG ØKTDELER"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer()
+                Text("\(workoutSteps.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if workoutSteps.isEmpty {
+                Text(tr(
+                    "This workout has no detailed step list. You can review its full content in Advanced.",
+                    "Denne økten har ingen detaljert øktliste her. Du kan se hele innholdet i Avansert."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 15) {
+                    ForEach(previewPhases, id: \.self) { phase in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 7) {
+                                Image(systemName: phase.symbol)
+                                    .foregroundStyle(tint)
+                                Text(phase.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Spacer()
+                                Text("\(workoutSteps.filter { previewPhase($0) == phase }.count)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            ForEach(Array(workoutSteps.enumerated()), id: \.offset) { _, step in
+                                if previewPhase(step) == phase {
+                                    workoutStepRow(step)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(cornerRadius: 21)
+        )
+        .accessibilityIdentifier("athlth-quick-goal-workout-information")
+    }
+
+    private func previewPhase(_ block: WorkoutTemplateBlock) -> WorkoutPhaseKind {
+        // Source rests often have their own recovery phase: display these
+        // in the main sequence instead of making a separate distant group.
+        block.resolvedPhase == .recovery ? .main : block.resolvedPhase
+    }
+
+    private var previewPhases: [WorkoutPhaseKind] {
+        [.warmup, .main, .cooldown].filter { phase in
+            workoutSteps.contains { previewPhase($0) == phase }
+        }
+    }
+
+    private func workoutStepRow(_ step: WorkoutTemplateBlock) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: step.kind.systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 27, height: 27)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(step.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                let details = workoutStepDescription(step)
+                if !details.isEmpty {
+                    Text(details)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let notes = step.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func workoutStepDescription(_ step: WorkoutTemplateBlock) -> String {
+        var parts: [String] = []
+        if step.kind == .rest || step.resolvedPhase == .recovery {
+            parts.append(tr("Recovery", "Pause"))
+        }
+        if let duration = step.durationSeconds, duration > 0 {
+            let seconds = Int(duration.rounded())
+            if seconds < 60 {
+                parts.append("\(seconds) s")
+            } else if seconds % 60 == 0 {
+                parts.append("\(seconds / 60) min")
+            } else {
+                parts.append("\(seconds / 60) min \(seconds % 60) s")
+            }
+        }
+        if let meters = step.distanceMeters, meters > 0 {
+            parts.append(meters >= 1_000
+                ? String(format: "%.1f km", meters / 1_000)
+                : "\(Int(meters.rounded())) m")
+        }
+        if let sets = step.setCount, sets > 0,
+           let reps = step.repetitions, reps > 0 {
+            parts.append("\(sets) × \(reps)")
+        } else if let repetitions = step.repetitions, repetitions > 0 {
+            parts.append(tr("\(repetitions) reps", "\(repetitions) repetisjoner"))
+        }
+        if let zone = step.sourceIntensityZoneLabel, !zone.isEmpty {
+            parts.append(zone)
+        } else if let zone = step.targetHeartRateZone, (1...5).contains(zone) {
+            parts.append(tr("Zone Z\(zone)", "Pulssone Z\(zone)"))
+        }
+        if let minimum = step.targetHeartRatePercentMin,
+           let maximum = step.targetHeartRatePercentMax {
+            parts.append("\(Int(minimum.rounded()))–\(Int(maximum.rounded())) % " +
+                tr("HRmax", "makspuls"))
+        }
+        if let pace = step.targetPaceSecondsPerKilometer, pace > 0 {
+            let seconds = Int(pace.rounded())
+            parts.append(String(format: "%d:%02d min/km", seconds / 60, seconds % 60))
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var identity: some View {
@@ -389,8 +514,12 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
     ) -> some View {
         let selected = selectedKind == kind
         return Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                selectedKind = kind
+            if kind == .none {
+                onDecision(.continueWith(.none))
+            } else {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    selectedKind = kind
+                }
             }
         } label: {
             VStack(spacing: 7) {
