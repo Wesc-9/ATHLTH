@@ -167,14 +167,14 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { scrollProxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
                     identity
 
-                    // Show the real workout prescription BEFORE personal
-                    // targets. Every warm-up, work and recovery step is visible.
-                    workoutInformation
-
+                    // In the initial state, read the actual prescription
+                    // first. When a goal is selected, move its controls
+                    // directly below the identity so they are easy to edit.
                     if isRunning && selectedKind != .none {
                         VStack(alignment: .leading, spacing: 11) {
                             Text(tr("PERSONAL TARGET", "PERSONLIG MÅL"))
@@ -201,7 +201,10 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.white.opacity(0.94),
                                     in: RoundedRectangle(cornerRadius: 21))
+                        .id("personal-target-controls")
                     }
+
+                    workoutInformation
 
                     Label(
                         tr(
@@ -219,6 +222,13 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            .onChange(of: selectedKind) { _, kind in
+                if kind != .none {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        scrollProxy.scrollTo("personal-target-controls", anchor: .top)
+                    }
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 actionBar
             }
@@ -230,6 +240,7 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                         onDecision(.cancel)
                     }
                 }
+            }
             }
         }
         .presentationDetents([.large])
@@ -350,9 +361,9 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                                     .font(.caption.monospacedDigit())
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
-                            ForEach(Array(workoutSteps.enumerated()), id: \.offset) { _, step in
-                                if previewPhase(step) == phase {
-                                    workoutStepRow(step)
+                            ForEach(workoutSteps.indices, id: \.self) { index in
+                                if previewPhase(workoutSteps[index]) == phase {
+                                    workoutStepRow(workoutSteps[index])
                                 }
                             }
                         }
