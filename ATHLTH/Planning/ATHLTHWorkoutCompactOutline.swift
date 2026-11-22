@@ -15,6 +15,12 @@ enum ATHLTHWorkoutCompactOutline {
         let effortIndex: Int?
         let effortTotal: Int
 
+        /// The first real effort anchors the visible Hoveddel group heading.
+        /// Recovery blocks never create additional main-section headings.
+        var beginsMainSection: Bool {
+            kind == .work && effortIndex == 1
+        }
+
         var estimatedSeconds: TimeInterval? {
             guard !blocks.isEmpty,
                   blocks.allSatisfy({ ($0.durationSeconds ?? 0) > 0 }) else {
@@ -182,7 +188,13 @@ struct ATHLTHWorkoutCompactOutlineView: View {
             } else {
                 LazyVStack(spacing: 4) {
                     ForEach(rows) { row in
+                        if row.beginsMainSection {
+                            mainSectionHeading
+                        }
                         disclosure(row)
+                            // Visually nest efforts under Hoveddel without
+                            // adding another large expandable container.
+                            .padding(.leading, row.kind == .work ? 14 : 0)
                     }
                 }
             }
@@ -191,6 +203,29 @@ struct ATHLTHWorkoutCompactOutlineView: View {
         .background(Color.white.opacity(0.95),
                     in: RoundedRectangle(cornerRadius: 21))
         .accessibilityIdentifier("athlth-compact-workout-outline")
+    }
+
+    /// Hoveddel is always visible, while the individual descriptions
+    /// and recovery details remain hidden until a subsection is opened.
+    private var mainSectionHeading: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "figure.run")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 23)
+                .accessibilityHidden(true)
+            Text(ATHLTHLocalization.choose(
+                english: "Main workout", norwegian: "Hoveddel"
+            ))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ink)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+        .padding(.horizontal, 5)
+        .padding(.top, 5)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("athlth-workout-outline-main-heading")
     }
 
     private func disclosure(_ row: ATHLTHWorkoutCompactOutline.Row) -> some View {

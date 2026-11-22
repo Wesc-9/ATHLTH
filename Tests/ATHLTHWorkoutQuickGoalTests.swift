@@ -147,6 +147,10 @@ final class ATHLTHWorkoutQuickGoalTests: XCTestCase {
         XCTAssertEqual(rows[1].kind, .work)
         XCTAssertEqual(rows[4].kind, .cooldown)
         XCTAssertEqual(rows.compactMap(\.effortIndex), [1, 2, 3])
+        XCTAssertEqual(rows.filter(\.beginsMainSection).count, 1,
+                       "All deløkter must stay under one visible Hoveddel")
+        XCTAssertTrue(rows[1].beginsMainSection)
+        XCTAssertFalse(rows[2].beginsMainSection)
         XCTAssertEqual(rows[1].effortTotal, 3)
         XCTAssertEqual(rows[1].blocks.count, 2)
         XCTAssertEqual(rows[2].blocks.count, 2)
