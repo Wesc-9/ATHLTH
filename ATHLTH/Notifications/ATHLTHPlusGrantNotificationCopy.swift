@@ -29,8 +29,22 @@ enum ATHLTHPlusGrantNotificationCopy {
         guard let dayCount = Int(days), [7, 30, 90, 365].contains(dayCount)
         else { return canonical }
         let expiry = String(canonical[range.upperBound...].dropLast(5))
-        // The backend states UTC explicitly. Do not reinterpret a UTC expiry
-        // as a local midnight, which could shorten the user's actual grant.
-        return "Du har fått ATHLTH+ i \(dayCount) dager. Tilgangen varer til \(expiry) UTC."
+        // Parse and display UTC deliberately: a midnight conversion to local
+        // time could make the gifted entitlement look one day shorter.
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(secondsFromGMT: 0)
+        parser.dateFormat = "yyyy-MM-dd HH:mm"
+        let displayExpiry: String
+        if let date = parser.date(from: expiry) {
+            let display = DateFormatter()
+            display.locale = Locale(identifier: "nb_NO")
+            display.timeZone = TimeZone(secondsFromGMT: 0)
+            display.dateFormat = "d. MMMM yyyy 'kl.' HH:mm"
+            displayExpiry = display.string(from: date)
+        } else {
+            displayExpiry = expiry
+        }
+        return "Du har fått ATHLTH+ i \(dayCount) dager. Tilgangen varer til \(displayExpiry) UTC."
     }
 }
