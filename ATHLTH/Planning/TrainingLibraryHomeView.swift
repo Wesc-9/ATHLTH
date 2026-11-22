@@ -873,6 +873,7 @@ final class LibraryFavoritesStore: ObservableObject {
     @Published private(set) var favorites: [LibraryFavoriteRecord] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var pendingSyncCount = 0
 
     private let client: SupabaseClient
     private var activeUserID: UUID?
@@ -895,6 +896,7 @@ final class LibraryFavoritesStore: ObservableObject {
             name: "libraryFavoritePendingChanges",
             userID: userID
         ) ?? [:]
+        pendingSyncCount = pendingChanges.count
         // Reapply durable offline edits immediately after app relaunch or
         // account switch, before any remote refresh can complete.
         favorites = mergePendingChanges(into: favorites)
@@ -911,6 +913,7 @@ final class LibraryFavoritesStore: ObservableObject {
     }
 
     private func persistPendingChanges(for userID: UUID) {
+        pendingSyncCount = pendingChanges.count
         AccountLocalStorage.write(
             pendingChanges,
             name: "libraryFavoritePendingChanges",
@@ -976,6 +979,7 @@ final class LibraryFavoritesStore: ObservableObject {
             activeUserID = nil
             favorites = []
             pendingChanges = [:]
+            pendingSyncCount = 0
             refreshRequestID = nil
             isLoading = false
             lastRefreshAt = nil
@@ -1054,9 +1058,7 @@ final class LibraryFavoritesStore: ObservableObject {
         }
     }
 
-    var pendingSyncCount: Int { pendingChanges.count }
-
-    func isFavorite(
+     func isFavorite(
         _ kind: LibraryFavoriteKind,
         itemID: String
     ) -> Bool {
