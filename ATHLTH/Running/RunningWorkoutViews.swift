@@ -377,6 +377,7 @@ struct RunningWorkoutDetailView: View {
     @State private var copySaveError: String?
     @State private var showingIntervalEditor = false
     @State private var editingBeforeStart = false
+    @State private var focusedPrivateStepIndex: Int?
     @State private var editingPrivatePreset = false
     @State private var showingPrivateStartChoices = false
     @State private var showingPrivateCoach = false
@@ -523,12 +524,14 @@ struct RunningWorkoutDetailView: View {
     private func editPersonalizedCopy() {
         editingBeforeStart = false
         editingPrivatePreset = false
+        focusedPrivateStepIndex = nil
         showingIntervalEditor = true
     }
 
-    private func editPrivatePreset() {
+    private func editPrivatePreset(focusing index: Int? = nil) {
         editingBeforeStart = false
         editingPrivatePreset = true
+        focusedPrivateStepIndex = index
         showingIntervalEditor = true
     }
 
@@ -662,7 +665,14 @@ struct RunningWorkoutDetailView: View {
                     durationMinutes: previewWorkout.estimatedDurationSeconds.map {
                         Int(($0 / 60).rounded(.up))
                     },
-                    blocks: previewWorkout.recipePreviewBlocks
+                    blocks: previewWorkout.recipePreviewBlocks,
+                    onEditStep: { index in
+                        if workout.isBuiltIn {
+                            editPrivatePreset(focusing: index)
+                        } else {
+                            editPersonalizedCopy()
+                        }
+                    }
                 )
 
                 if workout.isBuiltIn {
@@ -839,7 +849,10 @@ struct RunningWorkoutDetailView: View {
             ))
         }
         .sheet(isPresented: $showingIntervalEditor) {
-            ATHLTHTrainIntervalComposerView(initial: previewWorkout) { edited in
+            ATHLTHTrainIntervalComposerView(
+                initial: previewWorkout,
+                focusedTimelineStepIndex: focusedPrivateStepIndex
+            ) { edited in
                 var personalized = edited
                 personalized.sharedSourceWorkoutID = edited.sharedSourceWorkoutID ??
                     (workout.isBuiltIn ? workout.id : workout.sharedSourceWorkoutID)
