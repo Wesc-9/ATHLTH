@@ -139,6 +139,9 @@ jobs:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
+      - name: Guard search keyboard focus across SwiftUI views
+        run: python3 scripts/audit_search_keyboard_focus.py
+
       - name: Verify iPad simulator-selection regressions
         run: python3 -m unittest discover -s scripts -p 'test_select_ipad_simulators.py' -v
       - name: Guard Insights tab routing and reference design
