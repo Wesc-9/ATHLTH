@@ -499,43 +499,52 @@ struct ATHLTHAdminUserDirectoryView: View {
             user.accountRole.lowercased() == "user"
     }
 
-    @ViewBuilder
+    /// When a grant already exists, retain expiry and both management
+    /// actions, and fall back to a second row on narrow devices.
     private func plusGrantControls(for user: DirectoryUser) -> some View {
-        HStack(spacing: 10) {
-            if user.adminPlusGrantActive {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label(tr("ATHLTH+ granted", "ATHLTH+ tildelt"),
-                          systemImage: "sparkles")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(gold)
-                    Text(user.adminPlusGrantExpiresAt.map {
-                        tr("Expires", "Utløper") + " " +
-                        $0.formatted(date: .abbreviated, time: .omitted)
-                    } ?? tr("No end date", "Uten sluttdato"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-                Button(tr("Change", "Endre")) {
-                    prepare(.grantPlus, user: user)
-                }
-                .accessibilityIdentifier("admin-edit-plus-grant")
-                Button(tr("Revoke", "Trekk tilbake"), role: .destructive) {
-                    prepare(.revokePlus, user: user)
-                }
-                .accessibilityIdentifier("admin-revoke-plus-grant")
-            } else {
-                Spacer()
-                Button {
-                    prepare(.grantPlus, user: user)
-                } label: {
-                    Label(tr("Grant ATHLTH+", "Tildel ATHLTH+"),
-                          systemImage: "sparkles")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .accessibilityIdentifier("admin-grant-plus")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                activeGrantLabel(user)
+                    .fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 2)
+                activeGrantButtons(user)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 7) {
+                activeGrantLabel(user)
+                activeGrantButtons(user)
             }
         }
+    }
+
+    private func activeGrantLabel(_ user: DirectoryUser) -> some View {
+        HStack(spacing: 5) {
+            Label(tr("ATHLTH+ granted", "ATHLTH+ tildelt"),
+                  systemImage: "sparkles")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(gold)
+            Text(user.adminPlusGrantExpiresAt.map {
+                tr("Expires", "Utløper") + " " +
+                $0.formatted(date: .abbreviated, time: .omitted)
+            } ?? tr("No end date", "Uten sluttdato"))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func activeGrantButtons(_ user: DirectoryUser) -> some View {
+        HStack(spacing: 6) {
+            Button(tr("Change", "Endre")) {
+                prepare(.grantPlus, user: user)
+            }
+            .accessibilityIdentifier("admin-edit-plus-grant")
+
+            Button(tr("Revoke", "Trekk tilbake"), role: .destructive) {
+                prepare(.revokePlus, user: user)
+            }
+            .accessibilityIdentifier("admin-revoke-plus-grant")
+        }
+        .font(.caption.weight(.semibold))
         .buttonStyle(.bordered)
         .tint(gold)
     }
@@ -544,41 +553,26 @@ struct ATHLTHAdminUserDirectoryView: View {
         _ user: DirectoryUser,
         plan: ATHLTHAdminDirectoryPresentation.Plan
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(tr("SUBSCRIPTION TYPE", "ABONNEMENTSTYPE"))
-                .font(.caption2.weight(.medium))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
-
-            Label(
-                ATHLTHAdminDirectoryPresentation.subscriptionLabel(
-                    tier: user.subscriptionTier,
-                    status: user.subscriptionStatus,
-                    norwegian: norwegian
-                ),
-                systemImage: plan == .plus ? "sparkles" : "person.crop.circle"
-            )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(plan == .plus ? gold : ink)
-        }
-        .accessibilityElement(children: .combine)
+        let value = ATHLTHAdminDirectoryPresentation.subscriptionLabel(
+            tier: user.subscriptionTier,
+            status: user.subscriptionStatus,
+            norwegian: norwegian
+        )
+        return Label(
+            value,
+            systemImage: plan == .plus ? "sparkles" : "person.crop.circle"
+        )
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(plan == .plus ? gold : ink)
+        .accessibilityLabel(tr("Subscription type", "Abonnementstype") + ": " + value)
     }
 
     private func registeredDetail(_ user: DirectoryUser) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(tr("REGISTERED", "REGISTRERT"))
-                .font(.caption2.weight(.medium))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
-
-            Label(
-                user.joinedAt.formatted(date: .abbreviated, time: .omitted),
-                systemImage: "calendar"
-            )
-            .font(.subheadline)
-            .foregroundStyle(ink)
-        }
-        .accessibilityElement(children: .combine)
+        let date = user.joinedAt.formatted(date: .abbreviated, time: .omitted)
+        return Label(date, systemImage: "calendar")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(tr("Registered", "Registrert") + ": " + date)
     }
 
     @ViewBuilder
@@ -606,21 +600,17 @@ struct ATHLTHAdminUserDirectoryView: View {
     }
 
     private func accountStatusDetail(_ user: DirectoryUser) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(tr("ACCOUNT STATUS", "KONTOSTATUS"))
-                .font(.caption2.weight(.medium))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
-            Label(
-                ATHLTHAdminDirectoryPresentation.accountStatusTitle(
-                    user.accountState, norwegian: norwegian
-                ),
-                systemImage: user.accountState == "suspended"
-                    ? "person.crop.circle.badge.xmark" : "checkmark.shield"
-            )
-            .font(.subheadline)
-            .foregroundStyle(user.accountState == "suspended" ? .red : ink)
-        }
+        let value = ATHLTHAdminDirectoryPresentation.accountStatusTitle(
+            user.accountState, norwegian: norwegian
+        )
+        return Label(
+            value,
+            systemImage: user.accountState == "suspended"
+                ? "person.crop.circle.badge.xmark" : "checkmark.shield"
+        )
+        .font(.caption)
+        .foregroundStyle(user.accountState == "suspended" ? .red : ink)
+        .accessibilityLabel(tr("Account status", "Kontostatus") + ": " + value)
     }
 
     private func prepare(_ kind: DirectoryAction.Kind, user: DirectoryUser) {
