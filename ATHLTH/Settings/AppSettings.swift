@@ -691,6 +691,8 @@ final class AppSettingsStore: ObservableObject {
         var draft = AudioCoachDraft()
         draft.load(configuration: snapshot.configuration)
         updateAudioCoachDefaults(from: draft)
+        audioCoachOutputPreference =
+            snapshot.configuration.outputPreference ?? .automatic
         audioCoachProfiles = snapshot.profiles
         audioCoachSavedRuleSets = snapshot.savedRuleSets
         activeAudioCoachProfileID = snapshot.activeProfileID
