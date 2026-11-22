@@ -8,6 +8,7 @@ struct WorkoutStartOptionsView: View {
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var gear: ProfileGearStore
 
     let session: PlannedSession
     let trainingDeviceProvider: TrainingDeviceProvider
@@ -60,6 +61,11 @@ struct WorkoutStartOptionsView: View {
 
     @State private var showingDisplayControls = false
     @State private var targetHeartRateZone: Int?
+    @State private var startType: ATHLTHQuickStartType = .free
+    @State private var chosenStrengthTemplate: PlannedSession?
+    @State private var showingStrengthWorkoutLibrary = false
+    @State private var selectedGearIDs: Set<UUID> = []
+    @State private var showOnIPad = false
 
 
     init(
@@ -92,6 +98,11 @@ struct WorkoutStartOptionsView: View {
         )
         _configuredExercises = State(
             initialValue: session.exercises
+        )
+        _startType = State(initialValue:
+            !session.exercises.isEmpty ? .exercises :
+            session.resolvedWorkoutBlocks.contains(where: { $0.kind == .exercise })
+                ? .workout : .free
         )
         _targetHeartRateZone = State(
             initialValue: session.targetAlertConfiguration?.heartRateZone
@@ -144,171 +155,79 @@ struct WorkoutStartOptionsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    strengthIntroCard
+                    if trackingMode == .advanced {
+                        strengthIntroCard
+                    } else {
+                        ATHLTHQuickStartSimpleDetailsCard(
+                            activity: .strength,
+                            summary: chosenStrengthTemplate?.title ?? (
+                                startType == .free
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Ready for free strength training",
+                                        norwegian: "Klar for fri styrketrening"
+                                    )
+                                    : session.title
+                            )
+                        )
+                    }
 
-                    // Exercise planning belongs in both Basic and Advanced.
-                    // Advanced should add optional workout controls, not hide the
-                    // core ability to build the strength session before starting.
-                    exerciseSelectionCard
-                    ATHLTHPlanSurface(density: .compact) {
-                        Button {
-                            showingTrainingPlacePicker = true
-                        } label: {
+                    ATHLTHQuickStartTypeSelector(
+                        activity: .strength,
+                        advanced: trackingMode == .advanced,
+                        selection: Binding(
+                            get: { startType },
+                            set: { _ in }
+                        )
+                    ) { type in
+                        switch type {
+                        case .free:
+                            startType = .free
+                            chosenStrengthTemplate = nil
+                        case .workout:
+                            showingStrengthWorkoutLibrary = true
+                        case .exercises:
+                            startType = .exercises
+                            chosenStrengthTemplate = nil
+                        case .route:
+                            break
+                        }
+                    }
+
+                    if startType == .exercises {
+                        exerciseSelectionCard
+                    } else if startType == .workout {
+                        ATHLTHPlanSurface(density: .compact) {
                             HStack(spacing: 12) {
-                                Image(systemName: "mappin.and.ellipse")
+                                Image(systemName: "list.bullet.clipboard")
                                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                 VStack(alignment: .leading, spacing: 3) {
+                                    Text(chosenStrengthTemplate?.title ?? session.title)
+                                        .font(.subheadline.weight(.semibold))
                                     Text(ATHLTHLocalization.choose(
-                                        english: "Training place",
-                                        norwegian: "Treningssted"
+                                        english: "Uses the workout's saved exercises and sets",
+                                        norwegian: "Bruker lagrede øvelser og sett"
                                     ))
-                                    .font(.subheadline.weight(.semibold))
-                                    Text(selectedTrainingPlace?.name ??
-                                        ATHLTHLocalization.choose(
-                                            english: "Optional · choose a venue",
-                                            norwegian: "Valgfritt · velg sted"
-                                        ))
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                            }
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    ATHLTHPlanSurface(density: .compact) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "heart.text.square")
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Heart-rate zone target",
-                                    norwegian: "Målpulssone"
-                                ))
-                                .font(.subheadline.weight(.semibold))
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Optional · set before starting",
-                                    norwegian: "Valgfritt · velges før økten"
-                                ))
-                                .font(.caption2)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-
-                            Spacer()
-
-                            Menu {
                                 Button(ATHLTHLocalization.choose(
-                                    english: "No target", norwegian: "Ingen mål"
-                                )) { targetHeartRateZone = nil }
-                                ForEach(1...5, id: \.self) { zone in
-                                    Button("Sone \(zone)") {
-                                        targetHeartRateZone = zone
-                                    }
+                                    english: "Change", norwegian: "Endre"
+                                )) {
+                                    showingStrengthWorkoutLibrary = true
                                 }
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Text(targetHeartRateZone.map { "Sone \($0)" } ??
-                                        ATHLTHLocalization.choose(
-                                            english: "No target", norwegian: "Ingen mål"
-                                        ))
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption2)
-                                }
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(minHeight: 44)
+                                .font(.caption.weight(.semibold))
                             }
                         }
                     }
 
-                    // Same immediate avatar row as Quick Run and Quick Walk.
-                    ATHLTHPlanSurface(ghost: false, density: .compact) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            WorkoutFriendPicker(
-                                selectedFriendIDs: $selectedFriendIDs
-                            )
-                            if !selectedFriendIDs.isEmpty {
-                                Divider()
-                                WorkoutSocialModePicker(mode: $socialMode)
-                            }
-                        }
-                    }
-
-                    // Audio Coach is a core workout option, not an
-                    // advanced-only control. Basic users may enable simple
-                    // spoken guidance without changing tracking mode.
-                    advancedOptionButton(
-                        title: "Audio Coach",
-                        subtitle:
-                            strengthAudioCoach.enabled
-                                ? ATHLTHLocalization.choose(
-                                    english: "Strength coaching on · adjust",
-                                    norwegian: "Styrkeveiledning på · juster"
-                                )
-                                : ATHLTHLocalization.choose(
-                                    english: "Off · tap to enable",
-                                    norwegian: "Av · trykk for å aktivere"
-                                ),
-                        icon: "waveform.and.mic",
-                        tint: ATHLTHTheme.premiumGold
-                    ) {
-                        showingAudioCoachSettings = true
-                    }
-
-                    if trackingMode == .advanced {
-                        VStack(spacing: 9) {
-                            advancedOptionButton(
-                                title: "Spotify",
-                                subtitle:
-                                    spotifySummary,
-                                icon: "music.note",
-                                tint: Color.green
-                            ) {
-                                showingSpotifyPicker = true
-                            }
-
-                            advancedOptionButton(
-                                title:
-                                    ATHLTHLocalization.choose(
-                                        english: "Rest & cues",
-                                        norwegian: "Hvile & varsler"
-                                    ),
-                                subtitle:
-                                    restCueSummary,
-                                icon: "timer",
-                                tint: ATHLTHTheme.accent
-                            ) {
-                                showingRestCueSettings = true
-                            }
-
-                            advancedOptionButton(
-                                title:
-                                    ATHLTHLocalization.choose(
-                                        english: "Display & input",
-                                        norwegian: "Skjerm & registrering"
-                                    ),
-                                subtitle:
-                                    displayControlSummary,
-                                icon: "rectangle.and.hand.point.up.left.fill",
-                                tint: ATHLTHTheme.accentDeep
-                            ) {
-                                showingDisplayControls = true
-                            }
-                        }
-                        .transition(
-                            .opacity
-                                .combined(
-                                    with: .move(
-                                        edge: .top
-                                    )
-                                )
-                        )
-                    }
+                    ATHLTHQuickStartToolsRow(
+                        activity: .strength,
+                        advanced: trackingMode == .advanced,
+                        showOnIPad: $showOnIPad,
+                        iPadAvailable: false,
+                        detail: { tool in strengthStartToolDetail(tool) }
+                    )
 
                 }
                 .padding(.horizontal, 16)
@@ -391,6 +310,71 @@ struct WorkoutStartOptionsView: View {
                 }
 
                 await exerciseLibrary.refresh()
+            }
+            .sheet(isPresented: $showingStrengthWorkoutLibrary) {
+                NavigationStack {
+                    List {
+                        ForEach(appSession.savedWorkoutTemplates.filter { workout in
+                            workout.kind == .strength &&
+                                (workout.resolvedWorkoutBlocks.contains {
+                                    $0.kind == .exercise
+                                } || !workout.exercises.isEmpty)
+                        }) { template in
+                            Button {
+                                chosenStrengthTemplate = template
+                                startType = .workout
+                                showingStrengthWorkoutLibrary = false
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "dumbbell")
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(template.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Saved workout",
+                                            norwegian: "Lagret treningsøkt"
+                                        ))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                }
+                                .frame(minHeight: 52)
+                            }
+                        }
+                    }
+                    .overlay {
+                        if appSession.savedWorkoutTemplates.filter({
+                            $0.kind == .strength &&
+                                ($0.resolvedWorkoutBlocks.contains {
+                                    $0.kind == .exercise
+                                } || !$0.exercises.isEmpty)
+                        }).isEmpty {
+                            ContentUnavailableView(
+                                ATHLTHLocalization.choose(
+                                    english: "No saved strength workouts",
+                                    norwegian: "Ingen lagrede styrkeøkter"
+                                ),
+                                systemImage: "dumbbell"
+                            )
+                        }
+                    }
+                    .navigationTitle(ATHLTHLocalization.choose(
+                        english: "Choose workout",
+                        norwegian: "Velg treningsøkt"
+                    ))
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
+                                showingStrengthWorkoutLibrary = false
+                            }
+                        }
+                    }
+                }
             }
             .sheet(
                 isPresented: $showingExerciseLibrary
