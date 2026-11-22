@@ -562,6 +562,13 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     }
 
 
+    /// Optional consent-based house rules and informal rewards. Historic
+    /// challenges omit these without changing their scoring behavior.
+    var allowedActions: String? = nil
+    var prohibitedActions: String? = nil
+    var firstPrize: String? = nil
+    var loserConsequence: String? = nil
+
     var startsAt: Date
     var endsAt: Date?
     var allowMultipleAttempts: Bool
