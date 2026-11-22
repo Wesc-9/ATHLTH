@@ -53,6 +53,34 @@ struct ATHLTHWorkoutInviteNotificationRoute: Identifiable, Equatable {
     }
 }
 
+/// A competition notification always opens the one existing group thread.
+/// The recipient check prevents cold-launch taps switching between accounts.
+struct ATHLTHTournamentPushRoute: Identifiable, Equatable {
+    let tournamentID: UUID
+    let recipientID: UUID?
+    var id: UUID { tournamentID }
+
+    func isForAccount(_ id: UUID) -> Bool {
+        recipientID == nil || recipientID == id
+    }
+
+    static func resolve(userInfo: [AnyHashable: Any]) -> Self? {
+        guard
+            (userInfo["athlth_entity_type"] as? String)?.lowercased() ==
+                "athlth_tournament",
+            let raw = userInfo["athlth_entity_id"] as? String,
+            let id = UUID(uuidString: raw),
+            let kind = (userInfo["athlth_kind"] as? String)?.lowercased(),
+            ["arena_invite", "arena_round", "arena_chat"].contains(kind)
+        else { return nil }
+        return Self(
+            tournamentID: id,
+            recipientID: (userInfo["athlth_recipient_id"] as? String)
+                .flatMap(UUID.init(uuidString:))
+        )
+    }
+}
+
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -91,6 +119,8 @@ final class APNsPushManager: ObservableObject {
         ATHLTHPushNavigationTarget?
     @Published private(set) var pendingChallengeNotification:
         ATHLTHChallengeNotificationRoute?
+    @Published private(set) var pendingTournamentNotification:
+        ATHLTHTournamentPushRoute?
     @Published private(set) var pendingWorkoutInviteNotification:
         ATHLTHWorkoutInviteNotificationRoute?
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
@@ -165,6 +195,13 @@ final class APNsPushManager: ObservableObject {
             return
         }
 
+        if let tournament = ATHLTHTournamentPushRoute.resolve(
+            userInfo: userInfo
+        ) {
+            pendingTournamentNotification = tournament
+            return
+        }
+
         if let route = ATHLTHChallengeNotificationRoute.resolve(
             userInfo: userInfo
         ) {
@@ -220,6 +257,10 @@ final class APNsPushManager: ObservableObject {
 
     func clearPendingChallengeNotification() {
         pendingChallengeNotification = nil
+    }
+
+    func clearPendingTournamentNotification() {
+        pendingTournamentNotification = nil
     }
 
     func clearPendingWorkoutInviteNotification() {
