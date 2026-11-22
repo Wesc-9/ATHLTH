@@ -3396,17 +3396,42 @@ struct TrainingPlanCatalogDetailView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                     .lineLimit(2)
-                Text(ATHLTHLocalization.choose(
-                    english: "See exercises and targets",
-                    norwegian: "Se øvelser, sett og mål"
-                ))
+                let steps = workout.resolvedWorkoutBlocks.filter { $0.kind != .note }
+                let exerciseCount = steps.filter { $0.kind == .exercise }.count
+                HStack(spacing: 5) {
+                    if exerciseCount > 0 {
+                        Text(ATHLTHLocalization.format(
+                            english: "%d exercises", norwegian: "%d øvelser",
+                            exerciseCount
+                        ))
+                    } else if !steps.isEmpty {
+                        Text(ATHLTHLocalization.format(
+                            english: "%d workout steps", norwegian: "%d øktdeler",
+                            steps.count
+                        ))
+                    }
+                    if steps.contains(where: { $0.kind == .rest }) {
+                        Text("·")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Rest included", norwegian: "Med pauser"
+                        ))
+                    }
+                    if steps.isEmpty {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Tap for details", norwegian: "Trykk for detaljer"
+                        ))
+                    }
+                }
                 .font(.caption2)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
             }
             Spacer(minLength: 5)
-            Text("\(workout.durationMinutes ?? 0) min")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            if let minutes = workout.durationMinutes, minutes > 0 {
+                Text("\(minutes) min")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                 .font(.caption.bold())
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
