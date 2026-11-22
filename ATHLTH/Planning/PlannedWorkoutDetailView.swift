@@ -1216,7 +1216,20 @@ struct PlannedWorkoutDetailView: View {
             symbol: currentWorkout.kind.systemImage,
             difficulty: nil,
             durationMinutes: currentWorkout.durationMinutes,
-            blocks: currentWorkout.resolvedWorkoutBlocks
+            blocks: currentWorkout.resolvedWorkoutBlocks,
+            onUpdateBlock: isCompleted || isSkipped ||
+                currentWorkout.cancelledAt != nil ||
+                session.recordedTimes(for: currentWorkout.id) != nil
+                ? nil : { index, updatedBlock in
+                    // Editing one scheduled part updates the original plan
+                    // session, not a second workout or detached copy.
+                    var updated = currentWorkout
+                    var editable = updated.resolvedWorkoutBlocks
+                    guard editable.indices.contains(index) else { return }
+                    editable[index] = updatedBlock
+                    updated.workoutBlocks = editable
+                    session.updateSession(updated, inPlan: planID)
+                }
         )
     }
 
