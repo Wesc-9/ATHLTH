@@ -879,7 +879,10 @@ struct ExerciseLibraryView: View {
                 try await Task.sleep(for: .milliseconds(180))
             } catch { return }
             guard !Task.isCancelled else { return }
-            query = queryInput
+            let normalized = queryInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Ignore whitespace-only edits and avoid triggering a full
+            // catalog search when the effective query has not changed.
+            if query != normalized { query = normalized }
         }
         .task {
             recents.refresh()
