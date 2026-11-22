@@ -49,9 +49,12 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         let matched = try XCTUnwrap(library.first {
             $0.sourceIdentifier == "athlth-native-overhead-press"
         })
-        XCTAssertEqual(block.exerciseID, matched.id)
-        XCTAssertEqual(block.exerciseSlug, matched.sourceIdentifier)
-        XCTAssertEqual(block.exerciseSnapshot?.name, matched.canonicalName)
+        let visible = ATHLTHExerciseReferenceResolver.visibleEquivalent(
+            of: matched, in: library
+        )
+        XCTAssertEqual(block.exerciseID, visible.id)
+        XCTAssertEqual(block.exerciseSlug, visible.sourceIdentifier)
+        XCTAssertEqual(block.exerciseSnapshot?.name, visible.canonicalName)
         XCTAssertFalse(block.exerciseSnapshot?.instructions.isEmpty ?? true)
         XCTAssertEqual(block.setCount, 5)
         XCTAssertEqual(block.repetitions, 3)
@@ -62,7 +65,7 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         // The live strength engine must forward the library identity into
         // completed logs so "Last trained" and progression see this movement.
         let queue = StrengthWorkoutStore.strengthExerciseLogsFromBlocks([block])
-        XCTAssertEqual(queue.first?.plannedExerciseID, matched.id)
+        XCTAssertEqual(queue.first?.plannedExerciseID, visible.id)
         XCTAssertEqual(queue.first?.sets.count, 5)
     }
 
@@ -138,14 +141,48 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
             &session, library: library
         )
         XCTAssertTrue(report.isReady)
-        XCTAssertEqual(session.exercises.first?.exerciseID,
-                       library.first {
-                           $0.sourceIdentifier == "athlth-native-overhead-press"
-                       }?.id)
+        let native = try XCTUnwrap(library.first {
+            $0.sourceIdentifier == "athlth-native-overhead-press"
+        })
+        XCTAssertEqual(
+            session.exercises.first?.exerciseID,
+            ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                of: native, in: library
+            ).id
+        )
         XCTAssertEqual(session.exercises.first?.id, planned.id)
         XCTAssertEqual(session.exercises.first?.sets, 5)
         XCTAssertEqual(session.exercises.first?.reps, 3)
         XCTAssertEqual(session.exercises.first?.restSeconds, 180)
+    }
+
+    func testLegacyNorwegianMarkloftCanBindToExistingLibraryExercise() throws {
+        let library = ExerciseLibraryStore().allExercises
+        let planned = PlannedExercise(
+            id: UUID(), exerciseID: nil,
+            embeddedExercise: ExerciseSnapshot(
+                name: "Markløft", instructions: [],
+                primaryMuscles: [], equipment: [], imageURL: nil
+            ),
+            sets: 3, reps: 1,
+            targetWeightKilograms: nil, targetRPE: 9,
+            restSeconds: 240, notes: "Last set AMRAP"
+        )
+        var session = workout(exercises: [planned])
+        let report = ATHLTHWorkoutExerciseBinding.bind(
+            &session, library: library
+        )
+        let expected = try XCTUnwrap(
+            ATHLTHExerciseReferenceResolver.resolvePublicName(
+                "Markløft", in: library
+            )
+        )
+        XCTAssertTrue(report.isReady)
+        XCTAssertEqual(session.exercises.first?.exerciseID, expected.id)
+        XCTAssertEqual(session.exercises.first?.sets, 3)
+        XCTAssertEqual(session.exercises.first?.reps, 1)
+        XCTAssertEqual(session.exercises.first?.restSeconds, 240)
+        XCTAssertEqual(session.exercises.first?.notes, "Last set AMRAP")
     }
 
     func testCardioAndNotesDoNotRequireStrengthExerciseIdentity() {
