@@ -68,6 +68,37 @@ enum ATHLTHTournamentSeasonContinuation {
                 qualifiersPerGroup: completed.qualifiersPerGroup
               )) != nil else { return nil }
 
+        // Preserve agreed competition rules, but require the organizer
+        // to select a fresh start for the new season. No old result, vote,
+        // prize payment or athlete consent is carried across.
+        var nextSettings = ATHLTHTournamentCompetitionSettings()
+        nextSettings.unlock = ATHLTHCompetitionUnlock(
+            rawValue: completed.releaseMode
+        ) ?? .interval
+        nextSettings.unit = ATHLTHCompetitionIntervalUnit(
+            rawValue: completed.releaseUnit
+        ) ?? .day
+        nextSettings.every = min(
+            max(1, completed.releaseEvery),
+            nextSettings.unit.maximumCount
+        )
+        nextSettings.completionHours = completed.completionHours
+        nextSettings.invitationPermission = ATHLTHCompetitionInvitePermission(
+            rawValue: completed.invitationPermission
+        ) ?? .admin
+        nextSettings.joinApproval = ATHLTHCompetitionJoinApproval(
+            rawValue: completed.joinApproval
+        ) ?? .admin
+        nextSettings.agreement = ATHLTHCompetitionAgreement(
+            allowed: completed.allowedActions,
+            prohibited: completed.prohibitedActions,
+            firstPrize: completed.prizeFirst,
+            secondPrize: completed.prizeSecond,
+            thirdPrize: completed.prizeThird,
+            loserConsequence: completed.loserConsequence
+        )
+        nextSettings.startsAt = nil
+
         // Deliberately do not re-use the previous club season ID. The owner
         // chooses a new club season (if applicable) in the full editor.
         // Proposal/vote deadlines are reset for this new group of invites.
@@ -98,7 +129,8 @@ enum ATHLTHTournamentSeasonContinuation {
             publicResults: completed.publicResults,
             allowExtensions: completed.allowExtensions,
             winPoints: completed.winPoints,
-            drawPoints: completed.drawPoints
+            drawPoints: completed.drawPoints,
+            competitionSettings: nextSettings
         )
     }
 }
