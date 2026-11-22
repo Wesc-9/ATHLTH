@@ -14,6 +14,7 @@ struct ATHLTHCompoundExerciseLibraryView: View {
     var onSelect: (([WorkoutTemplateBlock]) -> Void)? = nil
 
     @State private var records: [ATHLTHCompoundExercise] = []
+    @State private var savedSectionIDs: Set<UUID> = []
     @State private var query = ""
     @State private var selectedCategory: ATHLTHCompoundExercise.Category? = .intervals
     @State private var selection = 0
@@ -45,6 +46,7 @@ struct ATHLTHCompoundExerciseLibraryView: View {
         let mySections = ATHLTHWorkoutMainSectionLibrary.load(
             userID: session.profile.userID
         )
+        savedSectionIDs = Set(mySections.map(\.id))
         // Build once on source revisions rather than hashing every exercise
         // on each search keystroke and SwiftUI view publication.
         records = ATHLTHCompoundExerciseCatalog.build(
@@ -52,6 +54,18 @@ struct ATHLTHCompoundExerciseLibraryView: View {
             workoutCatalog: catalog.entries,
             saved: mySections
         )
+    }
+
+    private func removeSavedSection(_ item: ATHLTHCompoundExercise) {
+        let owned = item.sourceIDs.filter(savedSectionIDs.contains)
+        for id in owned {
+            // This only removes cached main-section entries. It never
+            // deletes the original workout or the athlete's recordings.
+            ATHLTHWorkoutMainSectionLibrary.delete(
+                id, userID: session.profile.userID
+            )
+        }
+        refresh()
     }
 
     var body: some View {
@@ -150,6 +164,19 @@ struct ATHLTHCompoundExerciseLibraryView: View {
                                 .athlthPlanCard(radius: 17)
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                if item.isPersonal &&
+                                    item.sourceIDs.contains(where: savedSectionIDs.contains) {
+                                    Button(role: .destructive) {
+                                        removeSavedSection(item)
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Remove saved main section",
+                                            norwegian: "Fjern lagret hoveddel"
+                                        ), systemImage: "trash")
+                                    }
+                                }
+                            }
                             .accessibilityIdentifier("compound-exercise-" + item.id)
                         }
                     }
