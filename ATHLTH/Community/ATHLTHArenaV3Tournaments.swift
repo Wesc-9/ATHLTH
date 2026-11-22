@@ -206,7 +206,8 @@ struct ATHLTHTournamentCreator: View {
                         ),
                         authority: $rulesAuthority,
                         cadenceDays: $cadenceDays,
-                        completionHours: $competitionSettings.completionHours
+                        completionHours: $competitionSettings.completionHours,
+                        showsLegacyRoundTiming: false
                     )
                     if let fixedActivity {
                         Label(
