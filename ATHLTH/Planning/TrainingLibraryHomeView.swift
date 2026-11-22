@@ -1027,6 +1027,8 @@ final class LibraryFavoritesStore: ObservableObject {
 
     /// Malformed or duplicated remote plans must not hide a working bundled
     /// plan with the same slug, nor appear as runnable catalog entries.
+    /// Changes to this rule require full build, iPhone, iPad, hybrid and
+    /// backend regression coverage on the exact release commit.
     static func mergeValidatedCatalog(
         remote: [TrainingPlanCatalogEntry]
     ) -> [TrainingPlanCatalogEntry] {
