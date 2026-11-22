@@ -1199,9 +1199,13 @@ final class ExerciseLibraryStore: ObservableObject {
                 source, fallbackTitle: source.name
               ) else { return nil }
 
-        if let sourceExerciseID,
+        let importedSourceID = originalExerciseID ?? sourceExerciseID
+        if let importedSourceID,
            let existing = customExercises.first(where: {
-               $0.exercise.sharedSourceExerciseID == sourceExerciseID
+               $0.exercise.sharedSourceExerciseID == importedSourceID &&
+               $0.exercise.ownerID == ownerID &&
+               (originalCreatorID == nil ||
+                $0.exercise.originalCreatorID == originalCreatorID)
            }) {
             return existing
         }
