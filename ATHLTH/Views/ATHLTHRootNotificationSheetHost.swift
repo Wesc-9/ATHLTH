@@ -37,6 +37,35 @@ struct ATHLTHRootNotificationSheetHost<Content: View>: View {
                     }
             }
         }
+        .sheet(
+            item: Binding<ATHLTHPlusGrantNotificationRoute?>(
+                get: {
+                    guard session.signedIn,
+                          let route = pushManager.pendingPlusGrantNotification,
+                          route.accountID == session.profile.userID
+                    else { return nil }
+                    return route
+                },
+                set: { route, _ in
+                    if route == nil {
+                        pushManager.clearPendingPlusGrantNotification()
+                    }
+                }
+            )
+        ) { _ in
+            NavigationStack {
+                ATHLTHNotificationCenterView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
+                                pushManager.clearPendingPlusGrantNotification()
+                            }
+                        }
+                    }
+            }
+        }
         .sheet(isPresented: $showingDailyCheckIn) {
             NavigationStack {
                 RecoverySorenessLogView(store: RecoverySorenessStore())
