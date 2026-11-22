@@ -1843,9 +1843,9 @@ final class AppSettingsStore: ObservableObject {
         userID: UUID? = nil
     ) -> WatchAudioCoachConfiguration {
         var configuration = incoming
-        if configuration.outputPreference == nil {
-            configuration.outputPreference = audioCoachOutputPreference
-        }
+        // Output follows the athlete's global setting, even for workout
+        // templates saved before cross-device coaching was introduced.
+        configuration.outputPreference = audioCoachOutputPreference
         configuration.fuelReminderIntervalMinutes = nil
         configuration.fuelReminderDurationMinutes = nil
         configuration.fuelCarbohydrateGramsPerHour = nil
