@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// One small entry point for the activities supported by the existing Train
-/// engine. It routes to the established recorders and workout library; it
-/// never creates an independent workout recording or a second plan model.
+/// Presents the nine primary training activities in a compact 3 × 3 grid.
+/// Supported activities reuse the existing Train start flow and recorder;
+/// unavailable activities remain visible but cannot be started.
 struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
     enum Action {
         case freeRun
@@ -15,75 +15,65 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
         case custom(CustomQuickWorkoutActivity)
     }
 
-    private enum Category: String, CaseIterable, Identifiable {
-        case running, walking, strength, cycling, freeTraining, custom
-        case hiit, circuit, functional, rowing, stairClimber, mobility, yoga, sports
+    /// The order here is the visual order in the activity grid.
+    enum Category: String, CaseIterable, Identifiable {
+        case freeTraining, walking, running
+        case strength, cycling, swimming
+        case yoga, meditation, custom
 
         var id: String { rawValue }
 
+        var isAvailable: Bool {
+            switch self {
+            case .freeTraining, .walking, .running, .strength, .custom:
+                return true
+            case .cycling, .swimming, .yoga, .meditation:
+                return false
+            }
+        }
+
         var title: String {
             switch self {
-            case .running: return tr("Running", "Løping")
+            case .freeTraining: return tr("Free training", "Fri trening")
             case .walking: return tr("Walking", "Gå")
+            case .running: return tr("Running", "Løping")
             case .strength: return tr("Strength", "Styrke")
             case .cycling: return tr("Cycling", "Sykling")
-            case .freeTraining: return tr("Free training", "Fri trening")
-            case .custom: return tr("Custom", "Egendefinert")
-            case .hiit: return "HIIT"
-            case .circuit: return tr("Circuit training", "Sirkeltrening")
-            case .functional: return tr("Functional", "Funksjonell")
-            case .rowing: return tr("Rowing", "Roing")
-            case .stairClimber: return tr("Stairs", "Trapper")
-            case .mobility: return tr("Mobility", "Mobilitet")
+            case .swimming: return tr("Swimming", "Svømming")
             case .yoga: return "Yoga"
-            case .sports: return tr("Sports", "Idrett")
+            case .meditation: return tr("Meditation", "Meditasjon")
+            case .custom: return tr("Custom", "Egendefinert")
             }
         }
 
         var subtitle: String {
             switch self {
-            case .running: return tr("Route, free run or intervals", "Rute, fri løping eller intervall")
-            case .walking: return tr("Free walk or route", "Fri gåtur eller rute")
-            case .strength: return tr("Free strength or saved sessions", "Fri styrke eller lagrede økter")
-            case .cycling: return tr("Indoor or outdoor workout", "Inne eller ute")
-            case .freeTraining: return tr("Start an open workout immediately", "Start en åpen økt direkte")
-            case .custom: return tr("Configure your own activity", "Tilpass en egen aktivitet")
-            case .hiit, .circuit, .functional, .rowing, .stairClimber, .mobility, .yoga, .sports:
-                return tr("Choose workout settings", "Velg øktoppsett")
+            case .freeTraining:
+                return tr("Start an open workout directly", "Start en åpen økt direkte")
+            case .walking:
+                return tr("Free walk or route", "Fri gåtur eller rute")
+            case .running:
+                return tr("Route, free run or intervals", "Rute, fri løping eller intervall")
+            case .strength:
+                return tr("Free strength or saved sessions", "Fri styrke eller lagrede økter")
+            case .custom:
+                return tr("Configure your own activity", "Tilpass en egen aktivitet")
+            case .cycling, .swimming, .yoga, .meditation:
+                return tr("Coming soon", "Kommer snart")
             }
         }
 
         var icon: String {
             switch self {
-            case .running: return "figure.run"
+            case .freeTraining: return "figure.cross.training"
             case .walking: return "figure.walk"
+            case .running: return "figure.run"
             case .strength: return "dumbbell.fill"
             case .cycling: return "bicycle"
-            case .freeTraining: return "figure.cross.training"
-            case .custom: return "figure.mixed.cardio"
-            case .hiit: return "figure.highintensity.intervaltraining"
-            case .circuit: return "arrow.triangle.2.circlepath"
-            case .functional: return "figure.strengthtraining.functional"
-            case .rowing: return "figure.rower"
-            case .stairClimber: return "figure.stair.stepper"
-            case .mobility: return "figure.flexibility"
+            case .swimming: return "figure.pool.swim"
             case .yoga: return "figure.yoga"
-            case .sports: return "sportscourt"
-            }
-        }
-
-        var quickCustomActivity: CustomQuickWorkoutActivity? {
-            switch self {
-            case .custom: return .other
-            case .hiit: return .hiit
-            case .circuit: return .circuit
-            case .functional: return .functional
-            case .rowing: return .rowing
-            case .stairClimber: return .stairClimber
-            case .mobility: return .mobility
-            case .yoga: return .yoga
-            case .sports: return .sports
-            default: return nil
+            case .meditation: return "figure.mind.and.body"
+            case .custom: return "figure.mixed.cardio"
             }
         }
 
@@ -93,16 +83,19 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedCategory: Category?
+
     let onSelect: (Action) -> Void
 
-    private let mainCategories: [Category] = [
-        .running, .walking, .strength, .cycling, .freeTraining, .custom
-    ]
-    private let otherCategories: [Category] = [
-        .hiit, .circuit, .functional, .rowing, .stairClimber, .mobility,
-        .yoga, .sports
-    ]
+    // Three columns for standard text sizes, with two larger touch targets
+    // when the user enables accessibility-sized type.
+    private var activityColumns: [GridItem] {
+        Array(
+            repeating: GridItem(.flexible(minimum: 0), spacing: 11),
+            count: dynamicTypeSize.isAccessibilitySize ? 2 : 3
+        )
+    }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -111,23 +104,25 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 20) {
                     if let selectedCategory {
                         subcategories(for: selectedCategory)
                     } else {
-                        header(tr("Choose an activity", "Velg aktivitet"),
-                               subtitle: tr("All training types in ATHLTH",
-                                            "Alle treningstyper i ATHLTH"))
-                        categorySection(tr("TRAINING", "TRENING"), categories: mainCategories)
-                        categorySection(tr("OTHER ACTIVITIES", "ANDRE AKTIVITETER"),
-                                        categories: otherCategories)
+                        header(
+                            tr("Choose an activity", "Velg aktivitet"),
+                            subtitle: tr(
+                                "Choose how you want to train",
+                                "Velg hvordan du vil trene"
+                            )
+                        )
+                        activityGrid
                     }
                 }
-                .frame(maxWidth: 680)
+                .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 18)
                 .padding(.top, 20)
-                .padding(.bottom, 30)
+                .padding(.bottom, 36)
             }
             .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
@@ -141,7 +136,9 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
                         } label: {
                             Image(systemName: "chevron.left")
                         }
-                        .accessibilityLabel(tr("Back to categories", "Tilbake til kategorier"))
+                        .accessibilityLabel(
+                            tr("Back to activities", "Tilbake til aktiviteter")
+                        )
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -151,6 +148,122 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             }
         }
         .accessibilityIdentifier("athlth-train-all-workout-categories")
+    }
+
+    private var activityGrid: some View {
+        LazyVGrid(columns: activityColumns, spacing: 11) {
+            ForEach(Category.allCases) { category in
+                Button {
+                    select(category)
+                } label: {
+                    activityTile(for: category)
+                }
+                .buttonStyle(.plain)
+                .disabled(!category.isAvailable)
+                .accessibilityIdentifier(
+                    "athlth-all-workouts-\(category.rawValue)"
+                )
+                .accessibilityLabel(category.title)
+                .accessibilityValue(
+                    category.isAvailable
+                        ? tr("Available", "Tilgjengelig")
+                        : tr("Coming soon", "Kommer snart")
+                )
+            }
+        }
+        .accessibilityIdentifier("athlth-all-workouts-activity-grid")
+    }
+
+    private func activityTile(for category: Category) -> some View {
+        let enabled = category.isAvailable
+        return VStack(spacing: 10) {
+            Image(systemName: category.icon)
+                .font(.system(size: 27, weight: .regular))
+                .foregroundStyle(
+                    enabled
+                        ? ATHLTHTrainDesign.bronze
+                        : ATHLTHTrainDesign.secondary.opacity(0.55)
+                )
+                .frame(width: 58, height: 58)
+                .background(
+                    enabled
+                        ? ATHLTHTrainDesign.paleGold.opacity(0.56)
+                        : ATHLTHPlanDesign.warmSurface.opacity(0.55),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .accessibilityHidden(true)
+
+            Text(category.title)
+                .font(.system(
+                    size: dynamicTypeSize.isAccessibilitySize ? 16 : 15,
+                    weight: .semibold
+                ))
+                .foregroundStyle(
+                    enabled
+                        ? ATHLTHTrainDesign.ink
+                        : ATHLTHTrainDesign.secondary.opacity(0.70)
+                )
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+
+            if !enabled {
+                Text(tr("Coming soon", "Kommer snart"))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary.opacity(0.75))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(
+                        ATHLTHPlanDesign.warmSurface.opacity(0.50),
+                        in: Capsule()
+                    )
+            } else {
+                // Equal tile heights, without filler captions on active activities.
+                Color.clear
+                    .frame(height: 21)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: dynamicTypeSize.isAccessibilitySize ? 168 : 158)
+        .padding(.horizontal, 5)
+        .background(
+            enabled ? Color.white.opacity(0.96) : Color.white.opacity(0.52),
+            in: RoundedRectangle(cornerRadius: 23, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .strokeBorder(
+                    ATHLTHTrainDesign.rule.opacity(enabled ? 0.60 : 0.27),
+                    lineWidth: 0.9
+                )
+        }
+        .shadow(
+            color: ATHLTHTrainDesign.ink.opacity(enabled ? 0.055 : 0),
+            radius: 13,
+            x: 0,
+            y: 5
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+    }
+
+    private func select(_ category: Category) {
+        // Keep the activity unavailable at the routing level as well,
+        // not just visually disabled, so it cannot start via this sheet.
+        guard category.isAvailable else { return }
+
+        switch category {
+        case .running, .walking, .strength:
+            selectedCategory = category
+        case .freeTraining:
+            choose(.freeTraining)
+        case .custom:
+            choose(.custom(.other))
+        case .cycling, .swimming, .yoga, .meditation:
+            break
+        }
     }
 
     private func header(_ title: String, subtitle: String) -> some View {
@@ -163,36 +276,6 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func categorySection(_ label: String, categories: [Category]) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(label)
-                .font(.system(size: 10, weight: .bold))
-                .tracking(1.5)
-                .foregroundStyle(ATHLTHTrainDesign.bronze)
-            ForEach(categories) { category in
-                Button {
-                    switch category {
-                    case .running, .walking, .strength:
-                        selectedCategory = category
-                    case .cycling:
-                        choose(.cycling)
-                    case .freeTraining:
-                        choose(.freeTraining)
-                    default:
-                        if let kind = category.quickCustomActivity {
-                            choose(.custom(kind))
-                        }
-                    }
-                } label: {
-                    optionRow(icon: category.icon, title: category.title,
-                              detail: category.subtitle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("athlth-all-workouts-\(category.rawValue)")
-            }
-        }
     }
 
     @ViewBuilder
@@ -233,7 +316,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             actionRow(icon: "square.grid.2x2", title: tr("Saved workouts", "Lagrede økter"),
                       detail: tr("Browse your workout library", "Se treningsbiblioteket"),
                       action: .strengthLibrary)
-        default:
+        case .freeTraining, .custom, .cycling, .swimming, .yoga, .meditation:
             EmptyView()
         }
     }

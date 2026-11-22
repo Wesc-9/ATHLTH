@@ -1373,6 +1373,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     private enum QuickActivity: String, CaseIterable, Identifiable {
         case running, walking, strength, cycling, freeTraining, custom
         var id: String { rawValue }
+        var isAvailable: Bool { self != .cycling }
 
         var image: String {
             switch self {
@@ -1443,7 +1444,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     private func openQuickActivity(_ activity: QuickActivity) {
-        guard !hasActiveWorkout else { return }
+        guard !hasActiveWorkout, activity.isAvailable else { return }
         recordQuickActivityTap(activity)
         social.quickTrainFriendIDs.removeAll()
         social.discardPreparedQuickTrainFriends()
@@ -1689,7 +1690,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 // rather than rearranging themselves after each workout.
                 ForEach(QuickActivity.allCases) { activity in
                     quickPhotoChoice(activity)
-                        .disabled(hasActiveWorkout)
+                        .disabled(hasActiveWorkout || !activity.isAvailable)
                 }
             }
         }
@@ -1701,39 +1702,61 @@ struct ATHLTHTrainTodayPremiumView: View {
             // longer "Egendefinert" title on compact iPhones.
             HStack(spacing: 5) {
                 quickChoiceIcon(activity)
-                Text(activity.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.65)
-                    .multilineTextAlignment(.leading)
-                    .layoutPriority(1)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(activity.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.65)
+                        .multilineTextAlignment(.leading)
+                    if !activity.isAvailable {
+                        Text(tr("Coming soon", "Kommer snart"))
+                            .font(.system(size: 9, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                }
+                .layoutPriority(1)
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-            .foregroundStyle(ink)
+            .foregroundStyle(
+                activity.isAvailable ? ink : muted.opacity(0.58)
+            )
             .padding(.horizontal, 8)
             .background(
-                Color.white.opacity(0.94),
+                Color.white.opacity(activity.isAvailable ? 0.94 : 0.52),
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(hairline.opacity(0.38), lineWidth: 0.7)
+                    .strokeBorder(
+                        hairline.opacity(activity.isAvailable ? 0.38 : 0.21),
+                        lineWidth: 0.7
+                    )
                     .allowsHitTesting(false)
             }
             .contentShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(activity.title)
-        .accessibilityHint(tr("Open workout setup", "Åpner treningsoppsett"))
+        .accessibilityHint(
+            activity.isAvailable
+                ? tr("Open workout setup", "Åpner treningsoppsett")
+                : tr("Coming soon", "Kommer snart")
+        )
     }
 
     private func quickChoiceIcon(_ activity: QuickActivity) -> some View {
         Image(systemName: activity.icon)
             .font(.system(size: 19, weight: .regular))
-            .foregroundStyle(champagne)
+            .foregroundStyle(
+                activity.isAvailable ? champagne : muted.opacity(0.50)
+            )
             .frame(width: 38, height: 38)
-            .background(ATHLTHTrainDesign.paleGold.opacity(0.44), in: Circle())
+            .background(
+                ATHLTHTrainDesign.paleGold.opacity(activity.isAvailable ? 0.44 : 0.20),
+                in: Circle()
+            )
             .accessibilityHidden(true)
     }
 

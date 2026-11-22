@@ -20,6 +20,28 @@ final class ATHLTHUnifiedLibraryNavigationTests: XCTestCase {
         XCTAssertEqual(ExerciseLibrarySection.section(forSegmentedIndex: 2), .marketplace)
     }
 
+    func testAllWorkoutSheetHasNineActivitiesInRequestedGridOrder() {
+        let categories = ATHLTHTrainAllWorkoutCategoriesSheet.Category.allCases
+        XCTAssertEqual(categories.map(\.rawValue), [
+            "freeTraining", "walking", "running",
+            "strength", "cycling", "swimming",
+            "yoga", "meditation", "custom"
+        ])
+    }
+
+    func testUnavailableWorkoutsStayVisibleButDisabled() {
+        let categories = ATHLTHTrainAllWorkoutCategoriesSheet.Category.allCases
+        let enabled = categories.filter(\.isAvailable).map(\.rawValue)
+        let disabled = categories.filter { !$0.isAvailable }.map(\.rawValue)
+
+        XCTAssertEqual(enabled, [
+            "freeTraining", "walking", "running", "strength", "custom"
+        ])
+        XCTAssertEqual(disabled, [
+            "cycling", "swimming", "yoga", "meditation"
+        ])
+    }
+
     func testNorwegianMuscleFiltersAreAlphabeticalWithoutChangingRawKeys() {
         let source = ["Shoulders", "Back", "Core", "Chest", "Biceps"]
         let localized = [
