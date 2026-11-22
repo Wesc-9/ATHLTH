@@ -132,6 +132,17 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
                          forKey: .equipmentRules) ?? ""
     }
 
+    /// Unsupported capture origins and synchronized formats can be saved
+    /// as private drafts, but must never be published as working competitions.
+    var isOperational: Bool {
+        if recordingDevice != .any { return false }
+        if discipline == .sprint {
+            return sprintMode == .massStart && sprintTarget != .route
+        }
+        if discipline == .laps && lapVerification == .gps { return false }
+        return true
+    }
+
     var isValid: Bool {
         guard (100...100_000).contains(targetDistanceMeters),
               (10...86_400).contains(targetDurationSeconds),
