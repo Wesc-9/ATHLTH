@@ -531,20 +531,23 @@ enum ATHLTHExerciseReferenceResolver {
             // source slug instead, so another account can resolve it safely.
             // Custom exercises retain their explicit creator identity.
             if found.source == .custom {
-                copy.exerciseID = found.id
-            } else if found.sourceIdentifier != nil {
+                if let approved = shareableSnapshot(found.exercise) {
+                    copy.exerciseID = found.id
+                    copy.exerciseSlug = nil
+                    copy.exerciseSnapshot = safeImportedSnapshot(
+                        approved, fallbackTitle: block.title
+                    )
+                } else {
+                    // A private/friends-only custom exercise must not expose
+                    // its owner-specific identifier in a public plan export.
+                    copy.exerciseID = nil
+                    copy.exerciseSlug = nil
+                }
+            } else if let sourceID = found.sourceIdentifier {
                 copy.exerciseID = nil
+                copy.exerciseSlug = sourceID
             } else {
                 copy.exerciseID = found.id
-            }
-            if let sourceID = found.sourceIdentifier {
-                copy.exerciseSlug = sourceID
-            }
-            if found.source == .custom,
-               let approved = shareableSnapshot(found.exercise) {
-                copy.exerciseSnapshot = safeImportedSnapshot(
-                    approved, fallbackTitle: block.title
-                )
             }
         }
         return copy
