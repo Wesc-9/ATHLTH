@@ -786,10 +786,14 @@ enum LibraryFavoriteKind: String, Codable, CaseIterable, Identifiable, Hashable 
 
     var title: String {
         switch self {
-        case .plan: return "Plans"
-        case .workout: return "Workouts"
-        case .exercise: return "Exercises"
-        case .route: return "Routes"
+        case .plan:
+            return ATHLTHLocalization.choose(english: "Plans", norwegian: "Planer")
+        case .workout:
+            return ATHLTHLocalization.choose(english: "Workouts", norwegian: "Økter")
+        case .exercise:
+            return ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser")
+        case .route:
+            return ATHLTHLocalization.choose(english: "Routes", norwegian: "Ruter")
         }
     }
 
@@ -1177,6 +1181,10 @@ final class LibraryFavoritesStore: ObservableObject {
             // Wait for the preceding write to complete before applying the
             // next requested state of this exact favorite.
             await previous?.value
+            // Never dispatch an old account's queued write after switching
+            // users; its desired state remains in that account's local queue.
+            guard activeUserID == user.id,
+                  client.auth.currentUser?.id == user.id else { return }
             do {
                 try await sendChange(change, userID: user.id)
                 acknowledgeChange(change, key: key, userID: user.id)
