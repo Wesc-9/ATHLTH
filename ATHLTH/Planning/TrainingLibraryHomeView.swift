@@ -3208,9 +3208,11 @@ struct TrainingPlanCatalogDetailView: View {
                             }
                             if let load = zonedWeek?.weeklyLoadScore {
                                 Text("·")
-                                Text("\(ATHLTHLocalization.choose(
-                                    english: "Load", norwegian: "Belastning"
-                                )) \(load.formatted())")
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Load", norwegian: "Belastning"
+                                    ) + " " + load.formatted()
+                                )
                             }
                         }
                         .font(.caption)
