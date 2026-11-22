@@ -46,7 +46,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .distance: .distance
         case .time: .time
         case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow: .heartZone
-        case .warmupStart, .warmupEnd, .mainStart, .mainEnd,
+        case .workoutStart, .warmupStart, .warmupEnd, .mainStart, .mainEnd,
              .cooldownStart, .cooldownEnd, .beforeMain, .beforeCooldown: .section
         case .recoveryStart, .recoveryEnd, .activeRecoveryStart,
              .activeRecoveryEnd: .pause
@@ -184,7 +184,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 }
             } else if family == .section {
                 ForEach([
-                    ATHLTHAudioCoachRule.Trigger.warmupStart, .warmupEnd,
+                    ATHLTHAudioCoachRule.Trigger.workoutStart,
+                    .warmupStart, .warmupEnd,
                     .mainStart, .mainEnd, .cooldownStart, .cooldownEnd
                 ], id: \.self) { choice($0) }
             } else if family == .step {
