@@ -66,6 +66,21 @@ enum ATHLTHCatalogPlanSessionFactory {
             )
         }
 
+        // Published HYROX stations use the exact existing library identifiers.
+        // Never infer a different equipment variant from a display name.
+        let stationIDs: [String: String] = [
+            "SkiErg": "athlth:skierg",
+            "Row": "athlth:rowing",
+            "Wall Balls": "athlth:wall-ball",
+            "Farmers Carry": "athlth:farmers-carry",
+            "Sandbag Lunges": "athlth:sandbag-walking-lunge"
+        ]
+        for index in blocks.indices where blocks[index].kind == .exercise {
+            if let stationID = stationIDs[blocks[index].title] {
+                blocks[index].exerciseSlug = stationID
+            }
+        }
+
         // All blocks are portable and ordered. Do not generate additional
         // parallel exercise or running data that could execute twice.
         blocks = blocks.enumerated().map { index, step in
@@ -226,7 +241,7 @@ enum ATHLTHCatalogPlanSessionFactory {
         WorkoutTemplateBlock(
             sequence: 1, kind: kind, title: title,
             exerciseSlug: kind == .exercise
-                ? ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: title)
+                ? ATHLTHExerciseReferenceResolver.exerciseSourceIdentifier(for: title)
                 : nil,
             distanceMeters: meters, repetitions: reps,
             durationSeconds: seconds, targetWeightKilograms: nil,
