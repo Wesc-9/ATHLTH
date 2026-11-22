@@ -179,6 +179,44 @@ final class ATHLTHPlanActualProgressTests: XCTestCase {
     }
 
     @MainActor
+    func testSkipRejectsUnknownWorkoutAndExplicitRestDay() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Skip safety", summary: "", weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let unknownID = UUID()
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: unknownID, skipped: true
+        )
+        XCTAssertFalse(store.isPlanSessionSkipped(
+            planID: plan.id, sessionID: unknownID
+        ))
+        let rest = PlannedSession(
+            id: UUID(), title: "Hviledag", kind: .recovery,
+            scheduledStart: nil, durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil,
+            workoutCategory: "rest_day"
+        )
+        store.addSession(rest, toDay: plan.weeks[0].days[0].id, inPlan: plan.id)
+        store.setPlanSessionSkipped(
+            planID: plan.id, sessionID: rest.id, skipped: true
+        )
+        XCTAssertFalse(store.isPlanSessionSkipped(
+            planID: plan.id, sessionID: rest.id
+        ))
+        let stored = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let progress = ATHLTHPlanActualProgress.inspect(
+            plan: stored, store: store, healthWorkouts: [], strengthHistory: []
+        )
+        XCTAssertEqual(progress.totalSkipped, 0)
+        XCTAssertEqual(progress.totalPlanned, 0)
+    }
+
+    @MainActor
     func testExplicitRestDayDoesNotCountAsAWorkoutOrCompletion() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
