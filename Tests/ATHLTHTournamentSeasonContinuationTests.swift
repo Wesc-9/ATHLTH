@@ -80,6 +80,11 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
             meetingLat: nil,
             meetingLon: nil,
             simpleMode: false,
+            invitationDays: 3,
+            unansweredPolicy: "cancel",
+            replacementUntil: nil,
+            allowFeedPost: true,
+            feedPublishedAt: nil,
             releaseMode: "interval",
             releaseEvery: 7,
             releaseUnit: "day",
@@ -99,7 +104,7 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
         ATHLTHTournamentRemoteEntry(
             tournamentID: UUID(), userID: athlete, seed: seed,
             response: response, respondedAt: nil,
-            groupIndex: nil, isReady: false, readyAt: nil,
+            expiresAt: nil, groupIndex: nil, isReady: false, readyAt: nil,
             removedAt: nil, replacedBy: nil,
             agreedRuleVersion: nil, agreedRulesAt: nil
         )
