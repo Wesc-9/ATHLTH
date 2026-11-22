@@ -40,7 +40,11 @@ struct ThreadWorkoutInvitationCard: View {
                 ? ATHLTHLocalization.choose(english: "Awaiting reply", norwegian: "Venter på svar")
                 : ATHLTHLocalization.choose(english: "Invitation received", norwegian: "Venter på ditt svar")
         case .accepted:
-            return ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
+            return workout.allowInviteeExercises == true
+                ? ATHLTHLocalization.choose(
+                    english: "Building workout together",
+                    norwegian: "Bygger økt sammen")
+                : ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
         case .declined:
             return ATHLTHLocalization.choose(english: "Declined", norwegian: "Avslått")
         case .cancelled:
@@ -142,7 +146,11 @@ struct ThreadWorkoutInvitationCard: View {
                         .frame(maxWidth: .infinity)
 
                         Button(
-                            ATHLTHLocalization.choose(english: "Accept", norwegian: "Godta"),
+                            workout.allowInviteeExercises == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "Join planning", norwegian: "Bli med og planlegg")
+                                : ATHLTHLocalization.choose(
+                                    english: "Accept", norwegian: "Godta"),
                             action: onAccept
                         )
                         .buttonStyle(.borderedProminent)
@@ -203,7 +211,10 @@ private struct ThreadWorkoutInvitationDetailsView: View {
     private var statusLabel: String {
         switch state {
         case .pending: return ATHLTHLocalization.choose(english: "Awaiting reply", norwegian: "Venter på svar")
-        case .accepted: return ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
+        case .accepted: return workout.allowInviteeExercises == true
+            ? ATHLTHLocalization.choose(
+                english: "Building workout together", norwegian: "Bygger økt sammen")
+            : ATHLTHLocalization.choose(english: "Accepted", norwegian: "Godtatt")
         case .declined: return ATHLTHLocalization.choose(english: "Declined", norwegian: "Avslått")
         case .cancelled: return ATHLTHLocalization.choose(english: "Cancelled", norwegian: "Avlyst")
         }
@@ -405,7 +416,10 @@ private struct ThreadWorkoutInvitationDetailsView: View {
 
                             Button(action: onAccept) {
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Accept", norwegian: "Godta"
+                                    english: workout.allowInviteeExercises == true
+                                        ? "Join planning" : "Accept",
+                                    norwegian: workout.allowInviteeExercises == true
+                                        ? "Bli med og planlegg" : "Godta"
                                 ))
                                 .frame(maxWidth: .infinity)
                             }
