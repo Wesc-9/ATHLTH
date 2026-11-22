@@ -1,0 +1,100 @@
+import Foundation
+import XCTest
+@testable import ATHLTH
+
+final class TrainTogetherLiveDraftTests: XCTestCase {
+    private func workout(kind: WorkoutKind) -> PlannedSession {
+        PlannedSession(
+            id: UUID(),
+            title: "Felles økt",
+            kind: kind,
+            scheduledStart: nil,
+            durationMinutes: 45,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil
+        )
+    }
+
+    private func decodedDraft(
+        workout: PlannedSession,
+        ownerApproved: Int?,
+        partnerApproved: Int?,
+        editMode: String
+    ) throws -> TrainTogetherLiveDraft {
+        let snapshot = try XCTUnwrap(
+            String(data: JSONEncoder().encode(workout), encoding: .utf8)
+        )
+        let payload: [String: Any] = [
+            "source_workout_id": workout.id.uuidString,
+            "owner_id": UUID().uuidString,
+            "partner_id": UUID().uuidString,
+            "edit_mode": editMode,
+            "participation_mode": "remote",
+            "workout_snapshot": snapshot,
+            "revision": 4,
+            "owner_approved_revision": ownerApproved as Any? ?? NSNull(),
+            "partner_approved_revision": partnerApproved as Any? ?? NSNull()
+        ]
+        return try JSONDecoder().decode(
+            TrainTogetherLiveDraft.self,
+            from: JSONSerialization.data(withJSONObject: payload)
+        )
+    }
+
+    func testBothMustApproveTheSameRevisionBeforeReady() throws {
+        let session = workout(kind: .running)
+        let pending = try decodedDraft(
+            workout: session, ownerApproved: 4, partnerApproved: 3,
+            editMode: "collaborative"
+        )
+        XCTAssertTrue(pending.ownerApproved)
+        XCTAssertFalse(pending.partnerApproved)
+        XCTAssertFalse(pending.bothApproved)
+        let approved = try decodedDraft(
+            workout: session, ownerApproved: 4, partnerApproved: 4,
+            editMode: "collaborative"
+        )
+        XCTAssertTrue(approved.bothApproved)
+    }
+
+    func testReadOnlyInviteKeepsWorkoutVisible() throws {
+        let session = workout(kind: .strength)
+        let draft = try decodedDraft(
+            workout: session, ownerApproved: nil, partnerApproved: nil,
+            editMode: "view_only"
+        )
+        XCTAssertFalse(draft.isCollaborative)
+        XCTAssertEqual(draft.workout?.id, session.id)
+    }
+
+    func testPlanningModelAcceptsEveryWorkoutKind() throws {
+        for kind: WorkoutKind in [.running, .walking, .strength,
+                                  .mobility, .recovery, .custom] {
+            let session = workout(kind: kind)
+            let draft = try decodedDraft(
+                workout: session, ownerApproved: nil, partnerApproved: nil,
+                editMode: "collaborative"
+            )
+            XCTAssertEqual(draft.workout?.kind, kind)
+        }
+    }
+
+    func testRemoteSessionCanChooseSynchronizedStart() throws {
+        var payload = SocialWorkoutInvitePayload(
+            workout: workout(kind: .running),
+            participationMode: .remote
+        )
+        // Older remote invitations without an explicit field retain
+        // independent starts. Newly approved ones choose false.
+        XCTAssertTrue(payload.resolvedStartIndependently)
+        payload.startIndependently = false
+        let restored = try JSONDecoder().decode(
+            SocialWorkoutInvitePayload.self,
+            from: JSONEncoder().encode(payload)
+        )
+        XCTAssertFalse(restored.resolvedStartIndependently)
+    }
+}
