@@ -220,6 +220,11 @@ struct MessageInboxView: View {
                     )
                 }
 
+                ATHLTHTournamentInboxSection(
+                    filterKey: selectedFilter.rawValue,
+                    onVisibleCountChanged: { _ in }
+                )
+
                 ATHLTHArenaInboxSection(
                     filterKey: selectedFilter.rawValue,
                     onVisibleCountChanged: { arenaInboxVisibleCount = $0 }
