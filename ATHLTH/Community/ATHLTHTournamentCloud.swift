@@ -632,23 +632,13 @@ struct ATHLTHTournamentCloudService {
 
     func matches(for tournamentID: UUID) async throws
         -> [ATHLTHTournamentRemoteMatch] {
-        var list: [ATHLTHTournamentRemoteMatch] = []
-        let pageSize = 500
-        var offset = 0
-        repeat {
-            let page: [ATHLTHTournamentRemoteMatch] = try await client
-                .from("athlth_tournament_matches")
-                .select()
-                .eq("tournament_id", value: tournamentID)
-                .order("round_number")
-                .order("slot_index")
-                .range(from: offset, to: offset + pageSize - 1)
-                .execute().value
-            list += page
-            if page.count < pageSize { break }
-            offset += pageSize
-        } while offset < 10_000
-        return list
+        // The raw table is intentionally score-restricted. Always load
+        // the server-filtered feed: other athletes' league scores remain
+        // sealed until every match in that round is confirmed.
+        return try await client
+            .rpc("athlth_tournament_visible_matches",
+                 params: ATHLTHTournamentIDParams(p_tournament: tournamentID))
+            .execute().value
     }
 
     func athleteNames(for IDs: Set<UUID>) async throws -> [UUID: String] {
