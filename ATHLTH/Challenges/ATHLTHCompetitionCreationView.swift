@@ -83,6 +83,7 @@ enum ATHLTHCompetitionCreationPolicy {
         distanceKM: Double,
         durationMinutes: Double,
         exerciseName: String,
+        hasRoute: Bool = false,
         endsAt: Date,
         now: Date
     ) -> Bool {
@@ -98,8 +99,9 @@ enum ATHLTHCompetitionCreationPolicy {
 
         switch activity {
         case .running, .walking:
-            guard [.fastestDistance, .farthestInTime, .mostDistance]
+            guard [.fastestDistance, .fastestRoute, .farthestInTime, .mostDistance]
                 .contains(metric) else { return false }
+            if metric == .fastestRoute { return hasRoute }
             if metric == .fastestDistance {
                 return distanceKM.isFinite && (0.1...500).contains(distanceKM)
             }
@@ -129,12 +131,15 @@ struct ATHLTHCompetitionCreationView: View {
     let advanced: Bool
     var initialFormat: ATHLTHCompetitionFormat? = nil
     var preselectedFriend: SocialProfileCard? = nil
+    var preselectedRoute: TrainingRoute? = nil
+    var preselectedDistanceKM: Double? = nil
 
     @State private var format: ATHLTHCompetitionFormat = .duel
     @State private var competitionTitle = ""
     @State private var chosenIDs: Set<UUID> = []
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
     @State private var distanceKM = 5.0
+    @State private var chosenRoute: TrainingRoute?
     @State private var durationMinutes = 30.0
     @State private var exerciseName = ""
     @State private var endsAt = Date().addingTimeInterval(7 * 86_400)
@@ -171,6 +176,7 @@ struct ATHLTHCompetitionCreationView: View {
             distanceKM: distanceKM,
             durationMinutes: durationMinutes,
             exerciseName: exerciseName,
+            hasRoute: chosenRoute != nil,
             endsAt: endsAt,
             now: Date()
         ) && selectedPeople.count == chosenIDs.count
@@ -280,6 +286,15 @@ struct ATHLTHCompetitionCreationView: View {
             scoring = ATHLTHCompetitionCreationPolicy.defaultScoring(
                 for: initialActivity
             )
+            if let preselectedDistanceKM,
+               preselectedDistanceKM.isFinite,
+               (0.1...500).contains(preselectedDistanceKM) {
+                distanceKM = preselectedDistanceKM
+            }
+            if let preselectedRoute {
+                chosenRoute = preselectedRoute
+                scoring = .fastestRoute
+            }
             if let preselectedFriend, preselectedFriend.userID != session.profile.userID {
                 chosenIDs.insert(preselectedFriend.userID)
             }
@@ -460,6 +475,19 @@ struct ATHLTHCompetitionCreationView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                if scoring == .fastestRoute {
+                    Text(chosenRoute?.title ?? tr(
+                        "Choose a route", "Velg en rute"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    if chosenRoute == nil {
+                        Text(tr("A saved route is required.",
+                                "Du må velge en lagret rute."))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                }
                 if scoring == .fastestDistance {
                     HStack {
                         Text(tr("Distance", "Distanse"))
@@ -505,6 +533,33 @@ struct ATHLTHCompetitionCreationView: View {
                 .font(.subheadline)
 
             if advanced {
+                if format == .duel && initialActivity != .strength {
+                    HStack(spacing: 8) {
+                        Text(tr("Race route", "Konkurranserute"))
+                            .font(.subheadline)
+                        Spacer()
+                        Menu {
+                            Button(tr("No route", "Ingen rute")) {
+                                chosenRoute = nil
+                                if scoring == .fastestRoute {
+                                    scoring = .fastestDistance
+                                }
+                            }
+                            ForEach(session.savedRoutes) { route in
+                                Button(route.title) {
+                                    chosenRoute = route
+                                    scoring = .fastestRoute
+                                }
+                            }
+                        } label: {
+                            Label(chosenRoute?.title ?? tr(
+                                "Choose route", "Velg rute"
+                            ), systemImage: "map")
+                            .font(.subheadline)
+                            .lineLimit(1)
+                        }
+                    }
+                }
                 DisclosureGroup(
                     tr("Advanced rules", "Avanserte regler"),
                     isExpanded: $showingAdvancedRules
@@ -561,7 +616,8 @@ struct ATHLTHCompetitionCreationView: View {
     private var duelMetrics: [ATHLTHChallengeScoring] {
         switch initialActivity {
         case .running, .walking:
-            [.fastestDistance, .mostDistance, .farthestInTime]
+            [.fastestDistance, .mostDistance, .farthestInTime] +
+                (chosenRoute == nil ? [] : [.fastestRoute])
         case .strength:
             [.workoutVolume, .mostReps, .heaviestWeight, .exerciseVolume]
         }
@@ -606,6 +662,14 @@ struct ATHLTHCompetitionCreationView: View {
         }) {
             throw ATHLTHCompetitionError.duplicate
         }
+        let routeSnapshot: ChallengeRouteSnapshot? = scoring == .fastestRoute
+            ? chosenRoute.map {
+                ChallengeRouteSnapshot(
+                    routeID: $0.id, title: $0.title,
+                    distanceKilometers: $0.distanceKilometers,
+                    coordinates: $0.coordinates
+                )
+            } : nil
         let rules = ATHLTHChallengeRules(
             scoring: scoring,
             verificationPolicy: initialActivity == .strength
@@ -615,9 +679,9 @@ struct ATHLTHCompetitionCreationView: View {
             targetDurationSeconds: scoring == .farthestInTime
                 ? durationMinutes * 60 : nil,
             timeBasis: .elapsed,
-            route: nil,
+            route: routeSnapshot,
             gpsRequired: initialActivity != .strength,
-            minimumRouteMatchPercent: nil,
+            minimumRouteMatchPercent: routeSnapshot == nil ? nil : 90,
             exerciseName: initialActivity == .strength &&
                 scoring != .workoutVolume ? exerciseName : nil,
             fixedWeightKilograms: nil,
