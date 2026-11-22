@@ -151,6 +151,105 @@ final class ATHLTHWorkoutUserTargetsStoreTests: XCTestCase {
                        "Effort")
     }
 
+    func testFourByFourSpeedAppliesToFourEffortsNotActiveRecoveries() {
+        let warmup = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Oppvarming",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 600, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .warmup
+        )
+        var entries: [WorkoutTemplateBlock] = [warmup]
+        for rep in 1...4 {
+            var effort = WorkoutTemplateBlock(
+                sequence: entries.count + 1, kind: .run,
+                title: "4x4 intervall drag \(rep)/4", exerciseSlug: nil,
+                distanceMeters: nil, repetitions: nil,
+                durationSeconds: 240, targetWeightKilograms: nil,
+                loadNote: nil, notes: nil, phase: .main
+            )
+            effort.targetHeartRateZone = 4
+            entries.append(effort)
+            if rep < 4 {
+                var recovery = WorkoutTemplateBlock(
+                    sequence: entries.count + 1, kind: .run,
+                    title: "Aktiv pause", exerciseSlug: nil,
+                    distanceMeters: nil, repetitions: nil,
+                    durationSeconds: 120, targetWeightKilograms: nil,
+                    loadNote: nil, notes: nil, phase: .recovery
+                )
+                recovery.targetHeartRateZone = 2
+                entries.append(recovery)
+            }
+        }
+        let cooldown = WorkoutTemplateBlock(
+            sequence: entries.count + 1, kind: .run, title: "Nedjogging",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 600, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .cooldown
+        )
+        entries.append(cooldown)
+
+        let updated = ATHLTHPersonalWorkoutSpeedPolicy.applying(
+            kilometersPerHour: 14, to: entries
+        )
+        XCTAssertEqual(updated.count, 9)
+        XCTAssertEqual(ATHLTHPersonalWorkoutSpeedPolicy.workIndices(
+            in: entries
+        ), [1, 3, 5, 7])
+        for index in [1, 3, 5, 7] {
+            XCTAssertEqual(updated[index].targetPaceSecondsPerKilometer ?? 0,
+                           3600 / 14, accuracy: 0.0001)
+            XCTAssertEqual(updated[index].targetHeartRateZone, 4)
+        }
+        for index in [0, 2, 4, 6, 8] {
+            XCTAssertNil(updated[index].targetPaceSecondsPerKilometer)
+        }
+        XCTAssertEqual(entries, ATHLTHPersonalWorkoutSpeedPolicy.applying(
+            kilometersPerHour: 100, to: entries
+        ))
+        XCTAssertTrue(entries.allSatisfy {
+            $0.targetPaceSecondsPerKilometer == nil
+        })
+    }
+
+    func testPersonalWorkoutOptionsResetClearsOnlyThatOwnersWorkout() {
+        let suite = "athlth.personal-options-reset-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let id = UUID()
+        let otherID = UUID()
+        var mine = ATHLTHWorkoutPersonalOptions()
+        mine.spotifyAutoplayOnStart = true
+        ATHLTHWorkoutPersonalOptionsStore.save(
+            mine, userID: "a", workoutID: id, defaults: defaults
+        )
+        ATHLTHWorkoutPersonalOptionsStore.save(
+            mine, userID: "b", workoutID: id, defaults: defaults
+        )
+        ATHLTHWorkoutPersonalOptionsStore.save(
+            mine, userID: "a", workoutID: otherID, defaults: defaults
+        )
+        ATHLTHWorkoutPersonalOptionsStore.reset(
+            userID: "a", workoutID: id, defaults: defaults
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutPersonalOptionsStore.load(
+                userID: "a", workoutID: id, defaults: defaults
+            ),
+            ATHLTHWorkoutPersonalOptions()
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutPersonalOptionsStore.load(
+                userID: "b", workoutID: id, defaults: defaults
+            ), mine
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutPersonalOptionsStore.load(
+                userID: "a", workoutID: otherID, defaults: defaults
+            ), mine
+        )
+    }
+
     func testChangedTemplateDoesNotInheritTargetsByIndex() {
         let suite = "athlth.user-targets-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
