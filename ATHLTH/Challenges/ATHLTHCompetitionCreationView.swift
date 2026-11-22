@@ -137,6 +137,8 @@ struct ATHLTHCompetitionCreationView: View {
     var preselectedDistanceKM: Double? = nil
 
     @State private var format: ATHLTHCompetitionFormat = .duel
+    @State private var leagueStyle: ATHLTHTournamentFormat = .league
+    @State private var showingExistingTournamentRules = false
     @State private var competitionTitle = ""
     @State private var chosenIDs: Set<UUID> = []
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
@@ -223,8 +225,12 @@ struct ATHLTHCompetitionCreationView: View {
                         simpleIdentity
                     }
 
-                    participantsCard
-                    competitionRules
+                    if format == .duel {
+                        participantsCard
+                        competitionRules
+                    } else {
+                        leagueOrCupSetup
+                    }
 
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -259,13 +265,19 @@ struct ATHLTHCompetitionCreationView: View {
                 VStack(spacing: 0) {
                     Divider().opacity(0.32)
                     Button {
-                        Task { await publish() }
+                        if format == .duel {
+                            Task { await publish() }
+                        } else {
+                            showingExistingTournamentRules = true
+                        }
                     } label: {
                         HStack(spacing: 9) {
                             if sending { ProgressView().tint(.white) }
                             Text(sending
                                 ? tr("Creating…", "Oppretter…")
-                                : tr("Create and invite", "Opprett og inviter"))
+                                : format == .duel
+                                  ? tr("Create and invite", "Opprett og inviter")
+                                  : tr("Continue to rules", "Fortsett til regler"))
                                 .font(.headline)
                             Image(systemName: "arrow.right")
                         }
@@ -273,14 +285,46 @@ struct ATHLTHCompetitionCreationView: View {
                         .frame(maxWidth: .infinity, minHeight: 53)
                         .background(bronze, in: RoundedRectangle(cornerRadius: 17))
                     }
-                    .disabled(!isValid || sending || successful)
-                    .opacity(isValid && !sending ? 1 : 0.48)
+                    .disabled(
+                        sending || successful ||
+                        (format == .duel && !isValid)
+                    )
+                    .opacity(
+                        !sending && !successful &&
+                        (format != .duel || isValid) ? 1 : 0.48
+                    )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .accessibilityIdentifier("athlth-competition-publish")
                 }
                 .background(.regularMaterial)
             }
+        }
+        .sheet(isPresented: $showingExistingTournamentRules) {
+            ATHLTHTournamentCreator(
+                preset: format == .cup ? .cup : leagueStyle,
+                fixedClubID: nil,
+                fixedActivity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
+                    initialActivity
+                ),
+                initialTitle: competitionTitle,
+                onPublished: { _ in
+                    showingExistingTournamentRules = false
+                    successful = true
+                    dismiss()
+                },
+                onSave: { newDraft in
+                    var saved = ATHLTHTournamentDraftStore.load(
+                        session.profile.userID
+                    )
+                    saved.append(newDraft)
+                    ATHLTHTournamentDraftStore.save(
+                        saved, owner: session.profile.userID
+                    )
+                    showingExistingTournamentRules = false
+                    dismiss()
+                }
+            )
         }
         .presentationDetents([.large])
         .onAppear {
@@ -403,6 +447,74 @@ struct ATHLTHCompetitionCreationView: View {
         .padding(15)
         .background(ATHLTHPlanDesign.selectedSurface,
                     in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    /// Keep the existing, tested tournament editor for the advanced
+    /// rules. This screen is only the common first-class entry and choice.
+    private var leagueOrCupSetup: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            titleBlock(tr("Competition details", "Konkurransedetaljer"))
+            if format == .league {
+                Text(tr("League format", "Ligatype"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+                ForEach(
+                    [ATHLTHTournamentFormat.league, .groups],
+                    id: \.self
+                ) { value in
+                    Button { leagueStyle = value } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: value.symbol)
+                                .foregroundStyle(bronze)
+                                .frame(width: 33)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(value == .league ? "Stor liga" : "Gruppeliga")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                Text(value.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(muted)
+                            }
+                            Spacer()
+                            Image(systemName: leagueStyle == value
+                                  ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(bronze)
+                        }
+                        .padding(13)
+                        .background(
+                            leagueStyle == value ?
+                                ATHLTHPlanDesign.selectedSurface : Color.white,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(
+                        "athlth-league-type-\(value.rawValue)"
+                    )
+                }
+            }
+            Label(
+                tr("Reuse the complete advanced rule editor",
+                   "Bruk hele den eksisterende avanserte regelredigeringen"),
+                systemImage: "slider.horizontal.3"
+            )
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(bronze)
+            Text(tr(
+                "Set rules authority, exercise selection, voting, round cadence, deadlines, evidence, practice rounds and invites in the next step.",
+                "Velg regelmyndighet, øvelser, avstemning, runder, frister, godkjenning, oppvarmingsrunder og invitasjoner i neste steg."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
+            Text(tr(
+                "Seasons are available for leagues and cups, not duels.",
+                "Liga og cup kan videreføres i nye sesonger. Duell har ikke sesonger."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
+        }
+        .padding(15)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var participantsCard: some View {
