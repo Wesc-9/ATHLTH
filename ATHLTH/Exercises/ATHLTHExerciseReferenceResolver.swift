@@ -408,9 +408,19 @@ enum ATHLTHExerciseReferenceResolver {
         // Resolve the retired native alias to the exact reviewed RepDB ID.
         // Never substitute a merely similar exercise or a private record.
         if source.sourceIdentifier == "athlth-native-incline-dumbbell-bench-press" {
-            let reviewed = library.filter {
-                $0.source == .repDB &&
-                $0.sourceIdentifier == "incline-dumbbell-bench-press"
+            // RepDB snapshots may use "Incline Dumbbell Press" instead of
+            // "Incline Dumbbell Bench Press". Both are reviewed names for
+            // the same dumbbell incline press, not the barbell variant.
+            let reviewedNames: Set<String> = [
+                "incline dumbbell press",
+                "incline dumbbell bench press"
+            ]
+            let reviewed = library.filter { entry in
+                guard entry.source == .repDB else { return false }
+                let name = key(entry.canonicalName)
+                let slug = entry.sourceIdentifier.map(key)
+                return reviewedNames.contains(name) ||
+                    slug == "incline dumbbell bench press"
             }
             if reviewed.count == 1 { return reviewed[0] }
         }
