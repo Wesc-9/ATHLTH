@@ -5574,25 +5574,11 @@ final class AppSessionStore: ObservableObject {
             }
         }
 
-        switch sessionsPerWeek {
-        case 1:
-            return [3]
-        case 2:
-            return [2, 5]
-        case 3:
-            return [2, 4, 6]
-        case 4:
-            return [1, 3, 5, 7]
-        case 5:
-            return [1, 2, 4, 5, 7]
-        case 6:
-            return [1, 2, 3, 4, 5, 6]
-        case 7:
-            return [1, 2, 3, 4, 5, 6, 7]
-        default:
-            // Invalid remote plans are rejected by hasCompleteWorkoutPattern.
-            return []
-        }
+        // Use exactly the weekday presets shown in the plan picker.
+        // Unsupported remote patterns are rejected before this path.
+        return TrainingPlanCatalogEntry.defaultDayIndexes(
+            for: sessionsPerWeek
+        )
     }
 
     func saveSharedPlan(
