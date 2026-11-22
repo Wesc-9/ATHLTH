@@ -147,6 +147,28 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testBundledDeadliftIsDiscoverableWithoutDuplicatingLibraryRecords() throws {
+        let library = ExerciseLibraryStore()
+        let original = try XCTUnwrap(library.allExercises.first {
+            $0.sourceIdentifier == "athlth-native-deadlift"
+        })
+        let preferred = ATHLTHExerciseReferenceResolver.visibleEquivalent(
+            of: original, in: library.allExercises
+        )
+        let visible = library.selectableExercises
+        XCTAssertTrue(visible.contains { $0.id == preferred.id })
+        if preferred.id != original.id {
+            XCTAssertEqual(preferred.source, .repDB)
+            XCTAssertFalse(visible.contains { $0.id == original.id })
+        }
+        XCTAssertTrue(library.search(query: "Markløft").contains {
+            $0.id == preferred.id
+        })
+        XCTAssertTrue(library.search(query: "Rumensk markløft")
+            .allSatisfy { $0.sourceIdentifier != "athlth-native-deadlift" })
+    }
+
+    @MainActor
     func testMuscleFiltersMatchSelectableRepDBExercises() {
         let library = ExerciseLibraryStore()
 
@@ -183,7 +205,9 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
             // Curl, while keeping retired duplicates out of search results.
             let isSelectableSource = entry.source != .athlthCatalog ||
                 (entry.sourceIdentifier.map {
-                    ExerciseLibraryStore.featuredNativeExerciseSlugs.contains($0)
+                    ExerciseLibraryStore.featuredNativeExerciseSlugs.contains($0) ||
+                    ExerciseLibraryStore.referencedNativeExerciseSlugs.contains($0) ||
+                    ExerciseLibraryStore.referencedFallbackExerciseSlugs.contains($0)
                 } == true &&
                 !ExerciseLibraryStore.isRetiredNativeDuplicate(entry))
             let isBiceps = (entry.bodyPart.map {
