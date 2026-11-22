@@ -138,10 +138,11 @@ struct ATHLTHTournamentCreator: View {
                 $0 != continuation?.ownerID
             } ?? []
         ))
-        _chosenNames = State(initialValue:
-            Dictionary(uniqueKeysWithValues: continuation?.participants.map {
-                ($0.id, $0.username)
-            } ?? []))
+        var previousNames: [UUID: String] = [:]
+        for athlete in continuation?.participants ?? [] {
+            previousNames[athlete.id] = athlete.username
+        }
+        _chosenNames = State(initialValue: previousNames)
         _selectedClubID = State(initialValue:
             fixedClubID ?? continuation?.clubID)
         _inviteSource = State(initialValue:
@@ -165,7 +166,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         athletes.count >= 2 && !busy && !allowedActivities.isEmpty &&
-        (fixedActivity == nil || allowedActivities == [fixedActivity!]) &&
+        (fixedActivity.map { allowedActivities == Set([$0]) } ?? true) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
         ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
         (inviteSource != .club || selectedClubID != nil) &&
@@ -183,7 +184,16 @@ struct ATHLTHTournamentCreator: View {
                     titleSection
                     formatSection
                     ATHLTHTournamentRuleConfigurationSection(
-                        activities: $allowedActivities,
+                        activities: Binding(
+                            get: {
+                                fixedActivity.map { Set([$0]) } ?? allowedActivities
+                            },
+                            set: { newValue in
+                                if fixedActivity == nil {
+                                    allowedActivities = newValue
+                                }
+                            }
+                        ),
                         authority: $rulesAuthority,
                         cadenceDays: $cadenceDays,
                         completionHours: $completionHours
