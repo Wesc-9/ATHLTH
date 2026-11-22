@@ -319,64 +319,66 @@ struct WorkoutStartOptionsView: View {
             .sheet(isPresented: $showingStrengthWorkoutLibrary) {
                 NavigationStack {
                     List {
-                        ForEach(appSession.savedWorkoutTemplates.filter { workout in
-                            workout.kind == .strength &&
-                                (workout.resolvedWorkoutBlocks.contains {
-                                    $0.kind == .exercise
-                                } || !workout.exercises.isEmpty)
-                        }) { template in
-                            Button {
-                                chosenStrengthTemplate = template
-                                startType = .workout
-                                showingStrengthWorkoutLibrary = false
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "dumbbell")
-                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(template.title)
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(ATHLTHLocalization.choose(
-                                            english: "Saved workout",
-                                            norwegian: "Lagret treningsøkt"
-                                        ))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
+                        Section(ATHLTHLocalization.choose(
+                            english: "My workouts", norwegian: "Mine økter"
+                        )) {
+                            ForEach(appSession.savedWorkoutTemplates.filter { workout in
+                                workout.kind == .strength &&
+                                    (workout.resolvedWorkoutBlocks.contains {
+                                        $0.kind == .exercise
+                                    } || !workout.exercises.isEmpty)
+                            }) { template in
+                                Button {
+                                    chosenStrengthTemplate = template
+                                    startType = .workout
+                                    showingStrengthWorkoutLibrary = false
+                                } label: {
+                                    Label(template.title, systemImage: "dumbbell")
+                                        .font(.subheadline.weight(.medium))
+                                        .frame(minHeight: 45,
+                                               alignment: .leading)
                                 }
-                                .frame(minHeight: 52)
+                            }
+                        }
+                        Section("ATHLTH") {
+                            ForEach(
+                                Array((
+                                    ATHLTHCuratedStrengthWorkouts.entries +
+                                    ATHLTHPremiumStrengthSessions.entries
+                                ).prefix(50))
+                            ) { entry in
+                                Button {
+                                    chosenStrengthTemplate = entry.plannedSession()
+                                    startType = .workout
+                                    showingStrengthWorkoutLibrary = false
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "dumbbell")
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(entry.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(entry.summary)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                    }
+                                    .frame(minHeight: 48)
+                                }
                             }
                         }
                     }
-                    .overlay {
-                        if appSession.savedWorkoutTemplates.filter({
-                            $0.kind == .strength &&
-                                ($0.resolvedWorkoutBlocks.contains {
-                                    $0.kind == .exercise
-                                } || !$0.exercises.isEmpty)
-                        }).isEmpty {
-                            ContentUnavailableView(
-                                ATHLTHLocalization.choose(
-                                    english: "No saved strength workouts",
-                                    norwegian: "Ingen lagrede styrkeøkter"
-                                ),
-                                systemImage: "dumbbell"
-                            )
-                        }
-                    }
                     .navigationTitle(ATHLTHLocalization.choose(
-                        english: "Choose workout",
-                        norwegian: "Velg treningsøkt"
+                        english: "Choose workout", norwegian: "Velg treningsøkt"
                     ))
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button(ATHLTHLocalization.choose(
                                 english: "Close", norwegian: "Lukk"
-                            )) {
-                                showingStrengthWorkoutLibrary = false
-                            }
+                            )) { showingStrengthWorkoutLibrary = false }
                         }
                     }
                 }
