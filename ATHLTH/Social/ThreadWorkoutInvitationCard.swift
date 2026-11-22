@@ -207,6 +207,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
 
     @State private var showsExercises = false
     @State private var showsStructure = false
+    @StateObject private var sharedDraft = TrainTogetherLiveDraftStore()
 
     private var statusLabel: String {
         switch state {
@@ -393,6 +394,45 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                         }
                     }
 
+                    if sharedDraft.draft != nil &&
+                       (isMine || state == .accepted) {
+                        detailSection(ATHLTHLocalization.choose(
+                            english: "Shared planning lobby",
+                            norwegian: "Felles planleggingslobby"
+                        )) {
+                            NavigationLink {
+                                TrainTogetherLiveDraftRoomView(
+                                    sourceWorkoutID: workout.id,
+                                    fallbackWorkout: workout
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Open live workout",
+                                        norwegian: "Åpne fellesøkt i sanntid"
+                                    ),
+                                    systemImage: "person.2.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 46)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTrainTogetherDesign.accent)
+
+                            Text(sharedDraft.draft?.isCollaborative == true
+                                ? ATHLTHLocalization.choose(
+                                    english: "Both can add exercises and approve the final workout.",
+                                    norwegian: "Begge kan legge til øvelser og godkjenne sluttresultatet."
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "The organizer edits; you can view and approve.",
+                                    norwegian: "Arrangøren redigerer; du kan se og godkjenne."
+                                ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+
                     if let notes = workout.notes, !notes.isEmpty {
                         detailSection(ATHLTHLocalization.choose(
                             english: "Notes", norwegian: "Notater"
@@ -429,7 +469,8 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                         .disabled(isResponding)
                     }
 
-                    if !isMine && (state == .pending || state == .accepted) {
+                    if !isMine && sharedDraft.draft == nil &&
+                       (state == .pending || state == .accepted) {
                         Button(action: onProposeChanges) {
                             Label(
                                 ATHLTHLocalization.choose(
@@ -456,6 +497,9 @@ private struct ThreadWorkoutInvitationDetailsView: View {
             }
             .scrollIndicators(.hidden)
             .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
+            .task(id: workout.id) {
+                await sharedDraft.refresh(workout.id)
+            }
             .navigationTitle(ATHLTHLocalization.choose(
                 english: "Invitation", norwegian: "Invitasjon"
             ))
