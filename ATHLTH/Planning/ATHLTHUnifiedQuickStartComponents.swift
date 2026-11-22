@@ -24,9 +24,9 @@ enum ATHLTHQuickStartActivity: Equatable {
 
     var types: [ATHLTHQuickStartType] {
         switch self {
-        case .running: return [.free, .route, .workout]
-        case .walking: return [.free, .route]
-        case .strength: return [.free, .workout, .exercises]
+        case .running: return [.free, .route, .workout, .competition]
+        case .walking: return [.free, .route, .competition]
+        case .strength: return [.free, .workout, .exercises, .competition]
         }
     }
 
@@ -40,7 +40,7 @@ enum ATHLTHQuickStartActivity: Equatable {
 }
 
 enum ATHLTHQuickStartType: String, Identifiable {
-    case free, route, workout, exercises
+    case free, route, workout, exercises, competition
     var id: String { rawValue }
 
     func title(for activity: ATHLTHQuickStartActivity) -> String {
@@ -60,6 +60,8 @@ enum ATHLTHQuickStartType: String, Identifiable {
             english: "Training workout", norwegian: "Treningsøkt")
         case .exercises: return ATHLTHLocalization.choose(
             english: "Add exercises", norwegian: "Legg til øvelser")
+        case .competition: return ATHLTHLocalization.choose(
+            english: "Competition", norwegian: "Konkurranse")
         }
     }
 
@@ -77,6 +79,9 @@ enum ATHLTHQuickStartType: String, Identifiable {
         case .exercises: return ATHLTHLocalization.choose(
             english: "Choose exercises before starting.",
             norwegian: "Velg øvelser før start.")
+        case .competition: return ATHLTHLocalization.choose(
+            english: "Duel, league or cup against other athletes.",
+            norwegian: "Duell, liga eller cup mot andre utøvere.")
         }
     }
 
@@ -86,6 +91,7 @@ enum ATHLTHQuickStartType: String, Identifiable {
         case .route: return "point.topleft.down.to.point.bottomright.curvepath"
         case .workout: return "list.bullet.clipboard"
         case .exercises: return "plus.circle"
+        case .competition: return "trophy"
         }
     }
 }
