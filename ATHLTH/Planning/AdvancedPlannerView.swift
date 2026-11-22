@@ -6742,13 +6742,32 @@ struct SessionEditorView: View {
             do {
                 let live = TrainTogetherLiveDraftStore()
                 await live.refresh(workout.id)
-                if let draft = live.draft {
-                    await live.save(workout, basedOn: draft.revision)
-                    if let issue = live.errorMessage {
-                        invitationError = issue
-                        showingInvitationError = true
-                        return
+                guard let draft = live.draft else {
+                    invitationError = live.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not load the current shared workout.",
+                            norwegian: "Kunne ikke hente gjeldende fellesøkt."
+                        )
+                    showingInvitationError = true
+                    return
+                }
+                await live.save(workout, basedOn: draft.revision)
+                if let issue = live.errorMessage {
+                    // The remote revision remains authoritative; never leave
+                    // the creator's calendar with a rejected local snapshot.
+                    if var latest = live.draft?.workout,
+                       let local = session.standalonePlannedSessions.first(where: {
+                           $0.id == latest.id
+                       }) {
+                        latest.gearIDs = local.gearIDs
+                        latest.spotifyPlaylist = local.spotifyPlaylist
+                        latest.spotifyAutoplayOnStart =
+                            local.spotifyAutoplayOnStart
+                        session.updateStandalonePlannedSession(latest)
                     }
+                    invitationError = issue
+                    showingInvitationError = true
+                    return
                 }
                 let conversation = try await messaging.openConversation(
                     with: partnerID
