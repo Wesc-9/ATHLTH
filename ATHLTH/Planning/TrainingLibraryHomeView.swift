@@ -5619,10 +5619,11 @@ struct LibraryFavoritesView: View {
         } else {
             kindFiltered = favorites.favorites
         }
+        let normalizedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let searchMatches = kindFiltered.filter {
-            searchQuery.isEmpty ||
-            $0.title.localizedStandardContains(searchQuery) ||
-            ($0.subtitle ?? "").localizedStandardContains(searchQuery)
+            normalizedQuery.isEmpty ||
+            $0.title.localizedStandardContains(normalizedQuery) ||
+            ($0.subtitle ?? "").localizedStandardContains(normalizedQuery)
         }
         let visible: [LibraryFavoriteRecord]
         if ownExerciseFavoritesOnly && initialKind == nil {
@@ -5924,7 +5925,9 @@ struct LibraryFavoritesView: View {
                 accent: ATHLTHTheme.premiumGold.opacity(0.20)
             )
         )
-        .navigationTitle("Favorites")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Favorites", norwegian: "Favoritter"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             recents.refresh()
