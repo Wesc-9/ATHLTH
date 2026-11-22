@@ -1025,6 +1025,43 @@ final class LibraryFavoritesStore: ObservableObject {
         self.client = client
     }
 
+    /// Malformed or duplicated remote plans must not hide a working bundled
+    /// plan with the same slug, nor appear as runnable catalog entries.
+    static func mergeValidatedCatalog(
+        remote: [TrainingPlanCatalogEntry]
+    ) -> [TrainingPlanCatalogEntry] {
+        let bundled = TrainingPlanCatalogEntry.bundledCatalog
+        var seenIDs = Set<UUID>()
+        var seenSlugs = Set<String>()
+        let validRemote = remote.filter {
+            $0.hasCompleteWorkoutPattern &&
+            (1...52).contains($0.durationWeeks) &&
+            !$0.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }.sorted {
+            if $0.catalogVersion != $1.catalogVersion {
+                return $0.catalogVersion > $1.catalogVersion
+            }
+            return $0.sortOrder < $1.sortOrder
+        }.filter { plan in
+            guard !seenIDs.contains(plan.id),
+                  !seenSlugs.contains(plan.slug) else { return false }
+            seenIDs.insert(plan.id)
+            seenSlugs.insert(plan.slug)
+            return true
+        }
+        let local = bundled.filter { plan in
+            guard !seenIDs.contains(plan.id),
+                  !seenSlugs.contains(plan.slug) else { return false }
+            seenIDs.insert(plan.id)
+            seenSlugs.insert(plan.slug)
+            return true
+        }
+        return (validRemote + local).sorted {
+            $0.sortOrder == $1.sortOrder
+                ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
+        }
+    }
+
     func refresh(force: Bool = false) async {
         guard let user = client.auth.currentUser else {
             activeUserID = nil
@@ -1659,13 +1696,7 @@ final class TrainingPlanLibraryStore: ObservableObject {
                     .execute()
                     .value
 
-            let remoteSlugs = Set(remote.map(\.slug))
-            let bundled = TrainingPlanCatalogEntry.bundledCatalog
-                .filter { !remoteSlugs.contains($0.slug) }
-            entries = (remote + bundled).sorted {
-                $0.sortOrder == $1.sortOrder
-                    ? $0.title < $1.title : $0.sortOrder < $1.sortOrder
-            }
+            entries = Self.mergeValidatedCatalog(remote: remote)
             loadedRemote = true
             errorMessage = nil
         } catch {
