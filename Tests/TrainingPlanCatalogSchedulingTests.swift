@@ -40,6 +40,56 @@ final class TrainingPlanCatalogSchedulingTests: XCTestCase {
     }
 
     @MainActor
+    func testCatalogStrengthPlansBindToExistingExercisesWhenCallerOmitsLibrary() throws {
+        let suite = "CatalogImplicitExerciseLibrary.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let entry = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
+            $0.slug == "strength-two-day-consistency"
+        })
+        let date = try XCTUnwrap(Calendar.current.date(from:
+            DateComponents(year: 2032, month: 5, day: 10)))
+        let plan = try XCTUnwrap(store.scheduleCatalogPlan(
+            entry, startDate: date, preferredDayIndexes: [2, 5]
+        ))
+        let moves = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+            .flatMap(\.resolvedWorkoutBlocks)
+            .filter { $0.kind == .exercise }
+        XCTAssertGreaterThan(moves.count, 5)
+        XCTAssertTrue(moves.allSatisfy { $0.exerciseID != nil })
+        let validIDs = Set(ExerciseLibraryStore().allExercises.map(\.id))
+        XCTAssertTrue(moves.allSatisfy {
+            $0.exerciseID.map(validIDs.contains) == true
+        })
+    }
+
+    @MainActor
+    func testCatalogRejectsIncompleteExerciseLibraryWithoutSavingPlanOrTemplate() throws {
+        let suite = "CatalogMissingExercises.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let entry = try XCTUnwrap(ATHLTHCuratedTrainingPlans.entries.first {
+            $0.slug == "strength-two-day-consistency"
+        })
+        let unrelated = Array(ExerciseLibraryStore().allExercises.prefix(1))
+        XCTAssertEqual(unrelated.count, 1)
+        let date = try XCTUnwrap(Calendar.current.date(from:
+            DateComponents(year: 2032, month: 5, day: 10)))
+        XCTAssertNil(store.scheduleCatalogPlan(
+            entry, startDate: date, preferredDayIndexes: [2, 5],
+            exerciseLibrary: unrelated
+        ))
+        XCTAssertNil(store.saveCatalogPlanTemplate(
+            entry, preferredDayIndexes: [2, 5],
+            exerciseLibrary: unrelated
+        ))
+        XCTAssertTrue(store.trainingPlans.isEmpty)
+        XCTAssertTrue(store.planTemplates.isEmpty)
+    }
+
+    @MainActor
     func testCatalogRejectsMoreThanSevenDaysInsteadOfSilentlyDroppingWorkouts() {
         let invalid = TrainingPlanCatalogEntry(
             id: UUID(), slug: "invalid-eight-day-catalog",
