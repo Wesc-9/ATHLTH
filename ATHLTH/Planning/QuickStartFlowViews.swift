@@ -1688,6 +1688,7 @@ struct RunQuickStartSheet: View {
         SpotifyPlaylistReference?
     @State private var spotifyAutoplay = false
     @State private var showingSpotifyPicker = false
+    @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
 
     var body: some View {
         NavigationStack {
@@ -1758,7 +1759,7 @@ struct RunQuickStartSheet: View {
                         showOnIPad: $shareThisWorkoutOnIPad,
                         // Installation detection must be verified before
                         // offering a remote live-sharing control.
-                        iPadAvailable: false,
+                        iPadAvailable: registeredIPad.hasRegisteredIPad,
                         detail: { tool in runStartToolDetail(tool) }
                     )
 
@@ -1961,6 +1962,8 @@ struct RunQuickStartSheet: View {
                     )
                     didLoadGuidanceDefaults = true
                 }
+
+                await registeredIPad.refresh(for: session.profile.userID)
 
                 if social.trainingPartners.isEmpty {
                     await social.refresh()
@@ -2786,8 +2789,6 @@ struct RunQuickStartSheet: View {
                 .font(.caption)
                 .padding(.horizontal, 12)
             }
-            ATHLTHLiveWorkoutPrestartToggle(isOn: $shareThisWorkoutOnIPad)
-                .padding(.horizontal, 12)
             if forceBasicSetup {
                 Button {
                     cancelPendingQuickRun()
@@ -3739,6 +3740,7 @@ struct WalkQuickStartSheet: View {
         SpotifyPlaylistReference?
     @State private var spotifyAutoplay = false
     @State private var showingSpotifyPicker = false
+    @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
 
     var body: some View {
         NavigationStack {
@@ -3808,7 +3810,7 @@ struct WalkQuickStartSheet: View {
                         activity: .walking,
                         advanced: isAdvancedSetup,
                         showOnIPad: $shareThisWorkoutOnIPad,
-                        iPadAvailable: false,
+                        iPadAvailable: registeredIPad.hasRegisteredIPad,
                         detail: { tool in walkStartToolDetail(tool) }
                     )
 
@@ -3938,6 +3940,8 @@ struct WalkQuickStartSheet: View {
                     spotify.playlists.isEmpty {
                     await spotify.refreshPlaylists()
                 }
+
+                await registeredIPad.refresh(for: session.profile.userID)
 
                 if social.trainingPartners.isEmpty {
                     await social.refresh()
