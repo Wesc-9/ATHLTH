@@ -6,6 +6,7 @@ import SwiftUI
 struct ATHLTHTournamentGroupConversationView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     let tournament: ATHLTHTournamentRemote
 
@@ -90,6 +91,7 @@ struct ATHLTHTournamentGroupConversationView: View {
         }
         .task(id: displayed.id) {
             await reload()
+            await social.markTournamentInboxRead(displayed.id)
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
                 if Task.isCancelled { break }
