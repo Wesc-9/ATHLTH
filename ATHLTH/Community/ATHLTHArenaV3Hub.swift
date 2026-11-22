@@ -670,13 +670,13 @@ struct ATHLTHArenaV3HomeView: View {
                 } label: {
                     competitionRow(
                         title: tournament.title,
-                        caption: tournament.format.title +
+                        caption: tournament.displayFormatTitle +
                             (tournament.clubID == nil ? "" : " · Klubb"),
                         status: pendingTournamentIDs.contains(tournament.id)
                             ? "Svar på invitasjon" :
                             tournament.status == "completed" ? "Fullført" :
                             tournament.status == "inviting" ? "Invitert" : "Pågår",
-                        symbol: tournament.format.symbol
+                        symbol: tournament.displayFormatSymbol
                     )
                 }
                 .buttonStyle(.plain)
@@ -746,9 +746,9 @@ struct ATHLTHArenaV3HomeView: View {
                     } label: {
                         competitionRow(
                             title: draft.title,
-                            caption: draft.format.title + (draft.clubID == nil ? "" : " · Klubb"),
+                            caption: (draft.singleEventMode ? "Enkeltkonkurranse" : draft.format.title) + (draft.clubID == nil ? "" : " · Klubb"),
                             status: "Utkast",
-                            symbol: draft.format.symbol
+                            symbol: (draft.singleEventMode ? "flag.checkered" : draft.format.symbol)
                         )
                     }
                     .buttonStyle(.plain)
@@ -1047,10 +1047,10 @@ struct ATHLTHArenaClubTournamentSection: View {
                 } label: {
                     competitionRow(
                         title: tournament.title,
-                        info: tournament.format.title + " · " +
+                        info: tournament.displayFormatTitle + " · " +
                             (tournament.status == "completed" ? "Fullført" :
                              tournament.status == "active" ? "Pågår" : "Invitasjoner"),
-                        symbol: tournament.format.symbol
+                        symbol: tournament.displayFormatSymbol
                     )
                 }
                 .buttonStyle(.plain)
@@ -1087,7 +1087,7 @@ struct ATHLTHArenaClubTournamentSection: View {
                     competitionRow(
                         title: draft.title,
                         info: (season?.title ?? "Uten sesong") + " · Utkast",
-                        symbol: draft.format.symbol
+                        symbol: (draft.singleEventMode ? "flag.checkered" : draft.format.symbol)
                     )
                 }
                 .buttonStyle(.plain)
