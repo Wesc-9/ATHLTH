@@ -79,8 +79,37 @@ struct ATHLTHCompetitionAgreement: Codable, Equatable {
     }
 }
 
+enum ATHLTHCompetitionStartMode: String, Codable, CaseIterable, Identifiable {
+    case manual, whenReady = "when_ready", scheduled
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .manual: return "Arrangøren starter når alle er klare"
+        case .whenReady: return "Automatisk når alle er klare"
+        case .scheduled: return "Til valgt dato og klokkeslett"
+        }
+    }
+}
+
+enum ATHLTHCompetitionEnvironment: String, Codable, CaseIterable, Identifiable {
+    case any, outdoor, gym
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .any: return "Ingen begrensning"
+        case .outdoor: return "Kun utendørs"
+        case .gym: return "Kun treningssenter"
+        }
+    }
+}
+
 struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var startsAt: Date? = nil
+    var startMode: ATHLTHCompetitionStartMode = .manual
+    var environment: ATHLTHCompetitionEnvironment = .any
+    var meetingPlace: String = ""
+    var meetingLat: Double? = nil
+    var meetingLon: Double? = nil
     var unlock: ATHLTHCompetitionUnlock = .interval
     var every: Int = 7
     var unit: ATHLTHCompetitionIntervalUnit = .day
@@ -95,7 +124,12 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
             $0 >= now.addingTimeInterval(-120) &&
             $0 <= now.addingTimeInterval(366 * 86_400)
         } ?? true
-        return validStart &&
+        let validVenue = meetingPlace.count <= 240 &&
+            ((meetingLat == nil && meetingLon == nil) ||
+             (meetingLat.map { (-90...90).contains($0) } == true &&
+              meetingLon.map { (-180...180).contains($0) } == true))
+        return validStart && validVenue &&
+            (startMode != .scheduled || startsAt != nil) &&
             (1...unit.maximumCount).contains(every) &&
             ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
             agreement.isValid
@@ -108,4 +142,39 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     /// Server scores a missed exercise as zero after its completion deadline.
     /// This is intentionally not a user-disableable setting.
     var missedExercisePoints: Int { 0 }
+
+    // Existing locally stored drafts predate the new start/venue rules.
+    // Decode missing fields to safe defaults instead of discarding a draft.
+    init() {}
+    private enum CodingKeys: String, CodingKey {
+        case startsAt, startMode, environment, meetingPlace, meetingLat,
+             meetingLon, unlock, every, unit, completionHours,
+             invitationPermission, joinApproval, agreement
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        startsAt = try c.decodeIfPresent(Date.self, forKey: .startsAt)
+        startMode = try c.decodeIfPresent(ATHLTHCompetitionStartMode.self,
+                                          forKey: .startMode) ?? .manual
+        environment = try c.decodeIfPresent(ATHLTHCompetitionEnvironment.self,
+                                            forKey: .environment) ?? .any
+        meetingPlace = try c.decodeIfPresent(String.self,
+                                             forKey: .meetingPlace) ?? ""
+        meetingLat = try c.decodeIfPresent(Double.self, forKey: .meetingLat)
+        meetingLon = try c.decodeIfPresent(Double.self, forKey: .meetingLon)
+        unlock = try c.decodeIfPresent(ATHLTHCompetitionUnlock.self,
+                                       forKey: .unlock) ?? .interval
+        every = try c.decodeIfPresent(Int.self, forKey: .every) ?? 7
+        unit = try c.decodeIfPresent(ATHLTHCompetitionIntervalUnit.self,
+                                     forKey: .unit) ?? .day
+        completionHours = try c.decodeIfPresent(Int.self,
+                             forKey: .completionHours) ?? 48
+        invitationPermission = try c.decodeIfPresent(
+            ATHLTHCompetitionInvitePermission.self,
+            forKey: .invitationPermission) ?? .admin
+        joinApproval = try c.decodeIfPresent(
+            ATHLTHCompetitionJoinApproval.self, forKey: .joinApproval) ?? .admin
+        agreement = try c.decodeIfPresent(
+            ATHLTHCompetitionAgreement.self, forKey: .agreement) ?? .init()
+    }
 }
