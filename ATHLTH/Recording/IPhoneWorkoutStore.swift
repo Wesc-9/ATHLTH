@@ -2824,6 +2824,15 @@ final class IPhoneWorkoutStore:
             syncLiveActivity()
             if let index = workout.structuredStepIndex,
                let steps = workout.structuredRunningWorkout?.steps,
+               steps.indices.contains(index) {
+                NotificationCenter.default.post(
+                    name: Notification.Name("athlth.spotifyWorkoutStepBegan"),
+                    object: nil,
+                    userInfo: ["workoutID": workout.id, "stepIndex": index]
+                )
+            }
+            if let index = workout.structuredStepIndex,
+               let steps = workout.structuredRunningWorkout?.steps,
                steps.indices.contains(index),
                ATHLTHSpotifyIntervalCuePolicy.isEffort(steps[index].phase) {
                 NotificationCenter.default.post(
@@ -4718,8 +4727,13 @@ final class IPhoneWorkoutStore:
             }
             return
         }
-        // The running engine is the single source of interval boundaries.
-        // Spotify only receives this best-effort cue; no recording awaits it.
+        // The running engine owns all boundaries, including active recovery.
+        // Spotify is strictly best effort and never controls the workout clock.
+        NotificationCenter.default.post(
+            name: Notification.Name("athlth.spotifyWorkoutStepBegan"),
+            object: nil,
+            userInfo: ["workoutID": workout.id, "stepIndex": nextIndex]
+        )
         if ATHLTHSpotifyIntervalCuePolicy.isEffort(plan.steps[nextIndex].phase) {
             NotificationCenter.default.post(
                 name: Notification.Name("athlth.spotifyRunEffortBegan"),
