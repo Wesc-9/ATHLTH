@@ -38,6 +38,7 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let completedAt: Date?
     let plannedStartsAt: Date?
     let startMode: String
+    let raceRules: ATHLTHCompetitionRaceRules
     let requiredEnvironment: String
     let meetingPlace: String?
     let meetingLat: Double?
@@ -92,6 +93,7 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         case completedAt = "completed_at"
         case plannedStartsAt = "planned_starts_at"
         case startMode = "start_mode"
+        case raceRules = "race_rules"
         case requiredEnvironment = "required_environment"
         case meetingPlace = "meeting_place"
         case meetingLat = "meeting_lat"
@@ -297,6 +299,7 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let meetingLat: Double?
     let meetingLon: Double?
     let coachExerciseIDs: [UUID]?
+    let raceRules: ATHLTHCompetitionRaceRules
     let invitationDays: Int
     let unansweredPolicy: String
     let allowFeedPost: Bool
@@ -323,6 +326,7 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
         meetingLon = settings.meetingLon
         coachExerciseIDs = settings.coachExerciseIDs.isEmpty
             ? nil : settings.coachExerciseIDs
+        raceRules = settings.race
         invitationDays = settings.invitationDays
         unansweredPolicy = settings.unansweredPolicy.rawValue
         allowFeedPost = settings.allowFeedPost
