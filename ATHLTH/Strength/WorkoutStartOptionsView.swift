@@ -100,10 +100,12 @@ struct WorkoutStartOptionsView: View {
             initialValue: session.exercises
         )
         _startType = State(initialValue:
-            !session.exercises.isEmpty ? .exercises :
-            session.resolvedWorkoutBlocks.contains(where: { $0.kind == .exercise })
-                ? .workout : .free
+            session.workoutBlocks?.contains(where: {
+                $0.kind == .exercise
+            }) == true ? .workout :
+            !session.exercises.isEmpty ? .exercises : .free
         )
+        _selectedGearIDs = State(initialValue: Set(session.gearIDs ?? []))
         _targetHeartRateZone = State(
             initialValue: session.targetAlertConfiguration?.heartRateZone
         )
@@ -600,13 +602,10 @@ struct WorkoutStartOptionsView: View {
 
     let advancedConfiguration =
         StrengthAdvancedConfiguration(
-            spotifyPlaylist:
-                trackingMode == .advanced
-                    ? selectedSpotifyPlaylist
-                    : nil,
-            spotifyAutoplay:
-                trackingMode == .advanced &&
-                spotifyAutoplay,
+            // Music chosen in Basic's collapsed settings is equally valid.
+            spotifyPlaylist: spotify.isConnected ? selectedSpotifyPlaylist : nil,
+            spotifyAutoplay: spotify.isConnected &&
+                selectedSpotifyPlaylist != nil && spotifyAutoplay,
             audioCoach:
                 strengthAudioCoach,
             restCues:
@@ -787,10 +786,154 @@ struct WorkoutStartOptionsView: View {
         .buttonStyle(.plain)
     }
 
+    /// Existing option screens are reused inside the shared tools panel.
+    /// Basic stays one-tap; Advanced exposes the full settings on demand.
+    @ViewBuilder
+    private func strengthStartToolDetail(
+        _ tool: ATHLTHQuickStartTool
+    ) -> some View {
+        switch tool {
+        case .spotify:
+            advancedOptionButton(
+                title: ATHLTHLocalization.choose(
+                    english: "Choose playlist", norwegian: "Velg spilleliste"
+                ),
+                subtitle: spotifySummary,
+                icon: "music.note",
+                tint: ATHLTHPlanDesign.accentInk
+            ) { showingSpotifyPicker = true }
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Start playlist with workout",
+                    norwegian: "Start spillelisten med økten"
+                ),
+                isOn: $spotifyAutoplay
+            )
+            .tint(ATHLTHPlanDesign.accentInk)
+            .disabled(selectedSpotifyPlaylist == nil)
+        case .guidance:
+            advancedOptionButton(
+                title: "Audio Coach",
+                subtitle: strengthAudioCoach.enabled
+                    ? ATHLTHLocalization.choose(
+                        english: "On · adjust", norwegian: "På · juster")
+                    : ATHLTHLocalization.choose(
+                        english: "Off · tap to enable", norwegian: "Av · trykk for å aktivere"),
+                icon: "waveform",
+                tint: ATHLTHPlanDesign.accentInk
+            ) { showingAudioCoachSettings = true }
+            if trackingMode == .advanced {
+                advancedOptionButton(
+                    title: ATHLTHLocalization.choose(
+                        english: "Rest and reminders", norwegian: "Hvile og varsler"
+                    ),
+                    subtitle: restCueSummary,
+                    icon: "timer",
+                    tint: ATHLTHPlanDesign.accentInk
+                ) { showingRestCueSettings = true }
+                advancedOptionButton(
+                    title: ATHLTHLocalization.choose(
+                        english: "Screen and registration",
+                        norwegian: "Skjerm og registrering"
+                    ),
+                    subtitle: displayControlSummary,
+                    icon: "rectangle.and.hand.point.up.left",
+                    tint: ATHLTHPlanDesign.accentInk
+                ) { showingDisplayControls = true }
+                HStack {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Target heart-rate zone",
+                            norwegian: "Målpulssone"
+                        ),
+                        systemImage: "heart.text.square"
+                    )
+                    .font(.subheadline)
+                    Spacer()
+                    Menu {
+                        Button(ATHLTHLocalization.choose(
+                            english: "No target", norwegian: "Ingen mål"
+                        )) { targetHeartRateZone = nil }
+                        ForEach(1...5, id: \.self) { zone in
+                            Button("Sone \(zone)") {
+                                targetHeartRateZone = zone
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(targetHeartRateZone.map {
+                                "Sone \($0)"
+                            } ?? ATHLTHLocalization.choose(
+                                english: "No target", norwegian: "Ingen mål"
+                            ))
+                            Image(systemName: "chevron.down")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                }
+                .frame(minHeight: 44)
+            }
+        case .equipment:
+            WorkoutGearSelectionCard(
+                selectedGearIDs: $selectedGearIDs,
+                activity: .strength
+            )
+            advancedOptionButton(
+                title: ATHLTHLocalization.choose(
+                    english: "Training location",
+                    norwegian: "Treningssted"
+                ),
+                subtitle: selectedTrainingPlace?.name ??
+                    ATHLTHLocalization.choose(
+                        english: "Optional", norwegian: "Valgfritt"
+                    ),
+                icon: "mappin.and.ellipse",
+                tint: ATHLTHPlanDesign.accentInk
+            ) { showingTrainingPlacePicker = true }
+        case .partner:
+            WorkoutFriendPicker(
+                selectedFriendIDs: $selectedFriendIDs
+            )
+            if !selectedFriendIDs.isEmpty {
+                WorkoutSocialModePicker(mode: $socialMode)
+            }
+        case .companion, .iPad:
+            EmptyView()
+        }
+    }
+
     private var configuredSession:
         PlannedSession {
         var configured = session
-        configured.exercises = configuredExercises
+        switch startType {
+        case .free:
+            configured.exercises = []
+            configured.workoutBlocks = nil
+            configured.runningWorkout = nil
+            configured.runningWorkouts = nil
+        case .exercises:
+            configured.exercises = configuredExercises
+            // Directly chosen exercises replace, rather than duplicate,
+            // any older parallel block-based strength recipe.
+            configured.workoutBlocks = nil
+        case .workout:
+            if let chosenStrengthTemplate {
+                configured.title = chosenStrengthTemplate.title
+                configured.durationMinutes = chosenStrengthTemplate.durationMinutes
+                configured.workoutBlocks = ATHLTHUniversalWorkoutExecutionRecipe(
+                    workout: chosenStrengthTemplate
+                ).blocks
+                configured.exercises = chosenStrengthTemplate.exercises
+                configured.kind = .strength
+                configured.workoutCategory = "strength"
+                configured.runningWorkout = nil
+                configured.runningWorkouts = nil
+            }
+        case .route:
+            break
+        }
+        configured.gearIDs = Array(selectedGearIDs)
         configured.plannedTrainingPlace = selectedTrainingPlace
         // A target selected before the workout is preserved for the Watch and
         // the strength log. Measured zones are computed only from actual HR.
