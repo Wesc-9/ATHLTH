@@ -37,6 +37,49 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         return block
     }
 
+    func testPlanWideLookupCachesRepeatedMovementWithoutReplacingForeignUUID() throws {
+        let suite = "CatalogLookupCache.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Repeated strength", summary: "", weekCount: 2,
+            startDate: Date()
+        ))
+        var first = strengthBlock()
+        let firstSession = workout("First", blocks: [first])
+        first.setCount = 3
+        first.repetitions = 8
+        let secondSession = workout("Second", blocks: [first])
+        let foreignID = UUID()
+        var foreign = strengthBlock()
+        foreign.exerciseID = foreignID
+        let foreignSession = workout("Foreign", blocks: [foreign])
+        store.addSession(
+            firstSession, toDay: plan.weeks[0].days[0].id, inPlan: plan.id
+        )
+        store.addSession(
+            secondSession, toDay: plan.weeks[1].days[0].id, inPlan: plan.id
+        )
+        store.addSession(
+            foreignSession, toDay: plan.weeks[1].days[1].id, inPlan: plan.id
+        )
+        var edited = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let report = ATHLTHWorkoutExerciseBinding.bind(
+            &edited, library: ExerciseLibraryStore().allExercises
+        )
+        XCTAssertEqual(report.linked, 2)
+        XCTAssertEqual(report.unresolved, ["Skulderpress"])
+        let steps = edited.weeks.flatMap(\.days).flatMap(\.sessions)
+            .flatMap { $0.workoutBlocks ?? [] }
+        XCTAssertEqual(steps.count, 3)
+        XCTAssertEqual(steps[0].exerciseID, steps[1].exerciseID)
+        XCTAssertEqual(steps[0].setCount, 5)
+        XCTAssertEqual(steps[1].setCount, 3)
+        XCTAssertEqual(steps[1].repetitions, 8)
+        XCTAssertEqual(steps[2].exerciseID, foreignID)
+    }
+
     func testPlanExerciseIdentityLinksWithoutChangingPrescription() throws {
         let library = ExerciseLibraryStore().allExercises
         var session = workout(blocks: [strengthBlock()])
