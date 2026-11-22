@@ -137,7 +137,7 @@ enum ATHLTHCompoundExerciseCatalog {
               work.allSatisfy { abs(($0.durationSeconds ?? -1) - 240) < 2 },
               let first = recovery.first?.durationSeconds,
               [120, 180].contains(Int(first.rounded())),
-              recovery.allSatisfy { abs(($0.durationSeconds ?? -1) - first) < 2 }
+              recovery.allSatisfy({ abs(($0.durationSeconds ?? -1) - first) < 2 })
         else { return nil }
         return Int(first.rounded())
     }
