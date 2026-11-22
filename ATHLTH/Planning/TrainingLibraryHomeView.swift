@@ -4137,10 +4137,15 @@ struct MyTrainingPlansLibraryView: View {
     @State private var visibleStartIndex = 0
     @State private var alphabetJumpRevision = 0
 
+    private var normalizedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var displayedTemplates: [TrainingPlan] {
         ATHLTHLibraryAlphabetSort.sorted(
             session.planTemplates.filter {
-                $0.title.localizedStandardContains(query) &&
+                (normalizedQuery.isEmpty ||
+                 $0.title.localizedStandardContains(normalizedQuery)) &&
                 (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
             }
         ) { $0.title }
@@ -4149,7 +4154,8 @@ struct MyTrainingPlansLibraryView: View {
     private var displayedPlans: [TrainingPlan] {
         ATHLTHLibraryAlphabetSort.sorted(
             session.trainingPlans.filter {
-                $0.title.localizedStandardContains(query) &&
+                (normalizedQuery.isEmpty ||
+                 $0.title.localizedStandardContains(normalizedQuery)) &&
                 (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
             }
         ) { $0.title }
