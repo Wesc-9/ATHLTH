@@ -247,6 +247,10 @@ struct ATHLTHTournamentCreator: View {
                         publicResults: $publicResults,
                         proof: $proofMode
                     )
+                    ATHLTHCompetitionRaceRulesSection(
+                        settings: $competitionSettings,
+                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities
+                    )
                     ATHLTHTournamentCompetitionRulesSection(
                         settings: $competitionSettings,
                         activities: fixedActivity.map { Set([$0]) } ?? allowedActivities
