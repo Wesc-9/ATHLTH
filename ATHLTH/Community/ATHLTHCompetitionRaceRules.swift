@@ -28,6 +28,18 @@ enum ATHLTHCompetitionSprintMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHCompetitionSprintTarget: String, Codable, CaseIterable, Identifiable {
+    case distance, duration, route
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .distance: return "Distanse"
+        case .duration: return "Tid"
+        case .route: return "Rute"
+        }
+    }
+}
+
 /// Requirement is a rule, not a user-editable assertion of device provenance.
 /// Recording origin must be checked against source-workout metadata on server.
 enum ATHLTHCompetitionRecordingDevice: String, Codable, CaseIterable, Identifiable {
@@ -56,6 +68,9 @@ enum ATHLTHCompetitionLapVerification: String, Codable, CaseIterable, Identifiab
 struct ATHLTHCompetitionRaceRules: Codable, Equatable {
     var discipline: ATHLTHCompetitionDiscipline = .workout
     var sprintMode: ATHLTHCompetitionSprintMode = .massStart
+    var sprintTarget: ATHLTHCompetitionSprintTarget = .distance
+    var routeID: UUID? = nil
+    var routeName: String = ""
     var recordingDevice: ATHLTHCompetitionRecordingDevice = .any
     var targetDistanceMeters: Int = 100
     var targetDurationSeconds: Int = 60
@@ -78,11 +93,15 @@ struct ATHLTHCompetitionRaceRules: Codable, Equatable {
               (1...500).contains(lapCount),
               (5...30).contains(countdownSeconds),
               lapCourseName.count <= 120,
+              routeName.count <= 120,
               equipmentRules.count <= 350,
               (lapCourseLatitude == nil && lapCourseLongitude == nil) ||
               (lapCourseLatitude.map { (-90...90).contains($0) } == true &&
                lapCourseLongitude.map { (-180...180).contains($0) } == true)
         else { return false }
+        if discipline == .sprint && sprintTarget == .route && routeID == nil {
+            return false
+        }
         return discipline != .laps ||
             !lapCourseName.trimmingCharacters(in: .whitespaces).isEmpty
     }
