@@ -462,6 +462,13 @@ enum WatchAudioCoachLanguage: String, Codable, CaseIterable, Hashable {
     }
 }
 
+/// Voice output is separate from the device that records the HealthKit workout.
+enum ATHLTHAudioCoachOutputPreference: String, Codable, Hashable, CaseIterable {
+    case automatic
+    case iPhone
+    case appleWatch
+}
+
 struct WatchAudioCoachConfiguration: Codable, Hashable {
     var enabled: Bool
     var language: WatchAudioCoachLanguage
@@ -517,17 +524,25 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     // leaves range. Optional keeps older payloads fully compatible.
     var preferIPhoneAudioWhenReachable: Bool? = nil
 
+    /// Optional so previously saved workout plans remain readable. Watch-only
+    /// is respected even when an older launch explicitly preferred iPhone.
+    var outputPreference: ATHLTHAudioCoachOutputPreference? = nil
+
     // The iPhone sets this on newly prepared mirrored workouts. Old iPhone
     // versions omit it; Watch then follows the previous reachability rule
     // rather than speaking simultaneously with a legacy mirrored phone.
     var useAcknowledgedVoiceLease: Bool? = nil
 
     var shouldPreferIPhoneAudioWhenReachable: Bool {
-        preferIPhoneAudioWhenReachable ?? false
+        if let outputPreference {
+            return outputPreference != .appleWatch
+        }
+        return preferIPhoneAudioWhenReachable ?? false
     }
 
     var shouldUseAcknowledgedVoiceLease: Bool {
-        useAcknowledgedVoiceLease ?? false
+        // New sessions must never infer voice ownership from WC reachability.
+        outputPreference != nil || (useAcknowledgedVoiceLease ?? false)
     }
 
     // Strength-specific Audio Coach cues. Optional fields keep older queued
@@ -823,6 +838,43 @@ enum ATHLTHGuidancePriority:
 /// Short lived, session-bound claim for ordinary mirrored Audio Coach speech.
 /// Only an acknowledged claim allows iPhone to become the voice owner.
 /// Older Watch/iPhone builds ignore these standalone JSON messages.
+/// Sent ONLY over the already mirrored HealthKit workout. A Watch-launched
+/// workout can prepare the companion's coach without a second recorder or
+/// a phone-originated launch. Never persist or send through account relay.
+struct ATHLTHAudioCoachMirrorInvitation: Codable, Hashable {
+    var workoutStartedAt: Date
+    var sentAt: Date
+    var configuration: WatchAudioCoachConfiguration
+
+    func isValid(for start: Date?, now: Date = Date()) -> Bool {
+        guard let start,
+              abs(start.timeIntervalSince(workoutStartedAt)) <= 1,
+              now.timeIntervalSince(sentAt) >= -2,
+              now.timeIntervalSince(sentAt) <= 15,
+              configuration.enabled,
+              configuration.shouldPreferIPhoneAudioWhenReachable,
+              configuration.shouldUseAcknowledgedVoiceLease
+        else { return false }
+        return true
+    }
+}
+
+/// A connected iPhone is not necessarily the user's audio output. Automatic
+/// routing requires a real external output, not proximity alone. An explicit
+/// iPhone preference may also use the built-in speaker.
+enum ATHLTHCoachPhoneOutputPolicy {
+    static func permitsPhone(
+        preference: ATHLTHAudioCoachOutputPreference,
+        externalOutputAvailable: Bool
+    ) -> Bool {
+        switch preference {
+        case .automatic: return externalOutputAvailable
+        case .iPhone: return true
+        case .appleWatch: return false
+        }
+    }
+}
+
 struct ATHLTHAudioCoachLeaseOffer: Codable, Hashable {
     var generationID: UUID
     var requestID: UUID
