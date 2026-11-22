@@ -1035,6 +1035,10 @@ final class LibraryFavoritesStore: ObservableObject {
             bundled.map { ($0.id, $0.slug) },
             uniquingKeysWith: { existing, _ in existing }
         )
+        let bundledBySlug = Dictionary(
+            bundled.map { ($0.slug, $0) },
+            uniquingKeysWith: { existing, _ in existing }
+        )
         var seenIDs = Set<UUID>()
         var seenSlugs = Set<String>()
         let validRemote = remote.filter {
@@ -1043,7 +1047,15 @@ final class LibraryFavoritesStore: ObservableObject {
             !$0.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             // Never allow a different remote slug to steal an ID owned by
             // one of the built-in plans. Existing saved plans use this UUID.
-            (bundledIDs[$0.id] == nil || bundledIDs[$0.id] == $0.slug)
+            (bundledIDs[$0.id] == nil || bundledIDs[$0.id] == $0.slug) &&
+            // Built-in identity includes its workout recipe and time frame.
+            // If those change, the remote edition needs a new slug rather
+            // than misleading existing schedules that carry this identity.
+            (bundledBySlug[$0.slug].map { local in
+                local.durationWeeks == $0.durationWeeks &&
+                local.sessionsPerWeek == $0.sessionsPerWeek &&
+                local.workoutPattern == $0.workoutPattern
+            } ?? true)
         }.sorted {
             if $0.catalogVersion != $1.catalogVersion {
                 return $0.catalogVersion > $1.catalogVersion
