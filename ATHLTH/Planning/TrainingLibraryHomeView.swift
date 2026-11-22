@@ -4264,6 +4264,13 @@ struct MyTrainingPlansLibraryView: View {
         let plans = ATHLTHLibraryAlphabetSort.sorted(
             templates + scheduled
         ) { $0.title }
+        let visiblePlans = ATHLTHLibraryAlphabetWindow.visible(
+            plans, start: visibleStartIndex, limit: visibleLimit
+        )
+        let templateIDs = Set(templates.map(\.id))
+        let scheduledIDs = Set(scheduled.map(\.id))
+        let visibleTemplates = visiblePlans.filter { templateIDs.contains($0.id) }
+        let visibleScheduled = visiblePlans.filter { scheduledIDs.contains($0.id) }
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: plans, id: { $0.id }, title: { $0.title }
         )
@@ -4314,7 +4321,7 @@ struct MyTrainingPlansLibraryView: View {
                     )
                 }
 
-                if !pageTemplates.isEmpty {
+                if !visibleTemplates.isEmpty {
                     planSectionHeader(
                         ATHLTHLocalization.choose(
                             english: "Saved Plans", norwegian: "Lagrede planer"
@@ -4326,7 +4333,7 @@ struct MyTrainingPlansLibraryView: View {
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 10) {
-                        ForEach(pageTemplates) { template in
+                        ForEach(visibleTemplates) { template in
                             if displayMode == .grid {
                                 compactPersonalPlanTile(template, reusable: true)
                             } else {
@@ -4336,7 +4343,7 @@ struct MyTrainingPlansLibraryView: View {
                     }
                 }
 
-                if !pagePlans.isEmpty {
+                if !visibleScheduled.isEmpty {
                     planSectionHeader(
                         ATHLTHLocalization.choose(
                             english: "Scheduled Plans", norwegian: "Planlagte planer"
@@ -4348,7 +4355,7 @@ struct MyTrainingPlansLibraryView: View {
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 12) {
-                    ForEach(pagePlans) { plan in
+                    ForEach(visibleScheduled) { plan in
                         let progress = planProgress(plan)
                         if displayMode == .grid {
                             compactPersonalPlanTile(plan, reusable: false)
@@ -4460,7 +4467,7 @@ struct MyTrainingPlansLibraryView: View {
                 }
 
                 ATHLTHLibraryLoadMoreButton(
-                    shown: pageTemplates.count + pagePlans.count,
+                    shown: visibleTemplates.count + visibleScheduled.count,
                     total: ATHLTHLibraryAlphabetWindow.remaining(
                         total: plans.count, start: visibleStartIndex
                     )
