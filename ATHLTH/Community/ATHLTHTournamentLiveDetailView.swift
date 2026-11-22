@@ -35,6 +35,9 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var selectedGroup = 0
     @State private var pendingWithdrawal: UUID?
     @State private var showingCancelConfirmation = false
+    @State private var nextSeasonDraft: ATHLTHTournamentDraft?
+    @State private var checkingSeasonRenewal = false
+    @State private var seasonNotice: String?
 
     private let cloud = ATHLTHTournamentCloudService()
 
@@ -158,6 +161,32 @@ struct ATHLTHTournamentLiveDetailView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
+        .sheet(item: $nextSeasonDraft) { draft in
+            ATHLTHTournamentCreator(
+                preset: draft.format,
+                fixedClubID: draft.clubID,
+                continuation: draft,
+                onPublished: { _ in
+                    nextSeasonDraft = nil
+                    seasonNotice = "Ny sesong opprettet. Forrige sesongs resultater er bevart."
+                },
+                onSave: { newDraft in
+                    var stored = ATHLTHTournamentDraftStore.load(userID)
+                    stored.append(newDraft)
+                    ATHLTHTournamentDraftStore.save(stored, owner: userID)
+                    nextSeasonDraft = nil
+                    seasonNotice = "Neste sesong er lagret som utkast i Arena."
+                }
+            )
+        }
+        .alert("Sesong", isPresented: Binding(
+            get: { seasonNotice != nil },
+            set: { if !$0 { seasonNotice = nil } }
+        )) {
+            Button("OK") { seasonNotice = nil }
+        } message: {
+            Text(seasonNotice ?? "")
+        }
         .sheet(item: $editingExerciseDeadlines) { match in
             ATHLTHTournamentExerciseDeadlineEditor(match: match) {
                 await reload()
@@ -200,6 +229,41 @@ struct ATHLTHTournamentLiveDetailView: View {
                       systemImage: "shield")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
+            }
+            if ATHLTHTournamentSeasonContinuation.canContinue(
+                format: current.format,
+                status: current.status,
+                ownerID: current.ownerID,
+                currentUserID: userID
+            ) {
+                Button {
+                    Task { await prepareNextSeason() }
+                } label: {
+                    HStack(spacing: 10) {
+                        if checkingSeasonRenewal {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "arrow.clockwise.circle")
+                        }
+                        Text("Fortsett til neste sesong")
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(15)
+                    .background(ATHLTHArenaV3Style.ink,
+                                in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+                .disabled(checkingSeasonRenewal)
+                .accessibilityIdentifier("athlth-tournament-next-season")
+                Text(
+                    "Ny sesong får egen tabell, nye invitasjoner og nullstilte poeng. " +
+                    "Tidligere sesong forblir i historikken."
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
             if current.status == "completed", let winner = champion {
                 HStack(spacing: 9) {
@@ -715,6 +779,36 @@ struct ATHLTHTournamentLiveDetailView: View {
             try await cloud.respond(tournamentID: current.id, accept: accepted)
             await reload()
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func prepareNextSeason() async {
+        guard !checkingSeasonRenewal else { return }
+        guard let candidate = ATHLTHTournamentSeasonContinuation.nextDraft(
+            from: current, entries: entries,
+            athleteNames: names, currentUserID: userID
+        ) else {
+            errorMessage = "Klarte ikke å lage neste sesong fra godkjente deltakere."
+            return
+        }
+        checkingSeasonRenewal = true
+        defer { checkingSeasonRenewal = false }
+        do {
+            let existing = try await cloud.visibleTournaments()
+            if existing.contains(where: {
+                $0.ownerID == userID && $0.title == candidate.title &&
+                    $0.format == candidate.format && $0.status != "cancelled"
+            }) || ATHLTHTournamentDraftStore.load(userID).contains(where: {
+                $0.title == candidate.title && $0.format == candidate.format
+            }) {
+                errorMessage = "En ny sesong med samme navn finnes allerede."
+                return
+            }
+            nextSeasonDraft = candidate
+        } catch {
+            errorMessage = "Kunne ikke kontrollere om neste sesong finnes: " +
+                error.localizedDescription
+        }
     }
 
     @MainActor private func start() async {
