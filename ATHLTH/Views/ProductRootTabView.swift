@@ -5785,6 +5785,7 @@ struct ATHLTHTrainView: View {
     @State private var trainDailyRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var selectedTrainDailyRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var selectedTrainDailySuggestedWorkout: PlannedSession?
+    @State private var selectedTrainStandaloneWorkout: PlannedSession?
     @State private var trainRecommendationRefreshTask: Task<Void, Never>?
     // Reuse the immutable published catalog and search cache already shared
     // with other workout-library entry points. Avoid rebuilding all bundled
@@ -5998,6 +5999,33 @@ struct ATHLTHTrainView: View {
                     .presentationDetents([.fraction(0.82), .large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
+            }
+            .sheet(item: $selectedTrainStandaloneWorkout) { workout in
+                HomeDailyRecommendedWorkoutSheet(
+                    workout: workout,
+                    isPlanWorkout: false,
+                    canStartWithWatch: watchConnection.isReady &&
+                        ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                            workout, device: .appleWatch
+                        ).canUsePreparedWatchTransfer,
+                    onOpenPlannedWorkout: {
+                        beginTrainStandaloneWorkout(workout, device: .iPhone)
+                    },
+                    onStartOnPhone: {
+                        beginTrainStandaloneWorkout(workout, device: .iPhone)
+                    },
+                    onStartOnWatch: {
+                        beginTrainStandaloneWorkout(workout, device: .appleWatch)
+                    },
+                    onSendToWatch: {
+                        beginTrainStandaloneWorkout(workout, device: .appleWatch)
+                    },
+                    isCalendarWorkout: true,
+                    canStart: !hasOngoingTrainWorkout && !workout.isExplicitRestDay &&
+                        session.recordedTimes(for: workout.id)?.endedAt == nil
+                )
+                .presentationDetents([.fraction(0.82), .large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(item: $selectedTrainDailySuggestedWorkout) { workout in
                 HomeDailyRecommendedWorkoutSheet(
@@ -6785,6 +6813,125 @@ struct ATHLTHTrainView: View {
         }
     }
 
+    /// Verify the original calendar record before selecting an existing recorder.
+    private func beginTrainStandaloneWorkout(
+        _ selected: PlannedSession, device: WorkoutCaptureDevice
+    ) {
+        guard let original = session.standalonePlannedSessions.first(where: {
+            $0.id == selected.id
+        }), !original.isExplicitRestDay,
+            session.recordedTimes(for: original.id)?.endedAt == nil,
+            !hasOngoingTrainWorkout else { return }
+
+        selectedTrainStandaloneWorkout = nil
+        if device == .appleWatch {
+            prepareTodayWorkoutForAppleWatch(original, planID: nil)
+            return
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(360))
+            guard !hasOngoingTrainWorkout,
+                  let current = session.standalonePlannedSessions.first(where: {
+                      $0.id == original.id
+                  }), !current.isExplicitRestDay,
+                  session.recordedTimes(for: current.id)?.endedAt == nil
+            else { return }
+
+            if current.isStructuredWorkout {
+                selectedStructuredWorkout = current
+            } else if let timed = ATHLTHUnifiedWorkout.timedNonCardioProjection(from: current) {
+                selectedStructuredWorkout = timed
+            } else if current.kind == .strength {
+                selectedStrengthSession = current
+            } else if current.kind == .running || current.kind == .walking {
+                startTrainStandalonePhoneEndurance(current)
+            } else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "No compatible recorder for this scheduled workout.",
+                    norwegian: "Ingen kompatibel opptaker for denne planlagte økten."
+                )
+            }
+        }
+    }
+
+    /// Use the same authoritative iPhone endurance store as the Home calendar.
+    /// The standalone workout ID is retained even without an active plan.
+    private func startTrainStandalonePhoneEndurance(_ workout: PlannedSession) {
+        guard !hasOngoingTrainWorkout else { return }
+        let treadmill = RunEnvironment.forPlannedSession(workout) == .treadmill
+        let route = treadmill ? nil : PlannedWorkoutWatchBuilder.route(
+            for: workout, routes: session.savedRoutes
+        )
+        guard workout.routeID == nil || route != nil || treadmill else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "The planned route is missing.",
+                norwegian: "Den planlagte ruten mangler."
+            )
+            return
+        }
+        let autoPause = !treadmill && (workout.autoPauseEnabled ??
+            settings.autoPauseOutdoorWorkouts)
+        var alerts = settings.routeAlertConfiguration
+        if treadmill { alerts.enabled = false }
+        let coach = PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+            for: workout, selectedRoute: route,
+            defaultConfiguration: settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault
+            )
+        )
+        if !treadmill, let target = workout.ghostTargetDurationSeconds {
+            guard let route else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "Ghost requires a saved route.",
+                    norwegian: "Ghost krever en lagret rute."
+                )
+                return
+            }
+            do {
+                try ghostRace.prepareTarget(
+                    route: route, targetDurationSeconds: target
+                )
+            } catch {
+                watchTransferError = error.localizedDescription
+                return
+            }
+        } else {
+            ghostRace.cancel()
+        }
+        if let gearIDs = workout.gearIDs {
+            gear.prepareNextWorkoutGear(Set(gearIDs))
+        } else {
+            gear.clearPreparedWorkoutGear()
+        }
+        let transfer = workout.kind == .running
+            ? PlannedWorkoutWatchBuilder.runningTransfer(
+                from: workout, routeAlerts: alerts, autoPauseEnabled: autoPause
+            ) : nil
+        phoneWorkout.start(
+            walking: workout.kind == .walking,
+            route: route, title: workout.title,
+            environment: treadmill ? .treadmill : .outdoor,
+            audioCoach: coach, structuredWorkout: transfer,
+            routeAlerts: alerts,
+            ghostUpdates: treadmill ? nil : workout.ghostUpdates,
+            autoPauseEnabled: autoPause,
+            plannedPlanID: nil, plannedSessionID: workout.id
+        )
+        if let active = phoneWorkout.active {
+            _ = session.recordPlannedWorkoutStarted(
+                workoutID: workout.id, startedAt: active.start
+            )
+            watchConnection.updateLocalWorkoutActivity(
+                isActive: true, title: workout.title
+            )
+            session.beginTrainingStatus(for: workout)
+            WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
+                workout: workout, session: session, settings: settings,
+                spotify: spotifyPlayback
+            )
+        }
+    }
+
     // Every Train section has exactly one shared navigation row, embedded
     // in its scrollable content rather than pinned to the viewport.
     @ViewBuilder
@@ -7278,6 +7425,9 @@ struct ATHLTHTrainView: View {
     private var premiumTodayScreen: some View {
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
+        let standaloneToday = HomeTodayCalendarSchedule.workouts(
+            plan: nil, standalone: session.standalonePlannedSessions, on: Date()
+        ).filter { !$0.isExplicitRestDay }
         let completedIDs: Set<UUID> = active.map {
             completedTodaySessionIDs(
                 planID: $0.id,
@@ -7347,6 +7497,7 @@ struct ATHLTHTrainView: View {
                 isActive: isActive,
             plan: active,
             sessions: sessions,
+            standaloneSessions: standaloneToday,
             completedIDs: completedIDs,
             healthCompletedIDs: healthIDs,
             completionFraction: progress,
@@ -7401,6 +7552,9 @@ struct ATHLTHTrainView: View {
                     workout: workout,
                     isHealthCompleted: healthCompleted
                 )
+            },
+            onOpenStandaloneWorkout: { workout in
+                selectedTrainStandaloneWorkout = workout
             },
             onSendWorkoutToWatch: { workout in
                 guard let active else { return }
@@ -7956,19 +8110,29 @@ struct ATHLTHTrainView: View {
     }
 
     private func prepareTodayWorkoutForAppleWatch(
-        _ selected: PlannedSession, planID: UUID
+        _ selected: PlannedSession, planID: UUID?
     ) {
-        guard watchConnection.isReady,
-              let workout = session.trainingPlan(withID: planID)?
+        let stored = planID.flatMap { id in
+            session.trainingPlan(withID: id)?
                 .weeks.flatMap(\.days).flatMap(\.sessions)
-                .first(where: { $0.id == selected.id }),
+                .first(where: { $0.id == selected.id })
+        } ?? session.standalonePlannedSessions.first(where: { $0.id == selected.id })
+        guard watchConnection.isReady,
+              !hasOngoingTrainWorkout,
+              let workout = stored,
               !workout.isExplicitRestDay,
-              !session.isPlanSessionSkipped(
-                planID: planID, sessionID: workout.id),
-              !session.isPlanSessionCompleted(
-                planID: planID, sessionID: workout.id,
-                healthWorkouts: health.workouts,
-                strengthHistory: strengthWorkout.workoutHistory),
+              session.recordedTimes(for: workout.id)?.endedAt == nil,
+              (planID.map { id in
+                  !session.isPlanSessionSkipped(planID: id, sessionID: workout.id) &&
+                  !session.isPlanSessionCompleted(
+                      planID: id, sessionID: workout.id,
+                      healthWorkouts: health.workouts,
+                      strengthHistory: strengthWorkout.workoutHistory
+                  )
+              } ?? true),
+              ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                  workout, device: .appleWatch
+              ).canUsePreparedWatchTransfer,
               let watchKind = ATHLTHWorkoutCaptureAdmission.watchKind(
                 for: workout)
         else {

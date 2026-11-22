@@ -32,6 +32,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     let plan: TrainingPlan?
     let sessions: [PlannedSession]
+    let standaloneSessions: [PlannedSession]
     let completedIDs: Set<UUID>
     let healthCompletedIDs: Set<UUID>
     let completionFraction: Double
@@ -58,6 +59,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onOpenWorkouts: () -> Void
     let onStartWorkout: (PlannedSession, Bool) -> Void
     let onWorkoutDetails: (PlannedSession, Bool) -> Void
+    let onOpenStandaloneWorkout: (PlannedSession) -> Void
     /// Long-press actions are handled by the owning validated launch flow.
     let onSendWorkoutToWatch: (PlannedSession) -> Void
     let onDelayWorkout: (PlannedSession, TimeInterval) -> Void
@@ -146,6 +148,9 @@ struct ATHLTHTrainTodayPremiumView: View {
                 } else {
                     adaptiveOpenDayCard
                 }
+            } else if !standaloneSessions.isEmpty {
+                // Scheduled standalone sessions are rendered below, not an open-day prompt.
+                EmptyView()
             } else if !hasRecordedWorkoutToday, let dailyRecommendation {
                 dailyRecommendationCard(dailyRecommendation)
             } else {
@@ -153,6 +158,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
 
             remainingTodaySection
+            standaloneTodaySection
             quickTrainSection
 
             // Ghost Race is a primary shortcut, shown before the active goal.
@@ -1649,6 +1655,76 @@ struct ATHLTHTrainTodayPremiumView: View {
                 .contentShape(RoundedRectangle(cornerRadius: 17))
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// Today's independent calendar sessions have the same identity as Home.
+    @ViewBuilder
+    private var standaloneTodaySection: some View {
+        if !standaloneSessions.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(tr("SCHEDULED WORKOUTS", "PLANLAGTE ENKELTØKTER"))
+                    .font(.caption.weight(.semibold))
+                    .tracking(1)
+                    .foregroundStyle(champagne)
+                    .accessibilityAddTraits(.isHeader)
+
+                ForEach(standaloneSessions) { workout in
+                    let finished = session.recordedTimes(for: workout.id)?.endedAt != nil
+                    Button {
+                        onOpenStandaloneWorkout(workout)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: finished ? "checkmark.circle.fill" :
+                                workout.kind.systemImage)
+                                .foregroundStyle(champagne)
+                                .frame(width: 36, height: 36)
+                                .background(ATHLTHTrainDesign.paleGold.opacity(0.4),
+                                            in: RoundedRectangle(cornerRadius: 10))
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                    .lineLimit(2)
+                                HStack(spacing: 5) {
+                                    Text(workout.kind.title)
+                                    if let minutes = workout.durationMinutes {
+                                        Text("· \(minutes) min")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                            }
+                            Spacer(minLength: 4)
+                            if finished {
+                                Text(tr("Done", "Ferdig"))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(champagne)
+                            } else if let scheduled = workout.scheduledStart {
+                                Text(scheduled, style: .time)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(muted)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(champagne)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(minHeight: 52)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(finished
+                        ? tr("View completed workout", "Vis fullført økt")
+                        : tr("Open scheduled workout", "Åpne planlagt økt"))
+                    if workout.id != standaloneSessions.last?.id {
+                        Divider()
+                    }
+                }
+            }
+            .padding(17)
+            .premiumTrainSurface(line: hairline)
         }
     }
 
