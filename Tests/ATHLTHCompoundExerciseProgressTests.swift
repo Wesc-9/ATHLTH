@@ -10,11 +10,15 @@ final class ATHLTHCompoundExerciseProgressTests: XCTestCase {
                 $0.title == "4 × 4 intervaller"
             }
         )
-        return try XCTUnwrap(
-            ATHLTHCompoundExerciseCatalog.build(
-                running: [original], workoutCatalog: [], saved: []
-            ).first
+        // The catalog is sorted by category and title and always includes
+        // other presets. Never confuse the first *visible* exercise with
+        // the source workout whose performed 4×4 protocol we are verifying.
+        let entries = ATHLTHCompoundExerciseCatalog.build(
+            running: [original], workoutCatalog: [], saved: []
         )
+        return try XCTUnwrap(entries.first {
+            $0.sourceIDs.contains(original.id)
+        })
     }
 
     private func recorded() -> [ATHLTHRecordedRunningStep] {
