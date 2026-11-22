@@ -5702,12 +5702,14 @@ struct LibraryFavoritesView: View {
             guard item.itemType == .exercise else { return nil }
             return UUID(uuidString: item.itemID)
         })
-        let exerciseEntries = Dictionary(
-            exerciseLibrary.allExercises.lazy
-                .filter { exerciseIDs.contains($0.id) }
-                .map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        let exerciseEntries: [UUID: ExerciseLibraryEntry] = exerciseIDs.isEmpty
+            ? [:]
+            : Dictionary(
+                exerciseLibrary.allExercises.lazy
+                    .filter { exerciseIDs.contains($0.id) }
+                    .map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: matches, id: { $0.id }, title: { $0.title }
         )
