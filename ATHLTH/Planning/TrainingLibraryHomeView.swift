@@ -2777,9 +2777,9 @@ struct TrainingPlanCatalogDetailView: View {
                             Text(entry.title)
                                 .font(
                                     .system(
-                                        size: 34,
+                                        size: 28,
                                         weight: .semibold,
-                                        design: .serif
+                                        design: .rounded
                                     )
                                 )
                                 .foregroundStyle(
@@ -2790,18 +2790,11 @@ struct TrainingPlanCatalogDetailView: View {
                         Spacer(minLength: 0)
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "About this plan", norwegian: "Om treningsplanen"
-                        ))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(entry.summary)
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineSpacing(2)
-                    }
+                    Text(entry.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if entry.tags.contains("no equipment") {
                         Label(
