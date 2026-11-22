@@ -8,6 +8,7 @@ struct ATHLTHCoachEditorTarget: Identifiable {
     let groupID: UUID?
     let ruleID: UUID?
     let isGroup: Bool
+    var startAtTrigger: Bool = false
 
     static func newGroup() -> Self {
         .init(groupID: nil, ruleID: nil, isGroup: true)
@@ -15,8 +16,9 @@ struct ATHLTHCoachEditorTarget: Identifiable {
     static func newCommand() -> Self {
         .init(groupID: nil, ruleID: nil, isGroup: false)
     }
-    static func group(_ id: UUID) -> Self {
-        .init(groupID: id, ruleID: nil, isGroup: true)
+    static func group(_ id: UUID, editTrigger: Bool = false) -> Self {
+        .init(groupID: id, ruleID: nil, isGroup: true,
+              startAtTrigger: editTrigger)
     }
     static func command(_ id: UUID) -> Self {
         .init(groupID: nil, ruleID: id, isGroup: false)
@@ -80,7 +82,8 @@ struct ATHLTHCoachRuleComposer: View {
         }
 
         _stage = State(initialValue:
-            (target.groupID != nil || target.ruleID != nil) ? .commands :
+            target.startAtTrigger ? .trigger :
+                (target.groupID != nil || target.ruleID != nil) ? .commands :
                 (target.isGroup ? .name : .trigger))
         _groupName = State(initialValue: group?.name ?? "")
         _trigger = State(initialValue: group?.trigger ?? original?.trigger ?? .distance)
