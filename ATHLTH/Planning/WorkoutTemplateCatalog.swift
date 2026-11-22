@@ -261,6 +261,12 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// Exact identifier for personal exercises; never infer two owners'
     /// exercises are equivalent merely from their displayed names.
     var exerciseID: UUID? = nil
+    /// The reusable main-section exercise this step was inserted from.
+    /// Kept distinct from single-movement exerciseID and exerciseSlug.
+    /// Optional so every existing saved workout and Watch recipe still decodes.
+    var compoundExerciseID: String? = nil
+    var compoundExerciseFamilyID: String? = nil
+    var compoundExerciseProtocolID: String? = nil
     /// Optional, so historic note blocks continue decoding unchanged.
     var wellnessKind: WorkoutWellnessKind? = nil
     /// Non-running timed activities remain distinct from running metrics.
@@ -322,6 +328,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.isIndoor == rhs.isIndoor &&
         lhs.exerciseSnapshot == rhs.exerciseSnapshot &&
         lhs.exerciseID == rhs.exerciseID &&
+        lhs.compoundExerciseID == rhs.compoundExerciseID &&
+        lhs.compoundExerciseFamilyID == rhs.compoundExerciseFamilyID &&
+        lhs.compoundExerciseProtocolID == rhs.compoundExerciseProtocolID &&
         lhs.wellnessKind == rhs.wellnessKind &&
         lhs.activityTag == rhs.activityTag
     }
@@ -377,6 +386,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(isIndoor)
         hasher.combine(exerciseSnapshot)
         hasher.combine(exerciseID)
+        hasher.combine(compoundExerciseID)
+        hasher.combine(compoundExerciseFamilyID)
+        hasher.combine(compoundExerciseProtocolID)
         hasher.combine(wellnessKind)
         hasher.combine(activityTag)
     }
@@ -440,6 +452,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case isIndoor = "is_indoor"
         case exerciseSnapshot = "exercise_snapshot"
         case exerciseID = "exercise_id"
+        case compoundExerciseID = "compound_exercise_id"
+        case compoundExerciseFamilyID = "compound_exercise_family_id"
+        case compoundExerciseProtocolID = "compound_exercise_protocol_id"
         case wellnessKind = "wellness_kind"
         case activityTag = "activity_tag"
     }
