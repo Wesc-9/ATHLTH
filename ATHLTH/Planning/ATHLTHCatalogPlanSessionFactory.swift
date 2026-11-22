@@ -56,7 +56,6 @@ enum ATHLTHCatalogPlanSessionFactory {
                 blueprint, week: weekNumber, recovery: recoveryWeek,
                 taper: competitionTaper
             )
-            category = "strength"
         } else if blueprint == .hyroxSkills || blueprint == .hyroxCircuit {
             blocks = hybridBlocks(blueprint, recovery: recoveryWeek,
                                   taper: competitionTaper)
