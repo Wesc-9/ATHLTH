@@ -547,6 +547,9 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         }
 
         switch kind.lowercased() {
+        case ATHLTHPlusGrantNotificationCopy.eventKind:
+            return ATHLTHPlusGrantNotificationCopy.title(norwegian: true)
+
         case "friend_request",
              "follow_request":
             return "Ny følgeforespørsel"
@@ -684,6 +687,9 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
         }
 
         switch kind.lowercased() {
+        case ATHLTHPlusGrantNotificationCopy.eventKind:
+            return ATHLTHPlusGrantNotificationCopy.message(message, norwegian: true)
+
         case "friend_request",
              "follow_request":
             return replacingSuffix(
