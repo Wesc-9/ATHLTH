@@ -246,6 +246,11 @@ enum ATHLTHUniversalActiveCapture {
             return nil
         }
         let current = checkpoint.executionBlocks[checkpoint.currentIndex]
+        guard let liveRoute = ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: checkpoint.workoutID,
+            blocks: checkpoint.executionBlocks,
+            index: checkpoint.currentIndex
+        ) else { return nil }
         // The original workout can be mixed; its ACTIVE stage cannot.
         // Do not advertise a cycling segment as a "hybrid" sport or
         // incorrectly inherit the previous running interval's metrics.
@@ -267,7 +272,9 @@ enum ATHLTHUniversalActiveCapture {
             recordingOwner: .iPhone,
             source: .structuredTimer,
             activityCategory: category,
-            engine: inRest ? .recovery : activeSport.engine,
+            // The same shared router drives the live screen and this
+            // universal snapshot; never recalculate a competing engine.
+            engine: inRest ? .recovery : liveRoute.engine,
             phase: checkpoint.pausedAt != nil ? .paused : (inRest ? .recovery : .work),
             startedAt: checkpoint.startedAt,
             elapsedSeconds: activeSeconds,
