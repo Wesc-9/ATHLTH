@@ -367,6 +367,24 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     /// One spoken heads-up this many seconds before a timed interval ends.
     var intervalCoachCountdownSeconds: TimeInterval? = nil
 
+    // Private session-only launch choices. These values are deliberately
+    // excluded from Codable: workouts shared with friends or saved as public
+    // recipes must never transport an athlete's personal Audio Coach/music.
+    var launchAudioCoachConfiguration: WatchAudioCoachConfiguration? = nil
+    var launchSpotifyPlaylist: SpotifyPlaylistReference? = nil
+    var launchSpotifyAutoplayOnStart: Bool? = nil
+    var launchSpotifyIntervalTrack: ATHLTHSpotifyIntervalTrack? = nil
+    var launchStepSongs: [Int: ATHLTHSpotifyIntervalTrack]? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, type, summary, blocks, routeID, isBuiltIn
+        case createdAt, updatedAt, sharedSourceOwnerID, sharedSourceWorkoutID
+        case intervalGhostPaceSecondsPerKilometer
+        case intervalGhostFollowRecovery, intervalGhostRecoverySlowdownPercent
+        case coachBrief, autoAdvanceTimedSteps, autoStartMainAfterWarmup
+        case intervalCoachCueEverySeconds, intervalCoachCountdownSeconds
+    }
+
     /// Recalculates from every resolved drag and pause, including overrides.
     private var estimateSteps: [RunningStepTarget] {
         blocks.flatMap { block in
