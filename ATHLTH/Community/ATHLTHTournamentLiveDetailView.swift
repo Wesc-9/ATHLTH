@@ -20,6 +20,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     let tournament: ATHLTHTournamentRemote
+    var openChatInitially = false
     @State private var latest: ATHLTHTournamentRemote?
     @State private var entries: [ATHLTHTournamentRemoteEntry] = []
     @State private var matches: [ATHLTHTournamentRemoteMatch] = []
@@ -86,7 +87,8 @@ struct ATHLTHTournamentLiveDetailView: View {
                             tournament: current,
                             entries: entries,
                             names: names,
-                            matches: matches
+                            matches: matches,
+                            openChatInitially: openChatInitially
                         ) {
                             await reload()
                         }
