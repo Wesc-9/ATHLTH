@@ -158,7 +158,12 @@ enum ATHLTHCoachPreferredSystemVoice {
             let locale = voice.language.lowercased()
             return prefixes.contains { locale.hasPrefix($0) }
         }
-        let best = available.sorted { lhs, rhs in
+        // Automatic coaching should never prefer a novelty/effect voice
+        // merely because its identifier sorts first on this iPhone or Watch.
+        let natural = available.filter {
+            !ATHLTHCoachVoiceCatalog.isNovelty(name: $0.name)
+        }
+        let best = (natural.isEmpty ? available : natural).sorted { lhs, rhs in
             if lhs.quality.rawValue != rhs.quality.rawValue {
                 return lhs.quality.rawValue > rhs.quality.rawValue
             }
