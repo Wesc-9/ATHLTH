@@ -26,6 +26,8 @@ struct ATHLTHTournamentCreator: View {
 
     let preset: ATHLTHTournamentFormat
     let fixedClubID: UUID?
+    /// Sports chosen from Quick Train cannot silently change to another mode.
+    let fixedActivity: ATHLTHTournamentActivity?
     let onSave: (ATHLTHTournamentDraft) -> Void
     let onPublished: ((UUID) -> Void)?
     private let tournamentCloud = ATHLTHTournamentCloudService()
@@ -78,16 +80,72 @@ struct ATHLTHTournamentCreator: View {
     init(
         preset: ATHLTHTournamentFormat,
         fixedClubID: UUID?,
+        fixedActivity: ATHLTHTournamentActivity? = nil,
+        initialTitle: String? = nil,
+        continuation: ATHLTHTournamentDraft? = nil,
         onPublished: ((UUID) -> Void)? = nil,
         onSave: @escaping (ATHLTHTournamentDraft) -> Void
     ) {
         self.preset = preset
         self.fixedClubID = fixedClubID
+        self.fixedActivity = fixedActivity
         self.onSave = onSave
         self.onPublished = onPublished
-        _format = State(initialValue: preset)
-        _selectedClubID = State(initialValue: fixedClubID)
-        _inviteSource = State(initialValue: fixedClubID == nil ? .friends : .club)
+        _format = State(initialValue: continuation?.format ?? preset)
+        _title = State(initialValue: continuation?.title ?? initialTitle ?? "")
+        _groupSize = State(initialValue: continuation?.groupSize ?? 4)
+        _qualifiersPerGroup = State(initialValue:
+            continuation?.qualifiersPerGroup ?? 2)
+        _allowedActivities = State(initialValue:
+            Set(continuation?.allowedActivities ??
+                fixedActivity.map { [$0] } ?? []))
+        _rulesAuthority = State(initialValue:
+            continuation?.rulesAuthority ?? .owner)
+        _cadenceDays = State(initialValue:
+            continuation?.cadenceDays ?? 7)
+        _completionHours = State(initialValue:
+            continuation?.completionHours ?? 48)
+        _rotationMode = State(initialValue:
+            continuation?.rotationMode ?? .all)
+        _restWeekdays = State(initialValue:
+            Set(continuation?.restWeekdays ?? []))
+        _winPoints = State(initialValue:
+            continuation?.winPoints ?? 3)
+        _drawPoints = State(initialValue:
+            continuation?.drawPoints ?? 1)
+        _allowExtensions = State(initialValue:
+            continuation?.allowExtensions ?? true)
+        _publicResults = State(initialValue:
+            continuation?.publicResults ?? false)
+        _proofMode = State(initialValue:
+            continuation?.proofMode ?? .opponent)
+        _exerciseMode = State(initialValue:
+            continuation?.exerciseMode ?? .owner)
+        _exerciseCount = State(initialValue:
+            continuation?.exerciseCount ?? 4)
+        _approvePlayerChanges = State(initialValue:
+            continuation?.approvePlayerChanges ?? false)
+        _warmupRounds = State(initialValue:
+            continuation?.warmupRounds ?? [])
+        _proposalsCloseAt = State(initialValue:
+            continuation?.proposalsCloseAt ??
+                Date().addingTimeInterval(2 * 86_400))
+        _votesCloseAt = State(initialValue:
+            continuation?.votesCloseAt ??
+                Date().addingTimeInterval(3 * 86_400))
+        _chosenIDs = State(initialValue: Set(
+            continuation?.participants.map(\.id).filter {
+                $0 != continuation?.ownerID
+            } ?? []
+        ))
+        _chosenNames = State(initialValue:
+            Dictionary(uniqueKeysWithValues: continuation?.participants.map {
+                ($0.id, $0.username)
+            } ?? []))
+        _selectedClubID = State(initialValue:
+            fixedClubID ?? continuation?.clubID)
+        _inviteSource = State(initialValue:
+            (fixedClubID ?? continuation?.clubID) == nil ? .friends : .club)
     }
 
     private var athletes: [ATHLTHTournamentParticipant] {
@@ -107,6 +165,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         athletes.count >= 2 && !busy && !allowedActivities.isEmpty &&
+        (fixedActivity == nil || allowedActivities == [fixedActivity!]) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
         ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
         (inviteSource != .club || selectedClubID != nil) &&
@@ -129,6 +188,14 @@ struct ATHLTHTournamentCreator: View {
                         cadenceDays: $cadenceDays,
                         completionHours: $completionHours
                     )
+                    if let fixedActivity {
+                        Label(
+                            "Konkurransen gjelder bare \(fixedActivity.title)",
+                            systemImage: fixedActivity.symbol
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
                     exerciseRulesSection
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
@@ -263,9 +330,8 @@ struct ATHLTHTournamentCreator: View {
             proposalsCloseAt: exerciseMode == .vote ? proposalsCloseAt : nil,
             votesCloseAt: exerciseMode == .vote ? votesCloseAt : nil,
             approvePlayerChanges: approvePlayerChanges,
-            allowedActivities: allowedActivities.sorted {
-                $0.rawValue < $1.rawValue
-            },
+            allowedActivities: (fixedActivity.map { [$0] } ??
+                allowedActivities.sorted { $0.rawValue < $1.rawValue }),
             rulesAuthority: rulesAuthority,
             cadenceDays: cadenceDays,
             completionHours: completionHours,
