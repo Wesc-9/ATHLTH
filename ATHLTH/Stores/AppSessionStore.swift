@@ -853,6 +853,12 @@ final class AppSessionStore: ObservableObject {
         )
 
         if skipped {
+            // A stale row, foreign plan ID, or rest day must never create
+            // a phantom skipped workout in progress/weekly adherence.
+            guard let planned = trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == sessionID }),
+                !planned.isExplicitRestDay else { return }
             skippedPlanSessions.insert(key)
             manuallyCompletedPlanSessions.remove(key)
         } else {
