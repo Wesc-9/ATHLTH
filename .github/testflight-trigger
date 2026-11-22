@@ -284,3 +284,5 @@ ATHLTH 2.2.6 explicitly authorized gated TestFlight retry after bounded iPhone s
 ATHLTH 2.2.6 gated TestFlight retry after iPhone simulator smoke Debug build fix 87ac0fa, 2026-11-21. Keep all five same-commit gates mandatory.
 
 ATHLTH 2.2.6 gated TestFlight rerun after simulator recovery and bounded diagnostics bd265ac, 2026-11-21. Require all five checks to pass before upload.
+
+ATHLTH 2.2.7 build 135 — explicit user-authorized TestFlight upload 2026-11-22. Universal competition race overlay, verified timing, GPS lap progress and voluntary live position on release/v2.2.7. Five same-commit CI gates required before signing/archiving, no bypass; if failed fix root cause and retrigger on same branch, do not overwrite frozen versions. No claim of delivery until App Store Connect upload confirmed.
