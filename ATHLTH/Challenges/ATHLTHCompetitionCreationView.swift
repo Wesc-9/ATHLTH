@@ -92,8 +92,9 @@ enum ATHLTHCompetitionCreationPolicy {
               !opponents.contains(ownerID),
               opponents.count >= minOpponents(format),
               opponents.count <= 20,
-              endsAt > now.addingTimeInterval(600),
-              endsAt <= now.addingTimeInterval(90 * 86_400)
+              (format != .duel ||
+               (endsAt > now.addingTimeInterval(600) &&
+                endsAt <= now.addingTimeInterval(90 * 86_400)))
         else { return false }
         guard format == .duel else { return true }
 
@@ -527,10 +528,26 @@ struct ATHLTHCompetitionCreationView: View {
                 .foregroundStyle(bronze)
             }
 
-            DatePicker(tr("Competition ends", "Konkurransen avsluttes"),
-                       selection: $endsAt, in: Date().addingTimeInterval(600)...,
-                       displayedComponents: [.date, .hourAndMinute])
+            if format == .duel {
+                DatePicker(tr("Competition ends", "Konkurransen avsluttes"),
+                           selection: $endsAt, in: Date().addingTimeInterval(600)...,
+                           displayedComponents: [.date, .hourAndMinute])
+                    .font(.subheadline)
+            } else {
+                Label(
+                    tr("One round every \(roundsPerWeek) day(s) · \(reviewHours) hours to submit",
+                       "Ny runde hver \(roundsPerWeek). dag · \(reviewHours) timer resultatfrist"),
+                    systemImage: "calendar"
+                )
                 .font(.subheadline)
+                .foregroundStyle(muted)
+                Text(tr(
+                    "The organizer and participants finalize match rules and the schedule in Arena before the tournament starts.",
+                    "Arrangøren og deltakerne fullfører kampregler og tidsplan i Arena før turneringen starter."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+            }
 
             if advanced {
                 if format == .duel && initialActivity != .strength {
