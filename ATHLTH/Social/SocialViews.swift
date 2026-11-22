@@ -1706,30 +1706,6 @@ struct FriendProfileView: View {
                 )
             }
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Choose a challenge",
-                norwegian: "Velg konkurranseform"
-            ),
-            isPresented: $showingArenaChoice,
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Single challenge",
-                norwegian: "Enkeltutfordring"
-            )) {
-                showingChallenge = true
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Competition series",
-                norwegian: "Konkurranseserie"
-            )) {
-                showingArenaCreate = true
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Cancel", norwegian: "Avbryt"
-            ), role: .cancel) {}
-        }
         .sheet(isPresented: $showingArenaCreate) {
             ATHLTHArenaCreateView(
                 ownerID: session.profile.userID,
@@ -2272,6 +2248,30 @@ struct FriendProfileView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .confirmationDialog(
+                    ATHLTHLocalization.choose(
+                        english: "Choose a challenge",
+                        norwegian: "Velg konkurranseform"
+                    ),
+                    isPresented: $showingArenaChoice,
+                    titleVisibility: .visible
+                ) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Single challenge",
+                        norwegian: "Enkeltutfordring"
+                    )) {
+                        showingChallenge = true
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Competition series",
+                        norwegian: "Konkurranseserie"
+                    )) {
+                        showingArenaCreate = true
+                    }
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    ), role: .cancel) {}
+                }
                 .frame(maxWidth: .infinity)
 
                 Button {
