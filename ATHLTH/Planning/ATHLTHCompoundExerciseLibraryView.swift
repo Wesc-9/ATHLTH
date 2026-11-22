@@ -343,6 +343,16 @@ struct ATHLTHCompoundExerciseDetailView: View {
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         .navigationTitle(exercise.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                LibraryFavoriteButton(
+                    kind: .exercise, itemID: exercise.id,
+                    title: exercise.title,
+                    subtitle: exercise.category.title + " · " + exercise.detail,
+                    icon: "figure.run"
+                )
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if let onSelect {
                 Button {
