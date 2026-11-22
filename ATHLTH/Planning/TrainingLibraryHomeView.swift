@@ -972,6 +972,10 @@ final class LibraryFavoritesStore: ObservableObject {
         favorites.filter { $0.itemType == kind }.count
     }
 
+    // Serialize writes per favorite. Otherwise rapid star/unstar actions can
+    // finish out of order on the server and resurrect a removed favorite.
+    private var pendingFavoriteWrites: [String: Task<Void, Never>] = [:]
+
     func toggle(
         _ kind: LibraryFavoriteKind,
         itemID: String,
@@ -997,33 +1001,16 @@ final class LibraryFavoritesStore: ObservableObject {
 
         localMutationRevision += 1
         lastRefreshAt = nil
+        let key = "\(user.id)|\(kind.rawValue)|\(itemID)"
+        let previous = pendingFavoriteWrites[key]
+        let record: LibraryFavoriteRecord?
         if isFavorite(kind, itemID: itemID) {
             favorites.removeAll {
-                $0.itemType == kind &&
-                $0.itemID == itemID
+                $0.itemType == kind && $0.itemID == itemID
             }
-            persistLocal()
-
-            Task {
-                do {
-                    try await client
-                        .from("library_favorites")
-                        .delete()
-                        .eq("user_id", value: user.id)
-                        .eq("item_type", value: kind.rawValue)
-                        .eq("item_id", value: itemID)
-                        .execute()
-                    guard activeUserID == user.id,
-                          client.auth.currentUser?.id == user.id else { return }
-                    errorMessage = nil
-                } catch {
-                    guard activeUserID == user.id,
-                          client.auth.currentUser?.id == user.id else { return }
-                    errorMessage = error.localizedDescription
-                }
-            }
+            record = nil
         } else {
-            let record = LibraryFavoriteRecord(
+            let added = LibraryFavoriteRecord(
                 userID: user.id,
                 itemType: kind,
                 itemID: itemID,
@@ -1032,23 +1019,37 @@ final class LibraryFavoritesStore: ObservableObject {
                 icon: icon,
                 createdAt: Date()
             )
-            favorites.insert(record, at: 0)
-            persistLocal()
+            favorites.insert(added, at: 0)
+            record = added
+        }
+        persistLocal()
 
-            Task {
-                do {
+        pendingFavoriteWrites[key] = Task {
+            // Wait for the preceding write to complete before applying the
+            // next requested state of this exact favorite.
+            await previous?.value
+            do {
+                if let record {
                     try await client
                         .from("library_favorites")
                         .upsert(record)
                         .execute()
-                    guard activeUserID == user.id,
-                          client.auth.currentUser?.id == user.id else { return }
-                    errorMessage = nil
-                } catch {
-                    guard activeUserID == user.id,
-                          client.auth.currentUser?.id == user.id else { return }
-                    errorMessage = error.localizedDescription
+                } else {
+                    try await client
+                        .from("library_favorites")
+                        .delete()
+                        .eq("user_id", value: user.id)
+                        .eq("item_type", value: kind.rawValue)
+                        .eq("item_id", value: itemID)
+                        .execute()
                 }
+                guard activeUserID == user.id,
+                      client.auth.currentUser?.id == user.id else { return }
+                errorMessage = nil
+            } catch {
+                guard activeUserID == user.id,
+                      client.auth.currentUser?.id == user.id else { return }
+                errorMessage = error.localizedDescription
             }
         }
     }
