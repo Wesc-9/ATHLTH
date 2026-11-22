@@ -48,6 +48,7 @@ struct ATHLTHTournamentCreator: View {
     @State private var restWeekdays: Set<Int> = []
     @State private var winPoints = 3
     @State private var drawPoints = 1
+    @State private var competitionSettings = ATHLTHTournamentCompetitionSettings()
     @State private var allowExtensions = true
     @State private var publicResults = false
     @State private var proofMode: ATHLTHTournamentProofMode = .opponent
@@ -117,6 +118,8 @@ struct ATHLTHTournamentCreator: View {
             continuation?.winPoints ?? 3)
         _drawPoints = State(initialValue:
             continuation?.drawPoints ?? 1)
+        _competitionSettings = State(initialValue:
+            continuation?.competitionSettings ?? .init())
         _allowExtensions = State(initialValue:
             continuation?.allowExtensions ?? true)
         _publicResults = State(initialValue:
@@ -170,6 +173,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         athletes.count >= 2 && !busy && !allowedActivities.isEmpty &&
+        competitionSettings.isValid &&
         (fixedActivity.map { allowedActivities == Set([$0]) } ?? true) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
         ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
@@ -219,6 +223,9 @@ struct ATHLTHTournamentCreator: View {
                         allowExtensions: $allowExtensions,
                         publicResults: $publicResults,
                         proof: $proofMode
+                    )
+                    ATHLTHTournamentCompetitionRulesSection(
+                        settings: $competitionSettings
                     )
                     warmupSection
                     if format == .groups { groupsSection }
@@ -355,7 +362,8 @@ struct ATHLTHTournamentCreator: View {
             publicResults: publicResults,
             allowExtensions: allowExtensions,
             winPoints: winPoints,
-            drawPoints: drawPoints
+            drawPoints: drawPoints,
+            competitionSettings: competitionSettings
         )
     }
 
