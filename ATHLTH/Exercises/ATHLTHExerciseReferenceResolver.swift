@@ -405,6 +405,16 @@ enum ATHLTHExerciseReferenceResolver {
         guard source.source == .athlthCatalog,
               source.sourceIdentifier?.hasPrefix("athlth-native-") == true
         else { return source }
+        // Resolve the retired native alias to the exact reviewed RepDB ID.
+        // Never substitute a merely similar exercise or a private record.
+        if source.sourceIdentifier == "athlth-native-incline-dumbbell-bench-press" {
+            let reviewed = library.filter {
+                $0.source == .repDB &&
+                $0.sourceIdentifier == "incline-dumbbell-bench-press" &&
+                key($0.canonicalName) == key("Incline Dumbbell Bench Press")
+            }
+            if reviewed.count == 1 { return reviewed[0] }
+        }
         let exactName = key(source.canonicalName)
         let equipment = Set(source.exercise.equipment.map(key))
         let identical = library.filter { entry in
