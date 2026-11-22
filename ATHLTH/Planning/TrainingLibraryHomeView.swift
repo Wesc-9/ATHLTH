@@ -895,6 +895,19 @@ final class LibraryFavoritesStore: ObservableObject {
             name: "libraryFavoritePendingChanges",
             userID: userID
         ) ?? [:]
+        // Reapply durable offline edits immediately after app relaunch or
+        // account switch, before any remote refresh can complete.
+        favorites = mergePendingChanges(into: favorites)
+    }
+
+    private func mergePendingChanges(
+        into serverRows: [LibraryFavoriteRecord]
+    ) -> [LibraryFavoriteRecord] {
+        let pending = Array(pendingChanges.values)
+        let pendingIDs = Set(pending.map { "\($0.kind.rawValue)|\($0.itemID)" })
+        return serverRows.filter {
+            !pendingIDs.contains("\($0.itemType.rawValue)|\($0.itemID)")
+        } + pending.compactMap(\.record)
     }
 
     private func persistPendingChanges(for userID: UUID) {
@@ -1020,12 +1033,7 @@ final class LibraryFavoritesStore: ObservableObject {
             guard requestedRevision == localMutationRevision else { return }
             // Preserve locally requested changes if the server is still
             // unavailable; retry them at the next refresh.
-            let pending = pendingChanges.values
-            let pendingIDs = Set(pending.map { "\($0.kind.rawValue)|\($0.itemID)" })
-            let resolvedRows = rows.filter {
-                !pendingIDs.contains("\($0.itemType.rawValue)|\($0.itemID)")
-            } + pending.compactMap(\.record)
-            favorites = resolvedRows
+            favorites = mergePendingChanges(into: rows)
             lastRefreshAt = pendingChanges.isEmpty ? Date() : nil
             persistLocal()
             if pendingChanges.isEmpty { errorMessage = nil }
