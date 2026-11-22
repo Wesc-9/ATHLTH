@@ -1759,7 +1759,7 @@ struct RunQuickStartSheet: View {
                         showOnIPad: $shareThisWorkoutOnIPad,
                         // Installation detection must be verified before
                         // offering a remote live-sharing control.
-                        iPadAvailable: registeredIPad.hasRegisteredIPad,
+                        iPadAvailable: ATHLTHDeviceRole.isIPhone && registeredIPad.hasRegisteredIPad,
                         detail: { tool in runStartToolDetail(tool) }
                     )
 
@@ -3750,7 +3750,7 @@ struct WalkQuickStartSheet: View {
                         activity: .walking,
                         advanced: isAdvancedSetup,
                         showOnIPad: $shareThisWorkoutOnIPad,
-                        iPadAvailable: registeredIPad.hasRegisteredIPad,
+                        iPadAvailable: ATHLTHDeviceRole.isIPhone && registeredIPad.hasRegisteredIPad,
                         detail: { tool in walkStartToolDetail(tool) }
                     )
 
