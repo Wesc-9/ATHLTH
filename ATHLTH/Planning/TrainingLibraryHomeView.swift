@@ -977,7 +977,10 @@ final class LibraryFavoritesStore: ObservableObject {
             loadPendingChanges(for: user.id)
         }
 
+        // Pending offline mutations must be retried on every library
+        // refresh, even within the normal two-minute cache window.
         if !force,
+           pendingChanges.isEmpty,
            let lastRefreshAt,
            Date().timeIntervalSince(lastRefreshAt) < 120 {
             return
@@ -1022,9 +1025,9 @@ final class LibraryFavoritesStore: ObservableObject {
                 !pendingIDs.contains("\($0.itemType.rawValue)|\($0.itemID)")
             } + pending.compactMap(\.record)
             favorites = resolvedRows
-            lastRefreshAt = Date()
+            lastRefreshAt = pendingChanges.isEmpty ? Date() : nil
             persistLocal()
-            errorMessage = nil
+            if pendingChanges.isEmpty { errorMessage = nil }
         } catch {
             guard activeUserID == user.id,
                   refreshRequestID == requestID,
