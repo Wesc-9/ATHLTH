@@ -37,6 +37,12 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let startedAt: Date?
     let completedAt: Date?
     let plannedStartsAt: Date?
+    let startMode: String
+    let requiredEnvironment: String
+    let meetingPlace: String?
+    let meetingLat: Double?
+    let meetingLon: Double?
+    let simpleMode: Bool
     let releaseMode: String
     let releaseEvery: Int
     let releaseUnit: String
@@ -80,6 +86,12 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         case startedAt = "started_at"
         case completedAt = "completed_at"
         case plannedStartsAt = "planned_starts_at"
+        case startMode = "start_mode"
+        case requiredEnvironment = "required_environment"
+        case meetingPlace = "meeting_place"
+        case meetingLat = "meeting_lat"
+        case meetingLon = "meeting_lon"
+        case simpleMode = "simple_mode"
         case releaseMode = "release_mode"
         case releaseEvery = "release_every"
         case releaseUnit = "release_unit"
@@ -237,6 +249,11 @@ private struct ATHLTHTournamentCreateParams: Encodable {
 
 private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let startsAt: String?
+    let startMode: String
+    let environment: String
+    let meetingPlace: String?
+    let meetingLat: Double?
+    let meetingLon: Double?
     let unlock: String
     let every: Int
     let unit: String
@@ -253,6 +270,11 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
         startsAt = settings.startsAt.map {
             ISO8601DateFormatter().string(from: $0)
         }
+        startMode = settings.startMode.rawValue
+        environment = settings.environment.rawValue
+        meetingPlace = settings.meetingPlace.isEmpty ? nil : settings.meetingPlace
+        meetingLat = settings.meetingLat
+        meetingLon = settings.meetingLon
         unlock = settings.unlock.rawValue
         every = settings.every
         unit = settings.unit.rawValue
