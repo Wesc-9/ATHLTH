@@ -1121,9 +1121,6 @@ struct ATHLTHHomeView: View {
     @State private var homeSocialLoadAccountID: UUID?
     @State private var showingHomeTodayCalendarAll = false
     @State private var showingHomeSocialInbox = false
-    @State private var showingHomeCalendarWorkoutPicker = false
-    @State private var homeCalendarPendingKind: WorkoutKind?
-    @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
     @State private var selectedHomeCompletedWorkout: SocialPublishableWorkout?
     @State private var homeDeferredPhoneWorkout: PlannedSession?
@@ -1673,20 +1670,6 @@ struct ATHLTHHomeView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
-            }
-            .sheet(isPresented: $showingHomeCalendarWorkoutPicker, onDismiss: {
-                if let kind = homeCalendarPendingKind {
-                    homeCalendarPendingKind = nil
-                    pendingHomeQuickStartKind = kind
-                } else if homeCalendarPendingCustom {
-                    homeCalendarPendingCustom = false
-                    onOpenTrain(.customQuick)
-                }
-            }) {
-                homeCalendarWorkoutPicker
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
             }
             .sheet(isPresented: $showingHomeTodayCalendarAll) {
                 homeTodayCalendarAllSheet
@@ -2324,9 +2307,10 @@ struct ATHLTHHomeView: View {
         homeWorkoutsThisWeek.count
     }
 
-    // The calendar keeps its place; a useful daily insight replaces the
-    // former Home goal shortcut without deleting any saved goals.
+    // Two real scheduled workouts fit in both compact Home cards.
+    // Keep a little breathing room for localized titles.
     private let homeCalendarContentMinHeight: CGFloat = 70
+    private let homeFriendsCalendarCardHeight: CGFloat = 154
 
     private var homeChallengeInvitationCount: Int {
         challenges.incomingInvitations(for: session.profile.userID).count
@@ -2508,8 +2492,13 @@ struct ATHLTHHomeView: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .padding(10)
+        .frame(
+            height: homeDynamicTypeSize.isAccessibilitySize
+                ? nil : homeFriendsCalendarCardHeight,
+            alignment: .topLeading
+        )
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -2593,9 +2582,9 @@ struct ATHLTHHomeView: View {
         let tournamentItems = tournamentCalendar.events(on: Date())
         // Coaching text is now below Friends, never duplicated here.
 
-        let visibleWorkoutCount = tournamentItems.isEmpty
-            ? min(todayWorkouts.count, 2)
-            : min(todayWorkouts.count, 1)
+        // Prioritize up to two actual workouts even when a tournament
+        // also has an event today; other events use remaining slots.
+        let visibleWorkoutCount = min(todayWorkouts.count, 2)
         let visibleCompletedCount = min(
             completedToday.count, max(0, 2 - visibleWorkoutCount)
         )
@@ -2789,9 +2778,8 @@ struct ATHLTHHomeView: View {
                     alignment: .top
                 )
             } else {
-                // Center the empty calendar state within the space below
-                // the header. Keep its call to action a little lower, without
-                // changing the height shared with the recommendation card.
+                // Show a quiet empty state only; starting a workout belongs
+                // in Training, not in the compact Home calendar preview.
                 VStack(alignment: .center, spacing: 8) {
                     Image(systemName: "calendar")
                         .font(.system(size: 19, weight: .light))
@@ -2803,27 +2791,6 @@ struct ATHLTHHomeView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                     .multilineTextAlignment(.center)
-                    Button {
-                        showingHomeCalendarWorkoutPicker = true
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Start a workout",
-                                norwegian: "Start en økt"
-                            ),
-                            systemImage: "plus"
-                        )
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .padding(.horizontal, 11)
-                        .frame(minHeight: 44)
-                        .background(
-                            ATHLTHTrainDesign.paleGold.opacity(0.35),
-                            in: Capsule()
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 8)
                 }
                 .frame(
                     maxWidth: .infinity,
@@ -2838,8 +2805,11 @@ struct ATHLTHHomeView: View {
         .padding(10)
         .frame(
             maxWidth: .infinity,
-            minHeight: 148,
-            maxHeight: .infinity,
+            alignment: .topLeading
+        )
+        .frame(
+            height: homeDynamicTypeSize.isAccessibilitySize
+                ? nil : homeFriendsCalendarCardHeight,
             alignment: .topLeading
         )
         .background(
@@ -2853,91 +2823,6 @@ struct ATHLTHHomeView: View {
         }
     }
 
-
-    private var homeCalendarWorkoutPicker: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "What would you like to train?",
-                        norwegian: "Hva vil du trene?"
-                    ))
-                    .font(.system(size: 22, weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose a category to configure your workout.",
-                        norwegian: "Velg en kategori for å tilpasse økten."
-                    ))
-                    .font(.system(size: 12))
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach([WorkoutKind.running, .walking, .strength]) { kind in
-                            Button {
-                                homeCalendarPendingKind = kind
-                                showingHomeCalendarWorkoutPicker = false
-                            } label: {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Image(systemName: kind.systemImage)
-                                        .font(.system(size: 21, weight: .medium))
-                                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                    Text(kind.title)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                                    Spacer(minLength: 0)
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                                .padding(14)
-                                .background(.white, in: RoundedRectangle(cornerRadius: 18))
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        Button {
-                            homeCalendarPendingCustom = true
-                            showingHomeCalendarWorkoutPicker = false
-                        } label: {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Image(systemName: "plus.circle")
-                                    .font(.system(size: 21))
-                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Other activities",
-                                    norwegian: "Andre aktiviteter"
-                                ))
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(ATHLTHTrainDesign.ink)
-                                Spacer(minLength: 0)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                            .padding(14)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 18))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(phoneWorkout.active != nil ||
-                            strengthWorkout.activeWorkout != nil ||
-                            watchConnection.hasActiveWatchWorkout)
-                    }
-                }
-                .padding(22)
-            }
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(ATHLTHLocalization.choose(
-                english: "New workout", norwegian: "Ny treningsøkt"
-            ))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Close", norwegian: "Lukk"
-                    )) {
-                        showingHomeCalendarWorkoutPicker = false
-                    }
-                }
-            }
-        }
-    }
 
     /// A guest's partner is the organizer; an organizer's partner is
     /// the invited athlete. Prefer the public @username if available.
