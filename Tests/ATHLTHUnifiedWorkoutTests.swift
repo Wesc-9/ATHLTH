@@ -194,7 +194,7 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         XCTAssertEqual(workout.kind, .walking)
     }
 
-    func testRunAndWalkTogetherIsHybrid() {
+    func testRunWalkIntervalsStayOneEnduranceWorkout() {
         var run = WorkoutTemplateBlock(
             sequence: 1, kind: .run, title: "Run",
             exerciseSlug: nil, distanceMeters: nil,
@@ -209,8 +209,18 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
             blocks: [run, walk], title: "Mixed", routeID: nil,
             estimatedMinutes: 8, to: &workout
         )
-        XCTAssertEqual(workout.kind, .custom)
-        XCTAssertEqual(workout.workoutCategory, "hybrid")
+        XCTAssertEqual(workout.kind, .running)
+        XCTAssertEqual(workout.workoutCategory, "running")
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.map(\.cardioActivity),
+                       [.running, .walking])
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(workout, device: .iPhone),
+            .phoneEndurance
+        )
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutCaptureRoute.resolve(workout, device: .appleWatch),
+            .watchEndurance
+        )
     }
 
 
