@@ -105,14 +105,6 @@ struct ATHLTHAudioCoachCircleOverview: View {
                 }
                 .accessibilityLabel(tr("New empty template", "Lag ny tom mal"))
                 .accessibilityIdentifier("athlth-coach-new-template-icon")
-                Button(action: onSaveTemplate) {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.title3)
-                        .frame(width: 44, height: 44)
-                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
-                }
-                .accessibilityLabel(tr("Save template", "Lagre mal"))
-                .accessibilityIdentifier("athlth-coach-save-template-icon")
             }
 
             HStack(spacing: 8) {
