@@ -575,6 +575,7 @@ struct PlannedWorkoutLobbyView: View {
     @State private var confirmingCancelWorkout = false
     @State private var chatPartner: SocialProfileCard?
     @State private var reminderInFlight: Set<UUID> = []
+    @StateObject private var sharedDraft = TrainTogetherLiveDraftStore()
 
     private let service = SupabaseMessagingService()
 
@@ -632,9 +633,15 @@ struct PlannedWorkoutLobbyView: View {
     }
 
     private var canLaunchWorkout: Bool {
-        onStartWorkout != nil &&
-        (workout.kind == .running || workout.kind == .walking ||
-         workout.kind == .strength)
+        // Planning covers all WorkoutKind cases; the recording callback
+        // remains responsible for rejecting unsupported capture devices.
+        onStartWorkout != nil
+    }
+
+    private var canEnterReadyLobby: Bool {
+        // Existing invitations (before the live-draft migration) keep their
+        // old behavior. New invitations require both approvals of one revision.
+        sharedDraft.draft?.bothApproved ?? true
     }
 
     private var isOrganizer: Bool {
@@ -643,7 +650,6 @@ struct PlannedWorkoutLobbyView: View {
 
     private var inviteeForReadyLobby: SocialProfileCard? {
         guard isOrganizer,
-              workout.trainTogetherMode == .physical,
               let invitedPartnerID = workout.invitedPartnerID else {
             return nil
         }
@@ -675,6 +681,9 @@ struct PlannedWorkoutLobbyView: View {
             VStack(alignment: .leading, spacing: 17) {
                 headerCard
                 workoutCard
+                if sharedDraft.draft != nil {
+                    sharedPlanningCard
+                }
                 participantsCard
                 startOptionsCard
                 if isOrganizer {
@@ -739,6 +748,7 @@ struct PlannedWorkoutLobbyView: View {
             ))
         }
         .task(id: sourceWorkoutID) {
+            await sharedDraft.refresh(sourceWorkoutID)
             await refresh()
             if workout.invitedPartnerID != nil &&
                inviteeForReadyLobby == nil {
@@ -761,6 +771,55 @@ struct PlannedWorkoutLobbyView: View {
                     break
                 }
                 await refresh()
+                await sharedDraft.refresh(sourceWorkoutID, quiet: true)
+            }
+        }
+        .task(id: sourceWorkoutID) {
+            await sharedDraft.watch(sourceWorkoutID)
+        }
+    }
+
+    private var sharedPlanningCard: some View {
+        ATHLTHTrainTogetherSurface {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Build and approve together",
+                        norwegian: "Bygg og godkjenn sammen"
+                    ),
+                    systemImage: "person.2.fill"
+                )
+                .font(.headline)
+
+                NavigationLink {
+                    TrainTogetherLiveDraftRoomView(
+                        sourceWorkoutID: sourceWorkoutID,
+                        fallbackWorkout: sharedDraft.draft?.workout ?? workout
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Open live planning lobby",
+                            norwegian: "Åpne planleggingslobbyen"
+                        ),
+                        systemImage: "square.and.pencil"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTrainTogetherDesign.accent)
+
+                Text(canEnterReadyLobby
+                    ? ATHLTHLocalization.choose(
+                        english: "Approved by both. Ready lobby is available.",
+                        norwegian: "Godkjent av begge. Klar-lobbyen er tilgjengelig."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Both must approve the latest workout before Ready.",
+                        norwegian: "Begge må godkjenne siste versjon før dere kan trykke Klar."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
             }
         }
     }
@@ -928,7 +987,7 @@ struct PlannedWorkoutLobbyView: View {
                 .font(.headline)
                 .foregroundStyle(ATHLTHTheme.primaryText)
 
-                if isOrganizer && workout.trainTogetherMode == .physical {
+                if isOrganizer && inviteeForReadyLobby != nil {
                     if let friend = inviteeForReadyLobby {
                         Button {
                             if matchingReadyLobbyID != nil {
@@ -956,6 +1015,7 @@ struct PlannedWorkoutLobbyView: View {
                         .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
                             openingReadyLobby || !canLaunchWorkout ||
+                            !canEnterReadyLobby ||
                             (social.coordinatedLobbySessionID != nil &&
                              matchingReadyLobbyID == nil)
                         )
@@ -977,8 +1037,7 @@ struct PlannedWorkoutLobbyView: View {
                 }
 
                 if canLaunchWorkout &&
-                    !(isOrganizer && workout.trainTogetherMode == .physical &&
-                      inviteeForReadyLobby != nil) {
+                    !(isOrganizer && inviteeForReadyLobby != nil) {
                     HStack(spacing: 9) {
                         Button {
                             startIndependently(using: .iPhone)
@@ -996,7 +1055,8 @@ struct PlannedWorkoutLobbyView: View {
                         .buttonStyle(.bordered)
                         .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
-                            openingReadyLobby || persistedWorkout == nil ||
+                            openingReadyLobby || !canEnterReadyLobby ||
+                            persistedWorkout == nil ||
                             social.coordinatedLobbySessionID != nil
                         )
 
@@ -1016,7 +1076,7 @@ struct PlannedWorkoutLobbyView: View {
                         .buttonStyle(.bordered)
                         .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
-                            openingReadyLobby ||
+                            openingReadyLobby || !canEnterReadyLobby ||
                             persistedWorkout == nil ||
                             !watchConnection.isVerifiedForLiveLaunch ||
                             social.coordinatedLobbySessionID != nil
@@ -1041,7 +1101,7 @@ struct PlannedWorkoutLobbyView: View {
 
     private func startIndependently(using device: WorkoutCaptureDevice) {
         guard let persistedWorkout, canLaunchWorkout,
-              !openingReadyLobby,
+              canEnterReadyLobby, !openingReadyLobby,
               social.coordinatedLobbySessionID == nil else {
             return
         }
@@ -1050,7 +1110,8 @@ struct PlannedWorkoutLobbyView: View {
 
     @MainActor
     private func openReadyLobby(with friend: SocialProfileCard) async {
-        guard !openingReadyLobby, canLaunchWorkout,
+        await sharedDraft.refresh(sourceWorkoutID)
+        guard !openingReadyLobby, canLaunchWorkout, canEnterReadyLobby,
               social.coordinatedLobbySessionID == nil,
               let persistedWorkout,
               persistedWorkout.invitedPartnerID == friend.userID else {
@@ -1069,7 +1130,8 @@ struct PlannedWorkoutLobbyView: View {
             creatorUsername: session.profile.username,
             invitePayload: SocialWorkoutInvitePayload(
                 workout: persistedWorkout,
-                participationMode: .physical,
+                participationMode: persistedWorkout.trainTogetherMode == .sameWorkout
+                    ? .remote : .physical,
                 maxParticipants: 2,
                 startIndependently: false
             ),
