@@ -591,6 +591,15 @@ final class ExerciseLibraryStore: ObservableObject {
             (nameAndID.contains("press") || nameAndID.contains("bench")) {
             words.append("Skråbenk med manualer")
         }
+        // Search synonyms for confirmed barbell deadlift identities. Exact
+        // movement variants remain separate: Romanian is never "Markløft".
+        let sourceName = ATHLTHExerciseReferenceResolver.key(englishName)
+        if ["deadlift", "conventional deadlift", "barbell deadlift"]
+            .contains(sourceName) {
+            words.append("Markløft")
+        } else if sourceName == "romanian deadlift" {
+            words.append("Rumensk markløft")
+        }
         if let sourceIdentifier {
             if let localized = norwegianExerciseNames[sourceIdentifier] {
                 words.append(localized)
