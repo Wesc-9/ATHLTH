@@ -119,6 +119,24 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         XCTAssertFalse(old.competitionSettings.requiresExplicitConsent)
     }
 
+    func testInvitationsDefaultToThreeDaysAndCancellation() {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        XCTAssertEqual(settings.invitationDays, 3)
+        XCTAssertEqual(settings.unansweredPolicy, .cancel)
+        XCTAssertTrue(settings.allowFeedPost)
+        settings.invitationDays = 0
+        XCTAssertFalse(settings.isValid)
+        settings.invitationDays = 31
+        XCTAssertFalse(settings.isValid)
+        settings.invitationDays = 10
+        settings.unansweredPolicy = .replace
+        XCTAssertTrue(settings.isValid)
+        settings.unansweredPolicy = .continue
+        XCTAssertTrue(settings.isValid)
+        settings.allowFeedPost = false
+        XCTAssertTrue(settings.isValid)
+    }
+
     func testNewStartModesAndMeetingCoordinates() {
         var settings = ATHLTHTournamentCompetitionSettings()
         settings.startMode = .scheduled
@@ -168,6 +186,9 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         )
         XCTAssertEqual(old.startMode, .manual)
         XCTAssertEqual(old.environment, .any)
+        XCTAssertEqual(old.invitationDays, 3)
+        XCTAssertEqual(old.unansweredPolicy, .cancel)
+        XCTAssertTrue(old.allowFeedPost)
         XCTAssertTrue(old.coachExerciseIDs.isEmpty)
         XCTAssertNil(old.meetingLat)
         XCTAssertNil(old.startsAt)
