@@ -175,7 +175,9 @@ enum WorkoutBlockGroupKind: String, Codable, Hashable {
 }
 
 struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
-    let sequence: Int
+    // Mutable only on an isolated value copy when normalizing a plan recipe.
+    // Never reconstruct the block field-by-field: new metadata must survive.
+    var sequence: Int
     var kind: WorkoutTemplateBlockKind
     var title: String
     var exerciseSlug: String?
