@@ -387,7 +387,9 @@ enum ATHLTHExerciseReferenceResolver {
             ($0.source == .repDB || $0.source == .athlthCatalog) &&
                 key($0.canonicalName) == clean
         }
-        if matches.count == 1 { return matches[0] }
+        if matches.count == 1 {
+            return visibleEquivalent(of: matches[0], in: library)
+        }
         // Two public entries with the same title are ambiguous, so stop.
         return nil
     }
