@@ -877,6 +877,7 @@ final class LibraryFavoritesStore: ObservableObject {
     private var activeUserID: UUID?
     private var lastRefreshAt: Date?
     private var localMutationRevision = 0
+    private var refreshRequestID: UUID?
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -886,6 +887,9 @@ final class LibraryFavoritesStore: ObservableObject {
         guard let user = client.auth.currentUser else {
             activeUserID = nil
             favorites = []
+            refreshRequestID = nil
+            isLoading = false
+            lastRefreshAt = nil
             errorMessage = nil
             return
         }
@@ -899,6 +903,9 @@ final class LibraryFavoritesStore: ObservableObject {
                     userID: user.id
                 ) ?? []
             lastRefreshAt = nil
+            refreshRequestID = nil
+            isLoading = false
+            errorMessage = nil
         }
 
         if !force,
@@ -909,8 +916,15 @@ final class LibraryFavoritesStore: ObservableObject {
 
         guard !isLoading else { return }
         let requestedRevision = localMutationRevision
+        let requestID = UUID()
+        refreshRequestID = requestID
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            if refreshRequestID == requestID {
+                refreshRequestID = nil
+                isLoading = false
+            }
+        }
 
         do {
             let rows: [LibraryFavoriteRecord] =
@@ -925,6 +939,7 @@ final class LibraryFavoritesStore: ObservableObject {
             // A slow response from account A must never replace account B's
             // favorites after sign-out or a rapid account switch.
             guard activeUserID == user.id,
+                  refreshRequestID == requestID,
                   client.auth.currentUser?.id == user.id else { return }
             // Do not replace a favorite the user toggled while the
             // network request was still in flight.
@@ -935,6 +950,7 @@ final class LibraryFavoritesStore: ObservableObject {
             errorMessage = nil
         } catch {
             guard activeUserID == user.id,
+                  refreshRequestID == requestID,
                   client.auth.currentUser?.id == user.id else { return }
             // Favorites remain fully usable from the account-local cache.
             // The next refresh retries Supabase automatically.
@@ -974,6 +990,8 @@ final class LibraryFavoritesStore: ObservableObject {
                     userID: user.id
                 ) ?? []
             lastRefreshAt = nil
+            refreshRequestID = nil
+            isLoading = false
             errorMessage = nil
         }
 
