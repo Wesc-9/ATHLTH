@@ -1,49 +1,6 @@
 import AVFoundation
 import SwiftUI
 
-private struct ATHLTHAudioCoachVoiceOption:
-    Identifiable,
-    Hashable
-{
-    let id: String
-    let name: String
-    let language: String
-    let qualityRank: Int
-
-    var qualityTitle: String? {
-        switch qualityRank {
-        case 3...:
-            return ATHLTHLocalization.choose(
-                english: "Premium",
-                norwegian: "Premium"
-            )
-        case 2:
-            return ATHLTHLocalization.choose(
-                english: "Enhanced",
-                norwegian: "Forbedret"
-            )
-        default:
-            return nil
-        }
-    }
-
-    var displayTitle: String {
-        if let qualityTitle {
-            return "\(name) · \(qualityTitle)"
-        }
-
-        return name
-    }
-
-    var compactTitle: String {
-        if let qualityTitle {
-            return "\(name) · \(qualityTitle)"
-        }
-
-        return name
-    }
-}
-
 @MainActor
 final class ATHLTHAudioCoachPreviewSpeaker:
     NSObject,
@@ -250,42 +207,41 @@ struct ATHLTHCoachVoiceChoices: View {
     let duckOtherAudio: Bool
     let speechStyle: ATHLTHCoachSpeechStyle
 
-    private var voices: [ATHLTHAudioCoachVoiceOption] {
-        let prefix: String
+    private var voices: [ATHLTHCoachVoiceDescriptor] {
+        let code: String
         switch language {
-        case .norwegian:
-            prefix = "nb"
-        case .english:
-            prefix = "en"
+        case .norwegian: code = "nb"
+        case .english: code = "en"
         case .system:
-            prefix = Locale.autoupdatingCurrent.language.languageCode?
+            code = Locale.autoupdatingCurrent.language.languageCode?
                 .identifier.lowercased() ?? "en"
         }
-        let prefixes: [String] = ["nb", "nn", "no"].contains(prefix)
-            ? ["nb", "nn", "no"] : [prefix]
 
-        return AVSpeechSynthesisVoice.speechVoices()
-            .filter { voice in
-                let locale = voice.language.lowercased()
-                return prefixes.contains { locale.hasPrefix($0) }
-            }
-            .map {
-                ATHLTHAudioCoachVoiceOption(
-                    id: $0.identifier,
-                    name: $0.name,
-                    language: $0.language,
-                    qualityRank: $0.quality.rawValue
-                )
-            }
-            .sorted { lhs, rhs in
-                if lhs.qualityRank != rhs.qualityRank {
-                    return lhs.qualityRank > rhs.qualityRank
-                }
-                if lhs.name != rhs.name {
-                    return lhs.name < rhs.name
-                }
-                return lhs.id < rhs.id
-            }
+        let installed = AVSpeechSynthesisVoice.speechVoices().map {
+            ATHLTHCoachVoiceDescriptor(
+                id: $0.identifier,
+                name: $0.name,
+                language: $0.language,
+                qualityRank: $0.quality.rawValue
+            )
+        }
+        return ATHLTHCoachVoiceCatalog.featured(
+            from: installed,
+            languageCode: code,
+            selectedIdentifier: selectedIdentifier
+        )
+    }
+
+    /// Old selections of basic/novelty voices become Automatic. Keep any
+    /// selected Azure voice or a voice installed only on another device.
+    private func removeObsoleteLocalSelection() {
+        guard let identifier = selectedIdentifier,
+              !identifier.hasPrefix(ATHLTHAzureCoachVoice.prefix),
+              let installed = AVSpeechSynthesisVoice(identifier: identifier),
+              installed.quality.rawValue < 2 ||
+                  ATHLTHCoachVoiceCatalog.isNovelty(name: installed.name)
+        else { return }
+        selectedIdentifier = nil
     }
 
     var body: some View {
@@ -324,7 +280,11 @@ struct ATHLTHCoachVoiceChoices: View {
             ForEach(voices) { voice in
                 ATHLTHCoachVoiceRow(
                     title: voice.name,
-                    subtitle: voice.qualityTitle ?? voice.language,
+                    subtitle: voice.qualityRank >= 3
+                        ? "Premium"
+                        : ATHLTHLocalization.choose(
+                            english: "Enhanced", norwegian: "Forbedret"
+                        ),
                     selected: selectedIdentifier == voice.id,
                     locked: false,
                     busy: false,
@@ -342,8 +302,23 @@ struct ATHLTHCoachVoiceChoices: View {
                 )
                 .accessibilityIdentifier("athlth-coach-voice-apple")
             }
+
+            if voices.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Install an Enhanced or Premium Apple voice in iOS Settings to see more natural options.",
+                        norwegian: "Last ned en forbedret Apple-stemme eller en Premium-stemme i iPhone-innstillingene for flere naturlige alternativer."
+                    ),
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear(perform: removeObsoleteLocalSelection)
     }
 }
 
