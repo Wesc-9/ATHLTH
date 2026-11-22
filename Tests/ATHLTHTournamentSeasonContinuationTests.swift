@@ -72,7 +72,19 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
             allowExtensions: false,
             ruleVersion: 2, rulesFrozenAt: nil,
             createdAt: Date(), startedAt: Date(),
-            completedAt: status == "completed" ? Date() : nil
+            completedAt: status == "completed" ? Date() : nil,
+            plannedStartsAt: nil,
+            releaseMode: "interval",
+            releaseEvery: 7,
+            releaseUnit: "day",
+            invitationPermission: "admin",
+            joinApproval: "admin",
+            allowedActions: "",
+            prohibitedActions: "",
+            prizeFirst: "",
+            prizeSecond: "",
+            prizeThird: "",
+            loserConsequence: ""
         )
     }
 
