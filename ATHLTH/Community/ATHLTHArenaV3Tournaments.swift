@@ -28,6 +28,9 @@ struct ATHLTHTournamentCreator: View {
     let fixedClubID: UUID?
     /// Sports chosen from Quick Train cannot silently change to another mode.
     let fixedActivity: ATHLTHTournamentActivity?
+    /// Entry flows choose a single competition format. The detailed rules
+    /// screen must not silently switch a group league into a cup.
+    let restrictFormat: Bool
     let onSave: (ATHLTHTournamentDraft) -> Void
     let onPublished: ((UUID) -> Void)?
     private let tournamentCloud = ATHLTHTournamentCloudService()
@@ -89,6 +92,7 @@ struct ATHLTHTournamentCreator: View {
         self.preset = preset
         self.fixedClubID = fixedClubID
         self.fixedActivity = fixedActivity
+        self.restrictFormat = fixedActivity != nil || continuation != nil
         self.onSave = onSave
         self.onPublished = onPublished
         _format = State(initialValue: continuation?.format ?? preset)
@@ -388,7 +392,8 @@ struct ATHLTHTournamentCreator: View {
     private var formatSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Konkurranseform")
-            ForEach(ATHLTHTournamentFormat.allCases) { option in
+            ForEach(restrictFormat ? [format] : ATHLTHTournamentFormat.allCases) {
+                option in
                 Button {
                     format = option
                 } label: {
