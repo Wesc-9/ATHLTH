@@ -113,7 +113,8 @@ struct ATHLTHTournamentExerciseVoteRemote: Decodable {
 
 struct ATHLTHTournamentLobbyMessageRemote: Decodable, Identifiable {
     let id: UUID
-    let authorID: UUID
+    /// Nil identifies trusted, server-generated competition updates.
+    let authorID: UUID?
     let content: String
     let kind: String
     let createdAt: Date
