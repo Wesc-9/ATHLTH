@@ -179,6 +179,9 @@ struct ATHLTHTournamentCreator: View {
         athletes.count >= (format == .cup ? 4 : 2) &&
         !busy && !allowedActivities.isEmpty &&
         competitionSettings.isValid &&
+        (competitionSettings.coachExerciseIDs.isEmpty ||
+          (exerciseMode == .owner &&
+           competitionSettings.coachExerciseIDs.count == exerciseCount)) &&
         (fixedActivity.map { allowedActivities == Set([$0]) } ?? true) &&
         ATHLTHTournamentCadence.options.contains(cadenceDays) &&
         ATHLTHTournamentCadence.completionHours.contains(
