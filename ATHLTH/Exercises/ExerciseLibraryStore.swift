@@ -1258,7 +1258,15 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     func updateCustomExercise(_ exercise: Exercise) {
-        guard exercise.origin == .custom, exercise.ownerID == accountID else { return }
+        guard let accountID,
+              exercise.origin == .custom,
+              exercise.ownerID == accountID,
+              customExercises.contains(where: {
+                  $0.id == exercise.id &&
+                  $0.source == .custom &&
+                  $0.exercise.ownerID == accountID
+              })
+        else { return }
 
         let entry = ExerciseLibraryEntry(
             id: exercise.id,
@@ -1276,8 +1284,6 @@ final class ExerciseLibraryStore: ObservableObject {
 
         if let index = customExercises.firstIndex(where: { $0.id == exercise.id }) {
             customExercises[index] = entry
-        } else {
-            customExercises.append(entry)
         }
 
         customExercises.sort {
