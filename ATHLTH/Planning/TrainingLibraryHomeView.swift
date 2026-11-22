@@ -2939,7 +2939,8 @@ struct TrainingPlanCatalogDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(20)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             // iPad / Stage Manager: use the whole available detail column.
             // Responsive cards inside the plan still control readability.
             .frame(maxWidth: .infinity)
@@ -2959,9 +2960,9 @@ struct TrainingPlanCatalogDetailView: View {
                     Image(systemName: "arrow.right")
                 }
                 .foregroundStyle(.white)
-                .padding(18)
-                .frame(maxWidth: .infinity, minHeight: 58)
-                .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 18))
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(ATHLTHPlanDesign.ink, in: RoundedRectangle(cornerRadius: 16))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -3075,16 +3076,18 @@ struct TrainingPlanCatalogDetailView: View {
                 )
             }
 
-            ForEach(
-                1...max(
-                    showAllWeeks
-                        ? entry.durationWeeks
-                        : min(entry.durationWeeks, 4),
-                    1
-                ),
-                id: \.self
-            ) { week in
-                previewWeekCard(week)
+            LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(
+                    1...max(
+                        showAllWeeks
+                            ? entry.durationWeeks
+                            : min(entry.durationWeeks, 4),
+                        1
+                    ),
+                    id: \.self
+                ) { week in
+                    previewWeekCard(week)
+                }
             }
 
             if entry.durationWeeks > 4 {
