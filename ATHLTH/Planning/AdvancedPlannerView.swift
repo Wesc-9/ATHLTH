@@ -6715,7 +6715,10 @@ struct SessionEditorView: View {
                         norwegian: "Kunne ikke sende invitasjonen. Utkastet er lagret."
                     )
             }
-            collaborationInviteBaseline = bound
+            collaborationInviteBaseline =
+                session.standalonePlannedSessions.first {
+                    $0.id == bound.id
+                } ?? bound
             collaborationInvitationSent = true
             allowInviteeExercises = true
             return nil
@@ -6757,7 +6760,7 @@ struct SessionEditorView: View {
                     sourceOwnerID: session.profile.userID,
                     shareVersion: 6
                 )
-                _ = await messaging.send(
+                let delivered = await messaging.send(
                     to: partnerID,
                     conversationID: conversation,
                     body: ATHLTHLocalization.choose(
@@ -6766,6 +6769,14 @@ struct SessionEditorView: View {
                     ),
                     attachment: attachment
                 )
+                if !delivered {
+                    invitationError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Your changes were saved, but the update was not delivered.",
+                            norwegian: "Endringene er lagret, men oppdateringen ble ikke sendt."
+                        )
+                    showingInvitationError = true
+                }
             } catch {
                 invitationError = error.localizedDescription
                 showingInvitationError = true
