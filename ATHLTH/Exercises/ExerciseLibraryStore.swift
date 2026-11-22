@@ -875,9 +875,9 @@ final class ExerciseLibraryStore: ObservableObject {
     /// Unlike English/Norwegian titles, these IDs survive language changes.
     /// Computed once; never build a workout lookup during scrolling.
     static let referencedNativeExerciseSlugs: Set<String> = {
-        let workouts = ATHLTHCuratedStrengthWorkouts.entries +
-            ATHLTHPremiumStrengthSessions.entries +
-            ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries
+        // Includes curated strength, GymCoach, HYROX and imported Zoned
+        // workouts: the same offline recipe inventory seen by the athlete.
+        let workouts = WorkoutTemplateCatalogEntry.bundledCatalog
         return Set(workouts.flatMap { workout in
             workout.blocks.compactMap { block in
                 guard block.kind == .exercise,
