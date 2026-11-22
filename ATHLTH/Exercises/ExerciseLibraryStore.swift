@@ -1532,7 +1532,12 @@ final class ExerciseLibraryStore: ObservableObject {
             decoded = []
         }
 
-        customExercises = decoded.map { exercise in
+        // A persisted account payload is not an authorization source.
+        // Reject records with foreign owners or catalog origins even when
+        // the file is accidentally copied between account namespaces.
+        customExercises = decoded.filter { exercise in
+            exercise.origin == .custom && exercise.ownerID == accountID
+        }.map { exercise in
             ExerciseLibraryEntry(
                 id: exercise.id,
                 exercise: exercise,
