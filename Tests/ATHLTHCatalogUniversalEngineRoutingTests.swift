@@ -69,9 +69,13 @@ final class ATHLTHCatalogUniversalEngineRoutingTests: XCTestCase {
             ATHLTHPlannedWorkoutCaptureRoute.resolve(workout, device: .iPhone),
             .phoneStructuredManual
         )
+        // Catalog strength includes a timed warm-up instruction. The
+        // current Watch strength transfer cannot execute that note, so
+        // the full recipe is intentionally not flattened into a false
+        // pure-strength workout.
         XCTAssertEqual(
             ATHLTHPlannedWorkoutCaptureRoute.resolve(workout, device: .appleWatch),
-            .watchStrength
+            .unavailable
         )
     }
 
