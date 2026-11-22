@@ -6411,10 +6411,20 @@ struct WorkoutTemplateBuilderView: View {
                     ScrollView {
                         if let index = selection.index(in: blocks) {
                             VStack(alignment: .leading, spacing: 15) {
-                                if blocks[index].kind != .run {
-                                    Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
-                                        .font(.title2.weight(.semibold))
-                                        .foregroundStyle(studioInk)
+                                ATHLTHWorkoutDetailsCard(
+                                    activityTitle: title.isEmpty
+                                        ? tr("Workout", "Treningsøkt") : title,
+                                    symbol: blocks[index].kind.systemImage,
+                                    showsTimingLabel: false
+                                ) {
+                                    Label(
+                                        ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]),
+                                        systemImage: blocks[index].isRestOrActiveRecovery
+                                            ? "pause.circle" : "list.number"
+                                    )
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(studioInk)
+                                    .lineLimit(2)
                                 }
                                 blockDetails(index)
                                 Button {
