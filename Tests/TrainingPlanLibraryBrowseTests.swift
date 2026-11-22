@@ -84,6 +84,18 @@ final class TrainingPlanLibraryBrowseTests: XCTestCase {
     }
 
     @MainActor
+    func testPlanPickerDefaultDaysMatchEverySupportedWeeklyFrequency() {
+        for sessions in 1...7 {
+            let days = TrainingPlanCatalogEntry.defaultDayIndexes(for: sessions)
+            XCTAssertEqual(days.count, sessions)
+            XCTAssertEqual(Set(days).count, sessions)
+            XCTAssertTrue(days.allSatisfy { (1...7).contains($0) })
+        }
+        XCTAssertTrue(TrainingPlanCatalogEntry.defaultDayIndexes(for: 0).isEmpty)
+        XCTAssertTrue(TrainingPlanCatalogEntry.defaultDayIndexes(for: 8).isEmpty)
+    }
+
+    @MainActor
     func testAllCatalogPlansExposeCorrectWeeklyFrequency() {
         let plans = TrainingPlanCatalogEntry.bundledCatalog
         XCTAssertGreaterThanOrEqual(Set(plans.map(\.sessionsPerWeek)).count, 2)
