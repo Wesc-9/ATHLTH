@@ -3,12 +3,10 @@ import SwiftUI
 /// Separate iPad presentation over the same stores used by iPhone.
 /// The sidebar is permanent in regular-width landscape windows; the system
 /// collapses columns naturally when Stage Manager provides a narrow window.
-/// Fixed-width iPad sidebar; only explicit user interaction changes visibility.
+/// Fixed-width iPad sidebar, with one native NavigationSplitView toggle.
+/// System visibility is persisted per scene; no duplicate hamburger view.
 enum ATHLTHStudioSidebarLayoutPolicy {
     static let fixedWidth: CGFloat = 280
-    static func toggled(_ value: NavigationSplitViewVisibility) -> NavigationSplitViewVisibility {
-        value == .detailOnly ? .all : .detailOnly
-    }
 }
 
 private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
