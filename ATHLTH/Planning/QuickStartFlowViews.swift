@@ -3771,6 +3771,25 @@ struct WalkQuickStartSheet: View {
     @State private var showingSpotifyPicker = false
     @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
 
+    init(
+        trainingDeviceProvider: TrainingDeviceProvider,
+        watchConnected: Bool,
+        plannedSession: PlannedSession? = nil,
+        initialRoute: TrainingRoute? = nil,
+        forceBasicSetup: Bool = false,
+        onStart: @escaping (WalkQuickStartConfiguration) async -> String?
+    ) {
+        self.trainingDeviceProvider = trainingDeviceProvider
+        self.watchConnected = watchConnected
+        self.plannedSession = plannedSession
+        self.initialRoute = initialRoute
+        self.forceBasicSetup = forceBasicSetup
+        self.onStart = onStart
+        // Preserve the route in the very first rendered frame, before .task
+        // loads optional preferences or starts asynchronous catalog work.
+        _selectedWalkingRoute = State(initialValue: initialRoute)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
