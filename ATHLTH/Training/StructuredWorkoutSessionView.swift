@@ -1266,7 +1266,16 @@ struct StructuredWorkoutSessionView: View {
             candidateRound = nil
         }
         let prospectiveBlocks = candidateRound ?? blocks
-        if currentIndex < prospectiveBlocks.count - 1 {
+        guard let stageDecision = ATHLTHWorkoutStagePolicy.afterStage(
+            at: currentIndex, totalStages: prospectiveBlocks.count
+        ) else {
+            persistenceErrorMessage = ATHLTHLocalization.choose(
+                english: "The workout step order could not be verified. Your progress has been preserved.",
+                norwegian: "Kunne ikke kontrollere rekkefølgen på økten. Fremdriften er bevart."
+            )
+            return
+        }
+        if case .advance = stageDecision {
             guard ATHLTHUniversalWorkoutLifecycle.nextPhase(
                 for: .advance, workoutID: workout.id,
                 expectedWorkoutID: workout.id, source: .structuredTimer,

@@ -5869,12 +5869,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func advanceStructuredRunningWorkout(manually: Bool = false) {
-        guard let workout = structuredRunningWorkout else {
-            return
-        }
-        // The final stage may complete without moving the cursor. A real
-        // next-stage transition uses the same bounds as the iPhone player.
-        if workout.steps.indices.contains(structuredStepIndex + 1) {
+        guard state == .running,
+              let workout = structuredRunningWorkout,
+              let stageDecision = ATHLTHWorkoutStagePolicy.afterStage(
+                  at: structuredStepIndex, totalStages: workout.steps.count
+              ) else { return }
+
+        // The last prescribed step completes the recipe but deliberately
+        // does NOT finish the original HealthKit workout.
+        if case .advance = stageDecision {
             guard state == .running,
                   allowsSharedWorkoutTransition(
                       .advance, stageIndex: structuredStepIndex,
@@ -5931,9 +5934,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             speak(report.text(norwegian: norwegian), priority: .structuredStep, event: report.event)
         }
 
-        let nextIndex = finishedIndex + 1
-
-        guard workout.steps.indices.contains(nextIndex) else {
+        guard case .advance(let nextIndex) = stageDecision else {
             structuredWorkoutComplete = true
             WKInterfaceDevice.current().play(.success)
             let scoped = ATHLTHCoachBoundaryCountdown.forRunningStep(

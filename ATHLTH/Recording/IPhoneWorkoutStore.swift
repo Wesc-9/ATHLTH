@@ -4574,6 +4574,19 @@ final class IPhoneWorkoutStore:
         }
 
         let finishedIndex = workout.structuredStepIndex ?? 0
+        guard let stageDecision = ATHLTHWorkoutStagePolicy.afterStage(
+            at: finishedIndex, totalStages: plan.steps.count
+        ) else { return }
+        if case .advance = stageDecision {
+            // The original iPhone recorder keeps its identity while the
+            // shared lifecycle authorizes entering the next prescribed stage.
+            guard ATHLTHUniversalWorkoutLifecycle.nextPhase(
+                for: .advance, workoutID: workout.id,
+                expectedWorkoutID: workout.id, source: .phoneRunWalk,
+                recordingOwner: .iPhone, phase: .work,
+                stageIndex: finishedIndex, stageCount: plan.steps.count
+            ) != nil else { return }
+        }
         // Credit scheduled time boundaries exactly, not the timer's
         // scheduling latency; the following phase receives the overshoot.
         let endElapsed: TimeInterval = {
@@ -4630,11 +4643,9 @@ final class IPhoneWorkoutStore:
                   priority: .structuredStep, event: report.event)
         }
 
-        let nextIndex = finishedIndex + 1
-
-        guard plan.steps.indices.contains(
-            nextIndex
-        ) else {
+        guard case .advance(let nextIndex) = stageDecision else {
+            // Finishing the last interval ends the prescription, never the
+            // enclosing run. This is not a second recorded workout.
             workout.structuredWorkoutComplete = true
             UINotificationFeedbackGenerator()
                 .notificationOccurred(.success)

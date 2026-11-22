@@ -1204,4 +1204,57 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
             }
         }
     }
+
+    func testSharedStagePolicyUsesOneCursorForIPhoneAndWatch() {
+        let expected: [ATHLTHWorkoutStageDecision] = [
+            .advance(nextIndex: 1), .advance(nextIndex: 2),
+            .advance(nextIndex: 3), .prescriptionComplete
+        ]
+        for (index, value) in expected.enumerated() {
+            XCTAssertEqual(
+                ATHLTHWorkoutStagePolicy.afterStage(
+                    at: index, totalStages: expected.count
+                ), value
+            )
+        }
+    }
+
+    func testStagePolicyFinishesPrescriptionWithoutFinishingRecording() {
+        let finished = ATHLTHWorkoutStagePolicy.afterStage(at: 0, totalStages: 1)
+        XCTAssertEqual(finished, .prescriptionComplete)
+        // HealthKit records one longer session even when the last planned
+        // interval is over. Finishing the recipe is not a new workout ID.
+        let id = UUID()
+        XCTAssertNil(ATHLTHWorkoutLifecyclePolicy.nextPhase(
+            for: .advance, workoutID: id, expectedWorkoutID: id,
+            source: .watchRecorder, recordingOwner: .appleWatch,
+            phase: .work, requestingOwner: .appleWatch,
+            stageIndex: 0, stageCount: 1
+        ))
+        XCTAssertEqual(ATHLTHWorkoutLifecyclePolicy.nextPhase(
+            for: .finish, workoutID: id, expectedWorkoutID: id,
+            source: .watchRecorder, recordingOwner: .appleWatch,
+            phase: .work, requestingOwner: .appleWatch
+        ), .completed)
+    }
+
+    func testSharedStagePolicyNeverAdvancesBadOrEmptyCursor() {
+        for (index, count) in [
+            (-1, 4), (0, 0), (0, -1), (4, 4), (10, 4)
+        ] {
+            XCTAssertNil(ATHLTHWorkoutStagePolicy.afterStage(
+                at: index, totalStages: count
+            ))
+        }
+        XCTAssertEqual(
+            ATHLTHWorkoutStagePolicy.afterStage(
+                at: 0, totalStages: 2
+            ), .advance(nextIndex: 1)
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutStagePolicy.afterStage(
+                at: 1, totalStages: 2
+            ), .prescriptionComplete
+        )
+    }
 }

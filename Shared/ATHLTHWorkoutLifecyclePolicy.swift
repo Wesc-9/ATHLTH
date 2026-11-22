@@ -72,3 +72,27 @@ enum ATHLTHWorkoutLifecyclePolicy {
         }
     }
 }
+
+/// Pure stage boundary shared by iPhone, iPad presentation and Apple Watch.
+/// Completing the last prescribed stage does NOT finish the HealthKit workout:
+/// the athlete can continue easy training until an explicit Finish action.
+/// Invalid or stale cursors are rejected before any metrics or plan are changed.
+enum ATHLTHWorkoutStageDecision: Equatable {
+    case advance(nextIndex: Int)
+    case prescriptionComplete
+}
+
+enum ATHLTHWorkoutStagePolicy {
+    static func afterStage(
+        at index: Int,
+        totalStages: Int
+    ) -> ATHLTHWorkoutStageDecision? {
+        guard totalStages > 0, index >= 0, index < totalStages else {
+            return nil
+        }
+        if index == totalStages - 1 {
+            return .prescriptionComplete
+        }
+        return .advance(nextIndex: index + 1)
+    }
+}
