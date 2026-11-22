@@ -528,9 +528,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
-        if !configuration.enabled ||
-            !configuration.shouldPreferIPhoneAudioWhenReachable ||
-            !configuration.shouldUseAcknowledgedVoiceLease {
+        if !effective.enabled ||
+            !effective.shouldPreferIPhoneAudioWhenReachable ||
+            !effective.shouldUseAcknowledgedVoiceLease {
             iPhoneVoiceLease.reset()
         }
 
@@ -591,9 +591,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
-        if !configuration.enabled ||
-            !configuration.shouldPreferIPhoneAudioWhenReachable ||
-            !configuration.shouldUseAcknowledgedVoiceLease {
+        if !effective.enabled ||
+            !effective.shouldPreferIPhoneAudioWhenReachable ||
+            !effective.shouldUseAcknowledgedVoiceLease {
             iPhoneVoiceLease.reset()
         }
 
