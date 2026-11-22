@@ -526,6 +526,9 @@ final class AppSettingsStore: ObservableObject {
             audioCoachDidChange()
         }
     }
+    @Published var audioCoachOutputPreference: ATHLTHAudioCoachOutputPreference {
+        didSet { audioCoachDidChange() }
+    }
     @Published var audioCoachDistanceTriggerEnabled: Bool { didSet { audioCoachDidChange() } }
     @Published var audioCoachTimeTriggerEnabled: Bool { didSet { audioCoachDidChange() } }
     @Published var audioCoachDistanceIntervalKilometers: Double { didSet { audioCoachDidChange() } }
@@ -954,6 +957,10 @@ final class AppSettingsStore: ObservableObject {
                     forKey: "settings.audioCoach.language"
                 ) ?? ""
             ) ?? .system
+        audioCoachOutputPreference =
+            ATHLTHAudioCoachOutputPreference(
+                rawValue: defaults.string(forKey: "settings.audioCoach.outputPreference") ?? ""
+            ) ?? .automatic
         audioCoachDistanceTriggerEnabled =
             defaults.object(
                 forKey: "settings.audioCoach.distanceTriggerEnabled"
@@ -1328,6 +1335,10 @@ final class AppSettingsStore: ObservableObject {
         defaults.set(
             audioCoachLanguage.rawValue,
             forKey: "settings.audioCoach.language"
+        )
+        defaults.set(
+            audioCoachOutputPreference.rawValue,
+            forKey: "settings.audioCoach.outputPreference"
         )
         defaults.set(
             audioCoachDistanceTriggerEnabled,
@@ -1721,6 +1732,7 @@ final class AppSettingsStore: ObservableObject {
         )
 
         configuration.coachGroups = audioCoachGroups
+        configuration.outputPreference = audioCoachOutputPreference
         return applyingFuelVoice(to: configuration)
     }
 
@@ -1811,6 +1823,9 @@ final class AppSettingsStore: ObservableObject {
         audioCoachSpeechRate = Double(config.resolvedSpeechRate)
         audioCoachSpeechVolume = Double(config.resolvedSpeechVolume)
         audioCoachSpeechStyle = config.speechStyle ?? .balanced
+        if let preference = config.outputPreference {
+            audioCoachOutputPreference = preference
+        }
         audioCoachAnnounceWorkoutStart = config.shouldAnnounceWorkoutStart
         audioCoachAnnouncePauseResume = config.shouldAnnouncePauseResume
         audioCoachAnnounceWorkoutComplete = config.shouldAnnounceWorkoutComplete
@@ -1826,6 +1841,9 @@ final class AppSettingsStore: ObservableObject {
         userID: UUID? = nil
     ) -> WatchAudioCoachConfiguration {
         var configuration = incoming
+        if configuration.outputPreference == nil {
+            configuration.outputPreference = audioCoachOutputPreference
+        }
         configuration.fuelReminderIntervalMinutes = nil
         configuration.fuelReminderDurationMinutes = nil
         configuration.fuelCarbohydrateGramsPerHour = nil
