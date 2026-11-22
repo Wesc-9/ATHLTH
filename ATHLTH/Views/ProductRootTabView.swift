@@ -413,6 +413,19 @@ struct ProductRootTabView: View {
                 selectedTab = persistedSelectedTab
             }
             restoreInterruptedPlanTabIfNeeded()
+            // Simulator-only smoke path: start on Home, then exercise the
+            // real native TabView selection transition into Train. Unlike
+            // launching directly on tab 1, this reproduces the build-135
+            // Home -> Train AttributeGraph stack overflow path.
+            if ProcessInfo.processInfo.arguments.contains(
+                "--athlth-smoke-home-train-hop"
+            ) {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(950))
+                    guard !Task.isCancelled else { return }
+                    selectedTab = 1
+                }
+            }
         }
         .task {
             updateDailyCheckInReminder()

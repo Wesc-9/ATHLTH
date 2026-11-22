@@ -52,6 +52,7 @@ on:
       - release/v2.2.5
       - release/v2.2.6
       - release/v2.2.7
+      - release/v2.2.8
     paths:
       - ATHLTH/**/*.swift
       - ATHLTHWidgets/**/*.swift
@@ -408,6 +409,34 @@ jobs:
             done
 
             echo "All five main tabs rendered on $DEVICE_NAME."
+
+            # Build 135 crashed only while moving between two already-mounted
+            # native tabs. A cold-start screenshot of tab 1 cannot detect it.
+            echo "Smoke testing Home -> Train tab switch on $DEVICE_NAME"
+            set +e
+            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \\
+              --athlth-compatibility-preview \\
+              --athlth-compatibility-tab=0 \\
+              --athlth-smoke-home-train-hop 2>&1)
+            HOP_STATUS=$?
+            set -e
+            echo "$HOP_OUTPUT"
+            if [ "$HOP_STATUS" -ne 0 ]; then
+              echo "::error::ATHLTH failed to launch for Home -> Train regression."
+              exit 1
+            fi
+            HOP_PID=$(echo "$HOP_OUTPUT" | awk -F': ' '/com\\.wesc9\\.athlth:/ {print $2}')
+            # The app changes selectedTab after 950ms, then gets time to
+            # process layout and AttributeGraph updates before verification.
+            sleep 8
+            if [ -z "$HOP_PID" ] || ! kill -0 "$HOP_PID" 2>/dev/null; then
+              echo "::error::ATHLTH crashed during Home -> Train transition on $DEVICE_NAME."
+              simctl_bounded "collect Home-to-Train crash logs" 65 spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+              exit 1
+            fi
+            HOP_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-home-train.png"
+            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train"
+            simctl_bounded "terminate transition app $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
 
             cleanup_device "$UDID"
             trap - EXIT
