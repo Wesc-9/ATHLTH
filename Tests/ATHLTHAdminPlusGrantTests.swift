@@ -3,6 +3,39 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAdminPlusGrantTests: XCTestCase {
+    func testRecipientSeesExactGrantDurationAndExpiryInNorwegian() {
+        let canonical = "You have received ATHLTH+ for 30 days. Valid until 2026-12-22 14:15 UTC."
+        XCTAssertEqual(
+            ATHLTHPlusGrantNotificationCopy.title(norwegian: true),
+            "Du har fått ATHLTH+"
+        )
+        XCTAssertEqual(
+            ATHLTHPlusGrantNotificationCopy.message(canonical, norwegian: true),
+            "Du har fått ATHLTH+ i 30 dager. Tilgangen varer til 2026-12-22 14:15 UTC."
+        )
+        XCTAssertEqual(
+            ATHLTHPlusGrantNotificationCopy.message(canonical, norwegian: false),
+            canonical
+        )
+    }
+
+    func testUnlimitedPlusGiftShowsNoEndDate() {
+        XCTAssertEqual(
+            ATHLTHPlusGrantNotificationCopy.message(
+                "You have received ATHLTH+ with no end date.", norwegian: true
+            ),
+            "Du har fått ATHLTH+ uten sluttdato."
+        )
+    }
+
+    func testUnknownPlusGrantTextIsNotMisrepresented() {
+        let unknown = "You have received ATHLTH+ for 400 days. Valid until tomorrow."
+        XCTAssertEqual(
+            ATHLTHPlusGrantNotificationCopy.message(unknown, norwegian: true),
+            unknown
+        )
+    }
+
     func testComplimentaryGrantExpiresOnServerProvidedDate() {
         let future = Date().addingTimeInterval(24 * 3600)
         let past = Date().addingTimeInterval(-24 * 3600)
