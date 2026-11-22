@@ -14,7 +14,8 @@ enum ATHLTHCoachVoiceCatalog {
     /// deliberately hidden; Automatic speech remains available independently.
     static func featured(
         from installed: [ATHLTHCoachVoiceDescriptor],
-        languageCode: String
+        languageCode: String,
+        selectedIdentifier: String? = nil
     ) -> [ATHLTHCoachVoiceDescriptor] {
         let code = languageCode.lowercased()
         let norwegian = ["nb", "nn", "no"].contains(code)
@@ -22,7 +23,7 @@ enum ATHLTHCoachVoiceCatalog {
         let limit = norwegian ? 4 : 3
         var shownNames = Set<String>()
 
-        return Array(installed
+        let eligible = installed
             .filter { voice in
                 let locale = voice.language.lowercased()
                 return prefixes.contains(where: { locale.hasPrefix($0) })
@@ -43,7 +44,16 @@ enum ATHLTHCoachVoiceCatalog {
                     locale: Locale(identifier: "en_US_POSIX")
                 )).inserted
             }
-            .prefix(limit))
+        var featured = Array(eligible.prefix(limit))
+        // A previously selected high-quality speaker should stay visible even
+        // when new premium downloads would otherwise push it off the list.
+        if let selectedIdentifier,
+           !featured.contains(where: { $0.id == selectedIdentifier }),
+           let selected = eligible.first(where: { $0.id == selectedIdentifier }) {
+            if !featured.isEmpty { featured.removeLast() }
+            featured.append(selected)
+        }
+        return featured
     }
 
     /// Apple also exposes character voices and sound effects as if they were
