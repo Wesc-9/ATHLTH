@@ -88,13 +88,21 @@ enum ATHLTHQuickRunTimelineAdapter {
                 norwegian: "Legg til en løpedel før du starter."
             )
         }
+        // Run/walk intervals are one endurance session, not a hybrid.
+        // Preserve every walking, running and recovery step in the original
+        // timeline. Strength, cycling and wellness still need their own
+        // validated capture route and must never be silently flattened.
         guard blocks.allSatisfy({ $0.kind == .run || $0.kind == .rest }),
               runs.allSatisfy({
-                  $0.cardioActivity != .walking && $0.activityTag != "cycling"
-              }) else {
+                  $0.activityTag != "cycling" &&
+                  ($0.cardioActivity == nil ||
+                   $0.cardioActivity == .running ||
+                   $0.cardioActivity == .walking)
+              }),
+              runs.contains(where: { $0.cardioActivity != .walking }) else {
             return ATHLTHLocalization.choose(
-                english: "Quick Train Running supports running and recovery. Mixed workouts belong in Plan.",
-                norwegian: "Quick Train Løping støtter løping og pauser. Kombinasjonsøkter startes fra Plan."
+                english: "A running workout may include walking intervals and recoveries. Other sports need their own workout mode.",
+                norwegian: "En løpeøkt kan ha gåintervaller og pauser. Andre treningsformer trenger sin egen treningsmodus."
             )
         }
         guard Set(runs.map { $0.isIndoor == true }).count == 1 else {
