@@ -191,6 +191,10 @@ struct ATHLTHIntervalResultSummaryCard: View {
                 $0.completedAt < performance.completedAt &&
                 $0.userReported == record.reported
             }
+        ).filter { $0.recoverySeconds == record.recoverySeconds }
+        let variant = " · " + ATHLTHLocalization.choose(
+            english: "\(record.recoverySeconds / 60) min recovery",
+            norwegian: "\(record.recoverySeconds / 60) min pause"
         )
         let source = record.reported
             ? tr("entered treadmill values", "oppgitte mølleverdier")
@@ -198,16 +202,16 @@ struct ATHLTHIntervalResultSummaryCard: View {
         guard let best = earlier.first else {
             return tr("Your first comparable 4 × 4 result", "Ditt første sammenlignbare 4 × 4-resultat") +
                 " · " + String(format: "%.1f km/t", record.averageSpeedKmh) +
-                " (" + source + ")"
+                " (" + source + ")" + variant
         }
         if record.averageSpeedKmh > best.averageSpeedKmh + 0.05 {
             return tr("New personal best for 4 × 4", "Ny personlig rekord på 4 × 4") +
                 " · " + String(format: "%.1f km/t", record.averageSpeedKmh) +
-                " (" + source + ")"
+                " (" + source + ")" + variant
         }
         return tr("Comparable 4 × 4 result", "Sammenlignbart 4 × 4-resultat") +
             " · " + String(format: "%.1f km/t", record.averageSpeedKmh) +
-            " (" + source + ")"
+            " (" + source + ")" + variant
     }
 
     private var evenness: String? {
