@@ -1043,24 +1043,24 @@ final class LibraryFavoritesStore: ObservableObject {
         )
         var seenIDs = Set<UUID>()
         var seenSlugs = Set<String>()
-        let validRemote = remote.filter {
-            $0.hasCompleteWorkoutPattern &&
-            (1...52).contains($0.durationWeeks) &&
-            !$0.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        let validRemote = remote.filter { candidate in
+            candidate.hasCompleteWorkoutPattern &&
+            (1...52).contains(candidate.durationWeeks) &&
+            !candidate.slug.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             // Never allow a different remote slug to steal an ID owned by
             // one of the built-in plans. Existing saved plans use this UUID.
-            (bundledIDs[$0.id] == nil || bundledIDs[$0.id] == $0.slug) &&
+            (bundledIDs[candidate.id] == nil || bundledIDs[candidate.id] == candidate.slug) &&
             // Built-in identity includes its workout recipe and time frame.
             // If those change, the remote edition needs a new slug rather
             // than misleading existing schedules that carry this identity.
-            (bundledBySlug[$0.slug].map { local in
+            (bundledBySlug[candidate.slug].map { local in
                 // Favorites, saved copies and histories refer to this UUID,
                 // so even a cosmetically identical remote replacement must
                 // keep the exact source identity.
-                local.id == $0.id &&
-                local.durationWeeks == $0.durationWeeks &&
-                local.sessionsPerWeek == $0.sessionsPerWeek &&
-                local.workoutPattern == $0.workoutPattern
+                local.id == candidate.id &&
+                local.durationWeeks == candidate.durationWeeks &&
+                local.sessionsPerWeek == candidate.sessionsPerWeek &&
+                local.workoutPattern == candidate.workoutPattern
             } ?? true)
         }.sorted {
             if $0.catalogVersion != $1.catalogVersion {
