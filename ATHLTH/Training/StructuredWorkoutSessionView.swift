@@ -220,6 +220,7 @@ struct StructuredWorkoutSessionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let workout: PlannedSession
     var linkedPlanID: UUID? = nil
@@ -473,7 +474,8 @@ struct StructuredWorkoutSessionView: View {
                     persistenceErrorMessage = error.localizedDescription
                     return
                 }
-                if !restoreCheckpoint() {
+                let restored = restoreCheckpoint()
+                if !restored {
                     guard ATHLTHStructuredRecoveryWritePolicy
                         .canCreateFreshCheckpoint(
                             alreadyAdmitted: hadOriginalAdmission,
@@ -491,6 +493,7 @@ struct StructuredWorkoutSessionView: View {
                     startedAt = Date()
                     activeSourcePlanID = linkedPlanID
                     hasStarted = true
+                    spotify.prepareWorkoutStepSongs(workoutID: workout.id)
                     setupCurrentStep()
                     guard persistCheckpoint() else {
                         hasStarted = false
@@ -507,6 +510,11 @@ struct StructuredWorkoutSessionView: View {
                     )
                     // Invitations only confirm once the protected checkpoint exists.
                     Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
+                }
+                // Restoring a checkpoint is not a new step transition; do
+                // not replay yesterday's or the current step's Spotify cue.
+                if restored {
+                    spotify.prepareWorkoutStepSongs(workoutID: workout.id)
                 }
                 publishStructuredSpectatorStatus()
                 updateScreenAwakeState()
@@ -1329,6 +1337,17 @@ struct StructuredWorkoutSessionView: View {
         enteredReps = max(block.repetitions ?? 0, 0)
         enteredWeight = block.targetWeightKilograms.map { String($0) } ?? ""
         emomWaitingForMinute = false
+        // Selection is read from the canonical execution block, never from a
+        // second music timer. Do not wait for playback or the network.
+        if block.spotifyTrack != nil {
+            let index = currentIndex
+            let track = block.spotifyTrack
+            Task { @MainActor in
+                await spotify.playWorkoutStepSong(
+                    track, workoutID: workout.id, stepIndex: index
+                )
+            }
+        }
         if let id = block.executionGroupID, modeStarts[id] == nil {
             modeStarts[id] = Date()
         }
