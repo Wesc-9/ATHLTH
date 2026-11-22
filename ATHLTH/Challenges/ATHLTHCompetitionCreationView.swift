@@ -133,7 +133,7 @@ enum ATHLTHCompetitionCreationPolicy {
             }
             if metric == .farthestInTime {
                 return durationMinutes.isFinite &&
-                    (1...1_440).contains(durationMinutes)
+                    ((10.0 / 60.0)...1_440.0).contains(durationMinutes)
             }
         case .strength:
             guard [.workoutVolume, .mostReps, .heaviestWeight, .exerciseVolume]
