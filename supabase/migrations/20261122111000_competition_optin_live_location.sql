@@ -96,3 +96,6 @@ revoke all on function public.athlth_competition_stop_live_position(uuid) from p
 grant execute on function public.athlth_competition_stop_live_position(uuid) to authenticated;
 -- RLS evaluates this helper as the authenticated athlete; it must be callable.
 grant execute on function private.athlth_competition_is_location_sharing(uuid,uuid) to authenticated;
+
+-- Remove expired coordinates rather than retaining historical location records.
+select cron.schedule('athlth-competition-live-location-purge','*/5 * * * *','delete from public.athlth_competition_live_positions where expires_at <= clock_timestamp()');
