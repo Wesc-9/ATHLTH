@@ -134,7 +134,7 @@ struct ATHLTHCoachRuleComposer: View {
              .routeRemaining, .routeETA:
             return max(100, draft.distanceIntervalMeters)
         case .currentZone: return 3
-        case .time, .timedUpdates, .elapsedTime, .clockTime, .heartRate:
+        case .timedUpdates, .elapsedTime, .clockTime, .heartRate:
             return max(15, draft.timeIntervalSeconds)
         default: return 1
         }
