@@ -1165,7 +1165,10 @@ struct WorkoutTemplateLibraryView: View {
     // Prepared once on selection, never rebuilt during sheet layout.
     @State private var pendingTargetSteps: [WorkoutTemplateBlock] = []
     @State private var previewedWorkoutSource: SelectedWorkoutSource?
-    @State private var workoutSourceAfterPreviewDismiss: SelectedWorkoutSource?
+    // Complete the choice only once the unified target sheet is dismissed.
+    @State private var previewGoalAfterDismiss: (
+        source: SelectedWorkoutSource, decision: ATHLTHWorkoutGoalSheetDecision
+    )?
 
     /// All workout categories use the same recipe preview and editor.
     private enum SelectedWorkoutSource: Identifiable {
@@ -1274,23 +1277,43 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
-    /// Keep target personalization and the common editor exactly as before:
-    /// the preview is only a reading/confirmation step.
-    private func confirmPreview(_ source: SelectedWorkoutSource) {
-        // Dismiss the detail sheet *before* opening target personalization
-        // or returning to the editor. Presenting both at once can lose taps.
-        workoutSourceAfterPreviewDismiss = source
-        previewedWorkoutSource = nil
-    }
-
-    private func completeConfirmedPreview(_ source: SelectedWorkoutSource) {
-        switch source {
-        case .scheduled(let workout), .saved(let workout):
-            onSelectPlanned?(workout)
-        case .catalog(let entry):
-            chooseCatalogForPlan(entry)
-        case .running(let workout):
-            chooseRunningForPlan(workout)
+    /// Every scheduled/saved workout enters the same compact preview and
+    /// optional goal picker as a catalog workout. Never mutate the original.
+    private func completePreviewGoal(
+        _ source: SelectedWorkoutSource,
+        decision: ATHLTHWorkoutGoalSheetDecision
+    ) {
+        switch decision {
+        case .cancel:
+            return
+        case .advanced:
+            // The existing plan editor owns advanced workout changes.
+            onSelectPlanned?(source.workout)
+        case .continueWith(let goal):
+            switch source {
+            case .scheduled(let workout), .saved(let workout):
+                var copy = workout
+                if goal != .none {
+                    copy.workoutBlocks = ATHLTHWorkoutQuickGoalApplier.apply(
+                        goal, to: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+                    )
+                }
+                onSelectPlanned?(copy)
+            case .catalog(let entry):
+                let blocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(
+                    entry.blocks
+                )
+                addCatalogToPlan(entry, blocks:
+                    ATHLTHWorkoutQuickGoalApplier.apply(goal, to: blocks))
+            case .running(let running):
+                var copy = running.plannedSession()
+                if goal != .none {
+                    copy.workoutBlocks = ATHLTHWorkoutQuickGoalApplier.apply(
+                        goal, to: ATHLTHUnifiedWorkout.editorBlocks(from: copy)
+                    )
+                }
+                onSelectPlanned?(copy)
+            }
         }
     }
 
@@ -2616,16 +2639,24 @@ struct WorkoutTemplateLibraryView: View {
             visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .sheet(item: $previewedWorkoutSource, onDismiss: {
-            if let source = workoutSourceAfterPreviewDismiss {
-                workoutSourceAfterPreviewDismiss = nil
-                completeConfirmedPreview(source)
+            if let pending = previewGoalAfterDismiss {
+                previewGoalAfterDismiss = nil
+                completePreviewGoal(pending.source, decision: pending.decision)
             }
         }) { source in
-            ATHLTHWorkoutSelectionPreviewSheet(workout: source.workout) {
-                confirmPreview(source)
+            let planned = source.workout
+            let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: planned)
+            ATHLTHWorkoutQuickTargetSheet(
+                workoutName: planned.title,
+                isRunning: planned.kind == .running,
+                durationMinutes: planned.durationMinutes,
+                partCount: blocks.count,
+                workoutSteps: blocks,
+                savingToLibrary: false
+            ) { decision in
+                previewGoalAfterDismiss = (source: source, decision: decision)
+                previewedWorkoutSource = nil
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
         .sheet(
             isPresented: $showingPersonalizationQuestion,

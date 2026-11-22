@@ -119,4 +119,87 @@ final class ATHLTHWorkoutQuickGoalTests: XCTestCase {
         )
         XCTAssertNil(unchanged.blocks[0].work.intensity.paceMinSecondsPerKilometer)
     }
+    func testCompactOutlineCountsActualIntervalDragNotRest() {
+        let group = UUID()
+        var effort = part("VO2", phase: .main, order: 2, duration: 180)
+        effort.groupID = group
+        effort.groupKind = .intervals
+        effort.groupRounds = 3
+        effort.targetHeartRateZone = 5
+        effort.targetHeartRatePercentMin = 90
+        effort.targetHeartRatePercentMax = 100
+
+        var recovery = part("Easy jog", kind: .rest,
+                            phase: .recovery, order: 3, duration: 60)
+        recovery.groupID = group
+        recovery.groupKind = .intervals
+        recovery.groupRounds = 3
+        recovery.targetHeartRateZone = 1
+
+        let source = [
+            part("Warm-up", phase: .warmup, order: 1, duration: 600),
+            effort, recovery,
+            part("Cool-down", phase: .cooldown, order: 4, duration: 300)
+        ]
+        let rows = ATHLTHWorkoutCompactOutline.rows(for: source)
+        XCTAssertEqual(rows.count, 5)
+        XCTAssertEqual(rows[0].kind, .warmup)
+        XCTAssertEqual(rows[1].kind, .work)
+        XCTAssertEqual(rows[4].kind, .cooldown)
+        XCTAssertEqual(rows.compactMap(\.effortIndex), [1, 2, 3])
+        XCTAssertEqual(rows[1].effortTotal, 3)
+        XCTAssertEqual(rows[1].blocks.count, 2)
+        XCTAssertEqual(rows[2].blocks.count, 2)
+        XCTAssertEqual(rows[3].blocks.count, 1,
+                       "No mandatory recovery after the final drag")
+        XCTAssertEqual(rows[1].estimatedSeconds, 240)
+        XCTAssertEqual(rows[3].estimatedSeconds, 180)
+        XCTAssertEqual(source[1].groupRounds, 3,
+                       "Presentation never changes the original interval recipe")
+    }
+
+    func testCompactOutlineKeepsFlatIntervalAndDescriptionsOnTheirRows() {
+        var source: [WorkoutTemplateBlock] = [
+            part("Warm-up", phase: .warmup, order: 1, duration: 600)
+        ]
+        for index in 1...3 {
+            source.append(part("Work \(index)", phase: .main,
+                               order: index * 2, duration: 60))
+            source.append(part("Rest \(index)", kind: .rest,
+                               phase: .recovery, order: index * 2 + 1,
+                               duration: 60))
+        }
+        let rows = ATHLTHWorkoutCompactOutline.rows(for: source)
+        XCTAssertEqual(rows.count, 4)
+        XCTAssertEqual(rows.compactMap(\.effortIndex), [1, 2, 3])
+        XCTAssertEqual(rows[2].blocks.map(\.title), ["Work 2", "Rest 2"])
+        XCTAssertEqual(rows[2].estimatedSeconds, 120)
+    }
+
+    func testCompactHeadlineOnlyShowsPrescribedWorkZones() {
+        var effort = part("Fast", phase: .main, order: 2)
+        effort.targetHeartRateZone = 5
+        effort.targetHeartRatePercentMin = 90
+        effort.targetHeartRatePercentMax = 100
+        var rest = part("Rest", kind: .rest, phase: .recovery, order: 3)
+        rest.targetHeartRateZone = 1
+        let blocks = [part("Warm", phase: .warmup, order: 1), effort, rest]
+        XCTAssertNotNil(ATHLTHWorkoutCompactOutline.headlineZone(for: blocks))
+        XCTAssertTrue(ATHLTHWorkoutCompactOutline.headlineZone(
+            for: blocks
+        )?.contains("Z5") == true)
+        XCTAssertFalse(ATHLTHWorkoutCompactOutline.headlineZone(
+            for: blocks
+        )?.contains("Z1") == true)
+        XCTAssertTrue(ATHLTHWorkoutCompactOutline.headlineHeartRatePercent(
+            for: blocks
+        )?.contains("90–100") == true)
+        XCTAssertNil(ATHLTHWorkoutCompactOutline.headlineZone(for: [
+            part("Unspecified", phase: .main, order: 1)
+        ]))
+        XCTAssertNil(ATHLTHWorkoutCompactOutline.headlineHeartRatePercent(
+            for: [part("Unspecified", phase: .main, order: 1)]
+        ))
+    }
+
 }

@@ -325,147 +325,13 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
         .background(.regularMaterial)
     }
 
-    /// Read-only preview: the same ordered source blocks used when adding the
-    /// workout. Recovery stays alongside work within the main section.
+    // The same compact disclosure outline is used for every workout source.
+    // A workout's original title/notes appear only after opening its row.
     private var workoutInformation: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack {
-                Text(tr("EXERCISES AND WORKOUT STEPS", "ØVELSER OG ØKTDELER"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.3)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                Spacer()
-                Text("\(workoutSteps.count)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-            if workoutSteps.isEmpty {
-                Text(tr(
-                    "This workout has no detailed step list. You can review its full content in Advanced.",
-                    "Denne økten har ingen detaljert øktliste her. Du kan se hele innholdet i Avansert."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            } else {
-                LazyVStack(alignment: .leading, spacing: 15) {
-                    ForEach(previewPhases, id: \.self) { phase in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 7) {
-                                Image(systemName: phase.symbol)
-                                    .foregroundStyle(tint)
-                                Text(phase.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                Spacer()
-                                Text("\(workoutSteps.filter { previewPhase($0) == phase }.count)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            ForEach(workoutSteps.indices, id: \.self) { index in
-                                if previewPhase(workoutSteps[index]) == phase {
-                                    workoutStepRow(workoutSteps[index])
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color.white.opacity(0.94),
-            in: RoundedRectangle(cornerRadius: 21)
+        ATHLTHWorkoutCompactOutlineView(
+            blocks: workoutSteps, isRunning: isRunning
         )
         .accessibilityIdentifier("athlth-quick-goal-workout-information")
-    }
-
-    private func previewPhase(_ block: WorkoutTemplateBlock) -> WorkoutPhaseKind {
-        // Source rests often have their own recovery phase: display these
-        // in the main sequence instead of making a separate distant group.
-        block.resolvedPhase == .recovery ? .main : block.resolvedPhase
-    }
-
-    private var previewPhases: [WorkoutPhaseKind] {
-        [.warmup, .main, .cooldown].filter { phase in
-            workoutSteps.contains { previewPhase($0) == phase }
-        }
-    }
-
-    private func workoutStepRow(_ step: WorkoutTemplateBlock) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: step.kind.systemImage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(tint)
-                .frame(width: 27, height: 27)
-                .background(ATHLTHPlanDesign.selectedSurface,
-                            in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(step.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                let details = workoutStepDescription(step)
-                if !details.isEmpty {
-                    Text(details)
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let notes = step.notes, !notes.isEmpty {
-                    Text(notes)
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func workoutStepDescription(_ step: WorkoutTemplateBlock) -> String {
-        var parts: [String] = []
-        if step.kind == .rest || step.resolvedPhase == .recovery {
-            parts.append(tr("Recovery", "Pause"))
-        }
-        if let duration = step.durationSeconds, duration > 0 {
-            let seconds = Int(duration.rounded())
-            if seconds < 60 {
-                parts.append("\(seconds) s")
-            } else if seconds % 60 == 0 {
-                parts.append("\(seconds / 60) min")
-            } else {
-                parts.append("\(seconds / 60) min \(seconds % 60) s")
-            }
-        }
-        if let meters = step.distanceMeters, meters > 0 {
-            parts.append(meters >= 1_000
-                ? String(format: "%.1f km", meters / 1_000)
-                : "\(Int(meters.rounded())) m")
-        }
-        if let sets = step.setCount, sets > 0,
-           let reps = step.repetitions, reps > 0 {
-            parts.append("\(sets) × \(reps)")
-        } else if let repetitions = step.repetitions, repetitions > 0 {
-            parts.append(tr("\(repetitions) reps", "\(repetitions) repetisjoner"))
-        }
-        if let zone = step.sourceIntensityZoneLabel, !zone.isEmpty {
-            parts.append(zone)
-        } else if let zone = step.targetHeartRateZone, (1...5).contains(zone) {
-            parts.append(tr("Zone Z\(zone)", "Pulssone Z\(zone)"))
-        }
-        if let minimum = step.targetHeartRatePercentMin,
-           let maximum = step.targetHeartRatePercentMax {
-            parts.append("\(Int(minimum.rounded()))–\(Int(maximum.rounded())) % " +
-                tr("HRmax", "makspuls"))
-        }
-        if let pace = step.targetPaceSecondsPerKilometer, pace > 0 {
-            let seconds = Int(pace.rounded())
-            parts.append(String(format: "%d:%02d min/km", seconds / 60, seconds % 60))
-        }
-        return parts.joined(separator: " · ")
     }
 
     private var identity: some View {
@@ -487,19 +353,24 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .lineLimit(3)
 
-                HStack(spacing: 11) {
+                HStack(spacing: 9) {
                     if let durationMinutes, durationMinutes > 0 {
                         Label("~\(durationMinutes) min", systemImage: "clock")
                     }
-                    if partCount > 0 {
-                        Label(
-                            tr("\(partCount) parts", "\(partCount) deler"),
-                            systemImage: "square.stack"
-                        )
+                    if let zone = ATHLTHWorkoutCompactOutline.headlineZone(
+                        for: workoutSteps
+                    ) {
+                        Label(zone, systemImage: "heart")
+                    }
+                    if let percent = ATHLTHWorkoutCompactOutline.headlineHeartRatePercent(
+                        for: workoutSteps
+                    ) {
+                        Text(percent)
                     }
                 }
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
