@@ -147,6 +147,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var mirroringRetryPending = false
     private var iPhoneVoiceLease = ATHLTHAudioCoachVoiceLease()
     private var lastMirrorSnapshotSentAt: Date?
+    private var lastCoachMirrorInvitationSentAt: Date?
     private var appliedRunningAppendCommands = Set<UUID>()
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var pendingLocalCoachEvent: (
@@ -516,8 +517,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let wasEnabled =
             audioCoachConfiguration.enabled
 
+        var effective = configuration.deliveryConfiguration
+        if workoutInitiatedLocallyOnWatch,
+           effective.outputPreference == nil,
+           (kind == .running || kind == .walking) {
+            effective.outputPreference = .automatic
+        }
         publish {
-            self.audioCoachConfiguration = configuration.deliveryConfiguration
+            self.audioCoachConfiguration = effective
         }
         resetAudioCoachThresholds()
         persistWorkoutRecoveryState()
@@ -572,8 +579,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             ? audioCoachConfiguration.strengthStatusIntervalSeconds
             : nil
 
+        var effective = configuration.deliveryConfiguration
+        if workoutInitiatedLocallyOnWatch,
+           effective.outputPreference == nil,
+           (kind == .running || kind == .walking) {
+            effective.outputPreference = .automatic
+        }
         publish {
-            self.audioCoachConfiguration = configuration.deliveryConfiguration
+            self.audioCoachConfiguration = effective
         }
 
         resetAudioCoachThresholds()
@@ -4441,6 +4454,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         mirroringActive = false
         mirroringRetryPending = false
         lastMirrorSnapshotSentAt = nil
+        lastCoachMirrorInvitationSentAt = nil
         iPhoneVoiceLease.reset()
         nextDistanceAnnouncementMeters = nil
         nextTimeAnnouncementSeconds = nil
@@ -4568,6 +4582,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         workoutOwnerID = WatchRouteStore.shared.companionAccountID
+        // Locally started Watch runs can invite a phone to own only the
+        // voice output; the Watch retains the sole HealthKit recording.
+        if workoutInitiatedLocallyOnWatch,
+           (kind == .running || kind == .walking),
+           audioCoachConfiguration.enabled,
+           audioCoachConfiguration.outputPreference == nil {
+            audioCoachConfiguration.outputPreference = .automatic
+        }
+        lastCoachMirrorInvitationSentAt = nil
         audioCoachRollingKilometer.reset()
         let resolvedRoute = route ?? plannedRoute
         returningToRouteStart = false
@@ -9417,6 +9440,35 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         do {
             try await workoutSession.sendToRemoteWorkoutSession(data: data)
             lastMirrorSnapshotSentAt = now
+
+            // The phone may become available after Watch start or reconnection.
+            // Re-advertise without interrupting the original workout session.
+            if workoutSession === self.workoutSession,
+               (kind == .running || kind == .walking),
+               audioCoachConfiguration.enabled,
+               audioCoachConfiguration.shouldPreferIPhoneAudioWhenReachable,
+               audioCoachConfiguration.shouldUseAcknowledgedVoiceLease,
+               (lastCoachMirrorInvitationSentAt.map {
+                   now.timeIntervalSince($0) >= 10
+               } ?? true) {
+                let invitation = ATHLTHAudioCoachMirrorInvitation(
+                    workoutStartedAt: startedAt ?? now,
+                    sentAt: Date(),
+                    configuration: audioCoachConfiguration
+                )
+                if let invitationData = try? JSONEncoder().encode(invitation) {
+                    do {
+                        try await workoutSession.sendToRemoteWorkoutSession(
+                            data: invitationData
+                        )
+                        if workoutSession === self.workoutSession {
+                            lastCoachMirrorInvitationSentAt = Date()
+                        }
+                    } catch {
+                        // No acknowledgement means the Watch keeps speaking.
+                    }
+                }
+            }
         } catch {
             publish {
                 self.errorMessage =
