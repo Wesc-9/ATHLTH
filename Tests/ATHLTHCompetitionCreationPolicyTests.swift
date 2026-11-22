@@ -60,7 +60,7 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         ] {
             XCTAssertTrue(sport.types.contains(.competition))
         }
-        XCTAssertEqual(ATHLTHCompetitionFormat.allCases.count, 3)
+        XCTAssertEqual(ATHLTHCompetitionFormat.allCases.count, 4)
     }
 
     func testDuelCannotStartWithoutOneEligibleOpponent() {
@@ -113,6 +113,30 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         XCTAssertTrue(valid(
             activity: .running, format: .cup,
             opponents: [rival, UUID(), UUID()], metric: .fastestDistance
+        ))
+    }
+
+    func testSingleEventHasExactlyOneSharedEventWithThreeOrMoreAthletes() {
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.single), 2)
+        XCTAssertFalse(valid(
+            activity: .running, format: .single,
+            opponents: [rival], metric: .fastestDistance
+        ))
+        XCTAssertTrue(valid(
+            activity: .running, format: .single,
+            opponents: [rival, UUID()], metric: .fastestDistance
+        ))
+        XCTAssertTrue(valid(
+            activity: .strength, format: .single,
+            opponents: [rival, UUID(), UUID()], metric: .workoutVolume
+        ))
+    }
+
+    func testVeryShortSprintsMayLastTenSeconds() {
+        XCTAssertTrue(valid(
+            activity: .running, format: .duel,
+            opponents: [rival], metric: .farthestInTime,
+            duration: 10.0 / 60.0
         ))
     }
 
