@@ -266,6 +266,32 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         if let first { library.deleteCustomExercise(first.id) }
     }
 
+    func testUnknownPrivateExerciseReferenceIsRemovedFromPublicExport() {
+        var unknown = block("Personal strength movement")
+        unknown.exerciseID = UUID()
+        unknown.exerciseSlug = "private-local-exercise"
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            unknown, from: []
+        )
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertNil(exported.exerciseSlug)
+        XCTAssertNil(exported.exerciseSnapshot)
+        XCTAssertEqual(exported.title, unknown.title)
+    }
+
+    func testPublicExerciseWithoutStableSlugDoesNotExportPrivateUUID() {
+        let publicExercise = entry(
+            "Cable Row", id: UUID(), source: .repDB
+        )
+        var linked = block("Cable Row")
+        linked.exerciseID = publicExercise.id
+        let exported = ATHLTHExerciseReferenceResolver.portableBlock(
+            linked, from: [publicExercise]
+        )
+        XCTAssertNil(exported.exerciseID)
+        XCTAssertNil(exported.exerciseSlug)
+    }
+
     func testPublicCatalogShareUsesStableSlugAndResolvesForRecipient() {
         let publicExercise = entry(
             "Lat Pulldown", id: UUID(), source: .repDB,
