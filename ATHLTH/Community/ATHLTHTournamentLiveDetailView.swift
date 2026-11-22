@@ -25,8 +25,9 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var entries: [ATHLTHTournamentRemoteEntry] = []
     @State private var matches: [ATHLTHTournamentRemoteMatch] = []
     @State private var confirmedStandings: [ATHLTHTournamentStandingRemote] = []
+    @State private var athleteProgress: [ATHLTHTournamentAthleteProgress] = []
     @State private var names: [UUID: String] = [:]
-    @State private var selection: ATHLTHTournamentDetailTab = .lobby
+    @State private var selection: ATHLTHTournamentDetailTab = .overview
     @State private var showingMatchReport: ATHLTHTournamentRemoteMatch?
     @State private var editingExerciseDeadlines: ATHLTHTournamentRemoteMatch?
     @State private var busy = false
@@ -52,6 +53,27 @@ struct ATHLTHTournamentLiveDetailView: View {
     }
     private var isOwner: Bool { current.ownerID == userID }
     private var pendingCount: Int { entries.filter { $0.response == "invited" }.count }
+    private var minimumAthletes: Int { current.format == .cup ? 4 : 2 }
+    private var readyToStart: Bool {
+        confirmedEntries.count >= minimumAthletes &&
+        pendingCount == 0 &&
+        confirmedEntries.allSatisfy {
+            $0.isReady && $0.agreedRuleVersion == current.ruleVersion
+        } &&
+        current.rulesConfirmedAt != nil &&
+        current.exerciseSelectionFinalizedAt != nil
+    }
+    private var visibleRoundComplete: Bool {
+        matches.contains { match in
+            !match.isWarmup && match.status == "confirmed" &&
+            !matches.contains { other in
+                other.phase == match.phase &&
+                other.roundNumber == match.roundNumber &&
+                other.groupIndex == match.groupIndex &&
+                !other.isBye && other.status != "confirmed"
+            }
+        }
+    }
     private var visibleGroups: [Int] {
         Array(Set(confirmedEntries.compactMap(\.groupIndex))).sorted()
     }
@@ -225,6 +247,23 @@ struct ATHLTHTournamentLiveDetailView: View {
             }
             .font(.caption)
             .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if current.status == "inviting" {
+                Text(current.startMode == "scheduled"
+                     ? "Starter ved valgt tidspunkt når alle er klare"
+                     : current.startMode == "when_ready"
+                     ? "Starter automatisk når alle er klare"
+                     : "Arrangøren starter når alle er klare")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            if let date = current.plannedStartsAt,
+               current.startMode == "scheduled" {
+                Label("Planlagt start: " + date.formatted(
+                    date: .abbreviated, time: .shortened),
+                      systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+            }
             if current.clubID != nil {
                 Label("Klubbturnering" +
                       (current.seasonID == nil ? "" : " · Sesong"),
@@ -333,7 +372,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .font(.subheadline.weight(.semibold))
                 .disabled(busy)
             } else if isOwner {
-                if pendingCount == 0 && confirmedEntries.count >= 3 {
+                if current.startMode == "manual" && readyToStart {
                     Button {
                         Task { await start() }
                     } label: {
@@ -345,17 +384,45 @@ struct ATHLTHTournamentLiveDetailView: View {
                     }
                     .disabled(busy)
                 } else {
-                    Label("Start blir tilgjengelig når alle har svart og minst to har godtatt.",
+                    Label(current.startMode == "manual"
+                          ? "Venter på Klar fra alle (minst \(minimumAthletes) deltakere)"
+                          : "Starter automatisk når alle er klare og startvilkårene er oppfylt.",
                           systemImage: "clock")
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
+            if myEntry?.response == "accepted" &&
+               myEntry?.isReady == false && !current.simpleMode {
+                if current.rulesConfirmedAt != nil &&
+                   myEntry?.agreedRuleVersion == current.ruleVersion &&
+                   current.exerciseSelectionFinalizedAt != nil {
+                    Button {
+                        Task {
+                            await markReady()
+                        }
+                    } label: {
+                        Label("Jeg er klar", systemImage: "checkmark.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(ATHLTHArenaV3Style.ink, in: Capsule())
+                    }
+                    .disabled(busy)
+                } else {
+                    Button("Se og godta reglene før du trykker Klar") {
+                        selection = .lobby
+                    }
+                    .font(.caption.weight(.semibold))
+                    .tint(ATHLTHArenaV3Style.gold)
                 }
             }
             ForEach(entries) { entry in
                 HStack(spacing: 9) {
                     Text(name(entry.userID)).lineLimit(1)
                     Spacer(minLength: 6)
-                    Text(entry.response == "accepted" ? "Godtatt" :
+                    Text(entry.response == "accepted"
+                         ? (entry.isReady ? "Klar" : "Ikke klar") :
                          entry.response == "declined" ? "Avslått" : "Invitert")
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     if isOwner && entry.userID != userID &&
@@ -379,6 +446,18 @@ struct ATHLTHTournamentLiveDetailView: View {
 
     private var overview: some View {
         VStack(alignment: .leading, spacing: 17) {
+            eventInformation
+            athleteProgressSection
+            NavigationLink {
+                ATHLTHTournamentGroupConversationView(tournament: current)
+            } label: {
+                Label("Åpne konkurransesamtalen", systemImage: "bubble.left.and.bubble.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(ATHLTHArenaV3Style.panel())
+            }
             if let practice = matches.first(where: { $0.phase == .warmup }) {
                 sectionTitle("Oppvarming")
                 Text("Disse rundene gir ingen poeng, plassering eller utslag.")
@@ -422,6 +501,64 @@ struct ATHLTHTournamentLiveDetailView: View {
         }
     }
 
+    private var eventInformation: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            sectionTitle("Konkurranseregler")
+            if current.requiredEnvironment != "any" {
+                Label(current.requiredEnvironment == "gym"
+                      ? "Kun på treningssenter"
+                      : "Kun utendørs", systemImage: "checkmark.shield")
+                    .font(.subheadline.weight(.medium))
+            }
+            if let place = current.meetingPlace, !place.isEmpty {
+                Label(place, systemImage: "mappin.and.ellipse")
+                    .font(.subheadline)
+            }
+            if current.meetingLat != nil && current.meetingLon != nil {
+                Text("Møtepunkt er markert på kartet.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            Text(current.releaseMode == "everyone_finished"
+                ? "Neste øvelse åpnes når alle er ferdige."
+                : "Neste øvelse åpnes etter avtalt tidsintervall.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            Text("Frist per øvelse: \(current.completionHours) timer")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
+    private var athleteProgressSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Deltakerstatus")
+            Text("Status er synlig uten at skjulte resultater eller privat trening deles.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            ForEach(confirmedEntries) { entry in
+                let progress = athleteProgress.first { $0.userID == entry.userID }
+                HStack(spacing: 10) {
+                    Image(systemName: progress?.symbol ?? "clock")
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        .frame(width: 27)
+                    Text(name(entry.userID))
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text(progress?.label ?? (entry.isReady ? "Venter start" : "Ikke klar"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                .padding(.vertical, 5)
+            }
+        }
+        .padding(15)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
     private var allMatchesSection: some View {
         LazyVStack(alignment: .leading, spacing: 11) {
             let games = matches.sorted { a, b in
@@ -454,7 +591,15 @@ struct ATHLTHTournamentLiveDetailView: View {
 
     private var standingsSection: some View {
         VStack(alignment: .leading, spacing: 13) {
-            if current.format == .cup {
+            if current.format != .cup && current.status == "active" &&
+               !visibleRoundComplete {
+                Label("Resultater og tabell er skjult frem til alle oppgjørene i runden er godkjent.",
+                      systemImage: "lock.shield")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .padding(14)
+                    .background(ATHLTHArenaV3Style.panel())
+            } else if current.format == .cup {
                 cupTree
             } else if current.format == .groups {
                 groupsTable
@@ -622,6 +767,8 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
                 Spacer()
                 Text(match.isBye ? "Frirunde" :
+                     match.status == "confirmed" &&
+                       match.homeScore == nil ? "Ferdig · skjult resultat" :
                      match.status == "confirmed" ? "Godkjent" :
                      match.status == "proposed" ? "Avventer godkjenning" :
                      match.status == "disputed" ? "Bestridt" : "Ikke avgjort")
@@ -755,14 +902,17 @@ struct ATHLTHTournamentLiveDetailView: View {
             async let participants = cloud.entries(for: current.id)
             async let competitionMatches = cloud.matches(for: current.id)
             async let officialRankings = cloud.standings(for: current.id)
+            async let progress = cloud.athleteProgress(for: current.id)
             let all = try await allTournaments
             let newEntries = try await participants
             let newMatches = try await competitionMatches
             let updatedRankings = try await officialRankings
+            let statuses = try await progress
             latest = all.first { $0.id == current.id } ?? latest
             entries = newEntries
             matches = newMatches
             confirmedStandings = updatedRankings
+            athleteProgress = statuses
             names = try await cloud.athleteNames(
                 for: Set(newEntries.map(\.userID))
             )
@@ -811,6 +961,17 @@ struct ATHLTHTournamentLiveDetailView: View {
             errorMessage = "Kunne ikke kontrollere om neste sesong finnes: " +
                 error.localizedDescription
         }
+    }
+
+    @MainActor private func markReady() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await ATHLTHTournamentLobbyCloudService()
+                .ready(tournamentID: current.id, value: true)
+            await reload()
+        } catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor private func start() async {
