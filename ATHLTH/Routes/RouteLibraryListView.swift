@@ -177,9 +177,14 @@ struct RouteLibraryListView: View {
          lengthFilter == 6 ? String(minLength) : "",
          lengthFilter == 6 ? String(maxLength) : "",
          String(publicFilter == .friends),
-         // Prevent GPS jitter from re-querying the catalogue every second.
-         String(Int(((locationStore.location?.coordinate.latitude ?? 0) * 50).rounded())),
-         String(Int(((locationStore.location?.coordinate.longitude ?? 0) * 50).rounded()))
+         // Only nearest sorting depends on GPS. Other sorts should not
+         // invalidate the network catalogue when the location changes.
+         sort == .nearest
+             ? String(Int(((locationStore.location?.coordinate.latitude ?? 0) * 50).rounded()))
+             : "",
+         sort == .nearest
+             ? String(Int(((locationStore.location?.coordinate.longitude ?? 0) * 50).rounded()))
+             : ""
         ].joined(separator: "|")
     }
 
@@ -1746,8 +1751,9 @@ struct RouteLibraryListView: View {
         catalogRequestID = requestID
         loading = true
         errorMessage = nil
-        if reset { catalog = []; hasMore = false }
-        let offset = catalog.count
+        // Keep the last successful page visible while refreshing.
+        // Replacing it only on success avoids blank-grid flashes.
+        let offset = reset ? 0 : catalog.count
         defer { if catalogRequestID == requestID { loading = false } }
         do {
             // The server returns only ~50 small records; no artificial
@@ -1770,7 +1776,12 @@ struct RouteLibraryListView: View {
                 .rpc("search_shared_route_library", params: params).execute().value
             try Task.checkCancellation()
             guard catalogRequestID == requestID else { return }
-            catalog += page
+            if reset {
+                catalog = page
+            } else {
+                let existingIDs = Set(catalog.map(\.id))
+                catalog.append(contentsOf: page.filter { !existingIDs.contains($0.id) })
+            }
             hasMore = page.count == 50
         } catch {
             if !Task.isCancelled && catalogRequestID == requestID {
