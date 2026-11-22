@@ -43,6 +43,11 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let meetingLat: Double?
     let meetingLon: Double?
     let simpleMode: Bool
+    let invitationDays: Int
+    let unansweredPolicy: String
+    let replacementUntil: Date?
+    let allowFeedPost: Bool
+    let feedPublishedAt: Date?
     let releaseMode: String
     let releaseEvery: Int
     let releaseUnit: String
@@ -92,6 +97,11 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         case meetingLat = "meeting_lat"
         case meetingLon = "meeting_lon"
         case simpleMode = "simple_mode"
+        case invitationDays = "invitation_days"
+        case unansweredPolicy = "unanswered_policy"
+        case replacementUntil = "replacement_until"
+        case allowFeedPost = "allow_feed_post"
+        case feedPublishedAt = "feed_published_at"
         case releaseMode = "release_mode"
         case releaseEvery = "release_every"
         case releaseUnit = "release_unit"
@@ -112,6 +122,7 @@ struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
     let seed: Int
     let response: String
     let respondedAt: Date?
+    let expiresAt: Date?
     let groupIndex: Int?
     let isReady: Bool
     let readyAt: Date?
@@ -126,6 +137,7 @@ struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
         case tournamentID = "tournament_id"
         case userID = "user_id"
         case respondedAt = "responded_at"
+        case expiresAt = "expires_at"
         case groupIndex = "group_index"
         case isReady = "is_ready"
         case readyAt = "ready_at"
@@ -285,6 +297,9 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let meetingLat: Double?
     let meetingLon: Double?
     let coachExerciseIDs: [UUID]?
+    let invitationDays: Int
+    let unansweredPolicy: String
+    let allowFeedPost: Bool
     let unlock: String
     let every: Int
     let unit: String
@@ -308,6 +323,9 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
         meetingLon = settings.meetingLon
         coachExerciseIDs = settings.coachExerciseIDs.isEmpty
             ? nil : settings.coachExerciseIDs
+        invitationDays = settings.invitationDays
+        unansweredPolicy = settings.unansweredPolicy.rawValue
+        allowFeedPost = settings.allowFeedPost
         unlock = settings.unlock.rawValue
         every = settings.every
         unit = settings.unit.rawValue
@@ -750,6 +768,13 @@ struct ATHLTHTournamentCloudService {
     func cancelUnstarted(tournamentID: UUID) async throws {
         try await client.rpc(
             "athlth_tournament_cancel",
+            params: ATHLTHTournamentIDParams(p_tournament: tournamentID)
+        ).execute()
+    }
+
+    func publishCompletedToFeed(tournamentID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_publish_feed",
             params: ATHLTHTournamentIDParams(p_tournament: tournamentID)
         ).execute()
     }
