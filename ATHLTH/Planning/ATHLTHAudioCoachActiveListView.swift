@@ -13,6 +13,7 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     // Every new workout opens the uncluttered Basic screen; the athlete's
     // actual Coach settings and profiles remain unchanged.
+    @State private var composerTarget: ATHLTHCoachEditorTarget?
     @State private var showingStandaloneTrigger = false
     @State private var showingStandaloneCommand = false
     @State private var openStandaloneCommandAfterTrigger = false
@@ -143,7 +144,15 @@ struct ATHLTHAudioCoachActiveListView: View {
                     selectedProfileName: $selectedProfileName,
                     showStructuredOptions: showStructuredOptions,
                     showRouteOptions: showRouteOptions,
-                    onEditRule: { id in selectedRule = SelectedRule(id: id) },
+                    onEditRule: { id in
+                        if let groupID = draft.coachGroups.first(where: {
+                            $0.ruleIDs.contains(id)
+                        })?.id {
+                            composerTarget = .group(groupID)
+                        } else {
+                            composerTarget = .command(id)
+                        }
+                    },
                     onEditOption: { option in editingOption = option },
                     onShowProfiles: { showingProfiles = true },
                     onCreateTemplate: { requestTemplateChange(.new) },
@@ -154,32 +163,19 @@ struct ATHLTHAudioCoachActiveListView: View {
                     onResetStandard: { showingResetStandardPrompt = true },
                     isDirty: hasUnsavedTemplateChanges,
                     onAddCommand: { groupID in
-                        openGroupCommands(groupID)
+                        composerTarget = .group(groupID)
                     },
                     onEditGroupTrigger: { groupID in
-                        guard let group = draft.coachGroups.first(where: { $0.id == groupID }) else { return }
-                        let rule = group.ruleIDs.compactMap { id in
-                            draft.customRules.first(where: { $0.id == id })
-                        }.first
-                        editingGroupTriggerID = groupID
-                        groupDraftName = group.name
-                        groupDraftTrigger = group.trigger ?? rule?.trigger ?? .time
-                        groupDraftInterval = group.interval ?? rule?.interval ?? 60
-                        showingGroupBuilder = true
+                        composerTarget = .group(groupID, editTrigger: true)
                     },
                     onMoveCommand: { token, destination in
                         ATHLTHAudioCoachCommandMoves.move(token, to: destination, draft: &draft)
                     },
                     onAddGroup: {
-                        prepareNewGroup()
-                        showingGroupBuilder = true
+                        composerTarget = .newGroup()
                     },
                     onAddGeneralCommand: {
-                        standaloneTrigger = .time
-                        standaloneInterval = 60
-                        standaloneMetric = .elapsedTime
-                        standalonePhrase = ""
-                        showingStandaloneTrigger = true
+                        composerTarget = .newCommand()
                     }
                 )
                 DisclosureGroup(isExpanded: $showingVoiceOptions) {
@@ -220,6 +216,25 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .padding(.horizontal, 4)
         }
         .tint(bronze)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if draft.enabled {
+                    Button(tr("Save", "Lagre")) { showingSaveChoices = true }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(bronze)
+                        .accessibilityIdentifier("athlth-coach-save-top")
+                }
+            }
+        }
+        .sheet(item: $composerTarget) { target in
+            ATHLTHCoachRuleComposer(
+                draft: $draft,
+                target: target,
+                supportsStructured: showStructuredOptions,
+                showsRoutes: showRouteOptions,
+                onClose: { composerTarget = nil }
+            )
+        }
         .sheet(isPresented: $showingGroupBuilder, onDismiss: {
             if let groupID = pendingGroupCommandID {
                 pendingGroupCommandID = nil
