@@ -120,6 +120,37 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         ))
     }
 
+    func testRouteTimeTrialRequiresSelectedRoute() {
+        XCTAssertFalse(ATHLTHCompetitionCreationPolicy.canPublish(
+            name: "Route duel",
+            ownerID: owner,
+            opponents: [rival],
+            format: .duel,
+            metric: .fastestRoute,
+            activity: .running,
+            distanceKM: 5,
+            durationMinutes: 30,
+            exerciseName: "",
+            hasRoute: false,
+            endsAt: Date().addingTimeInterval(86_400),
+            now: Date()
+        ))
+        XCTAssertTrue(ATHLTHCompetitionCreationPolicy.canPublish(
+            name: "Route duel",
+            ownerID: owner,
+            opponents: [rival],
+            format: .duel,
+            metric: .fastestRoute,
+            activity: .running,
+            distanceKM: 5,
+            durationMinutes: 30,
+            exerciseName: "",
+            hasRoute: true,
+            endsAt: Date().addingTimeInterval(86_400),
+            now: Date()
+        ))
+    }
+
     func testOnlyCompatibleDuelsCanBePublished() {
         XCTAssertFalse(valid(
             activity: .strength, format: .duel, opponents: [rival],
