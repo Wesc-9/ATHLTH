@@ -56,6 +56,8 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
             groupSize: 4, qualifiersPerGroup: 2,
             winPoints: 4, drawPoints: 1,
             status: status,
+            singleEventMode: false,
+            raceSignalAt: nil,
             exerciseMode: .vote,
             exerciseCount: 6,
             proposalsCloseAt: nil, votesCloseAt: nil,
