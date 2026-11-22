@@ -5811,6 +5811,8 @@ struct ATHLTHTrainView: View {
     @State private var pendingWorkoutCategoryAction: ATHLTHTrainAllWorkoutCategoriesSheet.Action?
     @State private var selectedTrainCompetitionActivity: ATHLTHQuickStartActivity?
     @State private var showingTrainIntervalComposer = false
+    @State private var showingTrainRunningWorkoutLibrary = false
+    @State private var trainRunningWorkoutSelection: RunningWorkoutTemplate?
     @State private var savedTrainIntervalTemplate: RunningWorkoutTemplate?
     @State private var personalLibrarySection: ATHLTHPersonalLibrarySection?
     @State private var showingTrainPlanWorkspace = false
@@ -5954,6 +5956,28 @@ struct ATHLTHTrainView: View {
                         advanced: settings.resolvedAdvancedSetup(for: .strength)
                     )
                 }
+            }
+            .sheet(isPresented: $showingTrainRunningWorkoutLibrary, onDismiss: {
+                if let selected = trainRunningWorkoutSelection {
+                    trainRunningWorkoutSelection = nil
+                    pendingPlannedEnduranceWorkout = nil
+                    pendingRunningTemplate = selected
+                }
+            }) {
+                NavigationStack {
+                    RunningWorkoutLibraryView(
+                        selectionTitle: ATHLTHLocalization.choose(
+                            english: "Choose running workout",
+                            norwegian: "Velg løpeøkt"
+                        ),
+                        onSelect: { workout in
+                            trainRunningWorkoutSelection = workout
+                            showingTrainRunningWorkoutLibrary = false
+                        }
+                    )
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingTrainIntervalComposer, onDismiss: {
                 // The interval editor closes before the running quick-start
@@ -7445,9 +7469,12 @@ struct ATHLTHTrainView: View {
     private var premiumTodayScreen: some View {
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
+        let planSessionIDs = Set(sessions.map(\.id))
         let standaloneToday = HomeTodayCalendarSchedule.workouts(
             plan: nil, standalone: session.standalonePlannedSessions, on: Date()
-        ).filter { !$0.isExplicitRestDay }
+        ).filter {
+            !$0.isExplicitRestDay && !planSessionIDs.contains($0.id)
+        }
         let completedIDs: Set<UUID> = active.map {
             completedTodaySessionIDs(
                 planID: $0.id,
@@ -9902,8 +9929,10 @@ struct ATHLTHTrainView: View {
             handleQuickStart(.walking)
         case .freeStrength:
             handleQuickStart(.strength)
-        case .strengthLibrary, .runningWorkouts:
+        case .strengthLibrary:
             personalLibrarySection = .workouts
+        case .runningWorkouts:
+            showingTrainRunningWorkoutLibrary = true
         case .strengthExercises:
             handleQuickStart(.strength)
         case .competition(let activity):
