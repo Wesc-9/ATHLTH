@@ -188,6 +188,28 @@ final class ATHLTHWorkoutUserTargetsStoreTests: XCTestCase {
         ))
     }
 
+    func testOldPrivateSpotifyAndCoachChoicesDecodeWithoutNewStepSongKey() throws {
+        struct LegacyOptions: Encodable {
+            var audioCoachConfiguration: WatchAudioCoachConfiguration?
+            var spotifyPlaylist: SpotifyPlaylistReference?
+            var spotifyAutoplayOnStart: Bool?
+            var spotifyIntervalTrack: ATHLTHSpotifyIntervalTrack?
+        }
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        let legacy = LegacyOptions(
+            audioCoachConfiguration: config, spotifyPlaylist: nil,
+            spotifyAutoplayOnStart: true, spotifyIntervalTrack: nil
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHWorkoutPersonalOptions.self,
+            from: JSONEncoder().encode(legacy)
+        )
+        XCTAssertTrue(restored.audioCoachConfiguration?.enabled == true)
+        XCTAssertTrue(restored.spotifyAutoplayOnStart == true)
+        XCTAssertTrue(restored.stepSongs.isEmpty)
+    }
+
     func testPersonalOptionsStayWithinAccountAndWorkout() {
         let suite = "athlth.personal-options-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
