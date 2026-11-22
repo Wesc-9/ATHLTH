@@ -94,3 +94,5 @@ revoke all on function public.athlth_competition_share_live_position(uuid,double
 grant execute on function public.athlth_competition_share_live_position(uuid,double precision,double precision,double precision) to authenticated;
 revoke all on function public.athlth_competition_stop_live_position(uuid) from public,anon;
 grant execute on function public.athlth_competition_stop_live_position(uuid) to authenticated;
+-- RLS evaluates this helper as the authenticated athlete; it must be callable.
+grant execute on function private.athlth_competition_is_location_sharing(uuid,uuid) to authenticated;
