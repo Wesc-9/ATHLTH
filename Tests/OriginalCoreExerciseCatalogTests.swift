@@ -72,6 +72,34 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testHistoricalOriginalCoreUUIDResolvesButCannotBeSelectedAgain() throws {
+        let library = ExerciseLibraryStore()
+        let source = try XCTUnwrap(library.athlthCatalogExercises.first {
+            ExerciseLibraryStore.isRetiredOriginalCoreSlug($0.sourceIdentifier)
+        })
+        XCTAssertTrue(library.allExercises.contains { $0.id == source.id })
+        XCTAssertFalse(library.selectableExercises.contains { $0.id == source.id })
+
+        var historical = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: source.name,
+            exerciseSlug: source.sourceIdentifier,
+            distanceMeters: nil, repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil, phase: .main
+        )
+        historical.exerciseID = source.id
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(
+                historical, in: library.allExercises
+            )?.id,
+            source.id,
+            "An old workout must retain its exact exercise identity"
+        )
+        XCTAssertFalse(library.search(query: source.name).contains {
+            $0.id == source.id
+        })
+    }
+
+    @MainActor
     func testCuratedExercisesRemainSelectableButDuplicateNativeMovementsAreHidden() {
         let library = ExerciseLibraryStore()
         let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
