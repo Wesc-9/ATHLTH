@@ -8,6 +8,19 @@ enum ATHLTHCatalogPlanSessionFactory {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
+    /// Copy and normalize sequence without rebuilding each workout step.
+    /// Future measurement, navigation, music and equipment fields are kept
+    /// automatically because the entire value is copied.
+    static func resequencedBlocks(
+        _ source: [WorkoutTemplateBlock]
+    ) -> [WorkoutTemplateBlock] {
+        source.enumerated().map { index, step in
+            var copy = step
+            copy.sequence = index + 1
+            return copy
+        }
+    }
+
     static func session(
         entry: TrainingPlanCatalogEntry,
         blueprint: TrainingPlanCatalogSessionBlueprint,
@@ -81,67 +94,9 @@ enum ATHLTHCatalogPlanSessionFactory {
             }
         }
 
-        // All blocks are portable and ordered. Do not generate additional
-        // parallel exercise or running data that could execute twice.
-        blocks = blocks.enumerated().map { index, step in
-            var copy = WorkoutTemplateBlock(
-                sequence: index + 1, kind: step.kind, title: step.title,
-                exerciseSlug: step.exerciseSlug,
-                distanceMeters: step.distanceMeters,
-                repetitions: step.repetitions,
-                durationSeconds: step.durationSeconds,
-                targetWeightKilograms: step.targetWeightKilograms,
-                loadNote: step.loadNote, notes: step.notes,
-                phase: step.phase,
-                targetPaceSecondsPerKilometer: step.targetPaceSecondsPerKilometer,
-                targetHeartRateZone: step.targetHeartRateZone,
-                setCount: step.setCount,
-                restBetweenSetsSeconds: step.restBetweenSetsSeconds,
-                groupID: step.groupID, groupKind: step.groupKind,
-                groupRounds: step.groupRounds,
-                cardioActivity: step.cardioActivity, isIndoor: step.isIndoor
-            )
-            // The memberwise initializer above only sets historic targets.
-            // Keep all canonical authored fields when a catalogue plan builds
-            // week-specific copies, including source Z1–Z5 percentage ranges,
-            // RIR, tempo, terrain and grouped set metadata.
-            copy.routeID = step.routeID
-            // Preserve explicit workout measurement and music metadata when
-            // reindexing plan steps. Losing these makes a scheduled workout
-            // behave differently from its reviewed library prescription.
-            copy.assessmentMethod = step.assessmentMethod
-            copy.assessmentScope = step.assessmentScope
-            copy.measurementStepID = step.measurementStepID
-            copy.spotifyTrack = step.spotifyTrack
-            copy.exerciseID = step.exerciseID
-            copy.exerciseSnapshot = step.exerciseSnapshot
-            copy.sourceIntensityZoneLabel = step.sourceIntensityZoneLabel
-            copy.targetHeartRatePercentMin = step.targetHeartRatePercentMin
-            copy.targetHeartRatePercentMax = step.targetHeartRatePercentMax
-            copy.targetEffortRPE = step.targetEffortRPE
-            copy.treadmillInclinePercent = step.treadmillInclinePercent
-            copy.individualSetTargets = step.individualSetTargets
-            copy.groupClockSeconds = step.groupClockSeconds
-            copy.executionGroupKind = step.executionGroupKind
-            copy.executionGroupID = step.executionGroupID
-            copy.executionRound = step.executionRound
-            copy.executionTotalRounds = step.executionTotalRounds
-            copy.executionGroupClockSeconds = step.executionGroupClockSeconds
-            copy.executionStationCount = step.executionStationCount
-            copy.wellnessKind = step.wellnessKind
-            copy.activityTag = step.activityTag
-            copy.targetVMAPercent = step.targetVMAPercent
-            copy.targetIntensityType = step.targetIntensityType
-            copy.targetElevationGainMeters = step.targetElevationGainMeters
-            copy.targetGradientPercent = step.targetGradientPercent
-            copy.targetTerrainType = step.targetTerrainType
-            copy.targetRepetitionsMaximum = step.targetRepetitionsMaximum
-            copy.targetRepsInReserve = step.targetRepsInReserve
-            copy.targetMovementTempo = step.targetMovementTempo
-            copy.sourceSupersetGroupIndex = step.sourceSupersetGroupIndex
-            copy.sourceLoadAlternativesKilograms = step.sourceLoadAlternativesKilograms
-            return copy
-        }
+        // Retain every source field, including future optional metadata.
+        // Only sequence changes in the isolated value copy.
+        blocks = resequencedBlocks(blocks)
 
         // Use the same sport classifier as Quick Train, Plan Studio and
         // the live router. Source metadata must never label mobility as
