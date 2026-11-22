@@ -875,6 +875,29 @@ enum ATHLTHCoachPhoneOutputPolicy {
     }
 }
 
+/// A short-lived strength announcement from the Watch's authoritative
+/// exercise engine. Only transmitted over the active HealthKit mirror;
+/// no health history, route, or user identity is persisted with the cue.
+struct ATHLTHStrengthMirroredCoachCue: Codable, Hashable {
+    var id: UUID
+    var workoutStartedAt: Date
+    var sentAt: Date
+    var text: String
+    var priority: ATHLTHGuidancePriority
+
+    func isValid(for workoutStart: Date?, now: Date = Date()) -> Bool {
+        guard let workoutStart,
+              abs(workoutStart.timeIntervalSince(workoutStartedAt)) <= 1,
+              now.timeIntervalSince(sentAt) >= -2,
+              now.timeIntervalSince(sentAt) <= 7,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              text.count <= 380,
+              (priority == .routineCoach || priority == .structuredStep)
+        else { return false }
+        return true
+    }
+}
+
 struct ATHLTHAudioCoachLeaseOffer: Codable, Hashable {
     var generationID: UUID
     var requestID: UUID
@@ -948,9 +971,11 @@ enum ATHLTHAudioCoachVoiceRouting {
             return true
         }
 
-        // The mirrored iPhone Audio Coach only speaks running/walking cues.
-        // Preserve the full strength experience on Watch.
-        if workoutKind == .strength {
+        // Legacy strength configurations have no mirrored cue transport.
+        // Modern strength sessions may hand off their Watch-generated speech,
+        // but short/critical countdowns always stay on the Watch.
+        if workoutKind == .strength &&
+            configuration.outputPreference == nil {
             return true
         }
 
