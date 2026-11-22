@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import Foundation
 @preconcurrency import HealthKit
@@ -49,6 +50,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         // none of these grants an unrestricted new speech lease.
         guard !aiConversationActive,
               mirroredIPhoneCoachAvailable,
+              mayUseIPhoneAudioOutput,
               snapshot?.watchOwnedAudioCoach != true,
               let state = snapshot?.state,
               state == .running || state == .paused
@@ -72,6 +74,25 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     private let iPhoneAudioCoach =
         MirroredWorkoutAudioCoach()
     private var aiConversationActive = false
+    private var phoneAudioPreference: ATHLTHAudioCoachOutputPreference = .automatic
+
+    private var mayUseIPhoneAudioOutput: Bool {
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        let external = outputs.contains {
+            switch $0.portType {
+            case .headphones, .bluetoothA2DP, .bluetoothHFP,
+                 .bluetoothLE, .airPlay, .carAudio, .usbAudio:
+                return true
+            default:
+                return false
+            }
+        }
+        return ATHLTHCoachPhoneOutputPolicy.permitsPhone(
+            preference: phoneAudioPreference,
+            externalOutputAvailable: external
+        )
+    }
+
     private var iPhoneAudioCoachPreparedAt:
         Date?
     private var iPhoneAudioCoachAttached =
@@ -107,6 +128,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard !aiConversationActive,
               iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
+              mayUseIPhoneAudioOutput,
               snapshot.watchOwnedAudioCoach != true,
               snapshot.supportsAudioCoachVoiceLease == true,
               snapshot.kind == .running ||
@@ -162,6 +184,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard !aiConversationActive,
               iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
+              mayUseIPhoneAudioOutput,
               mirroredSession != nil,
               acknowledgement.generationID ==
                 voiceLeaseGenerationID,
@@ -277,6 +300,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
 
         resetVoiceLease()
+        phoneAudioPreference = configuration.outputPreference ??
+            (configuration.shouldPreferIPhoneAudioWhenReachable
+                ? .iPhone : .automatic)
         iPhoneAudioCoach.prepare(
             configuration
         )
@@ -290,6 +316,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         aiConversationActive = false
         resetVoiceLease()
         iPhoneAudioCoach.stop()
+        phoneAudioPreference = .automatic
         iPhoneAudioCoachPreparedAt = nil
         iPhoneAudioCoachAttached = false
     }
@@ -652,6 +679,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
     private func handle(_ incoming: [Data]) {
         var latestSnapshot: WatchWorkoutLiveSnapshot?
+        var invitations: [ATHLTHAudioCoachMirrorInvitation] = []
         var receipts: [ATHLTHCoachDeliveryReceipt] = []
         var acknowledgements: [ATHLTHAudioCoachLeaseAcknowledgement] = []
         var ghostDisableRequests: [ATHLTHGhostDisableDuringWorkout] = []
@@ -660,6 +688,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         // HealthKit can deliver these alongside the first snapshot for a
         // workout, while the cached snapshot still describes another state.
         for data in incoming {
+            if let invitation = try? JSONDecoder().decode(
+                ATHLTHAudioCoachMirrorInvitation.self, from: data
+            ) {
+                invitations.append(invitation)
+                continue
+            }
             if let command = try? JSONDecoder().decode(
                 ATHLTHGhostDisableDuringWorkout.self, from: data
             ) {
@@ -709,6 +743,35 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
 
         let currentStart = latestSnapshot?.startedAt ?? snapshot?.startedAt
+
+        // A workout started directly on Watch has no iPhone-prepared coach.
+        // Accept its settings only from the same active HealthKit mirror,
+        // after validating the session, live ownership and message freshness.
+        if !iPhoneAudioCoachAttached,
+           let current = latestSnapshot ?? snapshot,
+           mirroredSession != nil,
+           current.supportsAudioCoachVoiceLease == true,
+           current.watchOwnedAudioCoach == false,
+           current.state == .running || current.state == .paused ||
+               current.state == .preparing,
+           let invitation = invitations.last(where: {
+               $0.isValid(for: current.startedAt)
+           }) {
+            resetVoiceLease()
+            phoneAudioPreference = invitation.configuration.outputPreference ??
+                .automatic
+            iPhoneAudioCoach.prepare(invitation.configuration)
+            iPhoneAudioCoachPreparedAt = Date()
+            iPhoneAudioCoachAttached = true
+        }
+
+        // Never keep an old claim after the headphones/selected phone route
+        // disappear. Watch will reclaim its local voice when the lease expires.
+        if iPhoneAudioCoachAttached, !mayUseIPhoneAudioOutput,
+           hasAcknowledgedVoiceLease {
+            resetVoiceLease()
+        }
+
         if ghostDisableRequests.contains(where: {
             $0.isValid(workoutStart: currentStart)
         }) {
@@ -740,7 +803,12 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             )
         }
 
-        guard let latestSnapshot else { return }
+        guard let latestSnapshot else {
+            if let current = snapshot {
+                offerVoiceLeaseIfNeeded(for: current)
+            }
+            return
+        }
 
         if iPhoneAudioCoachAttached {
             if latestSnapshot.watchOwnedAudioCoach == true {
