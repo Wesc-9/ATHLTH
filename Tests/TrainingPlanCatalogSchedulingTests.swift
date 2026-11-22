@@ -3,6 +3,60 @@ import XCTest
 
 final class TrainingPlanCatalogSchedulingTests: XCTestCase {
     @MainActor
+    func testCatalogPlanOneAndSevenDayPatternsKeepEveryWorkout() throws {
+        for count in [1, 7] {
+            let suite = "CatalogDayCount.\(count).\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let store = AppSessionStore(defaults: defaults)
+            let entry = TrainingPlanCatalogEntry(
+                id: UUID(), slug: "test-\(count)-days",
+                title: "Catalog \(count) sessions", summary: "Test",
+                category: "running", goal: "Run", level: "Beginner",
+                durationWeeks: 2, sessionsPerWeek: count,
+                workoutPattern: Array(repeating: "easy_run", count: count),
+                tags: ["running"], sortOrder: 0, catalogVersion: 1
+            )
+            XCTAssertTrue(entry.hasCompleteWorkoutPattern)
+            let date = try XCTUnwrap(Calendar.current.date(from:
+                DateComponents(year: 2032, month: 5, day: 10)))
+            let days = count == 1 ? [3] : Array(1...7)
+            let plan = try XCTUnwrap(store.scheduleCatalogPlan(
+                entry, startDate: date, preferredDayIndexes: days
+            ))
+            XCTAssertEqual(plan.weeks.count, 2)
+            XCTAssertEqual(
+                plan.weeks.flatMap(\.days).flatMap(\.sessions).count,
+                2 * count,
+                "The catalog must not invent or drop workouts"
+            )
+            for week in plan.weeks {
+                let actualDays = Set(week.days.filter {
+                    !$0.sessions.isEmpty
+                }.map(\.dayIndex))
+                XCTAssertEqual(actualDays, Set(days))
+            }
+        }
+    }
+
+    @MainActor
+    func testCatalogRejectsMoreThanSevenDaysInsteadOfSilentlyDroppingWorkouts() {
+        let invalid = TrainingPlanCatalogEntry(
+            id: UUID(), slug: "invalid-eight-day-catalog",
+            title: "Invalid", summary: "", category: "running",
+            goal: "Run", level: "Beginner",
+            durationWeeks: 2, sessionsPerWeek: 8,
+            workoutPattern: Array(repeating: "easy_run", count: 8),
+            tags: [], sortOrder: 0, catalogVersion: 1
+        )
+        XCTAssertFalse(invalid.hasCompleteWorkoutPattern)
+        let store = AppSessionStore()
+        XCTAssertNil(store.scheduleCatalogPlan(
+            invalid, startDate: Date(), preferredDayIndexes: Array(1...7)
+        ))
+    }
+
+    @MainActor
     func testSimplePlansAlternateEverySelectedActivityEvenWithOneDayPerWeek() throws {
         for days in [[3], [1, 2, 3, 4, 5, 6, 7]] {
             for minutes in [5, 60, 180] {
