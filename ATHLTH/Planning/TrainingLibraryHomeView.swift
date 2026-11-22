@@ -5733,8 +5733,20 @@ struct LibraryFavoritesView: View {
     }
 
     var body: some View {
-        let exerciseEntries = favoriteExerciseEntriesByID
         let matches = displayedFavorites
+        let page = ATHLTHLibraryAlphabetWindow.visible(
+            matches, start: visibleStartIndex, limit: visibleLimit
+        )
+        let exerciseIDs = Set(page.compactMap { item -> UUID? in
+            guard item.itemType == .exercise else { return nil }
+            return UUID(uuidString: item.itemID)
+        })
+        let exerciseEntries = Dictionary(
+            exerciseLibrary.allExercises.lazy
+                .filter { exerciseIDs.contains($0.id) }
+                .map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: matches, id: { $0.id }, title: { $0.title }
         )
@@ -5862,7 +5874,7 @@ struct LibraryFavoritesView: View {
                     norwegianPlaceholder: "Søk i favoritter"
                 )
 
-                if displayedFavorites.isEmpty {
+                if matches.isEmpty {
                     VStack(spacing: 15) {
                         Image(systemName: "star")
                             .font(.system(size: 27, weight: .medium))
@@ -5907,7 +5919,7 @@ struct LibraryFavoritesView: View {
                     )
                 } else {
                     LazyVGrid(columns: favoriteColumns, spacing: 10) {
-                        ForEach(pageFavorites) { item in
+                        ForEach(page) { item in
                             HStack(spacing: 8) {
                                 NavigationLink {
                                     favoriteDestination(item)
@@ -5942,7 +5954,7 @@ struct LibraryFavoritesView: View {
                         }
                     }
                     ATHLTHLibraryLoadMoreButton(
-                        shown: pageFavorites.count,
+                        shown: page.count,
                         total: ATHLTHLibraryAlphabetWindow.remaining(
                             total: matches.count, start: visibleStartIndex
                         )
