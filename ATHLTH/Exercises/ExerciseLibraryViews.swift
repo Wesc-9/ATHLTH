@@ -190,7 +190,18 @@ struct ExerciseLibraryView: View {
     }
 
     private var results: [ExerciseLibraryEntry] {
-        library.search(
+        // Marketplace and standalone favorites have their own data source.
+        // Do not search the entire exercise catalog for hidden results.
+        if selectedSection == .marketplace ||
+            (onSelect == nil && standaloneFavorites) {
+            return []
+        }
+        let favoriteIDs: Set<String> = favoritesOnly
+            ? Set(favorites.favorites.lazy
+                .filter { $0.itemType == .exercise }
+                .map(\.itemID))
+            : []
+        return library.search(
             query: query,
             bodyPart: selectedBodyPart,
             equipment: selectedEquipment
@@ -209,11 +220,7 @@ struct ExerciseLibraryView: View {
             }
 
             let favoriteMatches =
-                !favoritesOnly ||
-                favorites.isFavorite(
-                    .exercise,
-                    itemID: entry.id.uuidString
-                )
+                !favoritesOnly || favoriteIDs.contains(entry.id.uuidString)
 
             // Free strength is a workout-start option, not a standalone
             // exercise for browsing, favoriting or opening in the library.
