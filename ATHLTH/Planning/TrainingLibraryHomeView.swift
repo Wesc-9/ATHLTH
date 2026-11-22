@@ -939,6 +939,8 @@ final class LibraryFavoritesStore: ObservableObject {
                 try await sendChange(change, userID: userID)
                 acknowledgeChange(change, key: key, userID: userID)
             } catch {
+                guard activeUserID == userID,
+                      client.auth.currentUser?.id == userID else { return }
                 errorMessage = error.localizedDescription
             }
         }
@@ -952,6 +954,7 @@ final class LibraryFavoritesStore: ObservableObject {
         guard let user = client.auth.currentUser else {
             activeUserID = nil
             favorites = []
+            pendingChanges = [:]
             refreshRequestID = nil
             isLoading = false
             lastRefreshAt = nil
