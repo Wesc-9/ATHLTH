@@ -88,6 +88,39 @@ struct ATHLTHLiveWorkoutTransition: Hashable {
     }
 }
 
+/// One immutable execution recipe for every creation path (Quick Train,
+/// standalone planning, a plan day, or a library workout).
+/// This is not a new timer, HealthKit owner or saved exercise graph. Older
+/// workouts are projected in memory; the original source and identifiers
+/// remain untouched.
+struct ATHLTHUniversalWorkoutExecutionRecipe {
+    let workoutID: UUID
+    let activityCategory: String
+    let blocks: [WorkoutTemplateBlock]
+
+    init(workout: PlannedSession) {
+        workoutID = workout.id
+        activityCategory = ATHLTHUnifiedActivityProfile.category(for: workout)
+        blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+    }
+
+    var hasStructuredSteps: Bool { !blocks.isEmpty }
+
+    /// The current stage determines which controls appear, not which
+    /// recorder owns the activity. One workout ID survives every transition.
+    func activeRoute(at index: Int) -> ATHLTHLiveWorkoutRoute? {
+        ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: workoutID, blocks: blocks, index: index
+        )
+    }
+
+    func transition(after index: Int) -> ATHLTHLiveWorkoutTransition? {
+        ATHLTHLiveWorkoutEngineRouter.advance(
+            workoutID: workoutID, blocks: blocks, from: index
+        )
+    }
+}
+
 /// Pure routing contract shared by the planner, live views and eventual
 /// iPhone/Watch capture coordinator. It never owns a HealthKit session,
 /// starts a timer or publishes a second workout.
