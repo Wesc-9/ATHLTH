@@ -120,6 +120,83 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
         XCTAssertFalse(decoded.shouldPreferIPhoneAudioWhenReachable)
     }
 
+    func testAutomaticOutputPrefersExternalIPhoneAudioOnly() {
+        XCTAssertTrue(ATHLTHCoachPhoneOutputPolicy.permitsPhone(
+            preference: .automatic, externalOutputAvailable: true
+        ))
+        XCTAssertFalse(ATHLTHCoachPhoneOutputPolicy.permitsPhone(
+            preference: .automatic, externalOutputAvailable: false
+        ))
+        XCTAssertTrue(ATHLTHCoachPhoneOutputPolicy.permitsPhone(
+            preference: .iPhone, externalOutputAvailable: false
+        ))
+        XCTAssertFalse(ATHLTHCoachPhoneOutputPolicy.permitsPhone(
+            preference: .appleWatch, externalOutputAvailable: true
+        ))
+    }
+
+    func testAutomaticWatchStartCanUseAcknowledgedIPhoneHandoff() throws {
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.outputPreference = .automatic
+
+        XCTAssertTrue(config.shouldPreferIPhoneAudioWhenReachable)
+        XCTAssertTrue(config.shouldUseAcknowledgedVoiceLease)
+        XCTAssertTrue(ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+            configuration: config, workoutKind: .running,
+            priority: .routineCoach, iPhoneVoiceLeaseActive: false
+        ))
+        XCTAssertFalse(ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+            configuration: config, workoutKind: .running,
+            priority: .routineCoach, iPhoneVoiceLeaseActive: true
+        ))
+
+        let restored = try JSONDecoder().decode(
+            WatchAudioCoachConfiguration.self,
+            from: JSONEncoder().encode(config)
+        )
+        XCTAssertEqual(restored.outputPreference, .automatic)
+    }
+
+    func testAppleWatchOnlyPreferenceNeverOffersPhoneSpeech() {
+        var config = mirroredConfiguration()
+        config.outputPreference = .appleWatch
+        XCTAssertFalse(config.shouldPreferIPhoneAudioWhenReachable)
+        XCTAssertTrue(ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+            configuration: config, workoutKind: .walking,
+            priority: .routineCoach, iPhoneVoiceLeaseActive: true
+        ))
+    }
+
+    func testWatchLaunchedMirrorInvitationRequiresSameFreshWorkout() throws {
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.outputPreference = .automatic
+        let now = Date(timeIntervalSince1970: 20_000)
+        let startedAt = now.addingTimeInterval(-90)
+        let invitation = ATHLTHAudioCoachMirrorInvitation(
+            workoutStartedAt: startedAt, sentAt: now,
+            configuration: config
+        )
+        let decoded = try JSONDecoder().decode(
+            ATHLTHAudioCoachMirrorInvitation.self,
+            from: JSONEncoder().encode(invitation)
+        )
+        XCTAssertTrue(decoded.isValid(for: startedAt, now: now))
+        XCTAssertFalse(decoded.isValid(
+            for: startedAt.addingTimeInterval(2), now: now
+        ))
+        XCTAssertFalse(decoded.isValid(
+            for: startedAt, now: now.addingTimeInterval(16)
+        ))
+        var disabled = invitation
+        disabled.configuration.enabled = false
+        XCTAssertFalse(disabled.isValid(for: startedAt, now: now))
+        var watchOnly = invitation
+        watchOnly.configuration.outputPreference = .appleWatch
+        XCTAssertFalse(watchOnly.isValid(for: startedAt, now: now))
+    }
+
     func testValidOfferGrantsTemporaryLeaseAndAcknowledgesRequest() {
         var lease = ATHLTHAudioCoachVoiceLease()
         let now = Date(timeIntervalSince1970: 1_000)
