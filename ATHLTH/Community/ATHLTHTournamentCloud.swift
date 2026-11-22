@@ -211,6 +211,36 @@ struct ATHLTHTournamentStandingRemote: Decodable, Identifiable {
     }
 }
 
+struct ATHLTHTournamentAthleteProgress: Decodable, Identifiable {
+    let userID: UUID
+    let phase: String
+    let lastActivityAt: Date?
+    var id: UUID { userID }
+    enum CodingKeys: String, CodingKey {
+        case phase
+        case userID = "user_id"
+        case lastActivityAt = "last_activity_at"
+    }
+    var label: String {
+        switch phase {
+        case "invited": return "Venter på svar"
+        case "not_ready": return "Må trykke Klar"
+        case "training": return "Under trening"
+        case "reported": return "Ferdig · avventer resultat"
+        case "finished": return "Ferdig"
+        default: return "Venter start"
+        }
+    }
+    var symbol: String {
+        switch phase {
+        case "training": return "figure.run"
+        case "reported", "finished": return "checkmark.circle.fill"
+        case "not_ready", "invited": return "hourglass"
+        default: return "clock"
+        }
+    }
+}
+
 private struct ATHLTHTournamentStandingsParams: Encodable {
     let p_tournament: UUID
     let p_group: Int?
@@ -559,6 +589,15 @@ struct ATHLTHTournamentCloudService {
             offset += pageSize
         } while offset < 5_000
         return list
+    }
+
+    func athleteProgress(
+        for tournamentID: UUID
+    ) async throws -> [ATHLTHTournamentAthleteProgress] {
+        try await client.rpc(
+            "athlth_tournament_participant_progress",
+            params: ATHLTHTournamentIDParams(p_tournament: tournamentID)
+        ).execute().value
     }
 
     func standings(for tournamentID: UUID) async throws
