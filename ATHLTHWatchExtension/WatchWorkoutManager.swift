@@ -518,6 +518,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             audioCoachConfiguration.enabled
 
         var effective = configuration.deliveryConfiguration
+        // Keep the athlete's output choice even if delivery normalization
+        // strips transport-only fields from older serialized settings.
+        effective.outputPreference = configuration.outputPreference
         if workoutInitiatedLocallyOnWatch,
            effective.outputPreference == nil,
            (kind == .running || kind == .walking) {
@@ -580,6 +583,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             : nil
 
         var effective = configuration.deliveryConfiguration
+        // Keep the athlete's output choice even if delivery normalization
+        // strips transport-only fields from older serialized settings.
+        effective.outputPreference = configuration.outputPreference
         if workoutInitiatedLocallyOnWatch,
            effective.outputPreference == nil,
            (kind == .running || kind == .walking) {
