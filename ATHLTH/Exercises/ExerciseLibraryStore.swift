@@ -880,6 +880,11 @@ final class ExerciseLibraryStore: ObservableObject {
         })
     }()
 
+    /// HYROX and other offline source-backed stations also need the same
+    /// visible link as GymCoach exercises, even when RepDB is installed.
+    static let referencedFallbackExerciseSlugs: Set<String> =
+        Set(fallbackATHLTHExercises.compactMap(\.sourceIdentifier))
+
     /// A verified public duplicate must have precisely the same canonical
     /// English name AND equipment. Similar names and alternative movements
     /// never suppress a library entry or silently change its identity.
@@ -920,7 +925,8 @@ final class ExerciseLibraryStore: ObservableObject {
                 if Self.featuredNativeExerciseSlugs.contains(slug) {
                     return true
                 }
-                return Self.referencedNativeExerciseSlugs.contains(slug) &&
+                return (Self.referencedNativeExerciseSlugs.contains(slug) ||
+                    Self.referencedFallbackExerciseSlugs.contains(slug)) &&
                     repDBCounts[Self.exactPublicExerciseKey(entry)] != 1
             }
         }
