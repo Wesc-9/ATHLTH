@@ -25,6 +25,49 @@ enum ATHLTHUnifiedLibraryScope: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Shared, focus-stable search field for library collections. The view's
+/// identity stays fixed while text changes, so typing does not dismiss
+/// the keyboard or reset the surrounding scroll position.
+struct ATHLTHLibrarySearchField: View {
+    @Binding var text: String
+    let englishPlaceholder: String
+    let norwegianPlaceholder: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .accessibilityHidden(true)
+            TextField(
+                ATHLTHLocalization.choose(
+                    english: englishPlaceholder, norwegian: norwegianPlaceholder
+                ),
+                text: $text
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.search)
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Clear search", norwegian: "Tøm søk"
+                ))
+            }
+        }
+        .padding(12)
+        .background(
+            ATHLTHPlanDesign.surface,
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+    }
+}
+
 struct ATHLTHUnifiedPlansLibraryView: View {
     var onOpenPlan: ((UUID) -> Void)? = nil
     @State private var scope: ATHLTHUnifiedLibraryScope = .athlth
@@ -4250,14 +4293,11 @@ struct MyTrainingPlansLibraryView: View {
                     Spacer(minLength: 0)
                 }
                 if searchExpanded || !query.isEmpty {
-                    TextField(
-                        ATHLTHLocalization.choose(english: "Search my plans", norwegian: "Søk i mine planer"),
-                        text: $query
+                    ATHLTHLibrarySearchField(
+                        text: $query,
+                        englishPlaceholder: "Search my plans",
+                        norwegianPlaceholder: "Søk i mine planer"
                     )
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .padding(14)
-                    .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 15))
                 }
 
                 if !pageTemplates.isEmpty {
@@ -5802,17 +5842,11 @@ struct LibraryFavoritesView: View {
                                 in: RoundedRectangle(cornerRadius: 14))
                 }
 
-                TextField(
-                    ATHLTHLocalization.choose(
-                        english: "Search favorites", norwegian: "Søk i favoritter"
-                    ),
-                    text: $searchQuery
+                ATHLTHLibrarySearchField(
+                    text: $searchQuery,
+                    englishPlaceholder: "Search favorites",
+                    norwegianPlaceholder: "Søk i favoritter"
                 )
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(12)
-                .background(ATHLTHPlanDesign.surface,
-                            in: RoundedRectangle(cornerRadius: 14))
 
                 if displayedFavorites.isEmpty {
                     VStack(spacing: 15) {
