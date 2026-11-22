@@ -1052,6 +1052,10 @@ final class LibraryFavoritesStore: ObservableObject {
             // If those change, the remote edition needs a new slug rather
             // than misleading existing schedules that carry this identity.
             (bundledBySlug[$0.slug].map { local in
+                // Favorites, saved copies and histories refer to this UUID,
+                // so even a cosmetically identical remote replacement must
+                // keep the exact source identity.
+                local.id == $0.id &&
                 local.durationWeeks == $0.durationWeeks &&
                 local.sessionsPerWeek == $0.sessionsPerWeek &&
                 local.workoutPattern == $0.workoutPattern
