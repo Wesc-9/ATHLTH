@@ -720,7 +720,16 @@ struct ATHLTHChallenge: Identifiable, Codable, Hashable {
         guard status != .draft,
               status != .cancelled,
               let acceptedAt else { return nil }
-        return max(rules.startsAt, acceptedAt)
+        let agreedStart = max(rules.startsAt, acceptedAt)
+        // Sprint scoring begins after the countdown, never when an invite
+        // is accepted. The same rule applies to both athletes.
+        if let race = rules.competitionRace,
+           race.discipline == .sprint {
+            return agreedStart.addingTimeInterval(
+                TimeInterval(race.countdownSeconds)
+            )
+        }
+        return agreedStart
     }
 
     func scoringStartDate(for participantID: UUID) -> Date? {
