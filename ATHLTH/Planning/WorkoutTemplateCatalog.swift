@@ -3372,22 +3372,6 @@ struct WorkoutTemplateDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Text(tr("WORKOUT DETAILS", "ØKTDETALJER"))
-                        .font(.caption.weight(.semibold))
-                        .tracking(1.2)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    Spacer(minLength: 8)
-                    Picker(tr("Detail level", "Detaljnivå"), selection: $advancedMode) {
-                        Text(tr("Simple", "Enkel")).tag(false)
-                        Text(tr("Advanced", "Avansert")).tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 196)
-                    .accessibilityIdentifier("workout-recipe-detail-mode")
-                }
-                .padding(.horizontal, 3)
-
                 QuickTrainingHeroCard(
                     imageName: heroImageName,
                     title: entry.title,
@@ -3434,7 +3418,13 @@ struct WorkoutTemplateDetailView: View {
                     durationMinutes: entry.estimatedDurationMinutes,
                     blocks: displayedBlocks,
                     compactDetailLayout: true,
-                    detailAdvancedMode: $advancedMode
+                    detailAdvancedMode: $advancedMode,
+                    onUpdateBlock: { index, updated in
+                        var personalized = displayedBlocks
+                        guard personalized.indices.contains(index) else { return }
+                        personalized[index] = updated
+                        saveTargets(personalized)
+                    }
                 )
 
                 if let original = ATHLTHZonedPlanLibrary
@@ -3487,6 +3477,14 @@ struct WorkoutTemplateDetailView: View {
         .navigationTitle(tr("Workout", "Treningsøkt"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Picker(tr("Detail level", "Detaljnivå"), selection: $advancedMode) {
+                    Text(tr("Simple", "Enkel")).tag(false)
+                    Text(tr("Advanced", "Avansert")).tag(true)
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("workout-recipe-detail-mode")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
