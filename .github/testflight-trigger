@@ -1,4 +1,292 @@
-ATHLTH 2.2.7 build 135
-Release branch: release/v2.2.7
-Authorized gated TestFlight retry after fixing catalog session factory compilation and enabling five-check CI release gate.
-Timestamp: 2026-11-22T07:33:00Z
+ATHLTH V0.1 TestFlight upload retry 3 - App Store metadata fixed
+retry-watch-bundle-version-19
+align-bundles-21
+final-validated-upload-21
+validated-release-21
+healthkit-entitlements-validated-21
+v1.2.0-build-22-onboarding-release
+v1.3.0-build-24-folded-a-logo
+
+v1.3.1-build-25-final-testflight
+v1.3.2-build-26-workout-history-review
+v1.3.2-build-26-release-archive-fix-upload
+v1.3.3-build-28-selected-pulse-a-testflight
+v1.3.3-build-28-release-fixed-testflight
+v1.3.3-build-28-admin-release-scope-fix
+v1.3.3-build-29-latest-testflight
+v1.3.3-build-29-retry-icon-generator-fix
+v1.3.3-build-29-retry-use-committed-icons
+v1.3.4-build-31-profile-privacy-cleanup
+v1.3.4-build-32-healthkit-crash-hotfix
+ATHLTH 1.3.4 build 33 wearable status + no-watch adaptive UI
+ATHLTH 1.3.4 build 34 latest release/v1.3.4
+ATHLTH 1.3.5 build 35 TestFlight upload
+ATHLTH 1.3.5 build 35 retry after custom workout compile fix
+ATHLTH 1.3.6 build 36 TestFlight upload
+ATHLTH 1.3.7 build 37 TestFlight upload
+ATHLTH 1.3.8 build 38 TestFlight upload
+ATHLTH 1.3.9 build 39 TestFlight upload
+ATHLTH 1.3.9 build 41 latest TestFlight upload
+ATHLTH 1.4.0 build 42 TestFlight upload
+ATHLTH 1.4.0 build 42 retry after group image compile fix
+ATHLTH 1.4.1 build 43 TestFlight upload
+
+upload-build-45-swift6
+ATHLTH 1.4.3 build 46 TestFlight upload
+upload-build-47-healthkit-final
+ATHLTH 1.4.3 build 47 cloud-signing retry
+upload-build-47-cloud-signing
+1.4.4-build-49-search-notifications-insights-2026-09-28
+1.4.4-build-49-retry-notification-background-2026-09-28
+
+v1.4.4-build50-upload-2026-09-29
+ATHLTH 1.4.6 build 51 TestFlight upload 2026-09-29
+upload-v1.5.0-build52-2026-09-29T21-41-CEST
+ATHLTH 1.5.1 build 53 TestFlight upload 2026-09-30
+ATHLTH 1.5.2 build 54 TestFlight upload 2026-10-01
+ATHLTH 1.5.2 build 54 TestFlight retry after green full+iPhone+iPad validation 2026-10-01
+
+1.5.3-build57-2026-10-01-ghost-liveghost-audio-coach
+ATHLTH 1.5.4 build 58 TestFlight upload 2026-10-02
+ATHLTH 1.5.5 build 59 TestFlight upload 2026-10-02
+ATHLTH 1.5.5 build 59 TestFlight retry after Watch init fix 2026-10-02
+ATHLTH 1.5.6 build 60 TestFlight upload after pulse icon generator repair 2026-10-02
+ATHLTH 1.5.6 build 60 TestFlight retry with user-provided final app icon 2026-10-02
+ATHLTH 1.5.6 build 60 TestFlight retry after canonical app icon repair 2026-10-02
+ATHLTH 1.5.6 build 60 TestFlight retry after final icon checksum fix 2026-10-02
+ATHLTH 1.5.6 build 61 TestFlight upload 2026-10-03
+ATHLTH 1.5.6 build 61 TestFlight retry after image asset repair 2026-10-03
+ATHLTH 1.5.6 build 61 TestFlight retry after compile fixes 2026-10-03
+ATHLTH 1.5.7 build 62 TestFlight upload 2026-10-03
+ATHLTH 1.5.8 build 63 TestFlight upload 2026-10-03
+Retry build 63 after Watch strength compile fix 2026-10-03
+ATHLTH 1.5.8 build 63 retry after Watch always-on compile fix 2026-10-03
+Trigger ATHLTH 1.5.9 build 64 to TestFlight
+
+ATHLTH 1.6.0 build 65 TestFlight upload after main merge 7469aa9
+ATHLTH 1.6.1 build 66 TestFlight upload 2026-10-05
+ATHLTH 1.6.2 build 67 TestFlight upload 2026-10-05
+ATHLTH 1.6.2 build 67 TestFlight retry after muscle performance fixes 2026-10-05
+ATHLTH 1.6.3 build 68 TestFlight upload 2026-10-05
+ATHLTH 1.6.3 build 68 TestFlight retry after Watch compile fix 2026-10-05
+ATHLTH 1.6.4 build 69 TestFlight upload 2026-10-06
+ATHLTH 1.6.5 build 70 TestFlight upload 2026-10-06
+ATHLTH 1.6.6 build 71 TestFlight upload 2026-10-06 21:22 CEST
+ATHLTH 1.6.6 build 71 TestFlight retry after APNs entitlement fix 2026-10-06
+ATHLTH 1.6.7 build 72 TestFlight upload 2026-10-07
+ATHLTH 1.6.7 build 72 TestFlight retry after meeting point build fix 2026-10-07
+ATHLTH 1.6.7 build 72 TestFlight upload after compatibility preview fix 2026-10-07
+ATHLTH 1.6.8 build 73 TestFlight upload 2026-10-08
+ATHLTH 1.6.8 build 73 TestFlight retry after Clubs archive fix 2026-10-08
+ATHLTH 1.6.8 build 73 TestFlight retry 2 after Clubs workaround removal 2026-10-08
+ATHLTH 1.6.8 build 74 TestFlight upload after Swift 6 APNs compile fix and native muscle map improvements 2026-10-08
+ATHLTH 1.6.9 build 75 TestFlight upload after four green CI checks for d96ea1b724a6194fefb44ac8acce6b3b4dfcf97e (2026-10-09)
+ATHLTH 1.7.0 build 76 TestFlight upload 2026-10-10 — user authorized; green iOS, iPhone, backend; previous iPad passed
+ATHLTH 1.7.1 build 77 TestFlight requested 2026-10-11 01:18 CEST — latest release/v1.7.1 Train Together + Club + Insight updates; upload only after workflow signing/validation passes
+ATHLTH 1.7.2 build 78 TestFlight upload user-authorized 2026-10-11 after Arena fixes e64909e5
+ATHLTH 1.7.3 build 79 TestFlight upload — user-authorized 2026-10-12 after green Xcode/backend/iPad on bdca2c91d01baea1c9be46ab131c5393412c73ee
+
+ATHLTH 1.7.4 build 80 TestFlight upload — user-authorized 2026-10-14; validated source 3b0ef8b270f988ba263ff86c5da89895f3d96c6d; simulator build/unit tests and backend regressions passed; iPhone/iPad smoke pending.
+
+ATHLTH 1.7.5 build 81 TestFlight upload — user-authorized 2026-10-14 20:33 Europe/Oslo; upload requires successful build/unit tests and backend regressions for this exact commit.
+
+ATHLTH 1.7.6 build 82 — user-authorized TestFlight upload on 2026-10-15, following Train, Library, and Messages improvements; upload only after workflow signing, archive, and validation succeed.
+
+ATHLTH 1.7.6 build 82 TestFlight retry — 2026-10-15: fixed duplicate Norwegian exercise dictionary key that caused Xcode unit tests to crash; user-authorized upload only if build, tests, signing and validation succeed.
+
+ATHLTH 1.7.6 build 83 — user-authorized TestFlight upload for custom quick workout Watch presence, iPhone timer, manual/retrospective logging and provenance; upload only when archive, unit tests, backend and signing checks all pass (2026-10-15).
+
+ATHLTH 1.7.6 build 83 — final user-authorized TestFlight validation retry 2026-10-15; run on current release head after previous iOS checks were cancelled; upload only after successful build, tests, signing and archive validation.
+
+ATHLTH 1.7.7 build 83 — user-authorized TestFlight upload 2026-10-16 after Arena landing redesign and challenge improvements; require successful release build, backend tests, signed archive and upload validations.
+
+ATHLTH 1.7.8 build 84 TestFlight upload — user-authorized 2026-10-17; iOS build, backend regressions and iPad smoke successful at 1845ad40; iPhone smoke still running; physical Watch+iPhone testing required after processing. Keep release/v1.7.8 active and unlocked.
+
+ATHLTH 1.7.9 build 85 — TestFlight upload explicitly authorized by user 2026-10-18; source e5442db21116; require passing iOS/build/backend checks, signing and Watch companion validation before App Store Connect upload.
+v1.8.0-build-86-20261018-training-plans-scheduled-upload
+
+ATHLTH 1.8.1 build 87 TestFlight user-authorized 2026-10-18 — premium settings and integrated authenticated contact form; email sender configured and Resend-to-iCloud manual test delivered; require green iOS build, backend tests, signed archive and Watch companion validation before upload.
+ATHLTH 1.8.2 build 88 — user-authorized subscription ID validation in TestFlight on 2026-10-18; gated by successful iOS build and backend tests, signed archive and Apple upload checks.
+ATHLTH 1.8.2 build 88 — user-authorized TestFlight retry after StoreKit test MainActor fix; source 76ce0c2248a0f0cf6ac1b519c22dde9d6af02172; upload only after same-commit Xcode build and backend regressions pass (2026-10-18).
+ATHLTH 1.8.3 build 89 — user-authorized fresh TestFlight upload 2026-10-19; new push triggers iOS build and backend regressions for same commit; TestFlight workflow must gate upload on both successful checks, signing, Watch companion and archive validation.
+ATHLTH 1.8.4 build 90 — user-authorized TestFlight upload 2026-10-19; release source c31737ade0e4680f141a4ebfcbcf9e4254112a63; require same-commit successful iOS and backend tests, signed iPhone/Watch/Widget archive validation, and App Store Connect upload. Remain active/unlocked.
+ATHLTH v1.8.4 build 90 TestFlight retry — 2026-10-19; latest approved source d2a40eacad024c034a0514ce3d9062d3edc493c8; do not cancel same-commit build verification for subsequent active-branch pushes. Upload only after green Xcode, backend, signing and archive checks.
+ATHLTH 1.8.4 build 90 — user-authorized TestFlight retry 2026-10-19 after SwiftUI SessionEditor compiler-expression split; upload only after same-commit successful iOS build and backend regressions, valid archive and signatures. Keep 1.8.4 active.
+ATHLTH v1.8.4 build 90 — 2026-10-19 user-authorized TestFlight retry after fixing malformed @ViewBuilder in AdvancedPlannerView (64dd78c). Upload only after passing same-commit Xcode build and backend checks and validated signed iOS+Watch+Widget archive; leave version active.
+ATHLTH v1.8.4 build 91 — user-approved TestFlight upload after correcting misplaced SessionEditor sections, 2026-10-19. Require green same-commit build and backend tests, archive validation, iOS+Watch signing. Preserve 1.8.4 as active.
+ATHLTH 1.8.4 build 91 — user-authorized TestFlight retry 2026-10-19, after fixing AdvancedPlanner distance Stepper type inference at 2633ba7b1b190c60271aed77c5af95a6a0e99a3a; require passing same-commit iOS+Watch tests, backend regressions, signed archive and App Store Connect upload. Keep release/v1.8.4 active and unlocked.
+
+ATHLTH 1.8.4 build 91 — user-authorized TestFlight retry after updating structured-workout plan integration test: partial 1/2 is not a completion, 2/2 is; 2026-10-19. Run same-commit Xcode and backend gates and validate signing before App Store Connect upload. Keep 1.8.4 active.
+
+ATHLTH 1.8.5 build 92 — user-authorized TestFlight upload 2026-10-20. Use current release/v1.8.5 source with Explore route coverage and geometric deduplication; require passing same-commit Build ATHLTH and backend regression workflows, signed iPhone/Watch/Widget archive, and App Store Connect validation. Keep release/v1.8.5 active and unlocked.
+ATHLTH 1.8.5 build 92 — user-approved TestFlight upload 2026-10-20 after Home calendar start-button changes and PublicTrailDiscoveryStore Swift compile fix. Require successful same-commit iOS and backend checks, signed iPhone/Watch/Widget archive, and verified App Store Connect upload. Keep 1.8.5 active.
+ATHLTH 1.8.5 build 92 — user-approved TestFlight retry 2026-10-20 after fixing Quick Train layout test SocialStore environment injection (cf628c3). Require passing same-commit Xcode build, backend regressions, signed iPhone/Watch/Widget archive, and App Store Connect upload. Keep 1.8.5 active.
+
+ATHLTH 1.8.6 build 93 — user-authorized TestFlight upload 2026-10-20 for route builder, training plan premium run phase guidance, HR zones, outdoor pace and treadmill km/h; fix Swift build errors in selectedRoute and sheet view builder at 225a5d6bd860f599a1347073efd71cc5ae3e4869. Require green same-commit Xcode and backend checks, signed iOS/Watch/Widget archive validation, and verified App Store Connect upload. Keep release/v1.8.6 active and unlocked.
+ATHLTH 1.8.6 build 93 — user-authorized TestFlight retry 2026-10-20 after fixing incomplete Ghost Race result on rejected GPS finish in 6ba4989a50057124589034f7378ecbf07bde98e9. Preserve trustworthy GPS finish checks. Require both same-commit iOS tests and backend regressions to succeed before signed App Store Connect upload. Keep release/v1.8.6 active and unlocked.
+ATHLTH 1.8.6 build 93 — resume previously user-authorized TestFlight upload on current release head f3582d2cce19b8d8cdb9758db1b65f48cd871694, including latest Home Assistant Tailscale work. Prior same-commit iOS validation was cancelled by intervening commits; require same-commit iOS build, backend regressions, signing and archive validation before upload. Keep v1.8.6 active/unlocked.
+ATHLTH 1.8.7 build 94 — user-authorized TestFlight upload 2026-10-21 15:02 Europe/Oslo; release source 5d459e8ebf599a234bd69aa7b12cd37dd4a08284 including Home Quick Train Norwegian localization and SwiftUI stack mitigation. Require green same-commit iOS build and backend tests, signed iPhone/Watch/Widget archive, App Store Connect verification; keep v1.8.7 active.
+
+ATHLTH 1.8.8 build 95 — user-authorized TestFlight upload 2026-10-21. Include latest combined strength and running data, iPhone–Watch exercise/set synchronization, light ATHLTH strength Live Activity, timed bodyweight holds, and Replay exercise list. Require passing same-commit Build ATHLTH and backend regressions, signed iPhone/Watch/Widget archive and App Store Connect validation before actual upload. Keep release/v1.8.8 active/unlocked.
+
+ATHLTH 1.8.8 build 95 — explicit user-authorized TestFlight upload 2026-10-22 (Europe/Oslo). Launch release/v1.8.8 through normal same-commit build/backend checks, iOS+Apple Watch+Widget signed archive and App Store Connect validation. Retain active development branch (no version lock).
+
+ATHLTH 1.8.9 build 96 — user-authorized TestFlight upload 2026-10-22; includes premium image-free performance records, 4x4 pace records, interval/watch improvements and running analysis. Gate on same-commit iOS build and backend regressions, signed iPhone/Watch/Widget archive and validated App Store Connect upload; keep release/v1.8.9 active/unlocked.
+ATHLTH 1.8.9 build 96 — retry explicitly user-authorized TestFlight after updating detailed-interval warm-up tests and 4x4 record validation. Require successful same-commit Build ATHLTH and backend regressions, signed iPhone+Watch+Widget archive, verified App Store Connect upload. Preserve active release/v1.8.9; no version lock.
+
+ATHLTH 1.9.0 build 97 — user-authorized TestFlight upload 2026-10-24. Deploy only the active release/v1.9.0 code at this commit after same-commit Xcode build/unit tests, backend regressions, signing and archive validation succeed. Do not merge divergent main; preserve active release version.
+
+ATHLTH 1.9.1 build 98 — explicitly user-authorized TestFlight upload 2026-10-24. Include latest strength completion/recent activity shared premium artwork, Home header weather and icon refinements, per-second Dynamic Island anchored timer, Watch hybrid strength/treadmill interval improvements. Require the same-commit Build ATHLTH XCTest and backend regression gates, signed iPhone/Watch/Widget archive and App Store Connect validation. Keep release/v1.9.1 active; do not lock or merge main.
+ATHLTH 1.9.2 build 100 TestFlight request 2026-10-25 - validated gated pipeline
+ATHLTH 1.9.3 build 101 — user-authorized TestFlight upload 2026-10-25. Require successful same-commit Build ATHLTH and backend regressions, validated signed iOS/Watch/Widget archive, then upload to App Store Connect. Keep the version active; do not lock.
+
+ATHLTH 1.9.4 build 102 — user-authorized TestFlight upload 2026-10-26, ATHLTH Alive prototype. Require successful same-commit iOS/Watch/Widget build, backend regressions, signing, archive verification and App Store Connect validation before upload.
+
+ATHLTH 1.9.4 build 102 — retry explicitly authorized 2026-10-26 after SwiftUI compile fixes for Strength, Home Map and Route Detail. Upload only after required signing and archive checks succeed.
+
+ATHLTH 1.9.4 build 102 — authorized retry after remaining Home Map/Route Swift compile fixes and GHCR rate-limit backoff on 2026-10-26. Require verified archive, signing and upload.
+
+ATHLTH 1.9.4 build 102 — user-authorized retry on 2026-10-26 after Home Map compiler split and Docker Hub registry fallback. Require successful archive/signing and Apple upload.
+
+ATHLTH 1.9.5 build 103 — user-approved fresh version and TestFlight retry 2026-10-26 after Explore optional callback compiler correction; require archive, signing, backend and upload verification.
+ATHLTH 1.9.6 build 104 — explicit user-authorized TestFlight upload 2026-10-26; fixed undecodable PlanGoalHero catalog JPEG. Run same-commit iOS XCTest and backend gates, signed iPhone/Apple Watch/Widget archive validation and App Store Connect upload. Keep release/v1.9.6 active; do not implement the postponed Training Week concept yet.
+
+ATHLTH 1.9.6 build 104 — retry explicitly authorized TestFlight upload after correcting legacy training-plan navigation tests; 2026-10-26. Verify green same-commit iOS XCTest and backend regressions, then signed iPhone/Watch/Widget IPA, App Store Connect upload. Do not implement postponed training-week screen.
+
+ATHLTH 1.9.7 build 105 — user-authorized TestFlight upload 2026-10-27 (Europe/Oslo). Include approved Insights redesign with existing ProgressHero, premium muscle atlas and four Train-style tabs; require same-commit iOS XCTest and backend regression success, verified iPhone+Apple Watch+Widget signing and archive, and App Store Connect upload. Leave release/v1.9.7 active and unlocked; no additional design changes.
+
+ATHLTH 1.9.7 build 105 — explicitly user-authorized TestFlight retry 2026-10-27 after fixing SwiftUI type-check complexity in HomeDailyRecommendationCard and missing Train Today navigation case. Require successful iOS XCTest/backend regressions on this exact commit, signed iPhone/Watch/Widget archive and App Store Connect upload. Preserve active release/v1.9.7; do not implement postponed Training Week redesign.
+ATHLTH 1.9.8 build 106 — TestFlight requested 2026-10-27 — Plan and Coach redesign
+ATHLTH 1.9.8 build 106 — TestFlight retry after Swift 6 release archive fixes — 2026-10-27
+ATHLTH 1.9.8 build 106 — TestFlight retry after plan journey XCTest API fix — 2026-10-27
+ATHLTH 1.9.9 build 107 — explicit TestFlight request 2026-10-27 (Europe/Oslo), source f50e1fbeb912134b76c8b1c004f96ff7db74ecfc; require same-commit iOS XCTest and backend checks, signed iPhone/Watch/Widget archive and verified App Store Connect upload. Keep release/v1.9.9 active and unlocked.
+ATHLTH 1.9.9 build 107 — user-authorized TestFlight retry 2026-10-27 after resolving AI plan builder interpolation Swift compile errors; source 22b03755023bcab8354c0c897ded463ea786c208. Require passing same-commit iOS and backend checks, signed archive and verified App Store Connect upload; keep release active and unlocked.
+
+ATHLTH 2.0.0 build 108 — TestFlight explicitly requested 2026-10-27. Upload Community V5 new three-tab shell and current release/v2.0.0. Validate iPhone, Watch and Widget versions/signing before App Store Connect upload. Keep release active; no main merge.
+
+ATHLTH 2.0.0 build 108 — explicit user-authorized TestFlight retry 2026-10-27 after replacing stale Community V4 routing in App and Notifications. Archive/sign/upload current release/v2.0.0; verify iOS Watch Widgets.
+
+ATHLTH 2.0.0 build 108 — user-authorized TestFlight retry 2026-10-27 after fixing missing .setTreadmillTargetPace case in WatchRouteStore.swift. Require validated archive, signed IPA and verified App Store Connect upload; keep release/v2.0.0 active.
+
+ATHLTH 2.0.0 build 108 — user-authorized fresh TestFlight run 2026-10-27 after fixing ambiguous kilometerSplits GPS route XCTest overload; require same-commit passing iOS tests and backend regressions, signed archive, successful App Store Connect upload. Keep release/v2.0.0 active.
+
+ATHLTH 2.0.0 build 108 — retry user-authorized TestFlight workflow after fixing the remaining ambiguous recorded-minute kilometerSplits XCTest on 2026-10-27. Require successful exact-commit iOS and backend tests before verified signed App Store Connect upload.
+ATHLTH 2.0.1 build 109 — TestFlight explicitly requested 2026-10-28. Latest goals redesign, Audio Coach cleanup, Train improvements. Require same-commit green iOS XCTest/backend regressions; signed iPhone, Watch, Widget archive and verified Apple upload. Retry code/signing issues as needed; keep release/v2.0.1 active.
+ATHLTH 2.0.1 build 109 — 2026-10-28 retry after replacing removed ATHLTHRecoveryView with RecoverySorenessLogView in daily check-in notifications; require green same-commit iOS tests and backend, signed iPhone/Watch/Widget archive, and verified App Store Connect upload.
+
+ATHLTH 2.0.1 build 109 — user-approved retry 2026-10-28 after updating two stale XCTest expectations (91 strength templates and 30s/180s active jog recovery), code unchanged; require green same-commit XCTest/backend and signed archive before Apple upload.
+ATHLTH 2.0.2 build 110 — explicit user-authorized TestFlight upload 2026-10-28 Europe/Oslo; require same-commit successful iOS XCTest and backend regression workflows, validated signed iPhone/Watch/Widget archive, verified App Store Connect upload. Preserve release/v2.0.2 for continued development; do not merge main.
+ATHLTH 2.0.2 build 110 — explicit retry requested 2026-10-28 after Swift archive fixes (restored plan workout picker, corrected WorkoutTemplateLibraryView conditional modifiers, decomposed ProductRootTabView). Require successful exact-commit iOS XCTest and backend regressions, signed iPhone/Watch/Widget archive validation and verified App Store Connect upload.
+ATHLTH 2.0.2 build 110 — user-authorized 2026-10-28 TestFlight retry after removing APNs body-goal duplicate declarations and simplifying Train Plan SwiftUI subtitles. Require successful same-commit Build ATHLTH and backend regressions, validated signed iPhone/Watch/Widget archive and App Store Connect upload.
+ATHLTH 2.0.3 build 111 — user-authorized TestFlight upload 2026-10-28. Require same-commit Build ATHLTH XCTest and backend regressions, signed iPhone/Watch/Widget archive and Apple upload validation; retain active release/v2.0.3.
+ATHLTH 2.0.4 build 112 — explicit TestFlight request 2026-10-30. Upload current release/v2.0.4 after same-commit Build ATHLTH iOS XCTest and backend regression checks pass. Include implemented Community and fixes; trophy concept image is not implemented. Validate signed iPhone/Watch/Widget and Apple upload; no merge to main.
+ATHLTH 2.0.4 build 112 — user-authorized retry 2026-10-30 after restoring Insights readiness/trend helpers and splitting App lifecycle SwiftUI type checking; require same-commit successful iOS XCTest and backend regressions, validated iPhone/Watch/Widget archive and App Store Connect upload.
+ATHLTH 2.0.4 build 112 — user-approved retry 2026-10-30 after correcting Swift compile issues and stale Exercise privacy test fixture; require same-commit Build ATHLTH XCTest + backend checks before signed archive and App Store Connect upload.
+ATHLTH 2.0.5 build 113 — TestFlight upload explicitly authorized 2026-10-31 Europe/Oslo; upload current release/v2.0.5 (latest source db188aee987ebbc3e1bfb0c37cb3d869d52e8277) only after same-commit Build ATHLTH iOS XCTest and backend regressions succeed, validated signed iPhone/Watch/Widget archive, then verified App Store Connect upload. Keep release/v2.0.5 active; no main merge.
+
+ATHLTH 2.0.6 build 114 — user-authorized TestFlight upload 2026-11-01 Europe/Oslo. Run release/v2.0.6 through same-commit iOS XCTest and backend regression gates, signed iPhone/Apple Watch/Widget archive validation, and verified App Store Connect upload. Keep release/v2.0.6 active and unlocked; no main merge.
+
+ATHLTH 2.0.6 build 114 — user-authorized TestFlight retry 2026-11-01 after fixing missing required args in Community friend-vs-friend navigation. Require same-commit Build ATHLTH, backend regressions, signed iOS + Watch + Widget archive validation and verified Apple upload. Keep release/v2.0.6 active and unlocked.
+
+ATHLTH 2.0.6 build 114 — explicit user-authorized TestFlight retry 2026-11-01 after repairing the optional InjuryStatus.none XCTest fixture and updating legacy plan navigation assertions. Require same-commit Build ATHLTH full XCTest and backend regressions successful, iPhone+Watch+Widget signed archive verification, and App Store Connect upload. Keep release/v2.0.6 active; no main merge.
+ATHLTH 2.0.7 build 115 — explicit TestFlight request 2026-11-02 Europe/Oslo after Community Clubs, Arena image bounds and weekly challenge move, plus the shared-exercise identity XCTest assertion repair. Require same-commit Build ATHLTH and backend regressions success, signed iPhone+Watch+Widget archive and App Store Connect upload; leave release/v2.0.7 active.
+ATHLTH 2.0.8 build 116 — explicit user-authorized TestFlight upload 2026-11-02 Europe/Oslo after Home and Insights cleanup, HealthKit metrics, heart-rate recovery and running performance comparison. Require exact-commit successful Build ATHLTH iOS XCTest and backend regressions, signed iPhone+Apple Watch+Widget archive validation and verified App Store Connect upload. Keep release/v2.0.8 active; do not merge to main.
+ATHLTH 2.0.8 build 116 — user-authorized retry 2026-11-02 Europe/Oslo following Swift missing-return compile fix in Insights Health category icons. Require exact-commit successful Build ATHLTH + backend regression checks before signed iPhone, Apple Watch and Widget IPA upload to App Store Connect. Preserve release/v2.0.8 and no main merge.
+
+ATHLTH 2.0.9 build 117 — user-authorized TestFlight upload 2026-11-03 Europe/Oslo. Include Train Together updates, Insights training-signal redesign, muscle-balance relocation, and same-commit Swift parser correction. Require passing Build ATHLTH + backend regressions, validated signed iPhone/Watch/Widget archive and confirmed App Store Connect upload. Preserve active release/v2.0.9; no main merge.
+
+ATHLTH 2.0.9 build 117 — user-authorized TestFlight retry 2026-11-03 after fixing compiler failures in WorkoutTemplateCatalog (SwiftUI expression splitting), AppleCalendarSyncStore (declaration order), Arena season destination visibility and ArenaV3Hub (view extraction). Require passing exact-commit build/backend gates, signed archive and verified App Store Connect upload. Keep release/v2.0.9 open.
+
+ATHLTH 2.0.9 build 117 — user-authorized TestFlight retry after fixing Xcode 27 errors (Insights HRmax source, Arena spectator catch shadowing, advanced rules and match exercise SwiftUI inference, Challenge creation view modifier inference). 2026-11-03. Require exact-commit signed iPhone/Watch/Widget archive, backend tests, and App Store Connect acceptance. Do not close release branch.
+
+ATHLTH 2.0.9 build 117 — user-authorized TestFlight retry 2026-11-03 after follow-up Xcode diagnosis: corrected optional tournament exercise identifier in exercise evidence sheet; previous archive had missing profile HRmax, Arena spectator error binding, large SwiftUI rules/challenge/slot builders. This retry must archive signed iPhone/Watch/Widget and confirm App Store Connect upload. Remain on release/v2.0.9.
+ATHLTH 2.1.0 build 118 — explicit user-authorized TestFlight upload 2026-11-04 Europe/Oslo. Use latest release/v2.1.0 code; require same-commit successful Build ATHLTH and backend regression checks, validated signed iPhone/Watch/Widget archive and verified App Store Connect upload. Keep release/v2.1.0 active and unlocked; no main merge.
+ATHLTH 2.1.1 build 119 — explicitly authorized TestFlight upload on 2026-11-04 following fix for missing Watch app CFBundleVersion and CFBundleShortVersionString in archived Info.plist; retain all 2.1.1 feature changes plus Swift and RPE fixes. Verify exact-commit Build ATHLTH and backend regression success, signed iOS/Watch/Widget archive, and App Store Connect upload. Keep release/v2.1.1 open and do not merge main or upload 2.1.0.
+ATHLTH 2.1.1 build 119 — user-authorized TestFlight retry 2026-11-04 after 41809112245 failed exporting signed IPA: missing App Store provisioning profile for com.wesc9.athlth.watchkitapp.widgets plus Apple network offline. Four explicit bundle-specific provisioning profiles now prepared (including Watch Widget registration if absent), signing export switched to manual, Watch Widget Info.plist and version validation fixed. Require same-commit green iOS Build, backend regressions, signed iPhone/Watch/widget IPA, and confirmed App Store Connect upload; keep 2.1.0 locked and 2.1.1 open.
+ATHLTH 2.1.2 build 120 — user-authorized TestFlight upload 2026-11-04 Europe/Oslo, including strength detail hero muscle maps on the right (source 9ba111e4). Require same-commit iOS build/XCTest and backend regressions, validated iPhone/Watch/Widget signing and archive, and successful App Store Connect upload. Keep release/v2.1.2 active; do not merge or lock.
+ATHLTH 2.1.2 build 120 — explicitly user-authorized TestFlight retry on 2026-11-04 after verified one-time CI distribution signing certificate recovery (6f3fa05bb3458b4d93d1cc52d33e74c6a813cd1e). Require same-commit iOS/XCTest and backend green, signed iPhone/Watch/Widgets, and confirmed App Store Connect upload. Keep 2.1.2 active.
+ATHLTH 2.1.2 build 120 — user-authorized TestFlight retry after X.509 validity-window fix 7a2176c9b4d47034f446d1771803bcb93550e76f (Apple backdates cert by 10 minutes), 2026-11-04. Validate exact-commit build and backend gates and successful App Store Connect upload.
+ATHLTH 2.1.2 build 120 — user-approved retry 2026-11-04 after correcting iPad UISupportedInterfaceOrientations to all four orientations for Apple multitasking validation, retaining landscape-oriented adaptive iPad UI. Targeted unused CI certificate rotation for previous failed upload; require exact-commit iOS build, backend regressions, signed archive and confirmed App Store Connect acceptance. Keep release/v2.1.2 open.
+ATHLTH 2.1.3 build 121 — EXPLICIT user-authorized TestFlight upload 2026-11-05 Europe/Oslo. Include latest iPad Studio Scenario Lab, Plan Coach, training load and muscle breakdown, Workout Lab, consent-based PDF report and presentation, Ghost Race/Audio Coach fixes from release/v2.1.3. Source head before upload trigger: 6f77296601614281f0cff3165f6fc31b5ff2e145. Run signed iPhone/iPad/Watch/Widget archive and verify Apple App Store Connect upload. Preserve release/v2.1.3 as active branch; do not merge to main or lock version.
+ATHLTH 2.1.3 build 121 — explicit user-authorized TestFlight retry 2026-11-05 Europe/Oslo after failed signing in run 42121691830: previous stale CI certificate was already retired, so code now permits rotation ONLY of verified ATHLTH CI certificate 9285X3798K issued in successful run 41907757515. This runner no longer has its ephemeral private key. Preserve release/v2.1.3, same-commit successful iOS build/backend gates, signing of all four bundles, and verify Apple upload. Source commit before trigger a008530aeb622f0ef79cd39bfece64dc88fecbd2.
+ATHLTH 2.1.3 build 121 — EXPLICIT user-authorized TestFlight retry 2026-11-06: fixed measured iPhone active seconds, reject impossible Ghost GPS jumps and accept plausible accurate GPS; require successful build plus backend checks before Apple upload.
+ATHLTH 2.1.3 build 121 — EXPLICIT user-authorized TestFlight retry 2026-11-06 after fixing record/Ghost tests and verifying targeted cleanup of orphaned 42122394376 signing certificate; require release gates before upload.
+ATHLTH 2.1.4 build 122 — user-authorized TestFlight upload 2026-11-06 Europe/Oslo. Upload current release/v2.1.4 containing latest Ghost Race, strength, Watch and iPad fixes, with source head 3cb9ad2ca82ff42f87ec96b8424ad932f1e606d8 at authorization. Require successful exact-commit Build ATHLTH XCTest and backend regressions, signed iPhone/Apple Watch/all Widget bundles, validated archive, and confirmed App Store Connect upload. Keep release/v2.1.4 active; do not lock or merge into main.
+ATHLTH 2.1.4 build 122 — user-authorized TestFlight RETRY 2026-11-06 after failed run 42298972064 caused by Xcode 27 type-check timeout in ATHLTHStrengthCompletionReview.heaviestLift (line 72). Fixed by explicit per-exercise/per-set iteration on commit fe14d0fa2e3c92200de8d480ec55aff6051a6d60. Require same-commit Build ATHLTH and backend regressions, validated four-bundle signing, archive and successful App Store Connect upload. Keep release/v2.1.4 active and unlocked.
+ATHLTH 2.1.4 build 122 — explicit user-authorized TestFlight retry 2026-11-07 Europe/Oslo, after failed 42301387292 due to Build ATHLTH 42301387303 XCTest compilation failure: Tests/StrengthPostWorkoutReviewTests.swift:88 unhandled try XCTUnwrap in testHistoricalSixInchHoldDoesNotBecomeAWeightRecord. Fixed by declaring test throws on commit d315281209e12cb5d795270ce598fb222b8b0dc8. Require same-commit successful Build ATHLTH XCTest and backend regressions, complete iPhone/Watch/Widget signing, validated release archive, and App Store Connect upload. Keep release/v2.1.4 active and unlocked; do not merge main.
+
+ATHLTH 2.1.5 build 123 — explicitly requested TestFlight upload 2026-11-09 (Europe/Oslo), including grouped strength set editing, library/workout-builder performance improvements and refreshed Home cards. Release source includes Swift 6 audio delegate compile fix. Require successful exact-commit Build ATHLTH iOS XCTest, backend regressions, validated iPhone/Watch/Widget signing and successful App Store Connect upload. Preserve active release/v2.1.5; do not merge or lock.
+
+ATHLTH 2.1.5 build 123 — retry authorized 2026-11-09 after Swift 6 audio-coach delegate data-race errors in MirroredWorkoutAudioCoach.swift were corrected at 12b63219bd90085bf69583be574f1afd1c8942c6. Require same-commit Build ATHLTH and backend regression success, signed iPhone/Watch/Widget archive and confirmed App Store Connect upload. Preserve release/v2.1.5; no version lock.
+
+ATHLTH 2.1.5 build 123 — user-authorized TestFlight retry 2026-11-09 after fixing the invalid empty-array XCTest syntax in ATHLTHStudioDayCompletionPolicyTests.swift (commit 52786d51ff2c6c480f1fc71b2d3faa1611f38bc4). Require passing exact-commit Build ATHLTH XCTest and backend regression checks, signed iPhone/Watch/Widgets IPA, and App Store Connect upload verification. Keep release/v2.1.5 active without merging or locking.
+
+ATHLTH 2.1.5 build 123 — user-authorized TestFlight retry 2026-11-09 following full XCTest diagnosis of 42642396293 and 42642396250: prevent duplicate 1 km Audio Coach cues, preserve expanded 25-guide offline wellness catalog expectations, normalize ø/æ in Norwegian workout search, and map skråbenk med manualer to the original RepDB incline dumbbell press without reintroducing retired duplicate native IDs. Require successful same-commit Xcode XCTest and backend regressions, signed Watch/iPhone/widget archive and verified App Store Connect upload. Source head before trigger: e2693a45076da9de09d13cdaea586e990af99d64. Preserve active release/v2.1.5, no merge or lock.
+
+ATHLTH 2.1.5 build 123 — TestFlight retry authorized 2026-11-09 after Xcode 27 compiled tests failed in MuscleRecoveryLoadTests.swift:83 (missing englishName argument in ExerciseLibraryStore.searchableNorwegianTerms). Backward-compatible default argument now restores legacy call sites without changing production RepDB alias matching; source commit 01a61c41b4ae14703bae290a7963f74de5445873. Require exact-commit Build ATHLTH and backend regressions success, fully signed iPhone/Watch/Widgets archive, and confirmed App Store Connect delivery. Keep release/v2.1.5 open; no merge or lock.
+
+ATHLTH 2.1.6 build 124 — user-authorized TestFlight upload 2026-11-10 Europe/Oslo after iPhone side-menu premium redesign and iPad messaging/performance work; latest source before trigger 82460c163b790488f69d2350792c63e8a8dae5c5. Require same-commit successful Build ATHLTH XCTest and backend regressions, validated signing for iPhone, Watch and widgets, signed archive, and completed App Store Connect upload. Keep release/v2.1.6 active and unlocked; do not merge main.
+
+ATHLTH 2.1.7 build 125 — explicit user-authorized TestFlight upload 2026-11-10 Europe/Oslo. Upload current release/v2.1.7 as implemented, requiring same-commit successful Build ATHLTH XCTest and backend regressions, verified iPhone/Watch/Widgets signing, release archive, and confirmed App Store Connect delivery. The illustrative new iPad Plan Studio mockup created in chat is a design proposal only, NOT included in this build. Preserve active release/v2.1.7; do not lock or merge main.
+
+ATHLTH 2.1.8 build 126 — explicitly authorized TestFlight launch 2026-11-12 02:30 CET. Upload active release/v2.1.8 only after same-commit Build ATHLTH and backend regressions are green, verified signed iOS/Watch/Widgets archive, and confirmed App Store Connect upload. Monitor hourly, diagnose and fix failures, retry on current release branch, do not alter frozen versions.
+
+ATHLTH 2.1.8 build 126 — user-authorized retry 2026-11-12; upload only after same-commit Build ATHLTH and backend regressions succeed, signed archive validated; no new distribution certificates; verify App Store Connect acceptance before reporting success.
+
+ATHLTH 2.1.9 build 127 – authorized TestFlight release, 2026-11-13, full iPad live workout and one-session consent
+
+ATHLTH 2.1.9 build 127 – retry after fixing immutable live snapshot XCTest fixture, 2026-11-13
+
+ATHLTH 2.1.9 build 127 – TestFlight retry: fixed racy watchOS Info.plist build script – 2026-11-13
+
+ATHLTH 2.1.9 build 127 – retry: fixed optional Bool XCTest assertion in Quick Run timeline adapter – 2026-11-13
+
+ATHLTH 2.2.0 build 128 — user-authorized overnight TestFlight upload 2026-11-14 Europe/Oslo after cinematic workout imagery, training library data migration and shared running/Watch/iPad improvements. Require exact-commit green Build ATHLTH and backend tests, iPad verification, valid four-bundle signing, signed archive and confirmed App Store Connect delivery. Diagnose failures, retry safely on release/v2.2.0, keep previous releases unchanged; do not claim success before upload and Apple processing are verified.
+
+ATHLTH 2.2.0 build 128 — authorized retry 2026-11-14 after green exact-source XCTest and backend checks at 23d773e8474a1becf3722c6ea0a0e3194f8b659d; require green checks on new trigger commit, signed archive, App Store Connect upload and verified processing. Keep approved training plans and imagery unchanged.
+ATHLTH 2.2.1 build 129 TestFlight upload - user authorized 2026-11-15 after Audio Coach hydration and release build correction
+ATHLTH 2.2.1 build 129 authorized retry 2026-11-15 - fixed exercise catalog and distinct muscle icon XCTest failures; require same-commit green iOS/backend and signed TestFlight upload
+ATHLTH 2.2.2 build 130 — explicitly user-authorized TestFlight upload 2026-11-16 Europe/Oslo after route detail redesign, route Quick Train start, A–Å exercise library pagination, route editor via-point scroll fixes, plan canonical exercise references, and related iPhone/iPad fixes. Source head before upload trigger: a409996ca2fdb1ee75bafe2f985f750a9c8f499e. Require exact-commit successful Build ATHLTH/XCTest and backend regressions, archive signing for iPhone, Watch and both Widgets, App Store Connect delivery verified. Keep release/v2.2.2 active and unlocked; do not merge or change marketing version.
+ATHLTH 2.2.2 build 130 — user-authorized TestFlight retry on 2026-11-16 after fixing out-of-scope XCTest strength() helper in ATHLTHStudioRecordedWorkoutsTests.swift (commit e95897a62814781c96a669b235b752b5423e535e). Require exact-commit green Build ATHLTH and backend regressions before upload, valid signed iPhone/Watch/widgets archive and verified Apple delivery; keep version 2.2.2 active.
+ATHLTH 2.2.2 build 130 — user-authorized TestFlight retry 2026-11-16 (Europe/Oslo) after correcting five stale/incompatible XCTest assertions for Plan Studio skipped removal, HealthKit linked completion editing, featured native exercise catalog, Biceps category and dedicated goalDetails step. Source commit before upload trigger: 06e627676355002d8474edb4660a68fe474954ad. Require same-commit green Build ATHLTH and backend tests, four-bundle signed IPA, verified App Store Connect upload. Keep version 2.2.2 active; do not merge main or change build number.
+ATHLTH 2.2.2 build 130 — authorized retry 2026-11-16 after Build ATHLTH 43864665748 failed two assertions in ATHLTHAIProgramWorkoutStepsTests (canonical block stores distance) and ATHLTHAzureCoachVoiceTests (en-US Azure Neural supported). Corrections 8f46ce02 and 1429a2e6; source 1429a2e62577137bc3c5e03ffa91d2ed3622d1cc. Keep 2.2.2 build 130, require same-commit Build ATHLTH and backend green, signed iOS/Watch/widgets IPA, App Store Connect confirmation. No main merge.
+
+ATHLTH 2.2.3 build 131 — 2026-11-17 user-authorized recovery upload after 2.2.2 build 130 startup crashes; latest release head e3e5490d0f9ba7703d722f418775c27a25ad2c99; validate iPhone/Watch and backend then upload to TestFlight; fix failures and retry.
+
+ATHLTH 2.2.3 build 131 — retry 2026-11-17 after SwiftUI Section compiler fix 67c198885aa923fd98807583ff382654c3f227d1; user-authorized recovery upload, require same-commit build and backend success before App Store Connect.
+
+ATHLTH 2.2.3 build 131 — 2026-11-17 retry after fixing ATHLTHTrainTodayLayoutTests missing onQuickFreeTraining closure (6a56eeb82062212b539d55cc4645956849e92fbb); require same-commit Build ATHLTH and backend success, signed archive and Apple upload confirmation.
+
+ATHLTH 2.2.3 build 131 recovery retry after running-library unsaved draft regression fix 44d7b3601c5b146e77241e0b418107a2f0bdd822; upload only after same-commit build and backend checks pass; user authorized 2026-11-17.
+
+ATHLTH 2.2.4 build 132 — TestFlight upload user-authorized 2026-11-18. Source c34df9b085e8afd739247673ea82b4bc2784c7c6. Start release workflow for iOS + iPad + Apple Watch companion, keep previous releases locked and do not open PR/merge main. Require same-commit Build ATHLTH and backend green, explicit signed archive + App Store Connect upload; retry fixable failures under hourly monitoring until successfully processed.
+
+ATHLTH 2.2.4 build 132 — authorized TestFlight retry 2026-11-18 after fixing Swift 6 @MainActor isolation in Tests/ATHLTHiPadLiveWorkoutTests.swift at e9689e6650939c54f16eb17d379be213d00f3abe. Prior same-commit Build ATHLTH and hybrid XCTest failed compilation of boundedSpectatorSnapshot. Require new same-commit green Build ATHLTH and backend tests before Apple upload; no PR, main merge or version/build bump.
+
+ATHLTH 2.2.4 build 132 — authorized recovery retry 2026-11-18 after three XCTest expectation corrections and one singular Audio Coach grammar fix. Source 556ed0cfb3c641e367bd9a11f8714b817a5f6af1. Require same-commit Build ATHLTH and backend success before App Store Connect upload. No PR, no main merge; preserve 2.2.4/132.
+
+
+ATHLTH 2.2.5 build 133 — TestFlight upload explicitly authorized by user on 2026-11-19; full five-workflow release CI verified green on source fcc832a4e2cbe3297eea6a8bacb8438aa3bbb525 on 2026-11-20, including independent iPhone/iPad compatibility, watchOS, complete XCTest and iPad 11/13-inch screenshot artifacts. This trigger commit must independently pass the SAME-COMMIT release gate before signing iPhone/Watch/widgets and uploading to App Store Connect. No version bump, no source feature changes or frozen branch updates; physical GPS/HealthKit/Spotify/Audio Coach device acceptance remains untested.
+
+ATHLTH 2.2.6 build 134 — user-authorized TestFlight attempt 2026-11-21. Trigger on release/v2.2.6 only. Require full five-workflow same-commit release gate before signing and uploading; do not bypass CI, modify frozen branches, or claim Apple processing complete.
+ATHLTH 2.2.6 TestFlight retry 2026-11-21 — user-authorized after restoring single-build CI; require same-commit release checks and signed archive validation.
+
+ATHLTH 2.2.6 gated TestFlight request after full acceptance validation and CoreSimulator recovery, 2026-11-21. Do not upload unless all five gates succeed on this exact SHA.
+
+ATHLTH 2.2.6 explicitly authorized TestFlight retry 2026-11-21: validate all same-commit required CI gates; sign and upload only on success.
+
+ATHLTH 2.2.6 user-authorized gated TestFlight attempt after iPad screenshot recovery c8852f3; same-commit CI required, 2026-11-21.
+
+ATHLTH 2.2.6 user-authorized TestFlight retry after iPad recovery shell fix 9e0eccd, 2026-11-21. Require all five CI gates on this exact commit.
+
+ATHLTH 2.2.6 explicitly authorized gated TestFlight retry after bounded iPhone simulator build diagnostics fe351ad, 2026-11-21. Upload only after all five same-commit checks succeed.
+
+ATHLTH 2.2.6 gated TestFlight retry after iPhone simulator smoke Debug build fix 87ac0fa, 2026-11-21. Keep all five same-commit gates mandatory.
+
+ATHLTH 2.2.6 gated TestFlight rerun after simulator recovery and bounded diagnostics bd265ac, 2026-11-21. Require all five checks to pass before upload.
+
+ATHLTH 2.2.7 build 135 — explicit user-authorized TestFlight upload 2026-11-22. Universal competition race overlay, verified timing, GPS lap progress and voluntary live position on release/v2.2.7. Five same-commit CI gates required before signing/archiving, no bypass; if failed fix root cause and retrigger on same branch, do not overwrite frozen versions. No claim of delivery until App Store Connect upload confirmed.
+
+ATHLTH 2.2.7 build 135 — user-authorized gated TestFlight retry 2026-11-22 after fixing Swift compilation issues on release/v2.2.7: walking setup state, Quick Start actor isolation, competition switch and strength scoped countdown editor. Require all five CI workflows on THIS trigger commit before any signing or upload. No CI bypass, no frozen release changes.
+
+ATHLTH 2.2.7 build 135 — authorized gated retry 2026-11-22 after catalog category compile fix and release workflow gate enablement. Require all five exact-commit checks before signing and upload; do not modify frozen versions.
