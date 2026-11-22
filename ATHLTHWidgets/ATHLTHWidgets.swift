@@ -921,7 +921,10 @@ private struct ATHLTHAdaptiveCompactMetric: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                // Preserve "km" even when the system gives the workout
+                // only a narrow trailing slot beside another activity.
+                .allowsTightening(true)
+                .minimumScaleFactor(condensed.hasSuffix(" km") ? 0.60 : 0.75)
                 .frame(width: 28, height: 28)
                 .accessibilityLabel(regular)
         } else {
@@ -1005,6 +1008,8 @@ private struct ATHLTHCompactCardioIslandReadout: View {
                     ? ATHLTHLiveActivityDisplayPolicy.compactDistance(distanceMeters)
                     : distanceLabel)
                     .lineLimit(1)
+                    .allowsTightening(true)
+                    .minimumScaleFactor(isLimitedInWidth ? 0.62 : 0.82)
             }
             if !hasDistance || !isLimitedInWidth {
                 if hasDistance {
