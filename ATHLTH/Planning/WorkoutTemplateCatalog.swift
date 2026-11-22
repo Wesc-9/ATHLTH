@@ -3234,6 +3234,7 @@ enum ATHLTHWorkoutLibraryPersonalization {
 
 struct WorkoutTemplateDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
@@ -3253,6 +3254,10 @@ struct WorkoutTemplateDetailView: View {
     @State private var originalCompletions: [StructuredWorkoutCompletion] = []
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
+    @State private var personalOptions = ATHLTHWorkoutPersonalOptions()
+    @State private var audioCoachDraft = AudioCoachDraft()
+    @State private var showingPersonalAudioCoach = false
+    @State private var showingPersonalSpotify = false
 
     private var hasActiveWorkout: Bool {
         phoneWorkout.active != nil ||
@@ -3281,6 +3286,10 @@ struct WorkoutTemplateDetailView: View {
         // Preserve the original catalogue identity and recording path.
         var original = entry.plannedSession(useOriginalID: true)
         original.workoutBlocks = displayedBlocks
+        original.audioCoachConfiguration = personalOptions.audioCoachConfiguration
+        original.spotifyPlaylist = personalOptions.spotifyPlaylist
+        original.spotifyAutoplayOnStart = personalOptions.spotifyAutoplayOnStart
+        original.spotifyIntervalTrack = personalOptions.spotifyIntervalTrack
         _ = ATHLTHWorkoutExerciseBinding.bind(
             &original, library: exerciseLibrary.allExercises
         )
@@ -3326,6 +3335,93 @@ struct WorkoutTemplateDetailView: View {
         }
         reloadPersonalTargets()
         editingPersonalTargets = false
+    }
+
+    private func reloadPersonalOptions() {
+        personalOptions = ATHLTHWorkoutPersonalOptionsStore.load(
+            userID: accountKey, workoutID: entry.id
+        )
+    }
+
+    private func openPersonalAudioCoach() {
+        var draft = AudioCoachDraft()
+        draft.load(configuration: personalOptions.audioCoachConfiguration ??
+            settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault
+            ))
+        audioCoachDraft = draft
+        showingPersonalAudioCoach = true
+    }
+
+    private var workoutOptionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(tr("Workout settings", "Innstillinger for økten"),
+                  systemImage: "slider.horizontal.3")
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            Button(action: openPersonalAudioCoach) {
+                HStack(spacing: 10) {
+                    Image(systemName: "waveform")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Audio Coach").font(.subheadline.weight(.semibold))
+                        Text(personalOptions.audioCoachConfiguration == nil
+                            ? tr("Standard settings", "Standardinnstillinger")
+                            : tr("Customized for workout", "Tilpasset denne økten"))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            Button { showingPersonalSpotify = true } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "music.note")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Spotify").font(.subheadline.weight(.semibold))
+                        Text(personalOptions.spotifyPlaylist?.name ??
+                             personalOptions.spotifyIntervalTrack?.title ??
+                             tr("Choose playlist or interval song",
+                                "Velg spilleliste eller intervallsang"))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            Button { showingEditor = true } label: {
+                Label(
+                    tr("Other settings and complete workout editing",
+                       "Andre innstillinger og full øktredigering"),
+                    systemImage: "square.on.square"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .athlthPlanCard(radius: 20)
+        .accessibilityIdentifier("athlth-workout-settings")
     }
 
     private func resetPersonalTargets() {
@@ -3426,6 +3522,8 @@ struct WorkoutTemplateDetailView: View {
                         saveTargets(personalized)
                     }
                 )
+
+                workoutOptionsCard
 
                 if let original = ATHLTHZonedPlanLibrary
                     .workout(forCatalogSlug: entry.slug) {
@@ -3539,6 +3637,43 @@ struct WorkoutTemplateDetailView: View {
             .padding(.vertical, 11)
             .background(ATHLTHPlanDesign.canvas)
         }
+        .sheet(isPresented: $showingPersonalAudioCoach) {
+            NavigationStack {
+                ScrollView {
+                    PerWorkoutAudioCoachView(
+                        draft: $audioCoachDraft,
+                        showRouteOptions: entry.plannedSession().routeID != nil,
+                        showStructuredOptions: !displayedBlocks.isEmpty
+                    )
+                    .padding(16)
+                }
+                .navigationTitle("Audio Coach")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(tr("Cancel", "Avbryt")) {
+                            showingPersonalAudioCoach = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(tr("Save", "Lagre")) {
+                            personalOptions.audioCoachConfiguration =
+                                audioCoachDraft.configuration()
+                            showingPersonalAudioCoach = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingPersonalSpotify) {
+            ATHLTHWorkoutSpotifyOptionsSheet(
+                playlist: $personalOptions.spotifyPlaylist,
+                autoplay: $personalOptions.spotifyAutoplayOnStart,
+                intervalTrack: $personalOptions.spotifyIntervalTrack,
+                supportsIntervals: displayedBlocks.contains {
+                    $0.kind == .run && $0.cardioActivity != .walking
+                }
+            )
+        }
         .sheet(
             isPresented: $askingForPersonalTargets,
             onDismiss: finishDetailGoalSelection
@@ -3627,12 +3762,19 @@ struct WorkoutTemplateDetailView: View {
         }
         .onAppear {
             reloadPersonalTargets()
+            reloadPersonalOptions()
             originalCompletions = StructuredWorkoutCompletionStore.load(
                 userID: session.profile.userID
             )
         }
         .onChange(of: session.profile.userID) { _, _ in
             reloadPersonalTargets()
+            reloadPersonalOptions()
+        }
+        .onChange(of: personalOptions) { _, updated in
+            ATHLTHWorkoutPersonalOptionsStore.save(
+                updated, userID: accountKey, workoutID: entry.id
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             originalCompletions = StructuredWorkoutCompletionStore.load(
