@@ -132,7 +132,7 @@ struct ATHLTHCoachRuleComposer: View {
         switch option {
         case .distanceUpdates, .distance, .averagePace,
              .routeRemaining, .routeETA:
-            return max(100, draft.distanceIntervalMeters)
+            return max(100, Int((draft.distanceIntervalKilometers * 1_000).rounded()))
         case .currentZone: return 3
         case .timedUpdates, .elapsedTime, .clockTime, .heartRate:
             return max(15, draft.timeIntervalSeconds)
