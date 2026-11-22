@@ -55,7 +55,9 @@ struct ATHLTHTournamentLiveDetailView: View {
     }
     private var isOwner: Bool { current.ownerID == userID }
     private var pendingCount: Int { entries.filter { $0.response == "invited" }.count }
-    private var minimumAthletes: Int { current.format == .cup ? 4 : 2 }
+    private var minimumAthletes: Int {
+        current.singleEventMode ? 3 : current.format == .cup ? 4 : 2
+    }
     private var readyToStart: Bool {
         confirmedEntries.count >= minimumAthletes &&
         (current.unansweredPolicy != "replace" ||
@@ -98,7 +100,9 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
                 if current.status == "inviting" { invitationSection }
                 Picker("Turnering", selection: $selection) {
-                    ForEach(ATHLTHTournamentDetailTab.allCases) { tab in
+                    ForEach(current.singleEventMode ?
+                            [.overview, .lobby] :
+                            ATHLTHTournamentDetailTab.allCases) { tab in
                         Text(tab.title).tag(tab)
                     }
                 }
@@ -120,6 +124,9 @@ struct ATHLTHTournamentLiveDetailView: View {
                         }
                     case .overview: overview
                     case .matches:
+                        if current.singleEventMode {
+                            singleEventSection
+                        } else {
                         VStack(alignment: .leading,spacing: 18) {
                             if current.status == "active",
                                confirmedEntries.contains(where: { $0.userID == userID }) {
@@ -131,7 +138,11 @@ struct ATHLTHTournamentLiveDetailView: View {
                             }
                             allMatchesSection
                         }
-                    case .standings: standingsSection
+                        }
+                    case .standings:
+                        if current.singleEventMode {
+                            singleEventSection
+                        } else { standingsSection }
                     }
                 }
             }
@@ -236,7 +247,9 @@ struct ATHLTHTournamentLiveDetailView: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text((current.format.title + " · " + statusLabel).uppercased())
+            Text(((current.singleEventMode
+                ? "Enkeltkonkurranse" : current.format.title)
+                + " · " + statusLabel).uppercased())
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.8)
                 .foregroundStyle(ATHLTHArenaV3Style.gold)
@@ -246,8 +259,10 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 13) {
                 Label("\(confirmedEntries.count) deltakere", systemImage: "person.2")
-                Label("\(verifiedMatches.filter { !$0.isWarmup }.count) godkjent",
-                      systemImage: "checkmark.shield")
+                if !current.singleEventMode {
+                    Label("\(verifiedMatches.filter { !$0.isWarmup }.count) godkjent",
+                          systemImage: "checkmark.shield")
+                }
             }
             .font(.caption)
             .foregroundStyle(ATHLTHArenaV3Style.secondary)
@@ -275,7 +290,8 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
             }
-            if ATHLTHTournamentSeasonContinuation.canContinue(
+            if !current.singleEventMode &&
+               ATHLTHTournamentSeasonContinuation.canContinue(
                 format: current.format,
                 status: current.status,
                 ownerID: current.ownerID,
@@ -514,6 +530,9 @@ struct ATHLTHTournamentLiveDetailView: View {
         VStack(alignment: .leading, spacing: 17) {
             eventInformation
             athleteProgressSection
+            if current.singleEventMode {
+                singleEventSection
+            }
             NavigationLink {
                 ATHLTHTournamentGroupConversationView(tournament: current)
             } label: {
@@ -524,6 +543,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .padding(14)
                     .background(ATHLTHArenaV3Style.panel())
             }
+            if !current.singleEventMode {
             if let practice = matches.first(where: { $0.phase == .warmup }) {
                 sectionTitle("Oppvarming")
                 Text("Disse rundene gir ingen poeng, plassering eller utslag.")
@@ -564,6 +584,17 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
                 standingsSection
             }
+            } // Separate events never display a fictitious league fixture.
+        }
+    }
+
+    private var singleEventSection: some View {
+        ATHLTHTournamentSingleEventView(
+            tournament: current,
+            userID: userID,
+            names: names
+        ) {
+            await reload()
         }
     }
 
