@@ -170,8 +170,19 @@ enum ATHLTHWorkoutPersonalOptionsStore {
         userID: String, workoutID: UUID,
         defaults: UserDefaults = .standard
     ) {
-        guard !userID.isEmpty,
-              let data = try? JSONEncoder().encode(value) else { return }
+        guard !userID.isEmpty else { return }
+        if value == ATHLTHWorkoutPersonalOptions() {
+            reset(userID: userID, workoutID: workoutID, defaults: defaults)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(value) else { return }
         defaults.set(data, forKey: key(userID: userID, workoutID: workoutID))
+    }
+
+    static func reset(
+        userID: String, workoutID: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.removeObject(forKey: key(userID: userID, workoutID: workoutID))
     }
 }
