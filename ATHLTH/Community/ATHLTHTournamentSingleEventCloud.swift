@@ -90,7 +90,6 @@ struct ATHLTHTournamentSingleEventCloud {
             .eq("verification", value: "athlth")
             .eq("is_eligible", value: true)
             .gte("started_at", value: ISO8601DateFormatter().string(from: after))
-            .not("source_workout_id", operator: .is, value: "null")
             .order("started_at", ascending: false)
             .limit(30).execute().value
     }
