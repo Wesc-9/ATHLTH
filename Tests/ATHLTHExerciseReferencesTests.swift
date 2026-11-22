@@ -267,6 +267,36 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
     }
 
     @MainActor
+    func testMarketplaceImportUsesOriginalIDWhenSenderCopyHasDifferentID() {
+        let owner = UUID()
+        let creator = UUID()
+        let originalID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(owner)
+        defer { library.switchAccount(nil) }
+        let snapshot = ExerciseSnapshot(
+            name: "Creator exercise",
+            instructions: ["Controlled repetitions"],
+            primaryMuscles: ["Back"], secondaryMuscles: [],
+            equipment: [], imageURL: nil
+        )
+        let first = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: UUID(),
+            originalCreatorID: creator, originalExerciseID: originalID
+        )
+        let second = library.importSharedExercise(
+            snapshot, ownerID: owner, sourceExerciseID: UUID(),
+            originalCreatorID: creator, originalExerciseID: originalID
+        )
+        XCTAssertNotNil(first)
+        XCTAssertEqual(first?.id, second?.id)
+        XCTAssertEqual(library.customExercises.filter {
+            $0.exercise.sharedSourceExerciseID == originalID
+        }.count, 1)
+        if let first { library.deleteCustomExercise(first.id) }
+    }
+
+    @MainActor
     func testMarketplaceImportsFromDifferentCreatorsStayDistinct() {
         let owner = UUID()
         let sourceID = UUID()
