@@ -33,6 +33,14 @@ struct ATHLTHTournamentLobbyRulesView: View {
     private var votedFor: UUID? {
         votes.first { $0.voterID == session.profile.userID }?.proposalID
     }
+    private func ruleLine(_ name: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(name).font(.caption.weight(.semibold))
+            Text(value).font(.caption).fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+    }
+
     private var rulesLocked: Bool { tournament.rulesConfirmedAt != nil }
     private var acknowledged: Bool {
         entries.first { $0.userID == session.profile.userID }?
@@ -88,6 +96,81 @@ struct ATHLTHTournamentLobbyRulesView: View {
                          }.joined(separator: " · "))
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                Divider().opacity(0.5)
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(
+                        tournament.plannedStartsAt.map {
+                            "Tidligste start: " + $0.formatted(
+                                date: .abbreviated, time: .shortened
+                            )
+                        } ?? "Start når invitasjoner og regler er godkjent",
+                        systemImage: "calendar"
+                    )
+                    Label(
+                        tournament.releaseMode == "everyone_finished"
+                            ? "Neste øvelse: når alle er ferdige"
+                            : "Neste øvelse: hver \(tournament.releaseEvery) " +
+                                (tournament.releaseUnit == "month" ? "måned(er)"
+                                : tournament.releaseUnit == "day" ? "dag(er)"
+                                : tournament.releaseUnit == "hour" ? "time(r)"
+                                : "minutt(er)"),
+                        systemImage: "arrow.forward.circle"
+                    )
+                    Label(
+                        "Frist per øvelse: \(tournament.completionHours) timer · " +
+                        "ikke gjennomført: 0 poeng",
+                        systemImage: "clock.badge.exclamationmark"
+                    )
+                    Label(
+                        tournament.invitationPermission == "admin"
+                            ? "Invitasjoner: kun arrangør"
+                            : "Invitasjoner: godkjente deltakere",
+                        systemImage: "person.badge.plus"
+                    )
+                    Label(
+                        tournament.joinApproval == "open"
+                            ? "Nye deltakere: ingen ekstra godkjenning"
+                            : tournament.joinApproval == "participants"
+                                ? "Nye deltakere: alle må godkjenne"
+                                : "Nye deltakere: kun admin godkjenner",
+                        systemImage: "person.crop.circle.badge.checkmark"
+                    )
+                }
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                if !tournament.allowedActions.isEmpty ||
+                    !tournament.prohibitedActions.isEmpty ||
+                    !tournament.prizeFirst.isEmpty ||
+                    !tournament.prizeSecond.isEmpty ||
+                    !tournament.prizeThird.isEmpty ||
+                    !tournament.loserConsequence.isEmpty {
+                    Divider().opacity(0.5)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Vilkår, premier og frivillig konsekvens")
+                            .font(.subheadline.weight(.semibold))
+                        if !tournament.allowedActions.isEmpty {
+                            ruleLine("Tillatt", tournament.allowedActions)
+                        }
+                        if !tournament.prohibitedActions.isEmpty {
+                            ruleLine("Ikke tillatt", tournament.prohibitedActions)
+                        }
+                        if !tournament.prizeFirst.isEmpty {
+                            ruleLine("1. plass", tournament.prizeFirst)
+                        }
+                        if !tournament.prizeSecond.isEmpty {
+                            ruleLine("2. plass", tournament.prizeSecond)
+                        }
+                        if !tournament.prizeThird.isEmpty {
+                            ruleLine("3. plass", tournament.prizeThird)
+                        }
+                        if !tournament.loserConsequence.isEmpty {
+                            ruleLine("Taper", tournament.loserConsequence)
+                        }
+                        Text("Dette er frivillige avtaler. ATHLTH håndhever ikke straff eller utbetaler premier.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 7) {
                     Label(
