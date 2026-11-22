@@ -232,104 +232,8 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $sidebarVisibility) {
-            sidebar
-                // Suppress the system button in the left sidebar. The
-                // existing single hamburger in the detail toolbar remains.
-                .toolbar(removing: .sidebarToggle)
-                .navigationSplitViewColumnWidth(
-                    min: ATHLTHStudioSidebarLayoutPolicy.fixedWidth,
-                    ideal: ATHLTHStudioSidebarLayoutPolicy.fixedWidth,
-                    max: ATHLTHStudioSidebarLayoutPolicy.fixedWidth
-                )
-        } detail: {
-            NavigationStack(path: $detailNavigationPath) {
-                studioDetail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(canvas.ignoresSafeArea())
-                    .overlay(alignment: .topTrailing) {
-                        // Keep the same panel-edge handle available whenever
-                        // the inbox is collapsed, on every Studio destination.
-                        if !showingInspector {
-                            Button {
-                                openMessageHub()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(gold)
-                                    .frame(width: 26, height: 44)
-                                    .background(canvas, in: RoundedRectangle(cornerRadius: 12))
-                                    .overlay(RoundedRectangle(cornerRadius: 12)
-                                        .stroke(gold.opacity(0.3)))
-                                    // Preserve the slim visual grip with a
-                                    // comfortable 44pt touch target.
-                                    .frame(width: 44, height: 48)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                ATHLTHLocalization.choose(
-                                    english: "Open Inbox",
-                                    norwegian: "Åpne innboks"
-                                )
-                            )
-                            .accessibilityIdentifier("athlth-ipad-message-edge")
-                            .accessibilityHint(ATHLTHLocalization.choose(
-                                english: "Tap or swipe left on this handle to open Inbox",
-                                norwegian: "Trykk eller sveip mot venstre på håndtaket for å åpne Innboks"
-                            ))
-                            .padding(.top, 14)
-                            .simultaneousGesture(
-                                DragGesture(minimumDistance: 15)
-                                    .onEnded { value in
-                                        if ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
-                                            translation: value.translation
-                                        ) {
-                                            openMessageHub()
-                                        }
-                                    }
-                            )
-                        }
-                    }
-                    // Overview owns its compact title/metrics inside the
-                    // content. Avoid the duplicate large "Overview" title
-                    // that previously consumed substantial iPad space.
-                    .navigationTitle(
-                        libraryPage?.title ??
-                            (sidebarPage != nil ? "" :
-                                (selection == .overview ? "" : selection.label))
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                    // Keep the Overview scroll edge clean: a visible bar
-                    // previously rendered as an empty translucent title tile.
-                    .toolbarBackground(canvas, for: .navigationBar)
-                    .toolbarBackground(
-                        (selection == .overview && libraryPage == nil
-                            && sidebarPage == nil) || sidebarPage == .profile
-                            ? .hidden : .visible,
-                        for: .navigationBar
-                    )
-                    .toolbar(removing: .sidebarToggle)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                let next = ATHLTHStudioSidebarLayoutPolicy.toggled(sidebarVisibility)
-                                sidebarUserVisible = next != .detailOnly
-                                withAnimation(.easeInOut(duration: 0.18)) {
-                                    sidebarVisibility = next
-                                }
-                            } label: { Image(systemName: "line.3.horizontal") }
-                            .accessibilityLabel(ATHLTHLocalization.choose(english: "Side menu", norwegian: "Sidemeny"))
-                            .accessibilityIdentifier("athlth-ipad-sidebar-toggle")
-                        }
-                        // Inbox is available from the persistent edge handle
-                        // and the iPad sidebar, not a duplicate toolbar icon.
-                    }
-            }
-            .id(detailNavigationIdentity)
-        }
+        studioSplitView
         .navigationSplitViewStyle(.balanced)
-        .toolbar(removing: .sidebarToggle)
         // A single root-level, read-only full-screen spectator handles both
         // running and strength. Do not display a second legacy floating card.
         // iPhone/iPad share the workout engine; only Studio navigation and
@@ -457,6 +361,12 @@ struct ATHLTHiPadStudioRootView: View {
                 if studioPlanSync.enabled {
                     Task { await studioPlanSync.sync(session: session) }
                 }
+            }
+        }
+        .onChange(of: sidebarVisibility) { _, visibility in
+            // Persist only user-driven native sidebar changes after restore.
+            if didRestoreStudioScene && visibility != .automatic {
+                sidebarUserVisible = visibility != .detailOnly
             }
         }
         .onChange(of: selection) { _, destination in
@@ -588,6 +498,88 @@ struct ATHLTHiPadStudioRootView: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var studioSplitView: some View {
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
+            sidebar
+                // One system-owned sidebar toggle; no duplicate custom icon.
+                .navigationSplitViewColumnWidth(
+                    min: ATHLTHStudioSidebarLayoutPolicy.fixedWidth,
+                    ideal: ATHLTHStudioSidebarLayoutPolicy.fixedWidth,
+                    max: ATHLTHStudioSidebarLayoutPolicy.fixedWidth
+                )
+        } detail: {
+            NavigationStack(path: $detailNavigationPath) {
+                studioDetail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(canvas.ignoresSafeArea())
+                    .overlay(alignment: .topTrailing) {
+                        // Keep the same panel-edge handle available whenever
+                        // the inbox is collapsed, on every Studio destination.
+                        if !showingInspector {
+                            Button {
+                                openMessageHub()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(gold)
+                                    .frame(width: 26, height: 44)
+                                    .background(canvas, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12)
+                                        .stroke(gold.opacity(0.3)))
+                                    // Preserve the slim visual grip with a
+                                    // comfortable 44pt touch target.
+                                    .frame(width: 44, height: 48)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english: "Open Inbox",
+                                    norwegian: "Åpne innboks"
+                                )
+                            )
+                            .accessibilityIdentifier("athlth-ipad-message-edge")
+                            .accessibilityHint(ATHLTHLocalization.choose(
+                                english: "Tap or swipe left on this handle to open Inbox",
+                                norwegian: "Trykk eller sveip mot venstre på håndtaket for å åpne Innboks"
+                            ))
+                            .padding(.top, 14)
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 15)
+                                    .onEnded { value in
+                                        if ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+                                            translation: value.translation
+                                        ) {
+                                            openMessageHub()
+                                        }
+                                    }
+                            )
+                        }
+                    }
+                    // Overview owns its compact title/metrics inside the
+                    // content. Avoid the duplicate large "Overview" title
+                    // that previously consumed substantial iPad space.
+                    .navigationTitle(
+                        libraryPage?.title ??
+                            (sidebarPage != nil ? "" :
+                                (selection == .overview ? "" : selection.label))
+                    )
+                    .navigationBarTitleDisplayMode(.inline)
+                    // Keep the Overview scroll edge clean: a visible bar
+                    // previously rendered as an empty translucent title tile.
+                    .toolbarBackground(canvas, for: .navigationBar)
+                    .toolbarBackground(
+                        (selection == .overview && libraryPage == nil
+                            && sidebarPage == nil) || sidebarPage == .profile
+                            ? .hidden : .visible,
+                        for: .navigationBar
+                    )
+
+            }
+            .id(detailNavigationIdentity)
         }
     }
 
