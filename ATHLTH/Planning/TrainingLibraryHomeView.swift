@@ -2744,10 +2744,11 @@ struct TrainingPlanCatalogDetailView: View {
 
     @State private var createEditableCopy = false
     @State private var showingPersonalizePlan = false
-    @State private var showAllWeeks = false
-    // One session is open by default so users see actual exercises and
-    // targets immediately, without rendering every session for 16 weeks.
-    @State private var expandedSessionKeys: Set<String> = ["1:0"]
+    @State private var showAllWeeks = true
+    // Weeks and sessions start collapsed. Generate detailed steps only
+    // when requested to keep long plans responsive.
+    @State private var expandedWeeks: Set<Int> = []
+    @State private var expandedSessionKeys: Set<String> = []
     @State private var inspectedPlanStep: WorkoutTemplateBlock?
 
     var body: some View {
@@ -3189,14 +3190,30 @@ struct TrainingPlanCatalogDetailView: View {
         let zonedWeek = ATHLTHZonedPlanLibrary.plan(for: entry.slug)?
             .weeks.first(where: { $0.weekNumber == week })
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(ATHLTHLocalization.format(
-                    english: "Week %d", norwegian: "Uke %d", week
-                ))
-                .font(.headline.weight(.bold))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                Spacer()
-                if let zonedWeek {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    if !expandedWeeks.insert(week).inserted {
+                        expandedWeeks.remove(week)
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.format(
+                            english: "Week %d", norwegian: "Uke %d", week
+                        ))
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text(ATHLTHLocalization.format(
+                            english: "%d planned sessions",
+                            norwegian: "%d planlagte økter",
+                            entry.sessionsPerWeek
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer()
+                    if let zonedWeek {
                     weekPhaseLabel(zonedWeek.isRecoveryWeek
                         ? ATHLTHLocalization.choose(english: "RECOVERY", norwegian: "RESTITUSJON")
                         : zonedWeek.phase.uppercased())
@@ -3204,14 +3221,22 @@ struct TrainingPlanCatalogDetailView: View {
                     weekPhaseLabel(ATHLTHLocalization.choose(
                         english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
                     ))
-                } else if entry.usesCompetitionTaper &&
-                          week >= max(entry.durationWeeks - 1, 1) {
-                    weekPhaseLabel(ATHLTHLocalization.choose(
-                        english: "TAPER", norwegian: "NEDTRAPPING"
-                    ))
+                    } else if entry.usesCompetitionTaper &&
+                              week >= max(entry.durationWeeks - 1, 1) {
+                        weekPhaseLabel(ATHLTHLocalization.choose(
+                            english: "TAPER", norwegian: "NEDTRAPPING"
+                        ))
+                    }
+                    Image(systemName: expandedWeeks.contains(week)
+                        ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
+            if expandedWeeks.contains(week) {
             if let zonedWeek,
                let zonedPlan = ATHLTHZonedPlanLibrary.plan(for: entry.slug) {
                 LazyVGrid(
@@ -3288,6 +3313,7 @@ struct TrainingPlanCatalogDetailView: View {
                 ) { index, blueprint in
                     previewWeekSessionRow(blueprint, week: week, index: index)
                 }
+            }
             }
         }
         .padding(14)
