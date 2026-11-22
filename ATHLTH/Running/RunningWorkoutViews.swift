@@ -365,6 +365,7 @@ struct RunningWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
 
     let workout: RunningWorkoutTemplate
@@ -376,6 +377,20 @@ struct RunningWorkoutDetailView: View {
     @State private var copySaveError: String?
     @State private var showingIntervalEditor = false
     @State private var editingBeforeStart = false
+    @State private var editingPrivatePreset = false
+    @State private var showingPrivateStartChoices = false
+    @State private var showingPrivateCoach = false
+    @State private var showingPrivateSpotify = false
+    @State private var showingResetPrivateSettings = false
+    @State private var privateSavedWorkout: RunningWorkoutTemplate?
+    @State private var privateOptions = ATHLTHWorkoutPersonalOptions()
+    @State private var privateCoachDraft = AudioCoachDraft()
+    @State private var privateSpeedText = ""
+    @State private var selectedPrivateSongStep: PrivateSongStep?
+    private struct PrivateSongStep: Identifiable {
+        let index: Int
+        var id: Int { index }
+    }
     @State private var askingForTargets = false
     @State private var pendingAddToPlan = false
     @State private var lastHistory: ATHLTHLibraryWorkoutHistory.Summary?
@@ -393,11 +408,93 @@ struct RunningWorkoutDetailView: View {
         library.savedCopy(for: workout)
     }
 
+    private var hasSavedPrivateSettings: Bool {
+        privateSavedWorkout != nil ||
+        privateOptions != ATHLTHWorkoutPersonalOptions()
+    }
+
+    private func reloadPrivateSettings() {
+        guard workout.isBuiltIn else { return }
+        privateSavedWorkout = ATHLTHRunningPrivateWorkoutStore.load(
+            userID: session.profile.userID, source: workout
+        )
+        privateOptions = ATHLTHWorkoutPersonalOptionsStore.load(
+            userID: session.profile.userID.uuidString,
+            workoutID: workout.id
+        )
+    }
+
+    private func savePrivateWorkout(_ edited: RunningWorkoutTemplate) {
+        guard ATHLTHRunningPrivateWorkoutStore.save(
+            userID: session.profile.userID, source: workout,
+            customized: edited
+        ) else {
+            copySaveError = ATHLTHLocalization.choose(
+                english: "Could not save your private settings.",
+                norwegian: "Kunne ikke lagre dine private innstillinger."
+            )
+            return
+        }
+        reloadPrivateSettings()
+        editingPrivatePreset = false
+    }
+
+    private func resetPrivateSettings() {
+        ATHLTHRunningPrivateWorkoutStore.reset(
+            userID: session.profile.userID, sourceID: workout.id
+        )
+        ATHLTHWorkoutPersonalOptionsStore.reset(
+            userID: session.profile.userID.uuidString,
+            workoutID: workout.id
+        )
+        privateSavedWorkout = nil
+        privateOptions = .init()
+    }
+
+    /// Only the chosen running plan is passed to Quick Train. Private audio
+    /// and song choices are memory-only launch fields excluded from Codable.
+    private func launchLibraryWorkout(
+        _ selected: RunningWorkoutTemplate,
+        with options: ATHLTHWorkoutPersonalOptions
+    ) {
+        var payload = selected
+        payload.launchAudioCoachConfiguration = options.audioCoachConfiguration
+        payload.launchSpotifyPlaylist = options.spotifyPlaylist
+        payload.launchSpotifyAutoplayOnStart = options.spotifyAutoplayOnStart
+        payload.launchSpotifyIntervalTrack = options.spotifyIntervalTrack
+        payload.launchStepSongs = options.stepSongs.isEmpty
+            ? nil : options.stepSongs
+        onStart?(payload)
+        dismiss()
+    }
+
+    private func applyPrivateSpeed() {
+        let normalized = privateSpeedText.replacingOccurrences(of: ",", with: ".")
+        guard let speed = Double(normalized), speed.isFinite,
+              (2...30).contains(speed) else { return }
+        let candidate = ATHLTHRunningPrivateSpeedPolicy.applying(
+            kilometersPerHour: speed,
+            to: privateSavedWorkout ?? ATHLTHRunningLibraryDefaults.unpersonalized(workout)
+        )
+        savePrivateWorkout(candidate)
+    }
+
+    private func openPrivateCoach() {
+        var draft = AudioCoachDraft()
+        draft.load(configuration: privateOptions.audioCoachConfiguration ??
+            settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault
+            ))
+        privateCoachDraft = draft
+        showingPrivateCoach = true
+    }
+
     /// A catalogue page always shows the catalogue original. Personalized
     /// copies appear only when opening that specific workout in My Workouts.
     private var previewWorkout: RunningWorkoutTemplate {
         workout.isBuiltIn
-            ? ATHLTHRunningLibraryDefaults.unpersonalized(workout)
+            ? (privateSavedWorkout ??
+               ATHLTHRunningLibraryDefaults.unpersonalized(workout))
             : workout
     }
 
@@ -425,7 +522,132 @@ struct RunningWorkoutDetailView: View {
 
     private func editPersonalizedCopy() {
         editingBeforeStart = false
+        editingPrivatePreset = false
         showingIntervalEditor = true
+    }
+
+    private func editPrivatePreset() {
+        editingBeforeStart = false
+        editingPrivatePreset = true
+        showingIntervalEditor = true
+    }
+
+    /// Deliberately isolated from the long workout timeline: no recompute
+    /// on every keystroke, Spotify lookup or audio-engine state update.
+    private var privateRunningSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "My private settings",
+                        norwegian: "Mine innstillinger"
+                    ), systemImage: "person.crop.circle"
+                )
+                .font(.headline)
+                Spacer()
+                Text(ATHLTHLocalization.choose(
+                    english: "Only visible to you", norwegian: "Kun synlig for deg"
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
+            let count = ATHLTHRunningPrivateSpeedPolicy.workCount(
+                in: previewWorkout
+            )
+            if count > 0 {
+                HStack(spacing: 9) {
+                    TextField("14", text: $privateSpeedText)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 76)
+                        .accessibilityIdentifier("athlth-running-private-speed")
+                    Text("km/t")
+                        .font(.subheadline)
+                    Spacer(minLength: 0)
+                    Button(ATHLTHLocalization.choose(
+                        english: "All work intervals",
+                        norwegian: "Alle \(count) drag"
+                    )) {
+                        applyPrivateSpeed()
+                    }
+                    .disabled(Double(privateSpeedText.replacingOccurrences(
+                        of: ",", with: "."
+                    )).map { !(2...30).contains($0) } ?? true)
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Apply one speed to all efforts, without changing recoveries.",
+                    norwegian: "Sett samme fart på dragene uten å endre pausene."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
+            Button {
+                editPrivatePreset()
+            } label: {
+                Label("Rediger og lagre alle øktdeler",
+                      systemImage: "slider.horizontal.3")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            Divider()
+            Button(action: openPrivateCoach) {
+                Label("Audio Coach", systemImage: "waveform")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            Button { showingPrivateSpotify = true } label: {
+                Label("Spotify", systemImage: "music.note")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+
+            DisclosureGroup("Sang per drag eller pause") {
+                LazyVStack(alignment: .leading, spacing: 5) {
+                    ForEach(Array(previewWorkout.recipePreviewBlocks.enumerated()),
+                            id: \.offset) { step in
+                        Button {
+                            selectedPrivateSongStep = PrivateSongStep(
+                                index: step.offset
+                            )
+                        } label: {
+                            HStack {
+                                Text(step.element.title)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                Spacer(minLength: 8)
+                                Text(privateOptions.stepSongs[step.offset]?.title ??
+                                     "Velg sang")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                            }
+                            .frame(minHeight: 40)
+                            .contentShape(Rectangle())
+                        }
+                    }
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            if hasSavedPrivateSettings {
+                Button(role: .destructive) {
+                    showingResetPrivateSettings = true
+                } label: {
+                    Label("Nullstill mine innstillinger",
+                          systemImage: "arrow.counterclockwise")
+                        .font(.caption.weight(.semibold))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(ATHLTHPlanDesign.ink)
+        .padding(16)
+        .athlthPlanCard(radius: 20)
+        .accessibilityIdentifier("athlth-running-private-options")
     }
 
     var body: some View {
@@ -442,6 +664,10 @@ struct RunningWorkoutDetailView: View {
                     },
                     blocks: previewWorkout.recipePreviewBlocks
                 )
+
+                if workout.isBuiltIn {
+                    privateRunningSettingsCard
+                }
 
                 ATHLTHLastWorkoutHistoryCard(summary: lastHistory)
 
@@ -463,10 +689,11 @@ struct RunningWorkoutDetailView: View {
                     .tint(ATHLTHPlanDesign.accentInk)
 
                     Button {
-                        onStart(previewWorkout)
-                        dismiss()
+                        showingPrivateStartChoices = true
                     } label: {
-                        Label("Start Workout", systemImage: "play.fill")
+                        Label(ATHLTHLocalization.choose(
+                            english: "Start workout", norwegian: "Start økt"
+                        ), systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -543,6 +770,44 @@ struct RunningWorkoutDetailView: View {
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
+                english: "Which settings would you like to use?",
+                norwegian: "Hvilke innstillinger vil du bruke?"
+            ),
+            isPresented: $showingPrivateStartChoices,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "No personal settings", norwegian: "Ingen innstillinger"
+            )) {
+                launchLibraryWorkout(
+                    ATHLTHRunningLibraryDefaults.unpersonalized(workout),
+                    with: .init()
+                )
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "My settings", norwegian: "Mine innstillinger"
+            )) {
+                launchLibraryWorkout(previewWorkout, with: privateOptions)
+            }
+            .disabled(!hasSavedPrivateSettings)
+            Button(ATHLTHLocalization.choose(
+                english: "Adjust now", norwegian: "Juster nå"
+            )) {
+                editingBeforeStart = true
+                editingPrivatePreset = false
+                showingIntervalEditor = true
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Saved settings are private. Adjust now changes only this start.",
+                norwegian: "Lagrede innstillinger er private. Juster nå endrer bare denne starten."
+            ))
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
                 english: "Add your pace and other personal targets?",
                 norwegian: "Vil du legge inn fart og andre personlige mål?"
             ),
@@ -581,9 +846,10 @@ struct RunningWorkoutDetailView: View {
                 // Starting an edited original does not automatically save a
                 // personal copy. Explicit library copies must be changed and
                 // renamed; rejected saves keep the original intact.
-                if editingBeforeStart, let onStart {
-                    onStart(personalized)
-                    dismiss()
+                if editingPrivatePreset {
+                    savePrivateWorkout(personalized)
+                } else if editingBeforeStart, onStart != nil {
+                    launchLibraryWorkout(personalized, with: privateOptions)
                 } else if library.save(personalized) {
                     if pendingAddToPlan {
                         onSelect?(personalized)
@@ -604,6 +870,77 @@ struct RunningWorkoutDetailView: View {
                         )
                 }
             }
+        }
+        .onAppear {
+            reloadPrivateSettings()
+            refreshLastHistory()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            reloadPrivateSettings()
+        }
+        .onChange(of: privateOptions) { _, updated in
+            guard workout.isBuiltIn else { return }
+            ATHLTHWorkoutPersonalOptionsStore.save(
+                updated, userID: session.profile.userID.uuidString,
+                workoutID: workout.id
+            )
+        }
+        .sheet(isPresented: $showingPrivateCoach) {
+            NavigationStack {
+                ScrollView {
+                    PerWorkoutAudioCoachView(
+                        draft: $privateCoachDraft,
+                        showRouteOptions: workout.routeID != nil,
+                        showStructuredOptions: true
+                    )
+                    .padding(16)
+                }
+                .navigationTitle("Audio Coach")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Avbryt") { showingPrivateCoach = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Lagre") {
+                            privateOptions.audioCoachConfiguration =
+                                privateCoachDraft.configuration()
+                            showingPrivateCoach = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingPrivateSpotify) {
+            ATHLTHWorkoutSpotifyOptionsSheet(
+                playlist: $privateOptions.spotifyPlaylist,
+                autoplay: $privateOptions.spotifyAutoplayOnStart,
+                intervalTrack: $privateOptions.spotifyIntervalTrack,
+                supportsIntervals: true
+            )
+        }
+        .sheet(item: $selectedPrivateSongStep) { chosen in
+            ATHLTHSpotifyIntervalTrackPicker(selection: Binding(
+                get: { privateOptions.stepSongs[chosen.index] },
+                set: { song in
+                    if let song {
+                        privateOptions.stepSongs[chosen.index] = song
+                    } else {
+                        privateOptions.stepSongs.removeValue(forKey: chosen.index)
+                    }
+                }
+            ))
+        }
+        .confirmationDialog(
+            "Nullstille mine innstillinger?",
+            isPresented: $showingResetPrivateSettings,
+            titleVisibility: .visible
+        ) {
+            Button("Nullstill", role: .destructive) {
+                resetPrivateSettings()
+            }
+            Button("Avbryt", role: .cancel) {}
+        } message: {
+            Text("Personlig fart, Audio Coach og Spotify fjernes. Originaløkten beholdes.")
         }
         .alert(
             ATHLTHLocalization.choose(
