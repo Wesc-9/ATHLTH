@@ -56,7 +56,7 @@ struct ATHLTHTournamentInboxSection: View {
                             Text(pendingIDs.contains(tournament.id)
                                  ? "Invitasjon · Godta eller avslå"
                                  : recentText[tournament.id] ??
-                                   "Konkurransechat · \(tournament.format.title)")
+                                   "Konkurransechat · \(tournament.displayFormatTitle)")
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
