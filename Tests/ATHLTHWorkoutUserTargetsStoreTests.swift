@@ -101,7 +101,7 @@ final class ATHLTHWorkoutUserTargetsStoreTests: XCTestCase {
         for index in [0, 2, 4, 6, 8] {
             XCTAssertNil(updated[index].targetPaceSecondsPerKilometer)
         }
-        XCTAssertEqual(steps, (0..<9).map { steps[$0] })
+        XCTAssertTrue(steps.allSatisfy { $0.targetPaceSecondsPerKilometer == nil })
     }
 
     func testOnlyAccountOwnsSavedTargetsAndOriginalNeverChanges() {
