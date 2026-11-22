@@ -694,6 +694,14 @@ final class ATHLTHUniversalActiveCaptureTests: XCTestCase {
             XCTAssertEqual(projected.startedAt, started)
             XCTAssertEqual(projected.activityCategory, expectedSport)
             XCTAssertEqual(projected.engine, expectedEngine)
+            let routed = try XCTUnwrap(
+                ATHLTHLiveWorkoutEngineRouter.route(
+                    workoutID: watchFreeID, blocks: stages, index: index
+                )
+            )
+            XCTAssertEqual(projected.engine, routed.engine)
+            XCTAssertEqual(projected.workoutID, routed.workoutID)
+            XCTAssertEqual(projected.stageIndex, routed.blockIndex)
             XCTAssertEqual(projected.stageIndex, index)
         }
     }
