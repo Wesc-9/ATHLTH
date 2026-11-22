@@ -68,6 +68,83 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
         }
     }
 
+    func testModernStrengthCoachUsesPhoneForRoutineAndSetSpeech() {
+        var config = mirroredConfiguration()
+        config.outputPreference = .automatic
+        for priority in [
+            ATHLTHGuidancePriority.routineCoach, .structuredStep
+        ] {
+            XCTAssertFalse(ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+                configuration: config, workoutKind: .strength,
+                priority: priority, iPhoneVoiceLeaseActive: true
+            ))
+            XCTAssertTrue(ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+                configuration: config, workoutKind: .strength,
+                priority: priority, iPhoneVoiceLeaseActive: false
+            ))
+        }
+    }
+
+    func testStrengthCriticalCountdownAndSafetyStayOnWatch() {
+        var config = mirroredConfiguration()
+        config.outputPreference = .automatic
+        for priority in [
+            ATHLTHGuidancePriority.targetCritical, .routeCritical,
+            .ghostImportant, .ghostPeriodic
+        ] {
+            XCTAssertTrue(ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
+                configuration: config, workoutKind: .strength,
+                priority: priority, iPhoneVoiceLeaseActive: true
+            ))
+        }
+    }
+
+    func testStrengthCueIsFreshSessionBoundAndNeverCarriesOldSpeech() throws {
+        let now = Date(timeIntervalSince1970: 18_000)
+        let start = now.addingTimeInterval(-50)
+        let cue = ATHLTHStrengthMirroredCoachCue(
+            id: UUID(), workoutStartedAt: start, sentAt: now,
+            text: "Pausen starter. 60 sekunder.",
+            priority: .structuredStep
+        )
+        let decoded = try JSONDecoder().decode(
+            ATHLTHStrengthMirroredCoachCue.self,
+            from: JSONEncoder().encode(cue)
+        )
+        XCTAssertEqual(decoded.id, cue.id)
+        XCTAssertTrue(decoded.isValid(for: start, now: now))
+        XCTAssertFalse(decoded.isValid(
+            for: start.addingTimeInterval(3), now: now
+        ))
+        XCTAssertFalse(decoded.isValid(
+            for: start, now: now.addingTimeInterval(8)
+        ))
+        var expired = cue
+        expired.sentAt = now.addingTimeInterval(-20)
+        XCTAssertFalse(expired.isValid(for: start, now: now))
+        var unsafe = cue
+        unsafe.priority = .targetCritical
+        XCTAssertFalse(unsafe.isValid(for: start, now: now))
+        unsafe.priority = .routineCoach
+        unsafe.text = String(repeating: "x", count: 381)
+        XCTAssertFalse(unsafe.isValid(for: start, now: now))
+    }
+
+    func testStrengthMirrorInvitationUsesSameSessionAsPhoneAudio() {
+        var config = mirroredConfiguration()
+        config.outputPreference = .automatic
+        let now = Date(timeIntervalSince1970: 25_000)
+        let start = now.addingTimeInterval(-80)
+        let invitation = ATHLTHAudioCoachMirrorInvitation(
+            workoutStartedAt: start, sentAt: now,
+            configuration: config
+        )
+        XCTAssertTrue(invitation.isValid(for: start, now: now))
+        XCTAssertFalse(invitation.isValid(
+            for: start.addingTimeInterval(3), now: now
+        ))
+    }
+
     func testWalkingUsesSameRoutineOwnershipAsRunning() {
         XCTAssertFalse(
             ATHLTHAudioCoachVoiceRouting.shouldSpeakOnWatch(
