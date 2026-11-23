@@ -790,23 +790,9 @@ struct ProductRootTabView: View {
             .padding(.top, 8)
             .zIndex(50)
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: {
-                    social.coordinatedLobbySessionID != nil &&
-                    !social.isCoordinatedLobbyMinimized
-                },
-                set: { _ in }
-            )
-        ) {
-            if let sessionID =
-                    social.coordinatedLobbySessionID {
-                TrainTogetherCreatorLobbyView(
-                    sessionID: sessionID
-                )
-                .environmentObject(social)
-            }
-        }
+        // Isolate the coordinated lobby's observation and presentation from
+        // the large root TabView's AttributeGraph modifier chain.
+        .modifier(ATHLTHCoordinatedLobbyPresentation(social: social))
         .overlay {
             ZStack(alignment: .leading) {
                 if showingSideMenu {
@@ -14998,5 +14984,31 @@ private struct ProfileHexagonBadgeShape:
 private extension View {
     func athlthStablePresentationBoundary() -> AnyView {
         AnyView(self)
+    }
+}
+
+// Own the Train Together lobby presentation in a separate concrete view type.
+// The global tab tree must not embed the lobby's conditional presentation graph.
+private struct ATHLTHCoordinatedLobbyPresentation: ViewModifier {
+    @ObservedObject var social: SocialStore
+
+    private var lobbyPresented: Binding<Bool> {
+        Binding(
+            get: {
+                social.coordinatedLobbySessionID != nil &&
+                !social.isCoordinatedLobbyMinimized
+            },
+            set: { _ in }
+        )
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(isPresented: lobbyPresented) {
+                if let sessionID = social.coordinatedLobbySessionID {
+                    TrainTogetherCreatorLobbyView(sessionID: sessionID)
+                        .environmentObject(social)
+                }
+            }
     }
 }
