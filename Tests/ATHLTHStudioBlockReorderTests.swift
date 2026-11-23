@@ -60,6 +60,27 @@ final class ATHLTHStudioBlockReorderTests: XCTestCase {
         XCTAssertEqual(result[1].targetHeartRateZone, 3)
     }
 
+    func testActivePauseMovesFromRecoveryIntoMainWithoutLosingTargets() {
+        let run = step("Running", phase: .main)
+        var rest = step("Rest", phase: .recovery)
+        rest.kind = .rest
+        let active = ATHLTHActiveRecovery.convert(rest, active: true)
+        let moved = ATHLTHStudioBlockReorder.moving(
+            active.editorDragID, to: .main, over: nil, in: [run, active]
+        )
+        XCTAssertEqual(moved.map(\.editorDragID), [run.editorDragID, active.editorDragID])
+        XCTAssertTrue(moved[1].isActiveRecovery)
+        XCTAssertEqual(moved[1].resolvedPhase, .main)
+        XCTAssertEqual(moved[1].durationSeconds, active.durationSeconds)
+        XCTAssertEqual(moved[1].targetHeartRateZone, active.targetHeartRateZone)
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.orderedVisiblePhases(
+            for: moved, visiblePhases: [.main, .recovery]), [.main])
+        let back = ATHLTHStudioBlockReorder.moving(
+            active.editorDragID, to: .recovery, over: nil, in: moved
+        )
+        XCTAssertEqual(back[1].resolvedPhase, .recovery)
+    }
+
     func testDroppedOnOwnGroupDoesNotSplitIt() {
         let id = UUID()
         let a = step("A", groupID: id), b = step("B", groupID: id)

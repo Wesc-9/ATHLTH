@@ -293,6 +293,27 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
         XCTAssertEqual(daySections[0].blocks.first?.title, "Aktiv pause")
     }
 
+    func testActivePauseConversionAndInsertionKeepMainSection() {
+        let run = block("Running", phase: .main)
+        var rest = block("Rest", phase: .main)
+        rest.kind = .rest
+        rest.durationSeconds = 60
+        let active = ATHLTHActiveRecovery.convert(rest, active: true)
+        XCTAssertTrue(active.isActiveRecovery)
+        XCTAssertEqual(active.resolvedPhase, .main)
+        XCTAssertEqual(active.durationSeconds, 60)
+        let standalone = block("Separate recovery", phase: .recovery)
+        var steps = [run, standalone]
+        steps.insert(active, at: ATHLTHWorkoutPhasePlacement.insertionIndex(
+            for: .main, in: steps))
+        XCTAssertEqual(steps.map(\.title), [run.title, active.title, standalone.title])
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            at: 1, in: steps, visiblePhases: [.main, .recovery]), .main)
+        let passive = ATHLTHActiveRecovery.convert(active, active: false)
+        XCTAssertEqual(passive.resolvedPhase, .main)
+        XCTAssertEqual(ATHLTHActiveRecovery.convert(passive, active: true).resolvedPhase, .main)
+    }
+
     func testExplicitActivePauseStaysInSelectedSection() {
         var active = block("Active pause", phase: .warmup)
         active.activityTag = "active_recovery"

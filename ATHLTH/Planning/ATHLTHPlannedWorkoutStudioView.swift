@@ -21,6 +21,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let activity: ATHLTHPlannedWorkoutType?
     let hasSelectedRoute: Bool
     let onAddRun: (WorkoutPhaseKind) -> Void
+    let onAddWalk: (WorkoutPhaseKind) -> Void
     let onAddIntervals: (WorkoutPhaseKind) -> Void
     let onAddExercise: (WorkoutPhaseKind) -> Void
     let onAddFreeStrength: (WorkoutPhaseKind) -> Void
@@ -67,6 +68,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     private enum AddSheetAction {
         case run(WorkoutPhaseKind)
+        case walk(WorkoutPhaseKind)
         case exercise(WorkoutPhaseKind)
         case freeStrength(WorkoutPhaseKind)
         case superset(WorkoutPhaseKind)
@@ -558,23 +560,27 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private var runningEmptyActions: some View {
         VStack(spacing: 8) {
             HStack(spacing: 7) {
+                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"),
+                    symbol: "figure.walk", identifier: "athlth-workout-add-free-walk") { onAddWalk(.main) }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
                     symbol: "figure.run", identifier: "athlth-workout-add-free-run") { onAddRun(.main) }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
                     symbol: "plus", identifier: "athlth-workout-add-exercise") { onAddExercise(.main) }
-                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
-                    symbol: "map", identifier: "athlth-workout-add-route") { onSelectRoute(.main) }
             }
             HStack(spacing: 7) {
+                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                    symbol: "map", identifier: "athlth-workout-add-route") { onSelectRoute(.main) }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"),
                     symbol: "books.vertical", identifier: "athlth-workout-choose-from-library") { onAddWorkout(.main) }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
                     symbol: "pause", identifier: "athlth-workout-add-rest") { onAddRest(.main) }
+            }
+            HStack(spacing: 7) {
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Active rest", norwegian: "Aktiv pause"),
                     symbol: "figure.walk", identifier: "athlth-workout-add-active-rest") { onAddActiveRest(.main) }
+                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Add other", norwegian: "Legg til annet"),
+                    symbol: "square.grid.2x2", identifier: "athlth-workout-add-other") { onAddOther(.main) }
             }
-            emptyWorkoutAction(ATHLTHLocalization.choose(english: "Add other", norwegian: "Legg til annet"),
-                symbol: "square.grid.2x2", identifier: "athlth-workout-add-other") { onAddOther(.main) }
         }
     }
 
@@ -1414,6 +1420,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @ViewBuilder
     private func addSheetOptions(for phase: WorkoutPhaseKind) -> some View {
         if activity == .running {
+            addSheetRow(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"),
+                        "figure.walk", action: .walk(phase))
             addSheetRow(ATHLTHLocalization.choose(english: "Free running", norwegian: "Løping (friløp)"),
                         "figure.run", action: .run(phase))
             addSheetRow(ATHLTHLocalization.choose(english: "Running exercise", norwegian: "Øvelse"),
@@ -1529,6 +1537,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         queuedAddAction = nil
         switch action {
         case .run(let phase): onAddRun(phase)
+        case .walk(let phase): onAddWalk(phase)
         case .exercise(let phase): onAddExercise(phase)
         case .freeStrength(let phase): onAddFreeStrength(phase)
         case .superset(let phase): onAddSuperset(phase)

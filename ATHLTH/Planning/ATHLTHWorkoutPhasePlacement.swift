@@ -17,8 +17,16 @@ enum ATHLTHWorkoutPhasePlacement {
                 ) != .warmup
             } ?? blocks.count
         case .main, .recovery:
-            candidate = blocks.firstIndex { $0.resolvedPhase == .cooldown }
+            let boundary = blocks.firstIndex { $0.resolvedPhase == .cooldown }
                 ?? blocks.count
+            // Append to the actual selected category, before any separate
+            // category that follows it. Preserve legacy group recoveries.
+            let lastInPhase = blocks.indices.prefix(boundary).last {
+                ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                    at: $0, in: blocks, visiblePhases: [.warmup, .main, .cooldown, .recovery]
+                ) == phase
+            }
+            candidate = lastInPhase.map { $0 + 1 } ?? boundary
         case .cooldown:
             candidate = blocks.count
         }

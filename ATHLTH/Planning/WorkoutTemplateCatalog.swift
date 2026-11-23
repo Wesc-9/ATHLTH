@@ -749,7 +749,9 @@ enum ATHLTHActiveRecovery {
             block.sourceIntensityZoneLabel = nil
             block.targetHeartRatePercentMin = nil
             block.targetHeartRatePercentMax = nil
-            if block.groupID == nil { block.phase = .recovery }
+            // An explicit section is independent of the activity type.
+            // A legacy unassigned standalone pause still defaults to recovery.
+            if block.groupID == nil { block.phase = source.resolvedPhase }
         } else {
             block.kind = .rest
             block.title = ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause")
@@ -7618,6 +7620,12 @@ struct WorkoutTemplateBuilderView: View {
                     addRunBlock()
                 }
             },
+            onAddWalk: { phase in
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                addRunBlock(activity: .walking)
+                synchronizeRunningEnvironment()
+            },
             onAddIntervals: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
@@ -7762,6 +7770,7 @@ struct WorkoutTemplateBuilderView: View {
             },
             onAddActiveRest: { phase in
                 selectedPhase = phase
+                studioVisiblePhases.insert(phase)
                 addActiveRecoveryBlock(preservingSelectedPhase: true)
             },
             onAddWorkout: { phase in
@@ -8074,12 +8083,14 @@ struct WorkoutTemplateBuilderView: View {
     private func moveStudioBlock(
         _ id: UUID, to phase: WorkoutPhaseKind, before targetID: UUID?
     ) {
+        guard blocks.contains(where: { $0.editorDragID == id }) else { return }
         let moved = ATHLTHStudioBlockReorder.moving(
             id, to: phase, over: targetID, in: blocks
         )
         guard moved.map(\.editorDragID) != blocks.map(\.editorDragID)
                 || moved != blocks else { return }
         withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+            studioVisiblePhases.insert(phase)
             blocks = moved
             expandedBlockIndex = nil
         }
@@ -9646,7 +9657,12 @@ struct WorkoutTemplateBuilderView: View {
             notes: nil, phase: selectedPhase
         )
         var active = ATHLTHActiveRecovery.convert(rest, active: true)
-        if preservingSelectedPhase { active.phase = selectedPhase }
+        if let groupID,
+           let member = blocks.first(where: { $0.groupID == groupID }) {
+            active.phase = member.resolvedPhase
+        } else {
+            active.phase = preservingSelectedPhase ? selectedPhase : .recovery
+        }
         insertBlock(active, toGroup: groupID)
     }
 
