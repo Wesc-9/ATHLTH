@@ -320,3 +320,5 @@ ATHLTH 2.2.7 build 135 authorized gated TestFlight rerun after correcting broad 
 ATHLTH 2.2.8 build 137 — explicitly authorized 2026-11-23 TestFlight release from release/v2.2.8 after Audio Coach save-and-close, workout interval/recovery fixes, and iPhone side menu refinement. Require five green CI workflows on this exact trigger commit, verified iOS/Watch/Widgets archive and successful App Store Connect upload. On failure fix root cause on same active branch, bump build only after confirmed ASC upload/version collision, then re-trigger. Never bypass release gates or publish stale source.
 
 ATHLTH 2.2.8 build 137 — gated retry 2026-11-23 after fixing Swift 6 Audio Coach EnvironmentKey immutable closure default and explicit Set<UUID> inference in social presence. Require all five successful exact-commit checks before upload; keep build 137, never bypass checks.
+
+ATHLTH 2.2.8 build 137 gated TestFlight retry 2026-11-23: resolve Swift 6 main-actor isolated pure fourByFourRecovery call from Basic 4x4 outline and step guidance. Require all five same-commit CI checks and successful iPhone/Watch/Widget signing; no bypass or stale upload.
