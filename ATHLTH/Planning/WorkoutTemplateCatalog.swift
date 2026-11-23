@@ -5626,10 +5626,12 @@ struct WorkoutTemplateBuilderView: View {
                 selectedWorkoutExtra = .ghostRace
             },
             onNavigation: {
+                guard activeRouteID != nil else { return }
                 loadGuidanceDefaultsIfNeeded()
                 routeIsCustomized = true
                 selectedWorkoutExtra = .navigation
             },
+            showsNavigation: activeRouteID != nil,
             showsExpandedLabel: isPlannedWorkout &&
                 !studioAdvanced && initialActivity == .running
         )
@@ -5672,13 +5674,44 @@ struct WorkoutTemplateBuilderView: View {
                 ) { selectedWorkoutExtra = .heartRateAndPace }
 
                 workoutSettingButton(
-                    tr("Navigation", "Navigasjon"),
-                    icon: "map",
-                    detail: tr("Route guidance", "Ruteveiledning")
+                    tr("Gear", "Utstyr"),
+                    icon: "shoeprints.fill",
+                    detail: tr("Shoes and devices", "Sko og enheter")
+                ) { selectedWorkoutExtra = .gear }
+
+                workoutSettingButton(
+                    tr("Plan with a friend", "Planlegg med en venn"),
+                    icon: "person.2",
+                    detail: tr("Build together", "Bygg økten sammen")
                 ) {
-                    loadGuidanceDefaultsIfNeeded()
-                    routeIsCustomized = true
-                    selectedWorkoutExtra = .navigation
+                    persistWorkoutDraft()
+                    selectedWorkoutExtra = .planWithFriend
+                }
+
+                if initialActivity == .running {
+                    workoutSettingButton(
+                        "Ghost Race",
+                        icon: "figure.run",
+                        detail: tr("Compete against a target", "Løp mot et mål")
+                    ) {
+                        loadGuidanceDefaultsIfNeeded()
+                        if ghostDraft.targetTimeText.isEmpty {
+                            ghostDraft.load(route: activeRoute, settings: settings)
+                        }
+                        selectedWorkoutExtra = .ghostRace
+                    }
+                }
+
+                if activeRouteID != nil {
+                    workoutSettingButton(
+                        tr("Navigation", "Navigasjon"),
+                        icon: "map",
+                        detail: tr("Route guidance", "Ruteveiledning")
+                    ) {
+                        loadGuidanceDefaultsIfNeeded()
+                        routeIsCustomized = true
+                        selectedWorkoutExtra = .navigation
+                    }
                 }
             }
             Text(tr(
@@ -6399,7 +6432,7 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     )
                 case .heartRateAndPace:
-                    ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks)
+                    ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks, advanced: studioAdvanced)
                 case .audioCoach:
                     NavigationStack {
                         ScrollView {
@@ -6670,6 +6703,12 @@ struct WorkoutTemplateBuilderView: View {
         VStack(alignment: .leading, spacing: 13) {
             studioPlanHeader
 
+            // The selected exercise is the primary content, not an option
+            // buried beneath the activity and library add actions.
+            if !blocks.isEmpty {
+                basicWorkoutContents
+            }
+
             VStack(spacing: 9) {
                 if initialActivity == .running {
                     basicAddAction(
@@ -6765,14 +6804,26 @@ struct WorkoutTemplateBuilderView: View {
             .padding(12)
             .athlthPlanCard(radius: 20)
 
-            if !blocks.isEmpty {
-                basicWorkoutContents
-            }
-
             // Routes are optional context for a walk/run, not a second
             // activity picker or an Advanced phase selector.
             if initialActivity == .walking || initialActivity == .running ||
                hasWalking || hasActualRunning {
+                if initialActivity == .running, activeRouteID == nil,
+                   !blocks.isEmpty, !isBasicFreeRunningSelected {
+                    Button {
+                        selectedWorkoutExtra = .gear
+                    } label: {
+                        Label(tr("Workout gear", "Utstyr for økten"),
+                              systemImage: "shoeprints.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 15))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-basic-workout-gear")
+                } else {
                 HStack(spacing: 9) {
                     Button {
                         selectedPhase = .main
@@ -6808,6 +6859,7 @@ struct WorkoutTemplateBuilderView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(tr("Remove route", "Fjern rute"))
                     }
+                }
                 }
             }
 
@@ -6885,10 +6937,11 @@ struct WorkoutTemplateBuilderView: View {
             for: blocks
         ).flatMap(\.items)
         let visibleCount = basicContentsExpanded ? items.count : min(6, items.count)
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(tr("Added to workout", "Lagt til i økten"))
-                    .font(.subheadline.weight(.semibold))
+                Label(tr("Added to workout", "Lagt til i økten"),
+                      systemImage: "checkmark.circle")
+                    .font(.headline)
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                 Spacer(minLength: 4)
                 Text("\(items.count)")
@@ -6897,22 +6950,80 @@ struct WorkoutTemplateBuilderView: View {
             }
 
             ForEach(Array(items.prefix(visibleCount))) { item in
-                HStack(spacing: 10) {
-                    Image(systemName: item.symbol)
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        if !item.detail.isEmpty {
-                            Text(item.detail)
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .lineLimit(2)
+                let portion = Array(blocks.dropFirst(item.id)
+                    .prefix(item.representedSteps))
+                let isFourByFour = ATHLTHCompoundExerciseCatalog
+                    .fourByFourRecovery(portion) != nil
+                let displayName = isFourByFour
+                    ? tr("4 × 4 intervals", "4 × 4 intervaller")
+                    : item.title
+                let effortZones = ATHLTHPlannedWorkoutMetrics
+                    .plannedHeartRateZoneRange(
+                        for: portion.filter { !$0.isRestOrActiveRecovery }
+                    )
+                let seconds = ATHLTHWorkoutDurationEstimator.previewSeconds(
+                    for: portion,
+                    defaultActivity: initialActivity == .walking ? .walking : .running
+                )
+                HStack(spacing: 7) {
+                    Button {
+                        if initialActivity == .running {
+                            selectedWorkoutExtra = .heartRateAndPace
+                        } else if let first = portion.first {
+                            openStudioStepEditor(blockID: first.editorDragID)
                         }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: isFourByFour
+                                  ? "figure.run" : item.symbol)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                .frame(width: 46, height: 46)
+                                .background(ATHLTHPlanDesign.surface,
+                                            in: RoundedRectangle(cornerRadius: 13))
+                                .accessibilityHidden(true)
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(displayName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .lineLimit(2)
+                                if !item.detail.isEmpty {
+                                    Text(item.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        .lineLimit(2)
+                                }
+                                HStack(spacing: 9) {
+                                    if let seconds, seconds > 0 {
+                                        Label("~\(Int((seconds / 60).rounded())) min",
+                                              systemImage: "clock")
+                                    }
+                                    if let effortZones {
+                                        let prefix = ATHLTHLocalization.isNorwegian ? "S" : "Z"
+                                        let label = effortZones.lowerBound ==
+                                            effortZones.upperBound
+                                            ? "\(prefix)\(effortZones.lowerBound)"
+                                            : "\(prefix)\(effortZones.lowerBound)–" +
+                                                "\(prefix)\(effortZones.upperBound)"
+                                        Label(label, systemImage: "heart")
+                                    }
+                                }
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    Spacer(minLength: 4)
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-basic-selected-exercise")
+                    .accessibilityHint(tr("Edit workout targets", "Rediger øktmål"))
+
                     Button {
                         removeBasicContent(
                             startingAt: item.id,
@@ -6922,14 +7033,14 @@ struct WorkoutTemplateBuilderView: View {
                         Image(systemName: "xmark.circle")
                             .font(.system(size: 18))
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            .frame(minWidth: 38, minHeight: 38)
+                            .frame(minWidth: 35, minHeight: 44)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        tr("Remove", "Fjern") + " " + item.title
-                    )
+                    .accessibilityLabel(tr("Remove", "Fjern") + " " + displayName)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(ATHLTHPlanDesign.selectedSurface.opacity(0.65),
+                            in: RoundedRectangle(cornerRadius: 17))
                 .accessibilityElement(children: .contain)
             }
             if items.count > 6 {
@@ -6945,8 +7056,8 @@ struct WorkoutTemplateBuilderView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(15)
-        .athlthPlanCard(radius: 18)
+        .padding(14)
+        .athlthPlanCard(radius: 20)
         .accessibilityIdentifier("athlth-basic-workout-contents")
     }
 
@@ -9036,9 +9147,21 @@ struct WorkoutTemplateBuilderView: View {
         if selected.allSatisfy({ $0.resolvedPhase == .main }) {
             studioVisiblePhases.insert(.main)
         }
+        let suggestedFourByFour = ATHLTHCompoundExerciseCatalog
+            .fourByFourRecovery(selected) != nil
         var groupIDs: [UUID: UUID] = [:]
         for original in selected {
             var block = original
+            if suggestedFourByFour, block.kind == .run,
+               !block.isRestOrActiveRecovery,
+               block.targetHeartRateZone == nil,
+               block.sourceIntensityZoneLabel == nil,
+               block.targetHeartRatePercentMin == nil,
+               block.targetHeartRatePercentMax == nil {
+                // An estimated 4×4 guidance range, not a sensor measurement
+                // and not a personal HR-max calculation.
+                block.sourceIntensityZoneLabel = "Z4–Z5"
+            }
             block.editorDragID = UUID()
             if let originalID = original.groupID {
                 if groupIDs[originalID] == nil { groupIDs[originalID] = UUID() }
