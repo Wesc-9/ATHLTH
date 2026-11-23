@@ -544,7 +544,7 @@ struct TrainTogetherLiveDraftRoomView: View {
                     .font(.subheadline.weight(.medium)).foregroundStyle(accent)
             } else {
                 Button { Task { await live.approve() } } label: {
-                    Label(mineApproved ? tr("Waiting for partner", "Venter på ") + name(otherID(draft))
+                    Label(mineApproved ? tr("Waiting for ", "Venter på ") + name(otherID(draft))
                           : tr("Approve this workout", "Godkjenn denne økten"),
                           systemImage: mineApproved ? "clock" : "checkmark.circle")
                         .font(.subheadline.weight(.semibold))
@@ -677,24 +677,38 @@ private struct TrainTogetherRoomChat: View {
                     .font(.subheadline).foregroundStyle(.secondary)
                     .padding(.vertical, 10)
             }
-            LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(messages) { message in
-                    let mine = message.senderID == userID
-                    HStack {
-                        if mine { Spacer(minLength: 36) }
-                        VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
-                            Text(mine ? tr("You", "Du") : partnerName)
-                                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                            Text(message.body)
-                                .font(.subheadline)
-                                .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
-                                .padding(11)
-                                .background(mine ? ATHLTHTrainTogetherDesign.accentSoft : ATHLTHTrainTogetherDesign.surface,
-                                            in: RoundedRectangle(cornerRadius: 13))
-                            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
-                                .font(.caption2).foregroundStyle(.secondary)
+            if !messages.isEmpty {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            ForEach(messages) { message in
+                                let mine = message.senderID == userID
+                                HStack {
+                                    if mine { Spacer(minLength: 36) }
+                                    VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+                                        Text(mine ? tr("You", "Du") : partnerName)
+                                            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                                        Text(message.body)
+                                            .font(.subheadline)
+                                            .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                                            .padding(11)
+                                            .background(mine ? ATHLTHTrainTogetherDesign.accentSoft : ATHLTHTrainTogetherDesign.surface,
+                                                        in: RoundedRectangle(cornerRadius: 13))
+                                        Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+                                            .font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                    if !mine { Spacer(minLength: 36) }
+                                }
+                            }
                         }
-                        if !mine { Spacer(minLength: 36) }
+                        Color.clear.frame(height: 1).id("room-chat-bottom")
+                    }
+                    .frame(maxHeight: 320)
+                    .defaultScrollAnchor(.bottom)
+                    .onChange(of: messages.last?.id) { _, _ in
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo("room-chat-bottom", anchor: .bottom)
+                        }
                     }
                 }
             }
