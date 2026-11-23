@@ -1356,6 +1356,9 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var deferRouteUntilMain: Bool? = nil
     var intervalCoachCueEverySeconds: TimeInterval? = nil
     var intervalCoachCountdownSeconds: TimeInterval? = nil
+    /// Virtual Ghost settings travel with the structured Watch workout.
+    /// Nil preserves legacy workouts and route-based Ghost behavior.
+    var intervalGhostConfiguration: ATHLTHIntervalGhostPacer.WorkoutConfiguration? = nil
 }
 
 
