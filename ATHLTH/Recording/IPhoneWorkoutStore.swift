@@ -2863,6 +2863,57 @@ final class IPhoneWorkoutStore:
         syncLiveActivity()
     }
 
+    /// Uses the original iPhone workout clock and recorded steps, so Ghost
+    /// stays continuous without creating another recording or timer.
+    func intervalGhostLiveLeadMeters(at date: Date = Date()) -> Double? {
+        guard let workout = active,
+              let plan = workout.structuredRunningWorkout,
+              let configuration = plan.intervalGhostConfiguration,
+              configuration.isEnabled, configuration.isValid
+        else { return nil }
+        var progress = ATHLTHIntervalGhostPacer.VirtualProgress()
+        for recorded in (workout.recordedRunningSteps ?? []).sorted(by: { $0.index < $1.index }) {
+            guard plan.steps.indices.contains(recorded.index) else { continue }
+            let step = plan.steps[recorded.index]
+            guard let next = configuration.progress(
+                from: progress, segmentID: step.id,
+                kind: intervalGhostKind(for: step),
+                elapsedSeconds: recorded.activeSeconds,
+                actualMeters: recorded.distanceMeters
+            ) else { return nil }
+            progress = next
+        }
+        if workout.awaitingMainStart != true,
+           workout.structuredWorkoutComplete != true,
+           let index = workout.structuredStepIndex,
+           plan.steps.indices.contains(index) {
+            let step = plan.steps[index]
+            guard let next = configuration.progress(
+                from: progress, segmentID: step.id,
+                kind: intervalGhostKind(for: step),
+                elapsedSeconds: max(0, workout.elapsed(at: date) -
+                    (workout.structuredStepStartElapsedTime ?? 0)),
+                actualMeters: max(0, workout.distanceMeters -
+                    (workout.structuredStepStartDistanceMeters ?? 0))
+            ) else { return nil }
+            progress = next
+        }
+        return progress.leadMeters
+    }
+
+    private func intervalGhostKind(
+        for step: WatchRunningWorkoutStep
+    ) -> ATHLTHIntervalGhostPacer.SegmentKind {
+        switch step.phase {
+        case "warmup": return .warmup
+        case "cooldown": return .cooldown
+        case "recovery":
+            return step.ghostFollowsRecovery == true
+                ? .activeRecovery : .passiveRecovery
+        default: return .work
+        }
+    }
+
     var currentStructuredStep:
         WatchRunningWorkoutStep?
     {
