@@ -334,6 +334,26 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     }
                 }
 
+                // Outdoor running keeps incline in the primary metrics row.
+                // Show pace as an additional compact detail without squeezing
+                // five columns into the four-column header.
+                if runningLocation == .outdoor {
+                    HStack(spacing: 6) {
+                        Image(systemName: "speedometer")
+                            .accessibilityHidden(true)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Pace", norwegian: "Tempo"
+                        ))
+                        .fontWeight(.medium)
+                        Spacer(minLength: 8)
+                        Text(paceText + " min/km")
+                            .monospacedDigit()
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .padding(.top, 4)
+                }
+
                 if ATHLTHThreeMinuteAllOut.isRunningTest(
                     title: workoutName, blocks: blocks
                 ) {
