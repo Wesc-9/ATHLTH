@@ -3748,19 +3748,19 @@ struct WorkoutTemplateDetailView: View {
                         showRouteOptions: entry.plannedSession().routeID != nil,
                         showStructuredOptions: !displayedBlocks.isEmpty
                     )
+                    .environment(\.athlthAudioCoachSaveAndClose) {
+                        // This personal exercise has its own configuration;
+                        // saving must not replace the global coach template.
+                        personalOptions.audioCoachConfiguration =
+                            audioCoachDraft.configuration()
+                        showingPersonalAudioCoach = false
+                    }
                     .padding(16)
                 }
                 .navigationTitle("Audio Coach")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(tr("Cancel", "Avbryt")) {
-                            showingPersonalAudioCoach = false
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(tr("Save", "Lagre")) {
-                            personalOptions.audioCoachConfiguration =
-                                audioCoachDraft.configuration()
                             showingPersonalAudioCoach = false
                         }
                     }
@@ -6465,13 +6465,14 @@ struct WorkoutTemplateBuilderView: View {
                                 showRouteOptions: activeRoute != nil,
                                 showStructuredOptions: !blocks.isEmpty
                             )
-                        }
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button(tr("Done", "Ferdig")) {
-                                    persistWorkoutDraft()
-                                    selectedWorkoutExtra = nil
-                                }
+                            .environment(\.athlthAudioCoachSaveAndClose) {
+                                // Close only the nested coach sheet, then
+                                // checkpoint the latest session configuration.
+                                // Persisting after clearing the destination
+                                // also restores the workout editor, not Coach,
+                                // if the app is reopened immediately.
+                                selectedWorkoutExtra = nil
+                                persistWorkoutDraft()
                             }
                         }
                     }
