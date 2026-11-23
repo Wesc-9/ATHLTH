@@ -101,9 +101,9 @@ final class ATHLTHRouteMiniElevationTests: XCTestCase {
             athlthVerified: false,
             source: "openstreetmap",
             difficulty: "  Moderate  ",
-            elevationProfile: [130, 165, 145],
             elevationGainMeters: 49,
-            elevationLossMeters: 26
+            elevationLossMeters: 26,
+            elevationProfile: [130, 165, 145]
         )
         let summary = ATHLTHRouteMiniElevationPolicy.summary(
             for: r, published: published
