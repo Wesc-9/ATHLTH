@@ -7171,7 +7171,9 @@ struct ChallengeCreationView: View {
     private func prepareChallengeCreation() async {
         restoreCreationDraftIfAvailable()
         if social.mutualFollows.isEmpty {
-            await social.refresh()
+            // Challenge creation needs friend eligibility, not an
+            // expensive full Community/inbox/session reload.
+            await social.refreshHomeFriends()
         }
 
         guard invitees.isEmpty, !preselectedFriends.isEmpty else {
@@ -9547,9 +9549,10 @@ struct ChallengeDetailView: View {
                             )
 
                     if joined {
-                        await social.refresh(
-                            challengeStore:
-                                challenges
+                        // Joining changes challenge membership, not the
+                        // entire social feed or workout-session directory.
+                        await social.refreshChallenges(
+                            challengeStore: challenges
                         )
                     }
                 }
