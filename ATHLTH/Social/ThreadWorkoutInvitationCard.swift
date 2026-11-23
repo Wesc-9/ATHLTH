@@ -31,7 +31,7 @@ struct ThreadWorkoutInvitationCard: View {
                 return isMine
                     ? ATHLTHLocalization.choose(
                         english: "Shared draft · awaiting friend",
-                        norwegian: "Felles utkast · venter på venn")
+                        norwegian: "Invitasjon · venter på svar")
                     : ATHLTHLocalization.choose(
                         english: "Build this workout together",
                         norwegian: "Bygg denne økten sammen")
@@ -65,11 +65,11 @@ struct ThreadWorkoutInvitationCard: View {
             return workout.kind.title + " · " +
                 ATHLTHLocalization.choose(
                     english: "Shared workout draft",
-                    norwegian: "Felles treningsutkast")
+                    norwegian: "Bygg og gjennomfør økten sammen")
         }
         return workout.kind.title + " · " + (
             workout.trainTogetherMode == .sameWorkout
-            ? ATHLTHLocalization.choose(english: "Same workout", norwegian: "Samme økt")
+            ? ATHLTHLocalization.choose(english: "Same time, different locations", norwegian: "Samme tid, hvert vårt sted")
             : ATHLTHLocalization.choose(english: "Train in person", norwegian: "Trene fysisk sammen")
         )
     }
@@ -117,9 +117,18 @@ struct ThreadWorkoutInvitationCard: View {
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(workout.trainTogetherMode == .sameWorkout
+                          ? ATHLTHLocalization.choose(english: "Same time, different locations", norwegian: "Samme tid, hvert vårt sted")
+                          : ATHLTHLocalization.choose(english: "Train in person", norwegian: "Trener fysisk sammen"), systemImage: "person.2")
+                    if let minutes = workout.durationMinutes {
+                        Label("\(minutes) min", systemImage: "clock")
+                    }
+                    if workout.scheduledStart == nil {
+                        Label(ATHLTHLocalization.choose(english: "Time not agreed", norwegian: "Tidspunkt ikke avtalt"), systemImage: "calendar")
+                    }
                     if let start = workout.scheduledStart {
                         Label(
                             start.formatted(date: .abbreviated, time: .shortened),
@@ -250,7 +259,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                             .foregroundStyle(ATHLTHTheme.primaryText)
                         Text(workout.kind.title + " · " + (
                             workout.trainTogetherMode == .sameWorkout
-                            ? ATHLTHLocalization.choose(english: "Same workout", norwegian: "Samme økt")
+                            ? ATHLTHLocalization.choose(english: "Same time, different locations", norwegian: "Samme tid, hvert vårt sted")
                             : ATHLTHLocalization.choose(english: "Train in person", norwegian: "Trene fysisk sammen")
                         ))
                         .font(.subheadline)
