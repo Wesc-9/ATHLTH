@@ -4776,6 +4776,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var audioCoachDraft: AudioCoachDraft
     @State private var routeGuardianDraft: RouteGuardianDraft
     @State private var ghostDraft: GhostQuickStartDraft
+    @State private var intervalGhostConfiguration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
     @State private var coachIsCustomized: Bool
     @State private var routeIsCustomized: Bool
     @State private var guidanceDefaultsLoaded = false
@@ -5040,6 +5041,7 @@ struct WorkoutTemplateBuilderView: View {
         let routeAlertConfiguration: WatchRouteAlertConfiguration?
         let ghostTargetDurationSeconds: TimeInterval?
         let ghostUpdates: WatchGhostRaceAudioConfiguration?
+        let intervalGhostConfiguration: ATHLTHIntervalGhostPacer.WorkoutConfiguration?
         let runningEnvironment: RunEnvironment?
         // Restore the Basic screen's actual selection, not merely its blocks.
         // Optional fields keep drafts saved by earlier releases compatible.
@@ -5112,6 +5114,9 @@ struct WorkoutTemplateBuilderView: View {
         if let updates = stored.ghostUpdates {
             ghostDraft.updatesConfiguration = updates
             ghostDraft.updatesEnabled = updates.enabled
+        }
+        if let intervalGhost = stored.intervalGhostConfiguration, intervalGhost.isValid {
+            intervalGhostConfiguration = intervalGhost
         }
         manualDurationMinutes = stored.manualMinutes
         durationInputText = (stored.manualMinutes ??
@@ -5275,6 +5280,8 @@ struct WorkoutTemplateBuilderView: View {
                 ? ghostDraft.resolvedUpdates(
                     fallback: settings.ghostRaceAudioConfiguration
                   ) : nil,
+            intervalGhostConfiguration: intervalGhostConfiguration.isValid
+                ? intervalGhostConfiguration : nil,
             runningEnvironment: initialActivity == .running
                 ? studioBasicRunEnvironment : nil,
             basicRunMode: initialActivity == .running ? studioBasicRunMode.rawValue : nil,
