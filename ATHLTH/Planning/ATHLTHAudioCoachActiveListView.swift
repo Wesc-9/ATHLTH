@@ -39,6 +39,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var selectedFromProfiles: TemplateDestination?
     @State private var isNewEmptyTemplate = false
     @State private var showingProfiles = false
+    @State private var saveTemplateAfterProfilesDismiss = false
     @State private var showingSaveNewProfile = false
     @State private var creatingBlankTemplate = false
     @State private var profileName = ""
@@ -229,7 +230,12 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
         .sheet(isPresented: $showingSaveNewProfile) { saveNewProfileSheet }
         .sheet(isPresented: $showingProfiles, onDismiss: {
-            if let destination = selectedFromProfiles {
+            if saveTemplateAfterProfilesDismiss {
+                // Keep template Save / Save as new in the template manager
+                // instead of a duplicate top-right Save in the workout.
+                saveTemplateAfterProfilesDismiss = false
+                showingSaveChoices = true
+            } else if let destination = selectedFromProfiles {
                 selectedFromProfiles = nil
                 requestTemplateChange(destination)
             }
@@ -695,6 +701,26 @@ struct ATHLTHAudioCoachActiveListView: View {
                     ))
                     .font(.subheadline)
                     .foregroundStyle(dim)
+
+                    Button {
+                        saveTemplateAfterProfilesDismiss = true
+                        showingProfiles = false
+                    } label: {
+                        Label(
+                            tr("Save current setup as a template",
+                               "Lagre gjeldende oppsett som mal"),
+                            systemImage: "square.and.arrow.down"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(bronze)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(
+                            ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-coach-save-template-from-profiles")
 
                     Button {
                         selectedFromProfiles = .standard
