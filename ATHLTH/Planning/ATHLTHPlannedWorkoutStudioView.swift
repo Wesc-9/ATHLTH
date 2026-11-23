@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Geometry used only by live reordering. A reference buffer avoids
+/// invalidating the entire SwiftUI workout editor every time scrolling
+/// changes the onscreen position of one of dozens of exercise rows.
+/// Finger/drag state remains SwiftUI @State so active drags still animate.
+private final class ATHLTHStudioScrollFrameCache {
+    var rowFrames: [UUID: CGRect] = [:]
+    var phaseFrames: [WorkoutPhaseKind: CGRect] = [:]
+}
+
 /// The single Plan-specific presentation for the unified workout recipe.
 /// No parallel workout model: every row is a real editable WorkoutTemplateBlock.
 /// Phases are optional; an empty scratch workout has no preset sections.
@@ -75,7 +84,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
     @State private var dragPoint: CGPoint = .zero
     @State private var dragFingerOffsetY: CGFloat = 0
-    @State private var dragGeometry = ATHLTHStudioDragGeometry()
+    @State private var dragGeometry = ATHLTHStudioScrollFrameCache()
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
@@ -670,7 +679,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 15)
                 } else {
-                    VStack(spacing: 3) {
+                    // The main ScrollView owns scrolling. Keep offscreen
+                    // rows unmounted instead of building all 35+ steps and
+                    // their gestures/menus at every small scroll delta.
+                    LazyVStack(spacing: 3) {
                         ForEach(Array(rows.enumerated()), id: \.element.editorDragID) { position, block in
                             if block.groupKind?.isStrengthGroup == true,
                                let groupID = block.groupID {
@@ -722,7 +734,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                                 }
                                 .opacity(draggingID == block.editorDragID ? 0.13 : 1)
                             } else {
-                                stepRow(block, position: position + 1, phase: phase)
+                                stepRow(
+                                    block, position: position + 1, phase: phase,
+                                    phaseRows: rows
+                                )
                             }
                         }
                     }
@@ -745,7 +760,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
         .shadow(color: bronze.opacity(0.055), radius: 10, y: 5)
         .zIndex(draggingID.map { id in
-            entries(in: phase).contains { $0.editorDragID == id }
+            rows.contains { $0.editorDragID == id }
         } == true ? 5 : 0)
         .onGeometryChange(for: CGRect.self) { geometry in
             geometry.frame(in: .named("athlthWorkoutStudio"))
@@ -930,12 +945,15 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                VStack(spacing: 3) {
+                LazyVStack(spacing: 3) {
                     ForEach(Array(members.enumerated()), id: \.element.editorDragID) { index, member in
                         let position = rows.firstIndex(where: {
                             $0.editorDragID == member.editorDragID
                         }).map { $0 + 1 } ?? (index + 1)
-                        stepRow(member, position: position, phase: phase)
+                        stepRow(
+                            member, position: position, phase: phase,
+                            phaseRows: rows
+                        )
                     }
                 }
 
@@ -1139,11 +1157,11 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             // Repetition count and final recovery belong to the complete
             // interval editor in the ellipsis menu, not this compact card.
             if isExpanded {
-                VStack(spacing: 3) {
+                LazyVStack(spacing: 3) {
                     ForEach(members, id: \.element.editorDragID) { member in
                         stepRow(
                             member.element, position: member.offset + 1,
-                            phase: phase
+                            phase: phase, phaseRows: rows
                         )
                     }
                 }
@@ -1179,9 +1197,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private func stepRow(
         _ block: WorkoutTemplateBlock,
         position: Int,
-        phase: WorkoutPhaseKind
+        phase: WorkoutPhaseKind,
+        phaseRows: [WorkoutTemplateBlock]? = nil
     ) -> some View {
-        let rows = entries(in: phase)
+        // Reuse the containing phase snapshot. Re-filtering all blocks for
+        // each of 35+ rows made rendering quadratic under parent updates.
+        let rows = phaseRows ?? entries(in: phase)
         let supersetMembers = block.groupKind?.isStrengthGroup == true
             ? rows.filter {
                 $0.groupID == block.groupID && $0.groupKind == block.groupKind
