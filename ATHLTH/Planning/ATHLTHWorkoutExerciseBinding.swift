@@ -55,6 +55,15 @@ enum ATHLTHWorkoutExerciseBinding {
             // Unreferenced timing/route/interval blocks are never guessed by name.
             for i in blocks.indices where blocks[i].kind == .exercise ||
                 blocks[i].exerciseID != nil || blocks[i].exerciseSlug != nil {
+                if isLegacyTimedPhaseInstruction(blocks[i]),
+                   ATHLTHExerciseReferenceResolver.resolve(blocks[i], in: library) == nil {
+                    // A generic warm-up/cool-down instruction is not a single
+                    // strength movement. Keep its actual name, time, phase and
+                    // notes as a timed instruction, like current curated recipes.
+                    blocks[i].kind = .note
+                    blocks[i].exerciseSlug = nil
+                    continue
+                }
                 let reference = LookupKey(blocks[i])
                 let match: ExerciseLibraryEntry?
                 if let cached = cache[reference] {
@@ -124,6 +133,24 @@ enum ATHLTHWorkoutExerciseBinding {
         // targets; the editor can ask the athlete to select a library item.
         report.unresolved = Array(Set(report.unresolved)).sorted()
         return report
+    }
+
+    static func isLegacyTimedPhaseInstruction(_ block: WorkoutTemplateBlock) -> Bool {
+        guard block.kind == .exercise, block.exerciseID == nil,
+              block.exerciseSnapshot == nil,
+              block.groupID == nil, block.executionGroupID == nil,
+              (block.setCount ?? 1) == 1,
+              block.repetitions == nil, block.targetWeightKilograms == nil,
+              let seconds = block.durationSeconds, seconds.isFinite, seconds > 0
+        else { return false }
+        let name = ATHLTHExerciseReferenceResolver.key(block.title)
+        if let slug = block.exerciseSlug,
+           ATHLTHExerciseReferenceResolver.key(slug) != name { return false }
+        switch block.resolvedPhase {
+        case .warmup: return ["dynamic warm up", "dynamic warmup", "dynamisk oppvarming"].contains(name)
+        case .cooldown: return ["cool down", "cooldown", "nedtrapping", "cool down stretching"].contains(name)
+        default: return false
+        }
     }
 
     static func bind(

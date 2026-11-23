@@ -243,6 +243,7 @@ enum ATHLTHExerciseReferenceResolver {
         "bird dog": "bird-dog",
         "fuglehund": "bird-dog",
         "bodyweight squat": "bodyweight-squat",
+        "bodyweight squats": "bodyweight-squat",
         "knebøy med kroppsvekt": "bodyweight-squat",
         "reverse lunge": "kettlebell-reverse-lunge",
         "bakoverutfall med kettlebell": "kettlebell-reverse-lunge",
@@ -270,6 +271,7 @@ enum ATHLTHExerciseReferenceResolver {
     /// stock exercise library uses athlth: names. These exact aliases are
     /// limited to published, app-owned stations — never private exercises.
     private static let publishedHYROXSourceAliases: [String: String] = [
+        "lunges-each-leg": "athlth:stationary-lunge",
         "burpee-broad-jump": "athlth:burpee-broad-jump",
         "farmers-carry": "athlth:farmers-carry",
         "hand-release-push-up": "athlth:hand-release-push-up",
@@ -323,6 +325,14 @@ enum ATHLTHExerciseReferenceResolver {
                     return visibleEquivalent(of: native[0], in: library)
                 }
             }
+            // Legacy public plural identifiers from the same movement.
+            // Explicit private/foreign UUIDs were rejected above.
+            if normalizedSlug == "bodyweight squats" {
+                let matches = library.filter {
+                    $0.source == .repDB && $0.sourceIdentifier == "bodyweight-squat"
+                }
+                if matches.count == 1 { return matches[0] }
+            }
             if let canonicalID = publishedHYROXSourceAliases[slug] {
                 let matches = library.filter {
                     $0.source == .athlthCatalog &&
@@ -371,6 +381,15 @@ enum ATHLTHExerciseReferenceResolver {
     ) -> ExerciseLibraryEntry? {
         let clean = key(name)
         guard !clean.isEmpty else { return nil }
+        // Reviewed legacy bodyweight prescription; never replace it with
+        // walking, reverse or loaded lunges simply because the name overlaps.
+        if clean == "lunges each leg" {
+            let matches = library.filter {
+                $0.source == .athlthCatalog &&
+                $0.sourceIdentifier == "athlth:stationary-lunge"
+            }
+            if matches.count == 1 { return matches[0] }
+        }
         if let reviewedID = exerciseSourceIdentifier(for: name) {
             let source: ExerciseLibrarySource = reviewedID.hasPrefix("athlth-native-")
                 ? .athlthCatalog : .repDB

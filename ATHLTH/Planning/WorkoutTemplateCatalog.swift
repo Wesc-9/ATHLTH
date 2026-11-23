@@ -6314,7 +6314,7 @@ struct WorkoutTemplateBuilderView: View {
                         } else {
                             AnyView(simplePlannedWorkoutComposer)
                         }
-                        if let actionNotice {
+                        if focusedPlannerDay == nil, let actionNotice {
                             Label(actionNotice, systemImage: "info.circle")
                                 .font(.caption)
                                 .foregroundStyle(studioAccent)
@@ -9226,6 +9226,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func saveToMyWorkouts(asNew: Bool = false) {
+        actionNotice = nil
         guard canSave, let snapshot = libraryBoundSnapshot() else { return }
         if let savedTemplateID, !asNew,
            session.updateSavedWorkoutTemplate(snapshot, id: savedTemplateID) {
@@ -9272,6 +9273,18 @@ struct WorkoutTemplateBuilderView: View {
 
     private var saveBar: some View {
         VStack(spacing: 8) {
+            if focusedPlannerDay != nil, let actionNotice {
+                Label(actionNotice, systemImage: "info.circle")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(studioAccent)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityIdentifier("athlth-focused-workout-save-notice")
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
             if focusedPlannerDay == nil && !blocks.isEmpty {
                 Button {
                     showingWorkoutReview = true
@@ -9778,6 +9791,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func saveWorkout() {
+        actionNotice = nil
         guard canSave, let workout = libraryBoundSnapshot() else { return }
         if let issue = onValidateSave?(workout) {
             actionNotice = issue

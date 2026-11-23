@@ -360,8 +360,10 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         } label: {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 4) {
-                    Text(day.date.formatted(.dateTime.weekday(.abbreviated)))
+                    Text(day.date.formatted(.dateTime.weekday(.wide)))
                         .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                     Spacer(minLength: 0)
                     Text(day.date.formatted(.dateTime.day()))
                         .font(.headline.weight(.semibold))

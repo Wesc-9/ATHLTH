@@ -133,6 +133,44 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         }
     }
 
+    func testLegacyFullBodyExerciseNamesBindWithoutChangingSets() throws {
+        let library = ExerciseLibraryStore().allExercises
+        var squat = strengthBlock(title: "Bodyweight squats", slug: nil)
+        squat.setCount = 3
+        let lunges = strengthBlock(title: "Lunges (each leg)", slug: nil)
+        let pushUps = strengthBlock(title: "Push-ups", slug: nil)
+        var warmup = strengthBlock(title: "Dynamic warm-up", slug: nil)
+        warmup.phase = .warmup
+        warmup.setCount = nil
+        warmup.repetitions = nil
+        warmup.durationSeconds = 300
+        warmup.restBetweenSetsSeconds = nil
+        var session = workout(blocks: [warmup, squat, lunges, pushUps])
+        let report = ATHLTHWorkoutExerciseBinding.bind(&session, library: library)
+        XCTAssertTrue(report.isReady, "\(report.unresolved)")
+        let blocks = try XCTUnwrap(session.workoutBlocks)
+        XCTAssertEqual(blocks[0].kind, .note)
+        XCTAssertEqual(blocks[0].durationSeconds, 300)
+        XCTAssertEqual(blocks[0].resolvedPhase, .warmup)
+        XCTAssertTrue(blocks.dropFirst().allSatisfy { $0.exerciseID != nil })
+        XCTAssertEqual(blocks[1].setCount, 3)
+        XCTAssertEqual(blocks[2].repetitions, lunges.repetitions)
+    }
+
+    func testNamedForeignWarmupIsNeverConvertedToInstruction() {
+        var block = strengthBlock(title: "Dynamic warm-up", slug: nil)
+        block.exerciseID = UUID()
+        block.phase = .warmup
+        block.setCount = nil
+        block.repetitions = nil
+        block.durationSeconds = 300
+        var session = workout(blocks: [block])
+        let report = ATHLTHWorkoutExerciseBinding.bind(&session, library: [])
+        XCTAssertFalse(report.isReady)
+        XCTAssertEqual(session.workoutBlocks?.first?.exerciseID, block.exerciseID)
+        XCTAssertEqual(session.workoutBlocks?.first?.kind, .exercise)
+    }
+
     func testLegacyUnidentifiedTextIsRetainedButNotAcceptedAsExecutable() {
         let library = ExerciseLibraryStore().allExercises
         var block = strengthBlock(
