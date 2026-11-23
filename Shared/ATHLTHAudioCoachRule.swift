@@ -68,7 +68,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case randomMotivation, nearFinishTime, nearFinishDistance
         case elevationGain, uphillDetected
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
-        case zoneBelow, plannedZoneBelow
+        case zoneBelow, plannedZoneBelow, plannedZoneOutside
         // Thresholds are expressed in seconds per kilometre (300 = 5:00).
         case paceFasterOverall, paceFasterLastKilometer
         // The currently planned exercise/treadmill pace target is consulted live.
@@ -88,7 +88,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var usesLiveContext: Bool {
             switch self {
             case .nearFinishTime, .nearFinishDistance, .elevationGain,
-                 .uphillDetected, .plannedZoneBelow: return true
+                 .uphillDetected, .plannedZoneBelow, .plannedZoneOutside: return true
             default: return false
             }
         }
@@ -102,7 +102,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var isHeartRateCondition: Bool {
             switch self {
             case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit,
-                 .zoneBelow, .plannedZoneBelow:
+                 .zoneBelow, .plannedZoneBelow, .plannedZoneOutside:
                 return true
             default:
                 return false
@@ -161,6 +161,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .uphillDetected: return tr("When climbing", "Når du løper oppover")
             case .zoneBelow: return tr("Below heart-rate zone", "Under pulssone")
             case .plannedZoneBelow: return tr("Below workout target zone", "Under øktens målsone")
+            case .plannedZoneOutside: return tr("Outside workout target zone", "Utenfor øktens målsone")
             case .heartRateAbove: return tr("Heart rate above", "Puls over")
             case .heartRateBelow: return tr("Heart rate below", "Puls under")
             case .paceFasterOverall: return tr("Total pace faster than", "Snittempo raskere enn")
@@ -575,7 +576,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 return norwegian ? "Motbakke foran deg. Finn din rytme!"
                     : "You're climbing. Find your rhythm!"
             }
-            if trigger == .plannedZoneBelow || trigger == .zoneBelow {
+            if trigger == .plannedZoneBelow ||
+               trigger == .plannedZoneOutside || trigger == .zoneBelow {
                 return norwegian ? "Pulsen ligger under valgt sone. Juster innsatsen om det passer."
                     : "Heart rate is below your chosen zone. Adjust if appropriate."
             }
@@ -985,14 +987,17 @@ enum ATHLTHAudioCoachRuleDelivery {
         case .heartRateBelow:
             let threshold = Double(rule.validatedInterval)
             return bpm <= (previousActive ? threshold + 3 : threshold)
-        case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow:
+        case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow,
+             .plannedZoneOutside:
             guard let zone = ATHLTHHeartRateZones.measuredZone(
                 heartRateBPM: bpm, maximumBPM: maximumBPM
             ) else { return nil }
-            if rule.trigger == .plannedZoneBelow {
+            if rule.trigger == .plannedZoneBelow ||
+               rule.trigger == .plannedZoneOutside {
                 guard let target = context.plannedHeartRateZone,
                       (1...5).contains(target) else { return nil }
-                return zone < target
+                return rule.trigger == .plannedZoneBelow
+                    ? zone < target : zone != target
             }
             if rule.trigger == .zoneBelow {
                 return zone < rule.validatedInterval
