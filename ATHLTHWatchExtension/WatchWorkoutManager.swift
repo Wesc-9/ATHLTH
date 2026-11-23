@@ -3428,6 +3428,33 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             plan.isWarmUp
     }
 
+    /// Live virtual pacer reads the same active step clock and distance as
+    /// the structured workout engine; no parallel timer or HealthKit session.
+    var intervalGhostLiveLeadMeters: Double? {
+        guard let workout = structuredRunningWorkout,
+              let configuration = workout.intervalGhostConfiguration,
+              configuration.isEnabled, configuration.isValid,
+              !awaitingMainStart,
+              workout.steps.indices.contains(structuredStepIndex)
+        else { return nil }
+        let step = workout.steps[structuredStepIndex]
+        let kind: ATHLTHIntervalGhostPacer.SegmentKind
+        switch step.phase {
+        case "warmup": kind = .warmup
+        case "cooldown": kind = .cooldown
+        case "recovery":
+            kind = step.recoveryStyle == .active ? .activeRecovery : .passiveRecovery
+        default: kind = .work
+        }
+        let segmentID = step.id
+        guard let progress = configuration.progress(
+            from: .init(), segmentID: segmentID, kind: kind,
+            elapsedSeconds: currentStructuredStepElapsedTime,
+            actualMeters: currentStructuredStepDistanceMeters
+        ) else { return nil }
+        return progress.leadMeters
+    }
+
     var currentStructuredRunningStep: WatchRunningWorkoutStep? {
         guard let structuredRunningWorkout,
               structuredRunningWorkout.steps.indices.contains(
