@@ -317,7 +317,7 @@ struct PlannedWorkoutWatchBuilder {
             }
             let pace = block.targetPaceSecondsPerKilometer
             return WatchRunningWorkoutStep(
-                id: block.ghostSegmentID ?? UUID(), title: block.title, measure: measure,
+                id: UUID(), title: block.title, measure: measure,
                 // Preserve both authored targets even when the selected
                 // completion criterion is time OR distance. Some terrain
                 // plans prescribe a time cap and a distance benchmark.
@@ -333,6 +333,7 @@ struct PlannedWorkoutWatchBuilder {
                 targetTreadmillInclinePercent:
                     block.isIndoor == true ? block.treadmillInclinePercent : nil,
                 ghostFollowsRecovery: phase == "recovery" && block.kind != .rest,
+                ghostSourceSegmentID: block.ghostSegmentID,
                 coachBrief: phase == "work" ? block.notes : nil,
                 recoveryStyle: phase == "recovery" ? (block.kind == .rest ? .passive : .activeJog) : nil
             )
