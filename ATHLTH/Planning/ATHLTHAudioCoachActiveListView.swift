@@ -3,6 +3,7 @@ import SwiftUI
 /// Premium Audio Coach overview with one trigger-first editor for groups
 /// and one-trigger standalone commands. Older nested editing flows removed.
 struct ATHLTHAudioCoachActiveListView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
@@ -10,6 +11,8 @@ struct ATHLTHAudioCoachActiveListView: View {
     var globalScope: Bool = false
 
     @State private var composerTarget: ATHLTHCoachEditorTarget?
+    @State private var interruptedComposerTarget: ATHLTHCoachEditorTarget?
+    @State private var composerCheckpoint: ATHLTHCoachComposerCheckpoint?
     @State private var showingVoiceOptions = false
     @State private var showingSaveChoices = false
     @State private var showingDirtyTemplatePrompt = false
@@ -31,6 +34,18 @@ struct ATHLTHAudioCoachActiveListView: View {
         case standard
         case profile(UUID)
         case new
+    }
+
+    /// Ignore an involuntary nil written by UIKit while the scene is
+    /// inactive. Intentional Done/Save closes the editor explicitly.
+    private var stableComposerBinding: Binding<ATHLTHCoachEditorTarget?> {
+        Binding(
+            get: { composerTarget },
+            set: { incoming in
+                if incoming == nil && scenePhase != .active { return }
+                composerTarget = incoming
+            }
+        )
     }
 
     private let bronze = ATHLTHPlanDesign.accentInk
@@ -154,14 +169,35 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
             }
         }
-        .sheet(item: $composerTarget) { target in
+        .sheet(item: stableComposerBinding) { target in
             ATHLTHCoachRuleComposer(
                 draft: $draft,
                 target: target,
                 supportsStructured: showStructuredOptions,
                 showsRoutes: showRouteOptions,
-                onClose: { composerTarget = nil }
+                onClose: {
+                    interruptedComposerTarget = nil
+                    composerCheckpoint = nil
+                    composerTarget = nil
+                },
+                restoreCheckpoint: composerCheckpoint,
+                onCheckpoint: { composerCheckpoint = $0 }
             )
+            .interactiveDismissDisabled()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                interruptedComposerTarget = composerTarget
+            } else if composerTarget == nil,
+                      let interruptedComposerTarget {
+                // Recover just the same editor, never create a new rule.
+                Task { @MainActor in
+                    await Task.yield()
+                    guard composerTarget == nil, scenePhase == .active
+                    else { return }
+                    composerTarget = interruptedComposerTarget
+                }
+            }
         }
         .sheet(isPresented: $showingSaveNewProfile) { saveNewProfileSheet }
         .sheet(isPresented: $showingProfiles, onDismiss: {
