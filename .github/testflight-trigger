@@ -316,3 +316,5 @@ ATHLTH 2.2.7 build 135 gated TestFlight retry after TrainToday layout test initi
 ATHLTH 2.2.7 build 135 gated TestFlight retry after compound identity, retired exercises, 4x4 progress fixture and simulator boot recovery fixes; source=cccaea9f18fa4b6af3cce3ed7cc751ae63a2b84f
 
 ATHLTH 2.2.7 build 135 authorized gated TestFlight rerun after correcting broad bench-press catalog expectation (2026-11-22)
+
+ATHLTH 2.2.8 build 137 — explicitly authorized 2026-11-23 TestFlight release from release/v2.2.8 after Audio Coach save-and-close, workout interval/recovery fixes, and iPhone side menu refinement. Require five green CI workflows on this exact trigger commit, verified iOS/Watch/Widgets archive and successful App Store Connect upload. On failure fix root cause on same active branch, bump build only after confirmed ASC upload/version collision, then re-trigger. Never bypass release gates or publish stale source.
