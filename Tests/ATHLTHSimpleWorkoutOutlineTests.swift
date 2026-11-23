@@ -396,4 +396,48 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         )
     }
 
+    func testBasicFourByFourRemainsOneCardAfterDifferentPersonalPaces() {
+        var recipe: [WorkoutTemplateBlock] = []
+        let groupID = UUID()
+        for index in 1...4 {
+            var effort = block(
+                "Drag \(index)", phase: .main, index: recipe.count + 1,
+                duration: 240, pace: Double(325 - index * 5)
+            )
+            effort.groupID = groupID
+            effort.groupKind = .intervals
+            recipe.append(effort)
+            if index < 4 {
+                var recovery = block(
+                    "Pause \(index)", kind: .rest,
+                    phase: .recovery, index: recipe.count + 1,
+                    duration: 120
+                )
+                recovery.groupID = groupID
+                recovery.groupKind = .intervals
+                recipe.append(recovery)
+            }
+        }
+        recipe.append(block(
+            "Cool down", phase: .cooldown, index: recipe.count + 1,
+            duration: 600
+        ))
+        let before = recipe
+        let items = ATHLTHBasicRunningExerciseOutline.items(for: recipe)
+        XCTAssertEqual(items.count, 2, "One 4x4 card plus the separate cooldown")
+        XCTAssertEqual(items[0].id, 0)
+        XCTAssertEqual(items[0].representedSteps, 7)
+        XCTAssertEqual(items[0].repetitions, 4)
+        XCTAssertTrue(items[0].title.contains("4"))
+        XCTAssertEqual(items[1].id, 7)
+        XCTAssertEqual(recipe, before, "Basic presentation must never rewrite targets")
+
+        let remaining = ATHLTHBasicWorkoutContentsPolicy.removing(
+            from: recipe, startingAt: items[0].id,
+            representedSteps: items[0].representedSteps
+        )
+        XCTAssertEqual(remaining.count, 1)
+        XCTAssertEqual(remaining.first?.title, "Cool down")
+    }
+
 }
