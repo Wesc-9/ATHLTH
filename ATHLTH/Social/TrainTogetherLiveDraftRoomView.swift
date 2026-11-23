@@ -142,11 +142,33 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
         if draft != incoming { draft = incoming }
     }
 
+    static func mergingEditorRecipe(_ edited: PlannedSession, into source: PlannedSession) -> PlannedSession {
+        var result = source
+        result.title = edited.title
+        result.kind = edited.kind
+        result.durationMinutes = edited.durationMinutes
+        result.targetDistanceKilometers = edited.targetDistanceKilometers
+        result.targetPaceSecondsPerKilometer = edited.targetPaceSecondsPerKilometer
+        result.routeID = edited.routeID
+        result.workoutCategory = edited.workoutCategory
+        result.workoutBlocks = edited.workoutBlocks
+        // The unified blocks supersede legacy recipes, never duplicate them.
+        result.exercises = edited.exercises
+        result.runningWorkout = edited.runningWorkout
+        result.runningWorkouts = edited.runningWorkouts
+        result.audioCoachConfiguration = edited.audioCoachConfiguration
+        result.routeAlertConfiguration = edited.routeAlertConfiguration
+        result.ghostTargetDurationSeconds = edited.ghostTargetDurationSeconds
+        result.ghostUpdates = edited.ghostUpdates
+        return result
+    }
+
     static func privateSnapshot(_ workout: PlannedSession) -> PlannedSession {
         var copy = workout
         copy.gearIDs = []
         copy.spotifyPlaylist = nil
         copy.spotifyAutoplayOnStart = false
+        copy.spotifyIntervalTrack = nil
         return copy
     }
 
@@ -218,10 +240,11 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
         }
     }
 
+    @discardableResult
     func save(
         _ proposed: PlannedSession,
         basedOn originalRevision: Int
-    ) async {
+    ) async -> Bool {
         guard let current = draft, !isWorking,
               proposed.id == current.sourceWorkoutID,
               current.revision == originalRevision else {
@@ -229,7 +252,7 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
                 english: "The workout changed. Reopen the editor to review the latest version.",
                 norwegian: "Økten ble endret. Åpne redigering på nytt for å se nyeste versjon."
             )
-            return
+            return false
         }
         isWorking = true
         defer { isWorking = false }
@@ -245,11 +268,14 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
             // The RPC returns the authoritative new revision. No follow-up
             // SELECT is needed just to reflect the athlete's own edit.
             apply(updated)
-            guard !isWithdrawn(updated.sourceWorkoutID) else { return }
+            guard !isWithdrawn(updated.sourceWorkoutID) else { return false }
             if errorMessage != nil { errorMessage = nil }
+            return true
         } catch {
-            errorMessage = error.localizedDescription
+            let failure = error.localizedDescription
             await refresh(current.sourceWorkoutID, quiet: true)
+            errorMessage = failure
+            return false
         }
     }
 
@@ -297,333 +323,440 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
     }
 }
 
-/// The same workout editor is used for running, walking, strength and every
-/// other supported workout kind. No separate strength-only collaboration path.
+/// Shared room: the normal workout header, editor and read-only outline;
+/// server revisions remain authoritative for both participants.
 struct TrainTogetherLiveDraftRoomView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @StateObject private var live = TrainTogetherLiveDraftStore()
-    @State private var showEditor = false
-    @State private var editingRevision = 0
+    @State private var editor: EditorSelection?
+    @State private var selectedTab: RoomTab = .workout
 
     let sourceWorkoutID: UUID
     let fallbackWorkout: PlannedSession
 
-    private var isOwner: Bool {
-        live.draft?.ownerID == social.currentUserID
+    private enum RoomTab: String, CaseIterable { case workout, chat }
+    private struct EditorSelection: Identifiable {
+        let workout: PlannedSession
+        let revision: Int
+        let partnerName: String
+        var id: Int { revision }
     }
 
+    private let ink = ATHLTHTrainTogetherDesign.ink
+    private let accent = ATHLTHTrainTogetherDesign.accent
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+    private var isOwner: Bool { live.draft?.ownerID == session.profile.userID }
+    private func otherID(_ draft: TrainTogetherLiveDraft) -> UUID {
+        isOwner ? draft.partnerID : draft.ownerID
+    }
+    private func name(_ id: UUID) -> String {
+        if id == session.profile.userID {
+            let value = session.profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? tr("You", "Deg") : value
+        }
+        return social.profile(for: id)?.resolvedName
+            ?? social.resolvedQuickTrainPartners([id]).first?.resolvedName
+            ?? tr("Name unavailable", "Navn ikke tilgjengelig")
+    }
     private var canEdit: Bool {
-        guard let draft = live.draft else { return false }
+        guard let draft = live.draft, draft.cancelledAt == nil,
+              !live.isWithdrawn(sourceWorkoutID),
+              draft.ownerID == session.profile.userID || draft.partnerID == session.profile.userID else { return false }
         return isOwner || draft.isCollaborative
-    }
-
-    private var editableSourceWorkout: PlannedSession {
-        var source = live.workout ?? fallbackWorkout
-        // SessionEditorView's existing proposal guard reads this flag.
-        // The owner may always add exercises, including in view-only invites;
-        // the server-side edit_mode still prevents guest edits.
-        if isOwner { source.allowInviteeExercises = true }
-        return source
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let draft = live.draft, let workout = draft.workout {
-                    ATHLTHTrainTogetherSurface {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "LIVE WORKOUT PLANNING",
-                                    norwegian: "FELLES ØKTPLANLEGGING"
-                                ),
-                                systemImage: "person.2.fill"
-                            )
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
-
-                            Text(workout.title)
-                                .font(.system(size: 26, weight: .semibold, design: .serif))
-
-                            Label(workout.kind.title, systemImage: workout.kind.systemImage)
-                            Label(
-                                draft.isCollaborative
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Both can edit", norwegian: "Begge kan redigere"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Organizer edits · guest views",
-                                        norwegian: "Arrangør redigerer · gjest leser"
-                                    ),
-                                systemImage: draft.isCollaborative
-                                    ? "square.and.pencil" : "lock.fill"
-                            )
-                            Label(
-                                draft.isPhysical
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Training together in person",
-                                        norwegian: "Trener fysisk sammen"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Training from separate locations",
-                                        norwegian: "Trener hver for dere"
-                                    ),
-                                systemImage: draft.isPhysical
-                                    ? "person.2" : "network"
-                            )
-                            .font(.subheadline)
-                        }
-                    }
-
-                    ATHLTHTrainTogetherSurface {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Workout exercises",
-                                    norwegian: "Øvelser i økten"
-                                ))
-                                .font(.headline)
-                                Spacer()
-                                Text("v\(draft.revision)")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            if workout.exercises.isEmpty &&
-                               workout.resolvedWorkoutBlocks.isEmpty {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "No exercises added yet.",
-                                    norwegian: "Ingen øvelser lagt til ennå."
-                                ))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            } else {
-                                ForEach(workout.resolvedWorkoutBlocks) { block in
-                                    Label(block.title, systemImage: "rectangle.stack")
-                                        .font(.subheadline)
-                                }
-                                ForEach(workout.exercises) { exercise in
-                                    Label(
-                                        exercise.embeddedExercise.displayName,
-                                        systemImage: "dumbbell"
-                                    )
-                                    .font(.subheadline)
-                                }
-                            }
-
-                            if canEdit && !draft.bothApproved {
-                                Button {
-                                    editingRevision = draft.revision
-                                    showEditor = true
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english: "Add or edit exercises",
-                                            norwegian: "Legg til eller endre øvelser"
-                                        ),
-                                        systemImage: "plus.circle.fill"
-                                    )
-                                    .frame(maxWidth: .infinity, minHeight: 45)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(ATHLTHTrainTogetherDesign.accent)
-                            }
-                            if canEdit && draft.bothApproved {
-                                Button {
-                                    editingRevision = draft.revision
-                                    showEditor = true
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english: "Revise approved workout",
-                                            norwegian: "Endre godkjent økt"
-                                        ),
-                                        systemImage: "pencil"
-                                    )
-                                }
-                                .font(.caption)
-                            }
-                        }
-                    }
-
-                    ATHLTHTrainTogetherSurface {
-                        VStack(alignment: .leading, spacing: 11) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Approve workout before Ready",
-                                norwegian: "Godkjenn økten før Klar"
-                            ))
-                            .font(.headline)
-
-                            approvalRow(
-                                label: ATHLTHLocalization.choose(
-                                    english: "Organizer", norwegian: "Arrangør"
-                                ),
-                                approved: draft.ownerApproved
-                            )
-                            approvalRow(
-                                label: ATHLTHLocalization.choose(
-                                    english: "Training partner", norwegian: "Treningspartner"
-                                ),
-                                approved: draft.partnerApproved
-                            )
-
-                            if draft.bothApproved {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Approved by both. The organizer can open the Ready lobby.",
-                                        norwegian: "Begge har godkjent. Arrangøren kan åpne Klar-lobbyen."
-                                    ),
-                                    systemImage: "checkmark.seal.fill"
-                                )
-                                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
-                                .font(.subheadline)
-                            } else {
-                                let mineApproved = isOwner
-                                    ? draft.ownerApproved : draft.partnerApproved
-                                Button {
-                                    Task { await live.approve() }
-                                } label: {
-                                    Label(
-                                        mineApproved
-                                            ? ATHLTHLocalization.choose(
-                                                english: "Waiting for partner",
-                                                norwegian: "Venter på den andre"
-                                            )
-                                            : ATHLTHLocalization.choose(
-                                                english: "Approve this workout",
-                                                norwegian: "Godkjenn denne økten"
-                                            ),
-                                        systemImage: mineApproved
-                                            ? "clock" : "checkmark.circle"
-                                    )
-                                    .frame(maxWidth: .infinity, minHeight: 48)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(ATHLTHTrainTogetherDesign.accent)
-                                .disabled(mineApproved || live.isWorking)
-                            }
-                            Text(ATHLTHLocalization.choose(
-                                english: "Any new edit clears both approvals so neither person starts with an outdated plan.",
-                                norwegian: "Nye endringer nullstiller begge godkjenningene, slik at ingen starter med en utdatert plan."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
+            VStack(alignment: .leading, spacing: 15) {
+                if let draft = live.draft, let workout = live.workout {
+                    details(workout, draft: draft)
+                    tabBar
+                    if selectedTab == .workout {
+                        workoutContent(workout, draft: draft)
+                        approvalCard(draft)
+                    } else {
+                        TrainTogetherRoomChat(
+                            sourceID: sourceWorkoutID, userID: session.profile.userID,
+                            partnerName: name(otherID(draft)), canSend: !live.isWithdrawn(sourceWorkoutID))
                     }
                 } else if live.isLoading {
-                    ProgressView()
+                    ProgressView(tr("Loading shared workout…", "Henter fellesøkten…"))
+                        .frame(maxWidth: .infinity, minHeight: 100)
                 } else {
                     ATHLTHTrainTogetherSurface {
-                        Text(ATHLTHLocalization.choose(
-                            english: "No shared draft found for this invitation. The original invitation is still available.",
-                            norwegian: "Fant ikke fellesutkast for denne invitasjonen. Den opprinnelige invitasjonen er fortsatt tilgjengelig."
-                        ))
-                        .font(.subheadline)
+                        Label(live.isWithdrawn(sourceWorkoutID)
+                              ? tr("Invitation withdrawn", "Invitasjonen er trukket tilbake")
+                              : tr("Shared workout is unavailable", "Fellesøkten er ikke tilgjengelig"),
+                              systemImage: "info.circle")
+                            .font(.subheadline.weight(.medium))
                     }
                 }
                 if let error = live.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                        .font(.caption).foregroundStyle(.red)
                 }
-                Button {
-                    Task { await live.refresh(sourceWorkoutID) }
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Refresh workout", norwegian: "Oppdater økten"
-                        ),
-                        systemImage: "arrow.clockwise"
-                    )
-                }
-                .font(.caption)
-                .tint(ATHLTHTrainTogetherDesign.accent)
             }
-            .frame(maxWidth: 660)
+            .frame(maxWidth: 680)
             .padding(16)
             .frame(maxWidth: .infinity)
         }
         .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
-        .navigationTitle(ATHLTHLocalization.choose(
-            english: "Shared workout", norwegian: "Fellesøkt"
-        ))
+        .navigationTitle(tr("Shared workout", "Fellesøkt"))
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showEditor) {
-            SessionEditorView(
-                standaloneDate: live.workout?.scheduledStart
-                    ?? fallbackWorkout.scheduledStart ?? Date(),
-                initialSourceWorkout: editableSourceWorkout,
-                preserveSourceID: true,
-                onPreparedWorkout: { proposed in
-                    var revision = proposed
-                    // Never change the invitation permission merely because
-                    // the owner opened the universal exercise editor.
-                    revision.allowInviteeExercises =
-                        live.workout?.allowInviteeExercises
-                    Task {
-                        await live.save(revision, basedOn: editingRevision)
-                    }
+        .refreshable { await live.refresh(sourceWorkoutID) }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { Task { await live.refresh(sourceWorkoutID) } } label: {
+                    Image(systemName: "arrow.clockwise").foregroundStyle(accent)
                 }
-            )
+                .accessibilityLabel(tr("Refresh workout", "Oppdater økten"))
+            }
         }
-        .task(id: sourceWorkoutID) {
-            await live.watch(sourceWorkoutID)
+        .sheet(item: $editor) { selection in
+            sharedEditor(selection)
         }
+        .task(id: sourceWorkoutID) { await live.watch(sourceWorkoutID) }
         .task(id: sourceWorkoutID) {
-            // Realtime receives edits immediately. Polling is a resilience
-            // fallback for lost subscriptions, not a 6-second background
-            // download of the full workout snapshot.
+            await social.refresh()
             while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: .seconds(30))
-                } catch {
-                    break
-                }
-                guard !Task.isCancelled else { break }
-                if scenePhase == .active {
-                    await live.refresh(sourceWorkoutID, quiet: true)
-                }
+                do { try await Task.sleep(for: .seconds(30)) } catch { break }
+                if scenePhase == .active { await live.refresh(sourceWorkoutID, quiet: true) }
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                Task { await live.refresh(sourceWorkoutID, quiet: true) }
-            }
+            if phase == .active { Task { await live.refresh(sourceWorkoutID, quiet: true) } }
         }
         .onChange(of: live.draft?.revision) { _, _ in
-            guard isOwner,
-                  var updated = live.workout,
-                  let local = session.standalonePlannedSessions.first(where: {
-                      $0.id == updated.id
-                  }) else { return }
-            // Never let a shared, privacy-sanitized snapshot erase the
-            // creator's personal music and equipment selections.
+            guard isOwner, var updated = live.workout,
+                  let local = session.standalonePlannedSessions.first(where: { $0.id == updated.id })
+            else { return }
             updated.gearIDs = local.gearIDs
             updated.spotifyPlaylist = local.spotifyPlaylist
             updated.spotifyAutoplayOnStart = local.spotifyAutoplayOnStart
+            updated.spotifyIntervalTrack = local.spotifyIntervalTrack
             session.updateStandalonePlannedSession(updated)
         }
     }
 
-    private func approvalRow(label: String, approved: Bool) -> some View {
-        HStack {
-            Image(systemName: approved
-                ? "checkmark.circle.fill" : "circle.dotted")
-            .foregroundStyle(approved
-                ? ATHLTHTrainTogetherDesign.accent : Color.secondary)
-            Text(label)
-            Spacer()
-            Text(approved
-                ? ATHLTHLocalization.choose(
-                    english: "Approved", norwegian: "Godkjent"
-                )
-                : ATHLTHLocalization.choose(
-                    english: "Not approved", norwegian: "Ikke godkjent"
-                ))
-            .font(.caption.weight(.semibold))
+    private func details(_ workout: PlannedSession, draft: TrainTogetherLiveDraft) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ATHLTHPlannedWorkoutStudioHeader(
+                workoutName: .constant(workout.title),
+                activity: ATHLTHPlannedWorkoutType.from(workout),
+                blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout),
+                durationMinutes: workout.durationMinutes,
+                route: session.savedRoutes.first { $0.id == workout.routeID },
+                scheduledAt: workout.scheduledStart.map { Binding<Date>.constant($0) },
+                readOnly: true,
+                trainingPartnerName: name(otherID(draft))
+            )
+            HStack(spacing: 8) {
+                infoPill(draft.isPhysical ? tr("In person", "Fysisk sammen") : tr("Remote", "Hver for dere"),
+                         icon: draft.isPhysical ? "person.2.fill" : "network")
+                infoPill(draft.isCollaborative ? tr("Both edit", "Begge redigerer") : tr("Owner edits", "Arrangør redigerer"),
+                         icon: draft.isCollaborative ? "square.and.pencil" : "lock")
+            }
         }
-        .font(.subheadline)
+    }
+
+    private func infoPill(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(accent)
+            .frame(maxWidth: .infinity, minHeight: 35)
+            .background(ATHLTHTrainTogetherDesign.accentSoft, in: Capsule())
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 4) {
+            ForEach(RoomTab.allCases, id: \.self) { tab in
+                Button { selectedTab = tab } label: {
+                    Label(tab == .workout ? tr("Workout", "Økten") : tr("Chat", "Chat"),
+                          systemImage: tab == .workout ? "list.bullet.rectangle" : "bubble.left.and.bubble.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selectedTab == tab ? ink : ATHLTHTrainTogetherDesign.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(selectedTab == tab ? ATHLTHTrainTogetherDesign.surface : .clear,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(ATHLTHTrainTogetherDesign.accentSoft, in: RoundedRectangle(cornerRadius: 15))
+    }
+
+    private func workoutContent(_ workout: PlannedSession, draft: TrainTogetherLiveDraft) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(tr("Workout contents", "Øktinnhold")).font(.headline)
+                Spacer()
+                Text(tr("Version", "Versjon") + " \(draft.revision)")
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            ATHLTHWorkoutCompactOutlineView(
+                blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout),
+                isRunning: workout.kind == .running || workout.kind == .walking
+            )
+            if canEdit {
+                Button {
+                    editor = EditorSelection(workout: workout, revision: draft.revision,
+                                             partnerName: name(otherID(draft)))
+                } label: {
+                    Label(draft.bothApproved ? tr("Revise approved workout", "Endre godkjent økt")
+                          : tr("Add or edit exercises", "Legg til eller endre øvelser"),
+                          systemImage: "square.and.pencil")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(accent)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(ATHLTHTrainTogetherDesign.accentSoft, in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .disabled(live.isWorking)
+                .accessibilityIdentifier("athlth-shared-room-edit")
+            }
+        }
+        .padding(13)
+        .athlthTrainTogetherCard(subtle: true)
+    }
+
+    private func approvalCard(_ draft: TrainTogetherLiveDraft) -> some View {
+        let mineApproved = isOwner ? draft.ownerApproved : draft.partnerApproved
+        return ATHLTHTrainTogetherSurface {
+            HStack {
+                Text(tr("Approve workout", "Godkjenn økten")).font(.headline)
+                Spacer()
+                Text("\((draft.ownerApproved ? 1 : 0) + (draft.partnerApproved ? 1 : 0))/2")
+                    .font(.caption.monospacedDigit().weight(.semibold)).foregroundStyle(accent)
+            }
+            approvalRow(name(draft.ownerID), approved: draft.ownerApproved)
+            Divider()
+            approvalRow(name(draft.partnerID), approved: draft.partnerApproved)
+            if draft.bothApproved {
+                Label(tr("Both have approved. Ready lobby can be opened.",
+                         "Begge har godkjent. Klar-lobbyen kan åpnes."),
+                      systemImage: "checkmark.seal.fill")
+                    .font(.subheadline.weight(.medium)).foregroundStyle(accent)
+            } else {
+                Button { Task { await live.approve() } } label: {
+                    Label(mineApproved ? tr("Waiting for partner", "Venter på ") + name(otherID(draft))
+                          : tr("Approve this workout", "Godkjenn denne økten"),
+                          systemImage: mineApproved ? "clock" : "checkmark.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(mineApproved ? accent : .white)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(mineApproved ? ATHLTHTrainTogetherDesign.accentSoft : accent,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .disabled(mineApproved || live.isWorking)
+            }
+            Text(tr("Editing resets both approvals.", "Endringer nullstiller begge godkjenningene."))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func approvalRow(_ label: String, approved: Bool) -> some View {
+        HStack(spacing: 10) {
+            Text(String(label.prefix(1)).uppercased())
+                .font(.subheadline.weight(.semibold)).foregroundStyle(accent)
+                .frame(width: 36, height: 36)
+                .background(ATHLTHTrainTogetherDesign.accentSoft, in: Circle())
+            Text(label).font(.subheadline.weight(.medium)).foregroundStyle(ink)
+            Spacer()
+            Label(approved ? tr("Approved", "Godkjent") : tr("Pending", "Ikke godkjent"),
+                  systemImage: approved ? "checkmark.circle.fill" : "circle.dotted")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(approved ? accent : .secondary)
+        }
+    }
+
+    private func sharedEditor(_ selection: EditorSelection) -> some View {
+        let source = selection.workout
+        return WorkoutTemplateBuilderView(
+            initialTitle: source.title,
+            initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: source),
+            initialRouteID: source.routeID,
+            initialDurationOverrideMinutes: source.durationMinutes,
+            initialExtras: ATHLTHWorkoutPlannerExtras(
+                audioCoachConfiguration: source.audioCoachConfiguration,
+                routeAlertConfiguration: source.routeAlertConfiguration,
+                ghostTargetDurationSeconds: source.ghostTargetDurationSeconds,
+                ghostUpdates: source.ghostUpdates,
+                intervalGhostConfiguration: source.resolvedWorkoutBlocks.first?.intervalGhostConfiguration
+            ),
+            draftContext: "train-together-\(source.id.uuidString)-revision-\(selection.revision)",
+            plannedDate: source.scheduledStart,
+            initialActivity: ATHLTHPlannedWorkoutType.from(source),
+            initialStudioAdvanced: true,
+            collaborationPartnerName: selection.partnerName,
+            collaborationWorkoutID: source.id,
+            collaborationInviteSent: true,
+            saveButtonTitle: tr("Save shared workout", "Lagre fellesøkt"),
+            onSaveSharedRevision: { edited in
+                guard canEdit else { return tr("Editing is no longer available.", "Redigering er ikke lenger tilgjengelig.") }
+                let revision = TrainTogetherLiveDraftStore.mergingEditorRecipe(edited, into: source)
+                let saved = await live.save(revision, basedOn: selection.revision)
+                return saved ? nil : (live.errorMessage ?? tr("Could not save the workout.", "Kunne ikke lagre økten."))
+            }
+        )
+    }
+}
+
+/// Separate chat per source workout. No ordinary direct messages or other
+/// rooms are queried. RLS enforces membership, blocking and cancellation.
+private struct TrainTogetherRoomMessage: Identifiable, Codable, Equatable {
+    let id: UUID
+    let sourceWorkoutID: UUID
+    let senderID: UUID
+    let body: String
+    let createdAt: Date
+    enum CodingKeys: String, CodingKey {
+        case id, body
+        case sourceWorkoutID = "source_workout_id"
+        case senderID = "sender_id"
+        case createdAt = "created_at"
+    }
+}
+
+private struct TrainTogetherRoomMessageInsert: Encodable {
+    let id: UUID
+    let sourceWorkoutID: UUID
+    let senderID: UUID
+    let body: String
+    enum CodingKeys: String, CodingKey {
+        case id, body
+        case sourceWorkoutID = "source_workout_id"
+        case senderID = "sender_id"
+    }
+}
+
+private struct TrainTogetherRoomChat: View {
+    @Environment(\.scenePhase) private var scenePhase
+    let sourceID: UUID
+    let userID: UUID
+    let partnerName: String
+    let canSend: Bool
+    @State private var messages: [TrainTogetherRoomMessage] = []
+    @State private var input = ""
+    @State private var sending = false
+    @State private var loading = false
+    @State private var error: String?
+    @State private var limit = 50
+    private let client = SupabaseEnvironment.client
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        ATHLTHTrainTogetherSurface {
+            HStack {
+                Label(tr("Workout chat", "Øktchat"), systemImage: "bubble.left.and.bubble.right")
+                    .font(.headline)
+                Spacer()
+                Label(tr("Private", "Privat"), systemImage: "lock.fill")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Text(tr("Only you and your training partner can see this chat.",
+                    "Bare du og treningspartneren din kan se denne chatten."))
+                .font(.caption).foregroundStyle(.secondary)
+            if messages.count >= limit {
+                Button(tr("Load earlier messages", "Last inn tidligere meldinger")) {
+                    limit += 50
+                    Task { await refresh() }
+                }
+                .font(.caption.weight(.semibold))
+            }
+            if messages.isEmpty {
+                Text(tr("No messages yet. Discuss the workout here.", "Ingen meldinger ennå. Avtal økten her."))
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+            }
+            LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(messages) { message in
+                    let mine = message.senderID == userID
+                    HStack {
+                        if mine { Spacer(minLength: 36) }
+                        VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+                            Text(mine ? tr("You", "Du") : partnerName)
+                                .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                            Text(message.body)
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                                .padding(11)
+                                .background(mine ? ATHLTHTrainTogetherDesign.accentSoft : ATHLTHTrainTogetherDesign.surface,
+                                            in: RoundedRectangle(cornerRadius: 13))
+                            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        if !mine { Spacer(minLength: 36) }
+                    }
+                }
+            }
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+            HStack(alignment: .bottom, spacing: 9) {
+                TextField(tr("Write a message…", "Skriv en melding…"), text: $input, axis: .vertical)
+                    .lineLimit(1...4)
+                    .padding(10)
+                    .background(ATHLTHTrainTogetherDesign.accentSoft, in: RoundedRectangle(cornerRadius: 12))
+                    .disabled(!canSend || sending)
+                Button { Task { await send() } } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.headline.weight(.semibold)).foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(ATHLTHTrainTogetherDesign.accent, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSend || sending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || input.count > 2000)
+                .accessibilityLabel(tr("Send message", "Send melding"))
+            }
+        }
+        .accessibilityIdentifier("athlth-shared-room-chat")
+        .task(id: sourceID) {
+            await refresh()
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { break }
+                if scenePhase == .active { await refresh() }
+            }
+        }
+    }
+
+    @MainActor private func refresh() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            let rows: [TrainTogetherRoomMessage] = try await client
+                .from("social_workout_room_messages").select()
+                .eq("source_workout_id", value: sourceID)
+                .order("created_at", ascending: false)
+                .limit(limit).execute().value
+            guard !Task.isCancelled else { return }
+            messages = Array(rows.reversed())
+        } catch is CancellationError {
+        } catch { self.error = error.localizedDescription }
+    }
+
+    @MainActor private func send() async {
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canSend, !sending, !text.isEmpty, text.count <= 2000 else { return }
+        sending = true
+        error = nil
+        defer { sending = false }
+        do {
+            try await client.from("social_workout_room_messages")
+                .insert(TrainTogetherRoomMessageInsert(id: UUID(), sourceWorkoutID: sourceID,
+                                                       senderID: userID, body: text))
+                .execute()
+            input = ""
+            await refresh()
+        } catch { self.error = error.localizedDescription }
     }
 }

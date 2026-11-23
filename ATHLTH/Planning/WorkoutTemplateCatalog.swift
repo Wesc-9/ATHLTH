@@ -4943,6 +4943,7 @@ struct WorkoutTemplateBuilderView: View {
     /// Used by Coach's Add flow: schedule an edited workout without
     /// automatically saving a template in My Workouts.
     private let onAddStandalone: ((PlannedSession) -> Bool)?
+    private let onSaveSharedRevision: ((PlannedSession) async -> String?)?
     /// The imported-session planner keeps its compact grouped Basic view in
     /// SessionEditorView. Switching modes returns the complete unsaved recipe.
     private let onSwitchToBasic: ((PlannedSession) -> Void)?
@@ -4998,7 +4999,8 @@ struct WorkoutTemplateBuilderView: View {
         externalCloseRequest: Int = 0,
         onKeepEditingInline: (() -> Void)? = nil,
         focusedPlannerDay: Date? = nil,
-        draftDestinationDate: Date? = nil
+        draftDestinationDate: Date? = nil,
+        onSaveSharedRevision: ((PlannedSession) async -> String?)? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -5107,6 +5109,7 @@ struct WorkoutTemplateBuilderView: View {
         self.initialCopyDurationMinutes = initialMinutes
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
+        self.onSaveSharedRevision = onSaveSharedRevision
         self.onSwitchToBasic = onSwitchToBasic
         self.onValidateSave = onValidateSave
         self.saveButtonTitle = saveButtonTitle
@@ -5452,7 +5455,7 @@ struct WorkoutTemplateBuilderView: View {
     // Standalone workout creation keeps its established palette. When opened
     // from the plan, use the same tokens as the first plan-creation screen.
     private var isPlannedWorkout: Bool {
-        onSaveToPlan != nil || onAddStandalone != nil
+        onSaveToPlan != nil || onAddStandalone != nil || onSaveSharedRevision != nil
     }
     private var studioInk: Color {
         isPlannedWorkout ? ATHLTHTrainDesign.ink
@@ -5857,13 +5860,15 @@ struct WorkoutTemplateBuilderView: View {
                     detail: tr("Shoes and devices", "Sko og enheter")
                 ) { selectedWorkoutExtra = .gear }
 
-                workoutSettingButton(
-                    tr("Plan with a friend", "Planlegg med en venn"),
-                    icon: "person.2",
-                    detail: tr("Build together", "Bygg økten sammen")
-                ) {
-                    persistWorkoutDraft()
-                    selectedWorkoutExtra = .planWithFriend
+                if onSaveSharedRevision == nil {
+                    workoutSettingButton(
+                        tr("Plan with a friend", "Planlegg med en venn"),
+                        icon: "person.2",
+                        detail: tr("Build together", "Bygg økten sammen")
+                    ) {
+                        persistWorkoutDraft()
+                        selectedWorkoutExtra = .planWithFriend
+                    }
                 }
 
                 if initialActivity == .running {
@@ -5997,6 +6002,7 @@ struct WorkoutTemplateBuilderView: View {
         NavigationStack {
             editorWithDraftLifecycle
         }
+        .interactiveDismissDisabled(onSaveSharedRevision != nil && collaborationInviteSending)
         .sheet(isPresented: $showingWorkoutReview) {
             ATHLTHWorkoutReviewSheet(
                 title: workoutSnapshot().title,
@@ -6308,6 +6314,7 @@ struct WorkoutTemplateBuilderView: View {
                 route: activeRoute,
                 scheduledAt: plannedDate != nil ? $studioBasicDate : nil,
                 dateSelectionLocked: focusedPlannerDay != nil,
+                scheduleReadOnly: onSaveSharedRevision != nil,
                 runningEnvironment: initialActivity == .running
                     ? $studioBasicRunEnvironment : nil,
                 trainingPartnerName: collaborationPartnerName,
@@ -6398,7 +6405,7 @@ struct WorkoutTemplateBuilderView: View {
                         } else {
                             AnyView(simplePlannedWorkoutComposer)
                         }
-                        if focusedPlannerDay == nil, let actionNotice {
+                        if focusedPlannerDay == nil, onSaveSharedRevision == nil, let actionNotice {
                             Label(actionNotice, systemImage: "info.circle")
                                 .font(.caption)
                                 .foregroundStyle(studioAccent)
@@ -9420,7 +9427,7 @@ struct WorkoutTemplateBuilderView: View {
 
     private var saveBar: some View {
         VStack(spacing: 8) {
-            if focusedPlannerDay != nil, let actionNotice {
+            if (focusedPlannerDay != nil || onSaveSharedRevision != nil), let actionNotice {
                 Label(actionNotice, systemImage: "info.circle")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(studioAccent)
@@ -9432,7 +9439,7 @@ struct WorkoutTemplateBuilderView: View {
                     .accessibilityIdentifier("athlth-focused-workout-save-notice")
                     .accessibilityAddTraits(.updatesFrequently)
             }
-            if focusedPlannerDay == nil && !blocks.isEmpty {
+            if focusedPlannerDay == nil && onSaveSharedRevision == nil && !blocks.isEmpty {
                 Button {
                     showingWorkoutReview = true
                 } label: {
@@ -9450,7 +9457,7 @@ struct WorkoutTemplateBuilderView: View {
 
             // Saving a reusable library copy is a separate action from
             // committing this scheduled workout and continuing in the plan.
-            if isPlannedWorkout && !blocks.isEmpty {
+            if isPlannedWorkout && onSaveSharedRevision == nil && !blocks.isEmpty {
                 Button {
                     saveToMyWorkouts()
                     // Keep the builder intact after the library save.
@@ -9514,7 +9521,7 @@ struct WorkoutTemplateBuilderView: View {
                                     in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
                         .opacity(canSave ? 1 : 0.48)
                 }
-                .disabled(!canSave)
+                .disabled(!canSave || collaborationInviteSending)
             }
         }
         .buttonStyle(.plain)
@@ -9954,6 +9961,24 @@ struct WorkoutTemplateBuilderView: View {
         guard canSave, let workout = libraryBoundSnapshot() else { return }
         if let issue = onValidateSave?(workout) {
             actionNotice = issue
+            return
+        }
+        if let onSaveSharedRevision {
+            guard !collaborationInviteSending else { return }
+            collaborationInviteSending = true
+            Task { @MainActor in
+                let error = await onSaveSharedRevision(workout)
+                collaborationInviteSending = false
+                if let error {
+                    actionNotice = error
+                    return
+                }
+                draftFinished = true
+                pendingDraftCheckpoint?.cancel()
+                pendingDraftCheckpoint = nil
+                UserDefaults.standard.removeObject(forKey: draftStorageKey)
+                closeWorkoutEditor()
+            }
             return
         }
         let cleanTitle = workout.title

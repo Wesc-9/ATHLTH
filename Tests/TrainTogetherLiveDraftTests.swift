@@ -82,6 +82,26 @@ final class TrainTogetherLiveDraftTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testSharedEditorPreservesInvitationIdentityAndDate() {
+        var original = workout(kind: .running)
+        original.scheduledStart = Date(timeIntervalSince1970: 1_800_000_000)
+        original.invitedPartnerID = UUID()
+        original.allowInviteeExercises = false
+        original.notes = "Meeting instructions"
+        var edited = workout(kind: .strength)
+        edited.title = "New recipe"
+        edited.durationMinutes = 30
+        let result = TrainTogetherLiveDraftStore.mergingEditorRecipe(edited, into: original)
+        XCTAssertEqual(result.id, original.id)
+        XCTAssertEqual(result.scheduledStart, original.scheduledStart)
+        XCTAssertEqual(result.invitedPartnerID, original.invitedPartnerID)
+        XCTAssertEqual(result.allowInviteeExercises, false)
+        XCTAssertEqual(result.notes, original.notes)
+        XCTAssertEqual(result.title, edited.title)
+        XCTAssertEqual(result.durationMinutes, edited.durationMinutes)
+    }
+
     func testRemoteSessionCanChooseSynchronizedStart() throws {
         var payload = SocialWorkoutInvitePayload(
             workout: workout(kind: .running),

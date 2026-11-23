@@ -11,6 +11,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     let route: TrainingRoute?
     let scheduledAt: Binding<Date>?
     let dateSelectionLocked: Bool
+    let readOnly: Bool
+    let scheduleReadOnly: Bool
     /// Only supplied for running workouts. Other activities never expose
     /// the running environment selector.
     let runningEnvironment: Binding<RunEnvironment>?
@@ -29,6 +31,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         route: TrainingRoute?,
         scheduledAt: Binding<Date>?,
         dateSelectionLocked: Bool = false,
+        readOnly: Bool = false,
+        scheduleReadOnly: Bool = false,
         runningEnvironment: Binding<RunEnvironment>? = nil,
         trainingPartnerName: String? = nil,
         collaborationInviteSent: Bool = false,
@@ -42,6 +46,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         self.route = route
         self.scheduledAt = scheduledAt
         self.dateSelectionLocked = dateSelectionLocked
+        self.readOnly = readOnly
+        self.scheduleReadOnly = scheduleReadOnly
         self.runningEnvironment = runningEnvironment
         self.trainingPartnerName = trainingPartnerName
         self.collaborationInviteSent = collaborationInviteSent
@@ -187,7 +193,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                 english: "Your workout", norwegian: "Din økt"
             ),
             symbol: activity?.symbol ?? "figure.run",
-            name: $workoutName,
+            name: readOnly ? nil : $workoutName,
             scheduledAt: scheduledAt,
             namePlaceholder: ATHLTHWorkoutNameSuggestion.suggested(
                 activity: activity,
@@ -198,6 +204,11 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
             showsTimingLabel: scheduledAt != nil && !dateSelectionLocked
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                if readOnly {
+                    Text(workoutName)
+                        .font(.system(.title3, design: .serif, weight: .semibold))
+                        .foregroundStyle(ink)
+                }
                 if let trainingPartnerName {
                     HStack(alignment: .center, spacing: 10) {
                         Image(systemName: "person.2.fill")
@@ -310,7 +321,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     .accessibilityElement(children: .combine)
                 }
 
-                if dateSelectionLocked && !showsCardioMetrics {
+                if (dateSelectionLocked || readOnly) && !showsCardioMetrics {
                     HStack(spacing: 12) {
                         metric("clock", ATHLTHLocalization.choose(
                             english: "Duration", norwegian: "Varighet"
@@ -386,11 +397,11 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
 
-                if activity == .running, let runningEnvironment {
+                if !readOnly, activity == .running, let runningEnvironment {
                     ATHLTHRunEnvironmentDetailRow(environment: runningEnvironment)
                 }
 
-                if let scheduledAt {
+                if !readOnly && !scheduleReadOnly, let scheduledAt {
                     if dateSelectionLocked {
                         DatePicker(selection: scheduledAt, displayedComponents: .hourAndMinute) {
                             Label(ATHLTHLocalization.choose(
