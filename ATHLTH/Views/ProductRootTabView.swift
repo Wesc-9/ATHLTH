@@ -5974,6 +5974,7 @@ struct ATHLTHTrainView: View {
                 AllTrainingPlansView()
             }
             .sheet(isPresented: $showingAllWorkoutCategories.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 guard let action = pendingWorkoutCategoryAction else { return }
                 pendingWorkoutCategoryAction = nil
                 handleWorkoutCategoryAction(action)
@@ -6005,6 +6006,7 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 if let selected = trainRunningWorkoutSelection {
                     trainRunningWorkoutSelection = nil
                     pendingPlannedEnduranceWorkout = nil
@@ -6027,6 +6029,7 @@ struct ATHLTHTrainView: View {
                 .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingTrainIntervalComposer.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 // The interval editor closes before the running quick-start
                 // sheet is presented. Preserve the newly built interval steps.
                 guard let template = savedTrainIntervalTemplate else { return }
@@ -6040,6 +6043,7 @@ struct ATHLTHTrainView: View {
                 .presentationDragIndicator(.visible)
             }
             .athlthStudioEditor(item: $trainProgramCreationLaunch.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
+                guard scenePhase == .active else { return }
                 // Only an actual dismissed presentation warrants a recovery.
                 // A normal background/foreground transition never enters here.
                 if let planID = newlyCreatedPlanToOpen {
@@ -6150,6 +6154,7 @@ struct ATHLTHTrainView: View {
                 .environmentObject(session)
             }
             .sheet(item: $selectedStrengthSession.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 guard ATHLTHScratchComposerPresentationPolicy
                     .startsLiveAfterSetupDismiss(
                         queued: pendingTrainStrengthLiveAfterDismiss,
@@ -6204,6 +6209,7 @@ struct ATHLTHTrainView: View {
             }
             .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingRunQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 pendingPlannedEnduranceWorkout = nil
             }) {
                 RunQuickStartSheet(
@@ -6275,6 +6281,7 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(isPresented: $showingWalkQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 pendingPlannedEnduranceWorkout = nil
             }) {
                 WalkQuickStartSheet(
@@ -6335,6 +6342,7 @@ struct ATHLTHTrainView: View {
             .sheet(
                 isPresented: $showingStrengthQuickStart.keepingPresentedWhenInactive(scenePhase),
                 onDismiss: {
+                    guard scenePhase == .active else { return }
                     quickStrengthStartWithExercises = false
                     guard ATHLTHScratchComposerPresentationPolicy
                         .startsLiveAfterSetupDismiss(
@@ -6398,6 +6406,7 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(item: $pendingRunningTemplate.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 pendingPlannedEnduranceWorkout = nil
             }) { workout in
                 RunQuickStartSheet(
@@ -6467,6 +6476,7 @@ struct ATHLTHTrainView: View {
             }
             .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingCustomQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+                guard scenePhase == .active else { return }
                 // Never compete with the setup sheet's dismissal animation.
                 if let launch = pendingCustomIPhoneQuick {
                     pendingCustomIPhoneQuick = nil
