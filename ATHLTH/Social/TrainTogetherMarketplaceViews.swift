@@ -2905,6 +2905,9 @@ struct TrainTogetherPostCreateView:
         } message: {
             Text(publishWarning ?? "")
         }
+        .onAppear { normalizeGuestCapacity() }
+        .onChange(of: selectedInviteeIDs) { _, _ in normalizeGuestCapacity() }
+        .onChange(of: maxGuests) { _, _ in normalizeGuestCapacity() }
         .sheet(isPresented: $showingSharedWorkoutEditor) {
             SessionEditorView(
                 standaloneDate: scheduledStart,
@@ -3623,6 +3626,12 @@ struct TrainTogetherPostCreateView:
         }
     }
 
+    // Keep the guest capacity valid when a previous draft or repeated post
+    // contains an out-of-range value, or the selected friends change.
+    private func normalizeGuestCapacity() {
+        maxGuests = min(15, max(1, max(maxGuests, selectedInviteeIDs.count)))
+    }
+
     private var socialWorkoutCard: some View {
         ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 15) {
@@ -3721,7 +3730,7 @@ struct TrainTogetherPostCreateView:
                             english: "Available spots", norwegian: "Ledige plasser"
                         ),
                         value: $maxGuests,
-                        in: max(1, selectedInviteeIDs.count)...15
+                        in: 1...15
                     )
                     .labelsHidden()
                     .fixedSize()
@@ -4083,6 +4092,7 @@ struct TrainTogetherPostCreateView:
             preparedWorkout != nil &&
             (joinPolicy == .open || !selectedInviteeIDs.isEmpty) &&
             selectedInviteeIDs.count <= maxGuests &&
+            maxGuests >= 1 && maxGuests <= 15 &&
             !cleanTitle.isEmpty &&
             (
                 participationMode ==
@@ -4267,6 +4277,10 @@ struct TrainTogetherPostCreateView:
     }
 
     private func publish() {
+        // Revalidate immediately before creating a post; UI state may have
+        // changed while another presentation was active.
+        guard canPublish, !marketplace.isWorking,
+              !isPublishing, !publishedSuccessfully else { return }
         let postID = UUID()
         let cleanTitle =
             title.trimmingCharacters(
