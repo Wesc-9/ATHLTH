@@ -86,6 +86,8 @@ struct AIProgramBuilderView: View {
 
     let mode: AIProgramGenerationMode
     let seed: AIProgramBuilderSeed?
+    let singleWorkoutDate: Date?
+    let onSingleWorkoutSelected: ((PlannedSession) -> Void)?
     let onProgramCreated: (() -> Void)?
     let onProgramCreatedPlanID: ((UUID) -> Void)?
     /// Coach's save icon creates a reusable plan template only; unlike
@@ -96,6 +98,8 @@ struct AIProgramBuilderView: View {
         mode: AIProgramGenerationMode,
         seed: AIProgramBuilderSeed? = nil,
         saveAsTemplateOnly: Bool = false,
+        singleWorkoutDate: Date? = nil,
+        onSingleWorkoutSelected: ((PlannedSession) -> Void)? = nil,
         onProgramCreated: (() -> Void)? = nil,
         onProgramCreatedPlanID: ((UUID) -> Void)? = nil
     ) {
@@ -103,6 +107,8 @@ struct AIProgramBuilderView: View {
         self.mode = mode
         self.seed = seed
         self.saveAsTemplateOnly = saveAsTemplateOnly
+        self.singleWorkoutDate = singleWorkoutDate
+        self.onSingleWorkoutSelected = onSingleWorkoutSelected
         self.onProgramCreated = onProgramCreated
         self.onProgramCreatedPlanID = onProgramCreatedPlanID
     }
@@ -185,6 +191,8 @@ struct AIProgramBuilderView: View {
         mode == .generate && seed == nil
     }
 
+    private var isSingleWorkout: Bool { singleWorkoutDate != nil && isStandaloneCoachJourney }
+
     private let service = AIProgramService()
     private let dayNames = ["M", "T", "W", "T", "F", "S", "S"]
 
@@ -239,6 +247,7 @@ struct AIProgramBuilderView: View {
             requireFullWeeks: true,
             requireExecutableWorkouts: true
         )
+        if isSingleWorkout && draft.sessionCount != 1 { issues.append("single_workout_count") }
         if isStandaloneCoachJourney &&
            standaloneIntake.injuryStatus == .considerations {
             issues += ATHLTHAIInjurySafetyValidator.violations(
@@ -254,7 +263,15 @@ struct AIProgramBuilderView: View {
     /// confirmation is limited to explicit Close; before any choices,
     /// the sheet may still be dismissed normally.
     private var hasCoachIntakeChanges: Bool {
-        let intake = standaloneIntake
+        var intake = standaloneIntake
+        if isSingleWorkout {
+            // Ignore internally fixed schedule fields when deciding whether
+            // an untouched intake needs a discard confirmation.
+            intake.durationWeeks = nil
+            intake.sessionsPerWeek = nil
+            intake.availableDays = []
+            intake.varyWeeks = true
+        }
         return !intake.trainingTypes.isEmpty || intake.includesCycling ||
             !intake.outcomes.isEmpty || !intake.muscleGroups.isEmpty ||
             intake.experience != nil || intake.durationWeeks != nil ||
@@ -359,7 +376,7 @@ struct AIProgramBuilderView: View {
                 }
             }
             .onChange(of: startDate) { _, _ in
-                if didLoadDefaults { coachDateEdited = true }
+                if didLoadDefaults && !isSingleWorkout { coachDateEdited = true }
             }
             .onChange(of: standaloneIntake) { _, _ in
                 // The consented injury details are intentionally NOT in
@@ -372,7 +389,7 @@ struct AIProgramBuilderView: View {
                 }
             }
             .onChange(of: intakePreferences) { _, value in
-                guard didLoadDefaults, session.signedIn else { return }
+                guard didLoadDefaults, session.signedIn, !isSingleWorkout else { return }
                 AccountLocalStorage.write(
                     value,
                     name: "coach",
@@ -440,8 +457,8 @@ struct AIProgramBuilderView: View {
                                     hasCoachIntakeChanges)
         .confirmationDialog(
             ATHLTHLocalization.choose(
-                english: "Leave Coach plan builder?",
-                norwegian: "Forlate Coach-planleggeren?"
+                english: isSingleWorkout ? "Leave Coach workout builder?" : "Leave Coach plan builder?",
+                norwegian: isSingleWorkout ? "Forlate øktbyggeren?" : "Forlate Coach-planleggeren?"
             ),
             isPresented: $showingCoachExitConfirmation,
             titleVisibility: .visible
@@ -457,8 +474,8 @@ struct AIProgramBuilderView: View {
             }
         } message: {
             Text(ATHLTHLocalization.choose(
-                english: "Your selected plan details will be lost if you leave.",
-                norwegian: "Valgene du har gjort i planen går tapt hvis du lukker."
+                english: isSingleWorkout ? "Your workout choices will be lost if you leave." : "Your selected plan details will be lost if you leave.",
+                norwegian: isSingleWorkout ? "Valgene for økten går tapt hvis du lukker." : "Valgene du har gjort i planen går tapt hvis du lukker."
             ))
         }
         .sheet(isPresented: $showingCoachGoalCreator, onDismiss: {
@@ -499,7 +516,7 @@ struct AIProgramBuilderView: View {
     private var standaloneCoachContent: some View {
         switch coachJourneyStage {
         case .welcome:
-            ATHLTHCoachPlanWelcomeScreen {
+            ATHLTHCoachPlanWelcomeScreen(singleWorkout: isSingleWorkout) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     coachJourneyStage = .intake
                 }
@@ -507,9 +524,11 @@ struct AIProgramBuilderView: View {
         case .intake:
             coachPlanIntake
         case .generating:
-            ATHLTHCoachPlanGeneratingScreen()
+            ATHLTHCoachPlanGeneratingScreen(singleWorkout: isSingleWorkout)
         case .preview:
-            if let preview {
+            if let preview, isSingleWorkout {
+                singleWorkoutPreview(preview)
+            } else if let preview {
                 ATHLTHCoachPlanDraftScreen(
                     draft: preview,
                     startDate: startDate,
@@ -541,13 +560,79 @@ struct AIProgramBuilderView: View {
         }
     }
 
+    @ViewBuilder
+    private func singleWorkoutPreview(_ draft: AIProgramDraft) -> some View {
+        if let week = draft.weeks.first,
+           let day = week.days.first(where: { !$0.sessions.isEmpty }),
+           let proposed = day.sessions.first,
+           let date = singleWorkoutDate {
+            let workout = proposed.makePlannedSession(exerciseLibrary: exerciseLibrary.allExercises)
+            VStack(alignment: .leading, spacing: 15) {
+                Text(ATHLTHLocalization.choose(english: "COACH WORKOUT", norwegian: "ØKT FRA COACH"))
+                    .font(.caption.weight(.bold)).tracking(1.6)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                Text(date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .font(.subheadline).foregroundStyle(ATHLTHTrainDesign.secondary)
+                Text(workout.title)
+                    .font(.system(.largeTitle, design: .serif, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                if let minutes = workout.durationMinutes {
+                    Label("\(minutes) min", systemImage: "clock")
+                        .font(.subheadline).foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                if !draft.summary.isEmpty {
+                    Text(draft.summary).font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                ATHLTHWorkoutCompactOutlineView(
+                    blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout),
+                    isRunning: workout.kind == .running || workout.kind == .walking)
+                Button {
+                    editingDraftWorkout = ATHLTHPlanDraftWorkoutSelection(
+                        weekNumber: week.weekNumber, dayIndex: day.dayIndex, sessionIndex: 0)
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Tilpass økten"),
+                          systemImage: "slider.horizontal.3")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTrainDesign.bronze)
+                Button {
+                    Task { await generatePreview() }
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Generate another workout", norwegian: "Be Coach om et nytt forslag"),
+                          systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTrainDesign.bronze)
+                Button {
+                    applyPreview(draft)
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Choose this workout", norwegian: "Velg denne økten"),
+                          systemImage: "calendar.badge.plus")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(ATHLTHTrainDesign.bronze.gradient, in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-coach-choose-single-workout")
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose a start time before adding the workout to your calendar.",
+                    norwegian: "Velg starttid før du legger økten i kalenderen."))
+                    .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+        }
+    }
+
     private var coachPlanIntake: some View {
         // The outer scroll view has only one intake child. Make the cards
         // themselves lazy so off-screen sections do not all layout at once.
         LazyVStack(alignment: .leading, spacing: 15) {
             HStack {
                 Text(ATHLTHLocalization.choose(
-                    english: "PLAN FOUNDATION", norwegian: "GRUNNLAG FOR PLANEN"))
+                    english: isSingleWorkout ? "WORKOUT FOUNDATION" : "PLAN FOUNDATION", norwegian: isSingleWorkout ? "GRUNNLAG FOR ØKTEN" : "GRUNNLAG FOR PLANEN"))
                     .font(.caption.bold())
                     .tracking(1.8)
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
@@ -728,8 +813,8 @@ struct AIProgramBuilderView: View {
 
                 HStack {
                     Text(ATHLTHLocalization.choose(
-                        english: "Additional preferences for this plan (optional)",
-                        norwegian: "Ekstra ønsker for denne planen (valgfritt)"
+                        english: isSingleWorkout ? "Additional workout preferences (optional)" : "Additional preferences for this plan (optional)",
+                        norwegian: isSingleWorkout ? "Ekstra ønsker for økten (valgfritt)" : "Ekstra ønsker for denne planen (valgfritt)"
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
@@ -753,8 +838,8 @@ struct AIProgramBuilderView: View {
                     }
                 }
                 TextField(ATHLTHLocalization.choose(
-                    english: "Other wishes for the plan (optional)",
-                    norwegian: "Andre ønsker for planen (valgfritt)"),
+                    english: isSingleWorkout ? "Other wishes for the workout (optional)" : "Other wishes for the plan (optional)",
+                    norwegian: isSingleWorkout ? "Andre ønsker for økten (valgfritt)" : "Andre ønsker for planen (valgfritt)"),
                           text: $coachFocusNotes, axis: .vertical)
                     .lineLimit(2...5)
                     .textFieldStyle(.roundedBorder)
@@ -779,8 +864,13 @@ struct AIProgramBuilderView: View {
             }
 
             coachIntakeCard("calendar", ATHLTHLocalization.choose(
-                english: "Start, duration and training days",
-                norwegian: "Start, varighet og treningsdager")) {
+                english: isSingleWorkout ? "Time for your workout" : "Start, duration and training days",
+                norwegian: isSingleWorkout ? "Tid til økten" : "Start, varighet og treningsdager")) {
+                if isSingleWorkout, let date = singleWorkoutDate {
+                    Label(date.formatted(.dateTime.weekday(.wide).day().month(.wide)), systemImage: "calendar")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                } else {
                 DatePicker(ATHLTHLocalization.choose(
                     english: "Start date", norwegian: "Startdato"),
                            selection: $startDate,
@@ -907,6 +997,7 @@ struct AIProgramBuilderView: View {
                     }
                 }
 
+                }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(ATHLTHLocalization.choose(
                         english: "Approximate time per session",
@@ -1241,6 +1332,7 @@ struct AIProgramBuilderView: View {
 
             // Optional, simple preference immediately before generating.
             // Variations mean planned progression, not random extra workouts.
+            if !isSingleWorkout {
             Toggle(isOn: $standaloneIntake.varyWeeks) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(ATHLTHLocalization.choose(
@@ -1257,14 +1349,15 @@ struct AIProgramBuilderView: View {
             }
             .tint(ATHLTHTrainDesign.bronze)
             .accessibilityIdentifier("athlth-coach-vary-weeks")
+            }
 
             Button {
                 applyStandaloneIntakeToRequest()
                 Task { await generatePreview() }
             } label: {
                 Label(ATHLTHLocalization.choose(
-                    english: "Build my plan with Coach",
-                    norwegian: "Lag planen min med Coach"),
+                    english: isSingleWorkout ? "Find a workout with Coach" : "Build my plan with Coach",
+                    norwegian: isSingleWorkout ? "La Coach finne en økt" : "Lag planen min med Coach"),
                       systemImage: "sparkles")
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -1362,6 +1455,10 @@ struct AIProgramBuilderView: View {
     }
 
     private func applyStandaloneIntakeToRequest() {
+        if isSingleWorkout, let date = singleWorkoutDate {
+            startDate = Calendar.current.startOfDay(for: date)
+            standaloneIntake.restrictToSingleWorkout(on: date)
+        }
         guard standaloneIntake.isComplete,
               let focus = standaloneIntake.resolvedTrainingFocus,
               let durationWeeks = standaloneIntake.durationWeeks
@@ -2029,8 +2126,9 @@ struct AIProgramBuilderView: View {
             let additionalRequest = coachFocusNotes.trimmingCharacters(
                 in: .whitespacesAndNewlines
             )
-            return standaloneIntake.coachContext +
-                "\nAthlete's optional plan request: " +
+            return (isSingleWorkout ? "Generate exactly ONE standalone executable workout, on the only allowed weekday. Return the normal one-week response envelope with all other days empty. Do not create additional workouts or rest-day sessions.\n" : "") +
+                standaloneIntake.coachContext +
+                "\nAthlete's optional request: " +
                 (additionalRequest.isEmpty
                     ? "None"
                     : String(additionalRequest.prefix(700)))
@@ -2942,6 +3040,32 @@ struct AIProgramBuilderView: View {
             )
             return
         }
+        if isSingleWorkout {
+            guard let date = singleWorkoutDate,
+                  let onSingleWorkoutSelected,
+                  HomeWeeklyProgressCalendar.canScheduleStandalone(on: date),
+                  draft.sessionCount == 1,
+                  let proposed = draft.weeks.first?.days.flatMap(\.sessions).first else {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "The workout or selected day is no longer valid.",
+                    norwegian: "Økten eller den valgte dagen er ikke lenger gyldig.")
+                return
+            }
+            var workout = proposed.makePlannedSession(exerciseLibrary: exerciseLibrary.allExercises)
+            let report = ATHLTHWorkoutExerciseBinding.bind(&workout, library: exerciseLibrary.allExercises)
+            guard report.isReady, !workout.isExplicitRestDay else {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "Review the workout and choose matching library exercises: ",
+                    norwegian: "Kontroller økten og velg riktige bibliotekøvelser: ") +
+                    report.unresolved.prefix(6).joined(separator: ", ")
+                return
+            }
+            // A proposed workout is handed to Home's date/time confirmation.
+            // Never add a TrainingPlan, alter active goals, or save implicitly.
+            onSingleWorkoutSelected(workout)
+            dismiss()
+            return
+        }
         var generated = draft.makeTrainingPlan(
             ownerID: session.profile.userID,
             startDate: startDate,
@@ -3099,7 +3223,14 @@ struct AIProgramBuilderView: View {
         shareLimitationsWithAI = false
 
         if mode == .generate {
-            startDate = session.suggestedTrainingPlanStartDate
+            startDate = singleWorkoutDate.map { Calendar.current.startOfDay(for: $0) }
+                ?? session.suggestedTrainingPlanStartDate
+            if isSingleWorkout, let date = singleWorkoutDate {
+                standaloneIntake.restrictToSingleWorkout(on: date)
+                weekCount = 1
+                sessionsPerWeek = 1
+                availableDays = standaloneIntake.availableDays
+            }
             endDate = Calendar.current.date(
                 byAdding: .weekOfYear,
                 value: max(weekCount, 1),

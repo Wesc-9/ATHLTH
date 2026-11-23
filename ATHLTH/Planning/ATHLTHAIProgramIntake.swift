@@ -235,6 +235,15 @@ struct ATHLTHAIProgramIntake: Equatable {
     var excludedMovements = ""
     var healthSharingAuthorized = false
 
+    mutating func restrictToSingleWorkout(on date: Date, calendar: Calendar = .current) {
+        durationWeeks = 1
+        sessionsPerWeek = 1
+        coachChoosesFrequency = false
+        availableDays = [ATHLTHTrainingPlanSchedule.calendarWeekdayIndex(
+            forRelativeDayIndex: 1, planStart: date, calendar: calendar)]
+        varyWeeks = false
+    }
+
     var resolvedTrainingFocus: TrainingFocus? {
         if trainingTypes.contains(.running) && trainingTypes.contains(.strength) {
             return .hybrid

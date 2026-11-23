@@ -3149,8 +3149,8 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var suggestionCatalogEntries: [WorkoutTemplateCatalogEntry] = []
     @State private var suggestionsReady = false
     @State private var showingWorkoutPicker = false
-    @State private var showingInspiration = false
-    @State private var pendingInspiration: PlannedSession?
+    @State private var showingSingleWorkoutCoach = false
+    @State private var pendingCoachWorkout: PlannedSession?
     @State private var pendingPickedWorkout: PlannedSession?
     @State private var selectedSuggestion: PlannedSession?
     @State private var suggestionStartTime = Date()
@@ -3379,12 +3379,6 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
     }
 
-    private var allInspirationWorkouts: [PlannedSession] {
-        let fullCatalog = suggestionCatalogEntries.map { $0.plannedSession() }
-        let running = runningLibrary.allTemplates.map { $0.plannedSession() }
-        return session.savedWorkoutTemplates + fullCatalog + running
-    }
-
     var body: some View {
         NavigationStack(path: $completedWorkoutPath) {
             ScrollView {
@@ -3555,20 +3549,18 @@ private struct HomeWeeklyProgressDaySheet: View {
                     restoreCompletedWorkoutIfNeeded()
                 }
             }
-            .sheet(isPresented: $showingInspiration, onDismiss: {
-                if let picked = pendingInspiration {
-                    pendingInspiration = nil
+            .sheet(isPresented: $showingSingleWorkoutCoach, onDismiss: {
+                if let picked = pendingCoachWorkout {
+                    pendingCoachWorkout = nil
                     presentSuggestion(picked)
                 }
             }) {
-                ATHLTHHomeWorkoutInspirationView(
-                    workouts: allInspirationWorkouts,
-                    recentActivities: recentActivityHints,
-                    goal: session.onboardingProfile?.currentGoal?.type,
-                    selectedDate: selection.date,
-                    onChoose: { workout in
-                        pendingInspiration = workout
-                        showingInspiration = false
+                AIProgramBuilderView(
+                    mode: .generate,
+                    singleWorkoutDate: selection.date,
+                    onSingleWorkoutSelected: { workout in
+                        pendingCoachWorkout = workout
+                        showingSingleWorkoutCoach = false
                     }
                 )
                 .presentationDetents([.large])
@@ -3877,8 +3869,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Browse a suggested session below, or find some inspiration.",
-                        norwegian: "Velg et forslag nedenfor, eller la deg inspirere."
+                        english: "Choose a suggestion below, or let Coach find a workout for you.",
+                        norwegian: "Velg et forslag nedenfor, eller la Coach finne en økt til deg."
                     ))
                     .font(.system(size: 13))
                     .foregroundStyle(dayInk.opacity(0.64))
@@ -3904,14 +3896,14 @@ private struct HomeWeeklyProgressDaySheet: View {
 
             if canPlanWorkout {
                 Button {
-                    showingInspiration = true
+                    showingSingleWorkoutCoach = true
                 } label: {
                     HStack(spacing: 9) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         Text(ATHLTHLocalization.choose(
-                            english: "Get inspired", norwegian: "Bli inspirert"
+                            english: "Let Coach find a workout", norwegian: "La Coach finne en økt"
                         ))
                         Spacer()
                         Image(systemName: "arrow.up.right")
@@ -3928,8 +3920,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Get workout suggestions based on your available time and recent sessions",
-                    norwegian: "Få treningsforslag ut fra tiden du har og nylige økter"
+                    english: "Open the Coach workout builder",
+                    norwegian: "Åpner Coach for å finne en tilpasset økt"
                 ))
             }
         }

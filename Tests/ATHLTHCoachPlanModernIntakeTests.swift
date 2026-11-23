@@ -18,6 +18,24 @@ final class ATHLTHCoachPlanModernIntakeTests: XCTestCase {
         return intake
     }
 
+    func testSingleWorkoutIntakeFixesOnlyScheduleFields() {
+        var intake = completeBase()
+        intake.coachChoosesFrequency = true
+        intake.healthSharingAuthorized = false
+        let calendar = Calendar(identifier: .gregorian)
+        let tuesday = calendar.date(from: DateComponents(year: 2026, month: 11, day: 24))!
+        intake.restrictToSingleWorkout(on: tuesday, calendar: calendar)
+        XCTAssertEqual(intake.durationWeeks, 1)
+        XCTAssertEqual(intake.sessionsPerWeek, 1)
+        XCTAssertEqual(intake.availableDays, [2])
+        XCTAssertFalse(intake.coachChoosesFrequency)
+        XCTAssertFalse(intake.varyWeeks)
+        XCTAssertEqual(intake.trainingTypes, [.running])
+        XCTAssertEqual(intake.sessionDurationMinutes, 45)
+        XCTAssertFalse(intake.healthSharingAuthorized)
+        XCTAssertTrue(intake.isComplete)
+    }
+
     func testNoInjuriesIsAnExplicitAnswerRatherThanMissingInput() {
         let intake = completeBase()
         XCTAssertEqual(intake.injuryStatus?.rawValue, "none")

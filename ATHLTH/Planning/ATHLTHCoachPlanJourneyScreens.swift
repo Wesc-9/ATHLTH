@@ -4,6 +4,7 @@ import SwiftUI
 /// The real data, AI request, validation, draft editor and commit stay in
 /// AIProgramBuilderView / AIProgramService; none of these screens fabricate a plan.
 struct ATHLTHCoachPlanWelcomeScreen: View {
+    var singleWorkout = false
     let onContinue: () -> Void
     private let ink = ATHLTHTrainDesign.ink
     private let muted = ATHLTHTrainDesign.secondary
@@ -33,14 +34,14 @@ struct ATHLTHCoachPlanWelcomeScreen: View {
                     Text(tr("MADE FOR YOU", "LAGET FOR DEG"))
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(2.5).foregroundStyle(muted)
-                    Text(tr("A plan built\nfor you", "En plan bygget\nfor deg"))
+                    Text(singleWorkout ? tr("A workout built\nfor you", "En økt laget\nfor deg") : tr("A plan built\nfor you", "En plan bygget\nfor deg"))
                         .font(.system(size: 37, weight: .regular, design: .serif))
                         .tracking(-0.6)
                         .foregroundStyle(ink)
                         .accessibilityAddTraits(.isHeader)
                     Text(tr(
-                        "Tell us about your training, everyday life and preferences. ATHLTH Coach creates a plan you can inspect and change before saving.",
-                        "Fortell om dine mål, din hverdag og dine preferanser. ATHLTH Coach lager en plan du kan gjennomgå og endre før lagring."
+                        singleWorkout ? "Tell Coach about your goals, time and equipment. Review a workout tailored to your choices." : "Tell us about your training, everyday life and preferences. ATHLTH Coach creates a plan you can inspect and change before saving.",
+                        singleWorkout ? "Fortell Coach om mål, tid og utstyr. Gjennomgå en økt tilpasset valgene dine." : "Fortell om dine mål, din hverdag og dine preferanser. ATHLTH Coach lager en plan du kan gjennomgå og endre før lagring."
                     ))
                     .font(.system(size: 12.5))
                     .foregroundStyle(muted)
@@ -53,12 +54,12 @@ struct ATHLTHCoachPlanWelcomeScreen: View {
             .background(ATHLTHTrainDesign.canvas)
 
             benefit("person.crop.circle", tr("Personal and realistic", "Personlig og realistisk"),
-                    tr("Built around your goals, experience and availability",
-                       "Basert på dine mål, erfaring og tilgjengelige dager"))
+                    tr(singleWorkout ? "Built around your goals, experience and time" : "Built around your goals, experience and availability",
+                       singleWorkout ? "Basert på dine mål, erfaring og tilgjengelig tid" : "Basert på dine mål, erfaring og tilgjengelige dager"))
             benefit("chart.line.uptrend.xyaxis", tr("Balanced progression", "Balanse og progresjon"),
                     tr("An appropriate mix of training and recovery",
                        "En god balanse mellom trening og restitusjon"))
-            benefit("slider.horizontal.3", tr("Your plan, your choices", "Enkel å justere"),
+            benefit("slider.horizontal.3", tr(singleWorkout ? "Your workout, your choices" : "Your plan, your choices", "Enkel å justere"),
                     tr("Edit individual workouts or ask Coach to regenerate",
                        "Rediger økter selv eller be Coach om et nytt forslag"))
 
@@ -89,6 +90,7 @@ struct ATHLTHCoachPlanWelcomeScreen: View {
 }
 
 struct ATHLTHCoachPlanGeneratingScreen: View {
+    var singleWorkout = false
     private let bronze = ATHLTHTrainDesign.bronze
     private let muted = ATHLTHTrainDesign.secondary
 
@@ -99,12 +101,12 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
     var body: some View {
         VStack(spacing: 22) {
             Spacer(minLength: 24)
-            Text(tr("Coach is building\nyour plan", "Coach lager\ntreningsplanen din"))
+            Text(singleWorkout ? tr("Coach is finding\nyour workout", "Coach finner\ntreningsøkten din") : tr("Coach is building\nyour plan", "Coach lager\ntreningsplanen din"))
                 .font(.system(size: 32, weight: .regular, design: .serif))
                 .multilineTextAlignment(.center)
             Text(tr(
-                "Review the plan before anything is saved.",
-                "Du godkjenner planen før noe lagres."
+                singleWorkout ? "Review the workout before anything is saved." : "Review the plan before anything is saved.",
+                singleWorkout ? "Du godkjenner økten før noe lagres." : "Du godkjenner planen før noe lagres."
             ))
                 .font(.system(size: 12.5))
                 .foregroundStyle(muted)
@@ -137,8 +139,8 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
             .frame(height: 248)
 
             VStack(alignment: .leading, spacing: 14) {
-                status("target", tr("Goals and available days", "Mål og treningsdager"))
-                status("dumbbell", tr("Workouts and progression", "Økter og progresjon"))
+                status("target", singleWorkout ? tr("Goals and available time", "Mål og tilgjengelig tid") : tr("Goals and available days", "Mål og treningsdager"))
+                status("dumbbell", singleWorkout ? tr("Exercises and structure", "Øvelser og oppsett") : tr("Workouts and progression", "Økter og progresjon"))
                 status("leaf", tr("Recovery", "Restitusjon"))
             }
             .padding(15)
