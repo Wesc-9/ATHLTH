@@ -317,7 +317,7 @@ struct PlannedWorkoutWatchBuilder {
             }
             let pace = block.targetPaceSecondsPerKilometer
             return WatchRunningWorkoutStep(
-                id: UUID(), title: block.title, measure: measure,
+                id: block.ghostSegmentID ?? UUID(), title: block.title, measure: measure,
                 // Preserve both authored targets even when the selected
                 // completion criterion is time OR distance. Some terrain
                 // plans prescribe a time cap and a distance benchmark.
@@ -333,7 +333,8 @@ struct PlannedWorkoutWatchBuilder {
                 targetTreadmillInclinePercent:
                     block.isIndoor == true ? block.treadmillInclinePercent : nil,
                 coachBrief: phase == "work" ? block.notes : nil,
-                recoveryStyle: phase == "recovery" ? (block.kind == .rest ? .passive : .activeJog) : nil
+                recoveryStyle: phase == "recovery" ? (block.kind == .rest ? .passive : .activeJog) : nil,
+                ghostFollowsRecovery: phase == "recovery" && block.kind != .rest
             )
         }
     }
@@ -344,6 +345,8 @@ struct PlannedWorkoutWatchBuilder {
         autoPauseEnabled: Bool? = nil
     ) -> WatchRunningWorkoutTransfer {
         let editedBlocks = workout.resolvedWorkoutBlocks
+        let intervalGhost = editedBlocks.compactMap(\.intervalGhostConfiguration)
+            .first.flatMap { $0.isEnabled && $0.isValid ? $0 : nil }
         if (workout.kind == .running || workout.kind == .walking),
            !editedBlocks.isEmpty,
            editedBlocks.contains(where: { $0.kind == .run }),
@@ -369,7 +372,8 @@ struct PlannedWorkoutWatchBuilder {
                 intervalCoachCueEverySeconds:
                     workout.resolvedRunningWorkouts.first?.intervalCoachCueEverySeconds,
                 intervalCoachCountdownSeconds:
-                    workout.resolvedRunningWorkouts.first?.intervalCoachCountdownSeconds
+                    workout.resolvedRunningWorkouts.first?.intervalCoachCountdownSeconds,
+                intervalGhostConfiguration: intervalGhost
             )
         }
 
@@ -394,7 +398,8 @@ struct PlannedWorkoutWatchBuilder {
                     structured.allSatisfy { $0.autoAdvanceTimedSteps != false },
                 autoStartMainAfterWarmup: structured.first?.autoStartMainAfterWarmup,
                 intervalCoachCueEverySeconds: structured.first?.intervalCoachCueEverySeconds,
-                intervalCoachCountdownSeconds: structured.first?.intervalCoachCountdownSeconds
+                intervalCoachCountdownSeconds: structured.first?.intervalCoachCountdownSeconds,
+                intervalGhostConfiguration: intervalGhost
             )
         }
 
@@ -456,7 +461,8 @@ struct PlannedWorkoutWatchBuilder {
                 workout.targetAlertConfiguration,
             autoPauseEnabled:
                 autoPauseEnabled ??
-                workout.autoPauseEnabled
+                workout.autoPauseEnabled,
+            intervalGhostConfiguration: intervalGhost
         )
     }
 
