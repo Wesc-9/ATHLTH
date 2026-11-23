@@ -9922,6 +9922,12 @@ private struct ATHLTHIntervalGhostSettingsView: View {
                             Text("Eget tempo").tag(
                                 ATHLTHIntervalGhostPacer.WorkoutConfiguration.PauseBehavior.customPace)
                         }
+                        .onChange(of: configuration.pauseBehavior) { _, value in
+                            if value == .customPace &&
+                                configuration.recoveryPaceSecondsPerKilometer == nil {
+                                configuration.recoveryPaceSecondsPerKilometer = 420
+                            }
+                        }
                         if configuration.pauseBehavior == .customPace {
                             Stepper(
                                 "Pausetempo: \(Int(configuration.recoveryPaceSecondsPerKilometer ?? 420) / 60):\(String(format: "%02d", Int(configuration.recoveryPaceSecondsPerKilometer ?? 420) % 60)) min/km",
@@ -9956,10 +9962,28 @@ private struct ATHLTHIntervalGhostSettingsView: View {
                                         configuration.segments.append(.init(
                                             id: stableID,
                                             enabled: enabled,
-                                            paceSecondsPerKilometer: nil
+                                            paceSecondsPerKilometer: configuration.segments.first {
+                                                $0.id == stableID
+                                            }?.paceSecondsPerKilometer
                                         ))
                                     }
                                 ))
+                                if let stableID = block.ghostSegmentID,
+                                   configuration.segments.contains(where: {
+                                       $0.id == stableID && $0.enabled
+                                   }) {
+                                    Stepper(
+                                        "Tempo \(Int(configuration.segments.first(where: { $0.id == stableID })?.paceSecondsPerKilometer ?? configuration.defaultPaceSecondsPerKilometer) / 60) min/km",
+                                        value: Binding(
+                                            get: { Int(configuration.segments.first(where: { $0.id == stableID })?.paceSecondsPerKilometer ?? configuration.defaultPaceSecondsPerKilometer) },
+                                            set: { newPace in
+                                                guard let index = configuration.segments.firstIndex(where: { $0.id == stableID }) else { return }
+                                                configuration.segments[index].paceSecondsPerKilometer = Double(newPace)
+                                            }
+                                        ), in: 120...1800, step: 5
+                                    )
+                                    .font(.caption)
+                                }
                             }
                         }
                     }
