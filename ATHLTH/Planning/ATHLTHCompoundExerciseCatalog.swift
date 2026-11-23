@@ -129,7 +129,7 @@ enum ATHLTHCompoundExerciseCatalog {
 
     /// Two- and three-minute recoveries belong to the same 4×4 exercise
     /// family but never share a record/PR category.
-    static func fourByFourRecovery(_ blocks: [WorkoutTemplateBlock]) -> Int? {
+    nonisolated static func fourByFourRecovery(_ blocks: [WorkoutTemplateBlock]) -> Int? {
         let relevant = blocks.filter {
             $0.kind == .run || $0.kind == .rest
         }
