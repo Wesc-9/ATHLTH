@@ -325,8 +325,8 @@ struct ATHLTHWorkoutQuickTargetSheet: View {
         .background(.regularMaterial)
     }
 
-    // The same compact disclosure outline is used for every workout source.
-    // A workout's original title/notes appear only after opening its row.
+    // Show actual exercises and prescriptions before choosing a target.
+    // The shared overview keeps every section open by default.
     private var workoutInformation: some View {
         ATHLTHWorkoutCompactOutlineView(
             blocks: workoutSteps, isRunning: isRunning

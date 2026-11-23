@@ -67,6 +67,36 @@ enum ATHLTHWorkoutSelectionOverview {
                 .compactMap { $0 }.joined(separator: " · ")
         }
 
+        /// Exact prescription, rather than the duration of the whole exercise.
+        /// Different set targets must not be silently averaged.
+        var prescription: String {
+            guard isExercise else {
+                return first.targetText ?? ATHLTHLocalization.choose(
+                    english: "Open", norwegian: "Fri")
+            }
+            let exerciseSteps = steps.filter { $0.kind == .exercise }
+            let targets = exerciseSteps.map { step -> String in
+                if let reps = step.repetitions, reps > 0 {
+                    if let upper = step.targetRepetitionsMaximum, upper > reps {
+                        return "\(reps)–\(upper)"
+                    }
+                    return String(reps)
+                }
+                if let seconds = step.durationSeconds, seconds.isFinite, seconds > 0 {
+                    return ATHLTHWorkoutCompactOutline.timeText(seconds)
+                }
+                return ATHLTHLocalization.choose(english: "Open", norwegian: "Fri")
+            }
+            let repetitionsOnly = exerciseSteps.allSatisfy { ($0.repetitions ?? 0) > 0 }
+            let suffix = repetitionsOnly ? " reps" : ""
+            if let target = targets.first, targets.allSatisfy({ $0 == target }) {
+                return "\(exerciseSteps.count) × \(target)" + suffix
+            }
+            return "\(exerciseSteps.count) " +
+                ATHLTHLocalization.choose(english: "sets", norwegian: "sett") +
+                " · " + targets.joined(separator: " / ") + suffix
+        }
+
         var estimatedSeconds: TimeInterval? {
             // AMRAP and EMOM have ONE shared group clock. Showing that
             // entire clock beside every station would inflate row estimates.
@@ -220,6 +250,23 @@ enum ATHLTHWorkoutSelectionOverview {
             index = cursor
         }
         return result
+    }
+
+    struct Section: Identifiable {
+        let id: Int
+        let phase: WorkoutPhaseKind
+        let rows: [Row]
+    }
+
+    /// Reuse the canonical phase outline and exercise/set grouping.
+    /// No sorting, invented steps, or mutation of the source recipe.
+    static func sections(for blocks: [WorkoutTemplateBlock]) -> [Section] {
+        let items = rows(for: blocks)
+        let phases = ATHLTHWorkoutPhaseOutline.sections(for: items.map(\.first))
+        return phases.map { section in
+            Section(id: section.id, phase: section.phase,
+                    rows: section.indices.map { items[$0] })
+        }
     }
 
     static func isBetweenSetPause(_ block: WorkoutTemplateBlock) -> Bool {

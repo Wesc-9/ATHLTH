@@ -155,58 +155,47 @@ enum ATHLTHWorkoutCompactOutline {
     }
 }
 
-/// One disclosure-based overview for catalog, personal and scheduled workouts.
-/// Only names, exact drag ordinal and estimated duration are visible until tap.
+/// Shared read-only workout overview. The stored exercise names and targets
+/// are visible immediately; only whole sections may be collapsed.
 struct ATHLTHWorkoutCompactOutlineView: View {
     let blocks: [WorkoutTemplateBlock]
     let isRunning: Bool
 
-    @State private var expandedRows: Set<Int> = []
-    @State private var advancedMode = false
-    @State private var mainExpanded = true
+    @State private var collapsedSections: Set<Int> = []
 
     private var ink: Color { ATHLTHPlanDesign.ink }
     private var muted: Color { ATHLTHPlanDesign.secondaryInk }
     private var tint: Color { ATHLTHPlanDesign.accentInk }
 
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var body: some View {
-        let rows = ATHLTHWorkoutCompactOutline.rows(for: blocks)
-        return VStack(alignment: .leading, spacing: 8) {
-            Text(ATHLTHLocalization.choose(
-                english: "WORKOUT OVERVIEW", norwegian: "ØKTOVERSIKT"
-            ))
-            .font(.caption2.weight(.semibold))
-            .tracking(1.1)
-            .foregroundStyle(muted)
-            .padding(.bottom, 4)
-
-            Picker(
-                ATHLTHLocalization.choose(english: "Editing mode", norwegian: "Redigeringsmodus"),
-                selection: $advancedMode
-            ) {
-                Text("Enkel").tag(false)
-                Text("Avansert").tag(true)
+        let sections = ATHLTHWorkoutSelectionOverview.sections(for: blocks)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(tr("WORKOUT OVERVIEW", "ØKTOVERSIKT"))
+                    .font(.caption2.weight(.semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(muted)
+                Spacer(minLength: 8)
+                if !sections.isEmpty {
+                    Text(isRunning ? tr("Target", "Mål") : tr("Sets / reps", "Sett / reps"))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(muted)
+                }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("athlth-workout-outline-mode")
 
-            if rows.isEmpty {
-                Text(ATHLTHLocalization.choose(
-                    english: "No detailed workout steps are available.",
-                    norwegian: "Ingen detaljerte øktdeler er tilgjengelige."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(muted)
+            if sections.isEmpty {
+                Text(tr("No detailed workout steps are available.",
+                        "Ingen detaljerte øktdeler er tilgjengelige."))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
             } else {
-                LazyVStack(spacing: 4) {
-                    ForEach(rows) { row in
-                        if row.beginsMainSection {
-                            mainSectionHeading
-                        }
-                        if row.kind != .work || mainExpanded {
-                            disclosure(row)
-                                .padding(.leading, row.kind == .work ? 14 : 0)
-                        }
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    ForEach(sections) { section in
+                        sectionView(section)
                     }
                 }
             }
@@ -217,175 +206,115 @@ struct ATHLTHWorkoutCompactOutlineView: View {
         .accessibilityIdentifier("athlth-compact-workout-outline")
     }
 
-    /// Hoveddel is always visible, while the individual descriptions
-    /// and recovery details remain hidden until a subsection is opened.
-    private var mainSectionHeading: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.16)) {
-                mainExpanded.toggle()
-            }
-        } label: {
-        HStack(spacing: 9) {
-            Image(systemName: "figure.run")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(tint)
-                .frame(width: 23)
-                .accessibilityHidden(true)
-            Text(ATHLTHLocalization.choose(
-                english: "Main workout", norwegian: "Hoveddel"
-            ))
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(ink)
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.down")
-                .font(.caption2)
-                .rotationEffect(.degrees(mainExpanded ? 180 : 0))
-                .foregroundStyle(muted)
+    private func sectionSymbol(_ phase: WorkoutPhaseKind) -> String {
+        switch phase {
+        case .warmup: return "flame"
+        case .main: return isRunning ? "figure.run" : "dumbbell"
+        case .recovery: return "pause"
+        case .cooldown: return "wind"
         }
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-        .padding(.horizontal, 5)
-        .padding(.top, 5)
-        .accessibilityAddTraits(.isHeader)
-        .accessibilityIdentifier("athlth-workout-outline-main-heading")
     }
 
-    private func disclosure(_ row: ATHLTHWorkoutCompactOutline.Row) -> some View {
-        let expanded = expandedRows.contains(row.id)
+    private func sectionView(_ section: ATHLTHWorkoutSelectionOverview.Section) -> some View {
+        let expanded = !collapsedSections.contains(section.id)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.easeInOut(duration: 0.16)) {
-                    if expanded { expandedRows.remove(row.id) }
-                    else { expandedRows.insert(row.id) }
+                    if expanded { collapsedSections.insert(section.id) }
+                    else { collapsedSections.remove(section.id) }
                 }
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: row.kind == .warmup ? "flame" :
-                          row.kind == .cooldown ? "wind" :
-                          row.kind == .recovery ? "pause" : "figure.run")
+                HStack(spacing: 9) {
+                    Image(systemName: sectionSymbol(section.phase))
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(tint)
-                        .frame(width: 23)
-                        .accessibilityHidden(true)
-
-                    Text(row.title)
+                        .frame(width: 24)
+                    Text(section.phase == .cooldown ? tr("Cool-down", "Avslutning") : section.phase.title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .trailing, spacing: 3) {
-                        if isRunning,
-                           let effort = row.effortIndex,
-                           row.effortTotal > 1 {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Rep \(effort) of \(row.effortTotal)",
-                                norwegian: "Drag \(effort) av \(row.effortTotal)"
-                            ))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(tint)
-                        }
-                        if let seconds = row.estimatedSeconds {
-                            Text("~" + ATHLTHWorkoutCompactOutline.timeText(seconds))
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(muted)
-                        }
-                    }
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(muted.opacity(0.5))
-                        .rotationEffect(.degrees(expanded ? 180 : 0))
-                        .frame(width: 14)
-                        .accessibilityHidden(true)
+                    Spacer(minLength: 4)
+                    Text("\(section.rows.count)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(muted)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(muted)
                 }
-                .frame(maxWidth: .infinity, minHeight: 46)
+                .padding(11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHPlanDesign.selectedSurface.opacity(0.8),
+                            in: RoundedRectangle(cornerRadius: 11))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(row.title)
-            .accessibilityValue(expanded
-                ? ATHLTHLocalization.choose(english: "Expanded", norwegian: "Åpen")
-                : ATHLTHLocalization.choose(english: "Collapsed", norwegian: "Lukket"))
-            .accessibilityHint(ATHLTHLocalization.choose(
-                english: "Show step names, descriptions and targets",
-                norwegian: "Vis øktnavn, beskrivelser og mål"))
-            .accessibilityIdentifier("athlth-workout-outline-row-\(row.id)")
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(expanded ? tr("Expanded", "Åpen") : tr("Collapsed", "Lukket"))
+            .accessibilityIdentifier(section.phase == .main
+                ? "athlth-workout-outline-main-heading"
+                : "athlth-workout-outline-section-\(section.id)")
 
             if expanded {
-                VStack(alignment: .leading, spacing: advancedMode ? 10 : 3) {
-                    ForEach(row.blocks.indices, id: \.self) { index in
-                        let block = row.blocks[index]
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(block.title)
-                                .font(block.isRestOrActiveRecovery
-                                    ? .system(size: advancedMode ? 13 : 11, weight: .regular)
-                                    : .subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
-                            let details = stepFacts(block)
-                            if !details.isEmpty {
-                                Text(details)
-                                    .font(block.isRestOrActiveRecovery ? .caption2 : .caption)
-                                    .foregroundStyle(muted)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            if let notes = block.notes, !notes.isEmpty {
-                                Text(notes)
-                                    .font(.caption)
-                                    .foregroundStyle(muted)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        if advancedMode && index < row.blocks.count - 1 {
-                            Divider().opacity(0.35)
-                        }
+                ForEach(section.rows) { row in
+                    exerciseRow(row)
+                    if row.id != section.rows.last?.id {
+                        Divider()
+                            .overlay(ATHLTHPlanDesign.outline.opacity(0.35))
+                            .padding(.leading, 35)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 33)
-                .padding(.trailing, 17)
-                .padding(.bottom, 13)
             }
         }
-        .padding(.horizontal, 5)
-        .background(expanded ? ATHLTHPlanDesign.selectedSurface.opacity(0.32) :
-                    Color.clear,
-                    in: RoundedRectangle(cornerRadius: 12))
     }
 
-    private func stepFacts(_ block: WorkoutTemplateBlock) -> String {
-        var facts: [String] = []
-        if block.kind == .rest || block.resolvedPhase == .recovery {
-            facts.append(ATHLTHLocalization.choose(
-                english: "Recovery", norwegian: "Pause"))
+    private func exerciseRow(_ row: ATHLTHWorkoutSelectionOverview.Row) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: row.isPause
+                  ? (row.first.isActiveRecovery ? "figure.walk" : "pause.fill")
+                  : row.first.kind.systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 26, height: 26)
+                .background(ATHLTHPlanDesign.selectedSurface.opacity(0.55), in: Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.title)
+                    .font(row.isPause ? .caption.weight(.medium) : .subheadline.weight(.semibold))
+                    .foregroundStyle(row.isPause ? muted : ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let round = row.first.executionRound,
+                   let total = row.first.executionTotalRounds, total > 1 {
+                    Text(tr("Round \(round) of \(total)", "Runde \(round) av \(total)"))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                }
+                if row.betweenSetPauses > 0 {
+                    Text(tr("Rest between sets", "Pause mellom sett") +
+                         (row.betweenSetRestSeconds.map {
+                            " · " + ATHLTHWorkoutCompactOutline.timeText($0 / Double(row.betweenSetPauses))
+                         } ?? ""))
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                }
+                if let notes = row.first.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(row.prescription)
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(row.isPause ? muted : tint)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 150, alignment: .trailing)
+                .layoutPriority(1)
         }
-        if let seconds = block.durationSeconds, seconds > 0 {
-            facts.append(ATHLTHWorkoutCompactOutline.timeText(seconds))
-        }
-        if let distance = block.distanceMeters, distance > 0 {
-            facts.append(distance >= 1000
-                ? String(format: "%.1f km", distance / 1000)
-                : "\(Int(distance.rounded())) m")
-        }
-        if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
-            facts.append("Z\(zone)")
-        } else if let source = block.sourceIntensityZoneLabel,
-                  !source.isEmpty {
-            facts.append(source)
-        }
-        if let low = block.targetHeartRatePercentMin,
-           let high = block.targetHeartRatePercentMax {
-            facts.append("\(Int(low.rounded()))–\(Int(high.rounded())) % " +
-                ATHLTHLocalization.choose(english: "HR max", norwegian: "makspuls"))
-        }
-        if let pace = block.targetPaceSecondsPerKilometer, pace > 0 {
-            let s = Int(pace.rounded())
-            facts.append(String(format: "%d:%02d min/km", s / 60, s % 60))
-        }
-        if let repetitions = block.repetitions, repetitions > 0 {
-            facts.append("\(repetitions) " + ATHLTHLocalization.choose(
-                english: "reps", norwegian: "repetisjoner"))
-        }
-        return facts.joined(separator: " · ")
+        .padding(.horizontal, 5)
+        .padding(.vertical, 9)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("athlth-workout-outline-row-\(row.id)")
     }
 }

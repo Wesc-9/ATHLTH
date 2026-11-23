@@ -53,6 +53,41 @@ final class ATHLTHWorkoutSelectionOverviewTests: XCTestCase {
         XCTAssertEqual(rows[0].title, "Back Extension")
     }
 
+    func testSelectionSectionsExposeActualExerciseNamesAndSetTargets() {
+        var warmup = strength("Band pull apart", sets: 2, rest: nil)
+        warmup.phase = .warmup
+        let main = strength("Back Extension", sets: 3)
+        var cooldown = strength("Stretch", sets: 1, rest: nil)
+        cooldown.phase = .cooldown
+        cooldown.repetitions = nil
+        cooldown.durationSeconds = 45
+        let recipe = [warmup, main, cooldown]
+        let sections = ATHLTHWorkoutSelectionOverview.sections(for: recipe)
+        XCTAssertEqual(sections.map(\.phase), [.warmup, .main, .cooldown])
+        XCTAssertEqual(sections.flatMap(\.rows).map(\.title),
+                       ["Band pull apart", "Back Extension", "Stretch"])
+        XCTAssertEqual(sections[0].rows[0].prescription, "2 × 8 reps")
+        XCTAssertEqual(sections[1].rows[0].prescription, "3 × 8 reps")
+        XCTAssertEqual(sections[2].rows[0].prescription, "1 × 45 s")
+        XCTAssertEqual(recipe[1].setCount, 3)
+    }
+
+    func testSelectionPreservesDifferentRepTargetsAndTransitionPauses() {
+        var first = strength("Squat", sets: 1, rest: nil)
+        first.repetitions = 8
+        first.title = "Squat · 1/2"
+        var second = first
+        second.title = "Squat · 2/2"
+        second.repetitions = 6
+        let recipe = [first, second, pause("Mellom øvelser", seconds: 90),
+                      strength("Press", slug: "press", sets: 1, rest: nil)]
+        let sections = ATHLTHWorkoutSelectionOverview.sections(for: recipe)
+        XCTAssertEqual(sections.count, 1)
+        XCTAssertEqual(sections[0].rows.map(\.title), ["Squat", "Pause", "Press"])
+        XCTAssertTrue(sections[0].rows[0].prescription.contains("8 / 6 reps"))
+        XCTAssertTrue(sections[0].rows[1].isPause)
+    }
+
     func testNoImplicitPauseIsInsertedBetweenDifferentExercises() {
         let workout = [
             strength("Back Extension", slug: "back", sets: 1, rest: nil),
