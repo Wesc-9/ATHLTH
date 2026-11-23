@@ -63,11 +63,12 @@ struct WatchRunIntervalFocusPage: View {
                         }
                     }
                     if !workout.awaitingMainStart,
-                       let lead = ATHLTHIntervalGhostPacer.leadMeters(
-                           step: step,
-                           elapsedSeconds: workout.currentStructuredStepElapsedTime,
-                           distanceMeters: workout.currentStructuredStepDistanceMeters
-                       ) {
+                       let lead = workout.intervalGhostLiveLeadMeters ??
+                           ATHLTHIntervalGhostPacer.leadMeters(
+                               step: step,
+                               elapsedSeconds: workout.currentStructuredStepElapsedTime,
+                               distanceMeters: workout.currentStructuredStepDistanceMeters
+                           ) {
                         HStack(spacing: 5) {
                             Image(systemName: "figure.run")
                             Text(lead >= 0
