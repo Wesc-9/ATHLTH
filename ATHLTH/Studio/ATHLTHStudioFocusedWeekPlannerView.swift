@@ -1,9 +1,43 @@
 import SwiftUI
 
-/// Decision shared by the seven-day rail and the previous/next-week buttons.
-/// Entry-screen preferences are not a workout draft; entering the workout
-/// builder marks the point at which a date-scoped draft needs protecting.
+/// Browsing weeks is independent of choosing a day. Only an explicit day
+/// selection can replace the editor or require a draft decision.
 enum ATHLTHStudioDayChangePolicy {
+    struct Navigation: Equatable {
+        private(set) var selectedDate: Date
+        private(set) var displayedWeekDate: Date
+
+        init(date: Date, calendar: Calendar = .current) {
+            selectedDate = calendar.startOfDay(for: date)
+            displayedWeekDate = selectedDate
+        }
+
+        mutating func browseWeek(_ offset: Int, calendar: Calendar = .current) {
+            displayedWeekDate = ATHLTHStudioHomeWeek.shiftedWeek(
+                from: displayedWeekDate, offset: offset, calendar: calendar)
+        }
+
+        mutating func selectDay(_ date: Date, calendar: Calendar = .current) {
+            selectedDate = calendar.startOfDay(for: date)
+            displayedWeekDate = selectedDate
+        }
+    }
+
+    struct ActivityCount: Identifiable, Equatable {
+        let type: ATHLTHPlannedWorkoutType
+        let count: Int
+        var id: ATHLTHPlannedWorkoutType { type }
+    }
+
+    static func activityCounts(for workouts: [PlannedSession]) -> [ActivityCount] {
+        let grouped = Dictionary(grouping: workouts.filter { !$0.isExplicitRestDay },
+                                 by: ATHLTHPlannedWorkoutType.from)
+        return ATHLTHPlannedWorkoutType.defaultOrder.compactMap { type in
+            guard let items = grouped[type], !items.isEmpty else { return nil }
+            return ActivityCount(type: type, count: items.count)
+        }
+    }
+
     enum Decision: Equatable {
         case unchanged
         case switchImmediately
@@ -97,7 +131,8 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
 
     let onClose: () -> Void
-    @State private var selectedDate: Date
+    @State private var navigation: ATHLTHStudioDayChangePolicy.Navigation
+    private var selectedDate: Date { navigation.selectedDate }
     @State private var scheduledTime: Date
     @State private var pendingDate: Date?
     @State private var saveMessage: String?
@@ -116,14 +151,14 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     init(initialDate: Date, onClose: @escaping () -> Void) {
         self.onClose = onClose
         let start = Calendar.current.startOfDay(for: initialDate)
-        _selectedDate = State(initialValue: start)
+        _navigation = State(initialValue: .init(date: start))
         _scheduledTime = State(initialValue:
             Calendar.current.date(
                 bySettingHour: 18, minute: 0, second: 0, of: start
             ) ?? start)
     }
 
-    private var snapshot: ATHLTHStudioHomeWeek.Snapshot {
+    private func snapshot(for date: Date) -> ATHLTHStudioHomeWeek.Snapshot {
         ATHLTHStudioHomeWeek.make(
             plans: session.trainingPlans,
             standalone: session.standalonePlannedSessions,
@@ -131,8 +166,12 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 ? health.workouts : [],
             pausedPlanIDs: session.pausedTrainingPlanIDs,
             deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
-            now: selectedDate
+            now: date
         )
+    }
+
+    private var visibleWeek: ATHLTHStudioHomeWeek.Snapshot {
+        snapshot(for: navigation.displayedWeekDate)
     }
 
     private var editable: Bool {
@@ -248,8 +287,8 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         HStack(spacing: 3) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(ATHLTHLocalization.choose(
-                    english: "Week \(ATHLTHStudioWeekRailLayout.weekNumber(for: selectedDate))",
-                    norwegian: "Uke \(ATHLTHStudioWeekRailLayout.weekNumber(for: selectedDate))"
+                    english: "Week \(ATHLTHStudioWeekRailLayout.weekNumber(for: navigation.displayedWeekDate))",
+                    norwegian: "Uke \(ATHLTHStudioWeekRailLayout.weekNumber(for: navigation.displayedWeekDate))"
                 ))
                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(ATHLTHStudioStyle.ink)
@@ -286,7 +325,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     }
 
     private var weekDateRangeLabel: String {
-        let range = ATHLTHStudioHomeWeek.weekRange(containing: selectedDate)
+        let range = ATHLTHStudioHomeWeek.weekRange(containing: navigation.displayedWeekDate)
         return range.start.formatted(.dateTime.day()) + "–" +
             range.end.formatted(.dateTime.day().month(.abbreviated))
     }
@@ -299,7 +338,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
             VStack(spacing: ATHLTHStudioWeekRailLayout.sectionSpacing) {
                 weekNavigationHeader
                 VStack(spacing: ATHLTHStudioWeekRailLayout.daySpacing) {
-                    ForEach(snapshot.days) { day in
+                    ForEach(visibleWeek.days) { day in
                         dayButton(day, compact: false, verticalHeight: tileHeight)
                     }
                 }
@@ -325,7 +364,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 ),
                 spacing: 6
             ) {
-                ForEach(snapshot.days) { day in
+                ForEach(visibleWeek.days) { day in
                     dayButton(day, compact: true)
                 }
             }
@@ -370,30 +409,10 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 }
                 .foregroundStyle(ATHLTHStudioStyle.ink)
 
-                HStack(spacing: 5) {
-                    if !day.restDays.isEmpty {
-                        Image(systemName: "moon.zzz")
-                        Text(ATHLTHLocalization.choose(english: "Rest", norwegian: "Hvile"))
-                    }
-                    if !day.planned.isEmpty {
-                        Image(systemName: "calendar")
-                        Text("\(day.planned.count)")
-                    }
-                    if !day.recorded.isEmpty || completedPlanned > 0 {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(ATHLTHStudioStyle.gold)
-                        Text("\(max(day.recorded.count, completedPlanned))")
-                    }
-                    if day.planned.isEmpty && day.restDays.isEmpty &&
-                       day.recorded.isEmpty && completedPlanned == 0 {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Free", norwegian: "Ledig"
-                        ))
-                    }
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+                dayStatus(day, completedCount: max(day.recorded.count, completedPlanned))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             .padding(.horizontal, compact ? 6 : 12)
             .padding(.vertical, compact ? 9 : 8)
@@ -418,6 +437,49 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func dayStatus(_ day: ATHLTHStudioHomeWeek.Day, completedCount: Int) -> some View {
+        let counts = ATHLTHStudioDayChangePolicy.activityCounts(for: day.planned.map(\.workout))
+        return HStack(spacing: 5) {
+            if !day.restDays.isEmpty {
+                Text(ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"))
+            } else if counts.isEmpty && completedCount == 0 {
+                Text(ATHLTHLocalization.choose(english: "Free", norwegian: "Ledig"))
+            }
+            if !counts.isEmpty {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(counts) { item in
+                            HStack(spacing: 3) {
+                                Image(systemName: item.type.symbol)
+                                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                                Text("\(item.count)").monospacedDigit()
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(item.type.title): \(item.count)")
+                        }
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+                    HStack(spacing: 3) {
+                        Image(systemName: counts[0].type.symbol)
+                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                        Text("\(counts[0].count)").monospacedDigit()
+                        if counts.count > 1 {
+                            Text("+\(counts.dropFirst().reduce(0) { $0 + $1.count })")
+                                .monospacedDigit()
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(counts.map { "\($0.type.title): \($0.count)" }.joined(separator: ", "))
+                }
+            }
+            if completedCount > 0 {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                Text("\(completedCount)").monospacedDigit()
+            }
+        }
     }
 
     @ViewBuilder
@@ -489,7 +551,12 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     /// and opens the existing WorkoutTemplateBuilderView. No second engine
     /// or duplicate draft persistence is introduced by this presentation.
     private var selectedDay: ATHLTHStudioHomeWeek.Day? {
-        snapshot.days.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+        // The browsed week may not contain the editing date. Never use
+        // its snapshot to validate a save or render the selected day.
+        let range = ATHLTHStudioHomeWeek.weekRange(containing: navigation.displayedWeekDate)
+        let source = selectedDate >= range.start && selectedDate <= range.end
+            ? visibleWeek : snapshot(for: selectedDate)
+        return source.days.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
     }
 
     private var favoriteWorkouts: [PlannedSession] {
@@ -520,7 +587,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 selectedActivity = type
             },
             onResumeDraft: { draft in
-                selectedDate = Calendar.current.startOfDay(for: draft.date)
+                navigation.selectDay(draft.date)
                 scheduledTime = draft.date
                 preferredAdvanced = draft.advanced
                 activeDraftContext = draft.context
@@ -681,16 +748,14 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     }
 
     private func changeWeek(_ offset: Int) {
-        let proposed = ATHLTHStudioHomeWeek.shiftedWeek(
-            from: selectedDate, offset: offset
-        )
-        requestDayChange(to: proposed)
+        // Pure browsing: keep the editor, clock, draft and save target.
+        navigation.browseWeek(offset)
     }
 
     /// Do not warn about an unsaved workout before one has been started.
     /// Date/time and Basic/Advanced preferences on the entry screen are
-    /// not an authored workout. Both the day rail and week arrows use this
-    /// single path so neither can raise a false draft confirmation.
+    /// not an authored workout. Only tapping a day enters this path;
+    /// week arrows never request a draft confirmation.
     private func requestDayChange(to proposed: Date) {
         let nextDate = Calendar.current.startOfDay(for: proposed)
         switch ATHLTHStudioDayChangePolicy.decision(
@@ -711,7 +776,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     }
 
     private func switchToDay(_ date: Date) {
-        selectedDate = Calendar.current.startOfDay(for: date)
+        navigation.selectDay(date)
         scheduledTime = settings.defaultPlannedWorkoutStart(on: selectedDate)
         pendingDate = nil
         saveMessage = nil

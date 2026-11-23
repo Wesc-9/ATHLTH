@@ -26,8 +26,44 @@ final class ATHLTHStudioDayChangePolicyTests: XCTestCase {
         )
     }
 
+    func testBrowsingWeeksDoesNotChangeSelectedDate() {
+        var navigation = ATHLTHStudioDayChangePolicy.Navigation(date: monday, calendar: calendar)
+        let nextWeek = calendar.date(byAdding: .day, value: 7, to: monday)!
+        navigation.browseWeek(1, calendar: calendar)
+        XCTAssertEqual(navigation.displayedWeekDate, nextWeek)
+        XCTAssertEqual(navigation.selectedDate, monday)
+        navigation.browseWeek(1, calendar: calendar)
+        XCTAssertEqual(navigation.displayedWeekDate, calendar.date(byAdding: .day, value: 14, to: monday))
+        XCTAssertEqual(navigation.selectedDate, monday)
+        navigation.browseWeek(-1, calendar: calendar)
+        let wednesday = calendar.date(byAdding: .day, value: 2, to: nextWeek)!
+        XCTAssertEqual(ATHLTHStudioDayChangePolicy.decision(current: navigation.selectedDate,
+            proposed: wednesday, hasStartedWorkout: true, calendar: calendar), .confirmDraft)
+        XCTAssertEqual(navigation.selectedDate, monday)
+        navigation.selectDay(wednesday, calendar: calendar)
+        XCTAssertEqual(navigation.selectedDate, wednesday)
+        XCTAssertEqual(navigation.displayedWeekDate, wednesday)
+    }
+
+    func testActivityCountsUseWorkoutCategoriesAndExcludeRest() {
+        func workout(_ kind: WorkoutKind, category: String? = nil) -> PlannedSession {
+            var value = PlannedSession(id: UUID(), title: "Workout", kind: kind,
+                scheduledStart: nil, durationMinutes: 20, targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil, routeID: nil, exercises: [], notes: nil)
+            value.workoutCategory = category
+            return value
+        }
+        let counts = ATHLTHStudioDayChangePolicy.activityCounts(for: [
+            workout(.strength), workout(.strength), workout(.running),
+            workout(.custom, category: "cycling"), workout(.recovery, category: "rest_day")
+        ])
+        XCTAssertEqual(counts.map(\.type), [.strength, .running, .cycling])
+        XCTAssertEqual(counts.map(\.count), [2, 1, 1])
+        XCTAssertTrue(ATHLTHStudioDayChangePolicy.activityCounts(for: []).isEmpty)
+    }
+
     @MainActor
-    func testEmptyPlannerChangesWeekWithoutDraftPrompt() {
+    func testEmptyPlannerSelectsDayInAnotherWeekWithoutDraftPrompt() {
         let nextWeek = calendar.date(byAdding: .day, value: 7, to: monday)!
         XCTAssertEqual(
             ATHLTHStudioDayChangePolicy.decision(
@@ -41,7 +77,7 @@ final class ATHLTHStudioDayChangePolicyTests: XCTestCase {
     }
 
     @MainActor
-    func testStartedWorkoutKeepsDraftConfirmationForDayAndWeek() {
+    func testStartedWorkoutKeepsDraftConfirmationForExplicitDaySelectionAcrossWeeks() {
         for days in [1, 7] {
             let proposed = calendar.date(byAdding: .day, value: days, to: monday)!
             XCTAssertEqual(
