@@ -28,8 +28,12 @@ private struct ATHLTHHomeDeferredPhoneStartSheet: View {
     @State private var started = false
     @State private var wasBackgrounded = false
 
-    private func startIfEligible() {
-        guard !started, !wasBackgrounded, scenePhase == .active else { return }
+    private func startIfEligible(explicitlyConfirmed: Bool = false) {
+        // An automatic countdown must never start a workout after
+        // backgrounding. Keep this sheet and its navigation in place,
+        // allowing the athlete to start explicitly on return instead.
+        guard !started, scenePhase == .active,
+              (explicitlyConfirmed || !wasBackgrounded) else { return }
         started = true
         dismiss()
         onStart()
@@ -60,7 +64,7 @@ private struct ATHLTHHomeDeferredPhoneStartSheet: View {
             }
 
             Button {
-                startIfEligible()
+                startIfEligible(explicitlyConfirmed: true)
             } label: {
                 Text(ATHLTHLocalization.choose(
                     english: "Start now", norwegian: "Start nå"
@@ -97,8 +101,9 @@ private struct ATHLTHHomeDeferredPhoneStartSheet: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
+                // Never pop the visible card just because the user briefly
+                // switches apps. Auto-start stays disabled until a new tap.
                 wasBackgrounded = true
-                dismiss()
             }
         }
     }
@@ -310,6 +315,13 @@ struct ProductRootTabView: View {
         guard TrainProgramCreationLaunch.interruptedDraft(
             userID: accountID, store: ATHLTHPlanCreationDraftStore()
         ) != nil else { return }
+        // An interrupted draft does not own global navigation. If the athlete
+        // last left the app on another tab, restoring the draft must not
+        // override their last selected screen on a remount/cold launch.
+        if persistedTabAccount == accountID.uuidString,
+           persistedSelectedTab != 1 {
+            return
+        }
         selectedTab = 1
     }
 
