@@ -50,6 +50,8 @@ final class SocialStore: ObservableObject {
     private var lastHomeSocialStatusAccountID: UUID?
     private var isHomeSocialStatusRefreshing = false
     private var lastFullRefreshAt: Date?
+    private var isChallengeRefreshInFlight = false
+    private var queuedChallengeRefreshStore: ChallengeStore?
     private var lastWorkoutMediaRefreshAt: Date?
     private var lastWorkoutMediaUserID: UUID?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
@@ -399,28 +401,42 @@ final class SocialStore: ObservableObject {
     func refreshChallenges(
         challengeStore: ChallengeStore
     ) async {
-        guard service.currentUserID != nil else {
+        guard let requestedUserID = service.currentUserID else {
             return
+        }
+        if isChallengeRefreshInFlight {
+            // Preserve the most recent refresh request after an update:
+            // a join/accept arriving during an earlier SELECT must not be
+            // missed, but 10 simultaneous screens must not issue 10 queries.
+            queuedChallengeRefreshStore = challengeStore
+            return
+        }
+
+        isChallengeRefreshInFlight = true
+        defer {
+            isChallengeRefreshInFlight = false
+            if let queued = queuedChallengeRefreshStore {
+                queuedChallengeRefreshStore = nil
+                Task { @MainActor [weak self] in
+                    await self?.refreshChallenges(challengeStore: queued)
+                }
+            }
         }
 
         do {
             let remoteChallenges =
                 try await service
                     .loadRemoteChallenges()
-
+            guard !Task.isCancelled,
+                  service.currentUserID == requestedUserID else { return }
             challengeStore
-                .replaceWithRemoteChallenges(
-                    remoteChallenges
-                )
+                .replaceWithRemoteChallenges(remoteChallenges)
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else {
-                return
-            }
-
-            errorMessage =
-                error.localizedDescription
+            guard !Task.isCancelled,
+                  service.currentUserID == requestedUserID else { return }
+            errorMessage = error.localizedDescription
         }
     }
 
