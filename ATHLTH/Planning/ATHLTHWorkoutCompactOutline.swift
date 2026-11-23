@@ -266,6 +266,16 @@ struct ATHLTHWorkoutCompactOutlineView: View {
         }
     }
 
+    private func setPauseDetail(_ row: ATHLTHWorkoutSelectionOverview.Row) -> String {
+        let rests = row.steps.filter { ATHLTHWorkoutSelectionOverview.isBetweenSetPause($0) }
+        let durations = rests.compactMap(\.durationSeconds).filter { $0.isFinite && $0 >= 0 }
+        guard durations.count == rests.count, let first = durations.first else { return "" }
+        if durations.allSatisfy({ $0 == first }) {
+            return " · " + ATHLTHWorkoutCompactOutline.timeText(first)
+        }
+        return " · " + durations.map { ATHLTHWorkoutCompactOutline.timeText($0) }.joined(separator: " / ")
+    }
+
     private func exerciseRow(_ row: ATHLTHWorkoutSelectionOverview.Row) -> some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: row.isPause
@@ -290,9 +300,7 @@ struct ATHLTHWorkoutCompactOutlineView: View {
                 }
                 if row.betweenSetPauses > 0 {
                     Text(tr("Rest between sets", "Pause mellom sett") +
-                         (row.betweenSetRestSeconds.map {
-                            " · " + ATHLTHWorkoutCompactOutline.timeText($0 / Double(row.betweenSetPauses))
-                         } ?? ""))
+                         setPauseDetail(row))
                         .font(.caption2)
                         .foregroundStyle(muted)
                 }
