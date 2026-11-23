@@ -4891,6 +4891,8 @@ struct WorkoutTemplateBuilderView: View {
     private let onDraftDiscarded: (() -> Void)?
     private let externalCloseRequest: Int
     private let onKeepEditingInline: (() -> Void)?
+    private let focusedPlannerDay: Date?
+    private let draftDestinationDate: Date?
 
     init(
         initialTitle: String = "",
@@ -4926,7 +4928,9 @@ struct WorkoutTemplateBuilderView: View {
         onCloseRequested: (() -> Void)? = nil,
         onDraftDiscarded: (() -> Void)? = nil,
         externalCloseRequest: Int = 0,
-        onKeepEditingInline: (() -> Void)? = nil
+        onKeepEditingInline: (() -> Void)? = nil,
+        focusedPlannerDay: Date? = nil,
+        draftDestinationDate: Date? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -5043,6 +5047,8 @@ struct WorkoutTemplateBuilderView: View {
         self.onDraftDiscarded = onDraftDiscarded
         self.externalCloseRequest = externalCloseRequest
         self.onKeepEditingInline = onKeepEditingInline
+        self.focusedPlannerDay = focusedPlannerDay
+        self.draftDestinationDate = draftDestinationDate
         self.collaborationPartnerName = collaborationPartnerName
         self.collaborationWorkoutID = collaborationWorkoutID
         self.collaborationInviteSent = collaborationInviteSent
@@ -5200,8 +5206,11 @@ struct WorkoutTemplateBuilderView: View {
         studioAdvanced = stored.studioAdvanced ?? studioAdvanced
         if let restored = stored.studioDate,
            restored.timeIntervalSinceReferenceDate > 0 {
-            studioBasicDate = restored
-            onScheduledTimeChanged?(restored)
+            let restoredTime = focusedPlannerDay.map {
+                ATHLTHStudioDayChangePolicy.timeOnDay(restored, day: $0)
+            } ?? restored
+            studioBasicDate = restoredTime
+            onScheduledTimeChanged?(restoredTime)
         }
         if initialActivity == .running {
             studioBasicRunMode = ATHLTHBasicFreeRunPolicy.restoredMode(
@@ -5816,10 +5825,12 @@ struct WorkoutTemplateBuilderView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(alignment: .top, spacing: 9) {
+            HStack(alignment: .center, spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(studioAccent)
+                    .frame(width: 32, height: 32)
+                    .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(name)
                         .font(.subheadline.weight(.semibold))
@@ -5830,11 +5841,14 @@ struct WorkoutTemplateBuilderView: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(studioAccent.opacity(0.75))
             }
-            .frame(maxWidth: .infinity, minHeight: 47, alignment: .topLeading)
-            .padding(12)
-            .background(ATHLTHPlanDesign.selectedSurface,
-                        in: RoundedRectangle(cornerRadius: 14))
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(10)
+            .background(ATHLTHPlanDesign.selectedSurface.opacity(0.75),
+                        in: RoundedRectangle(cornerRadius: 13))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -5907,6 +5921,24 @@ struct WorkoutTemplateBuilderView: View {
                 fallbackDurationMinutes: resolvedDurationMinutes
             )
         }
+    }
+
+    private func keepDraftAndClose() {
+        persistWorkoutDraft()
+        closeAfterDraftDecision = true
+        showingDiscardConfirmation = false
+    }
+
+    private func discardDraftAndClose() {
+        // Stop every scheduled and onDisappear write before removing the
+        // one active checkpoint. Other dates and drafts are unaffected.
+        draftFinished = true
+        pendingDraftCheckpoint?.cancel()
+        pendingDraftCheckpoint = nil
+        UserDefaults.standard.removeObject(forKey: draftStorageKey)
+        onDraftDiscarded?()
+        closeAfterDraftDecision = true
+        showingDiscardConfirmation = false
     }
 
     private func closeWorkoutEditor() {
@@ -6191,6 +6223,7 @@ struct WorkoutTemplateBuilderView: View {
                 durationMinutes: resolvedDurationMinutes,
                 route: activeRoute,
                 scheduledAt: plannedDate != nil ? $studioBasicDate : nil,
+                dateSelectionLocked: focusedPlannerDay != nil,
                 runningEnvironment: initialActivity == .running
                     ? $studioBasicRunEnvironment : nil,
                 trainingPartnerName: collaborationPartnerName,
@@ -6353,6 +6386,13 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .onChange(of: studioBasicDate) { _, value in
+                if let focusedPlannerDay {
+                    let normalized = ATHLTHStudioDayChangePolicy.timeOnDay(value, day: focusedPlannerDay)
+                    if normalized != value {
+                        studioBasicDate = normalized
+                        return
+                    }
+                }
                 // Date/time in the shared details card is authoritative for
                 // both Basic and Advanced, and the scheduled session is
                 // updated through the existing parent callback.
@@ -6692,30 +6732,21 @@ struct WorkoutTemplateBuilderView: View {
                     closeWorkoutEditor()
                 }
             ) {
-                ATHLTHDiscardDraftSheet(
-                    kind: onCloseRequested != nil || draftContext.hasPrefix("ipad-focused-day-") ? .standaloneWorkoutDraft : .workout,
-                    onKeepEditing: {
-                        showingDiscardConfirmation = false
-                    },
-                    onSaveDraftAndClose: {
-                        // The existing local checkpoint is the recoverable
-                        // draft; do not silently create a scheduled workout.
-                        persistWorkoutDraft()
-                        closeAfterDraftDecision = true
-                        showingDiscardConfirmation = false
-                    },
-                    onDiscard: {
-                        // The onDisappear draft observer must not recreate
-                        // the deleted checkpoint after dismissing this view.
-                        draftFinished = true
-                        pendingDraftCheckpoint?.cancel()
-                        pendingDraftCheckpoint = nil
-                        UserDefaults.standard.removeObject(forKey: draftStorageKey)
-                        onDraftDiscarded?()
-                        closeAfterDraftDecision = true
-                        showingDiscardConfirmation = false
-                    }
-                )
+                if focusedPlannerDay != nil {
+                    ATHLTHFocusedWorkoutDraftDecisionSheet(
+                        destination: draftDestinationDate,
+                        onKeepEditing: { showingDiscardConfirmation = false },
+                        onSaveDraftAndClose: { keepDraftAndClose() },
+                        onDiscard: { discardDraftAndClose() }
+                    )
+                } else {
+                    ATHLTHDiscardDraftSheet(
+                        kind: onCloseRequested != nil ? .standaloneWorkoutDraft : .workout,
+                        onKeepEditing: { showingDiscardConfirmation = false },
+                        onSaveDraftAndClose: { keepDraftAndClose() },
+                        onDiscard: { discardDraftAndClose() }
+                    )
+                }
             }
             .sheet(item: $selectedExerciseInfo) { block in
                 ATHLTHLinkedExerciseDetailView(block: block)

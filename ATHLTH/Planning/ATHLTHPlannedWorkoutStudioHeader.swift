@@ -10,6 +10,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     let durationMinutes: Int?
     let route: TrainingRoute?
     let scheduledAt: Binding<Date>?
+    let dateSelectionLocked: Bool
     /// Only supplied for running workouts. Other activities never expose
     /// the running environment selector.
     let runningEnvironment: Binding<RunEnvironment>?
@@ -27,6 +28,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         durationMinutes: Int?,
         route: TrainingRoute?,
         scheduledAt: Binding<Date>?,
+        dateSelectionLocked: Bool = false,
         runningEnvironment: Binding<RunEnvironment>? = nil,
         trainingPartnerName: String? = nil,
         collaborationInviteSent: Bool = false,
@@ -39,6 +41,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         self.durationMinutes = durationMinutes
         self.route = route
         self.scheduledAt = scheduledAt
+        self.dateSelectionLocked = dateSelectionLocked
         self.runningEnvironment = runningEnvironment
         self.trainingPartnerName = trainingPartnerName
         self.collaborationInviteSent = collaborationInviteSent
@@ -192,7 +195,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                 durationMinutes: durationMinutes,
                 routeTitle: route?.title
             ),
-            showsTimingLabel: scheduledAt != nil
+            showsTimingLabel: scheduledAt != nil && !dateSelectionLocked
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 if let trainingPartnerName {
@@ -307,6 +310,19 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     .accessibilityElement(children: .combine)
                 }
 
+                if dateSelectionLocked && !showsCardioMetrics {
+                    HStack(spacing: 12) {
+                        metric("clock", ATHLTHLocalization.choose(
+                            english: "Duration", norwegian: "Varighet"
+                        ), plannedDurationText)
+                        metric("list.bullet", ATHLTHLocalization.choose(
+                            english: "Steps", norwegian: "Deløkter"
+                        ), String(blocks.count))
+                    }
+                    .padding(10)
+                    .background(ATHLTHPlanDesign.selectedSurface.opacity(0.65),
+                                in: RoundedRectangle(cornerRadius: 12))
+                } else {
                 HStack(spacing: 0) {
                     metric("clock", ATHLTHLocalization.choose(
                         english: "Duration", norwegian: "Varighet"
@@ -334,6 +350,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     }
                 }
 
+                }
                 // Outdoor running keeps incline in the primary metrics row.
                 // Show pace as an additional compact detail without squeezing
                 // five columns into the four-column header.
@@ -374,6 +391,23 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                 }
 
                 if let scheduledAt {
+                    if dateSelectionLocked {
+                        DatePicker(selection: scheduledAt, displayedComponents: .hourAndMinute) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Start time", norwegian: "Starttid"
+                            ), systemImage: "clock")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        }
+                        .datePickerStyle(.compact)
+                        .tint(bronze)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityIdentifier("athlth-focused-workout-start-time")
+                    } else {
                     HStack(spacing: 8) {
                         DatePicker(
                             ATHLTHLocalization.choose(
@@ -395,10 +429,16 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                         .frame(maxWidth: .infinity)
                     }
                     .foregroundStyle(ink)
+                    }
                 }
             }
         }
         .accessibilityIdentifier("athlth-planned-shared-workout-details")
+    }
+
+    private var showsCardioMetrics: Bool {
+        activity == .running || activity == .walking || activity == .cycling ||
+            blocks.contains { $0.kind == .run }
     }
 
     private func metric(

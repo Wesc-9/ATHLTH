@@ -10,6 +10,14 @@ enum ATHLTHStudioDayChangePolicy {
         case confirmDraft
     }
 
+    /// A time picker changes the clock, never the selected weekday.
+    static func timeOnDay(_ time: Date, day: Date, calendar: Calendar = .current) -> Date {
+        let clock = calendar.dateComponents([.hour, .minute], from: time)
+        return calendar.date(bySettingHour: clock.hour ?? 18,
+                             minute: clock.minute ?? 0, second: 0,
+                             of: day) ?? calendar.startOfDay(for: day)
+    }
+
     static func decision(
         current: Date,
         proposed: Date,
@@ -434,7 +442,9 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                         plannedDate: scheduledTime,
                         initialActivity: selectedActivity,
                         initialStudioAdvanced: preferredAdvanced,
-                        onScheduledTimeChanged: { scheduledTime = $0 },
+                        onScheduledTimeChanged: {
+                            scheduledTime = ATHLTHStudioDayChangePolicy.timeOnDay($0, day: selectedDate)
+                        },
                         onAddStandalone: { draft in
                             saveWorkout(draft, for: selectedDate)
                         },
@@ -450,7 +460,9 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                         onKeepEditingInline: {
                             pendingDate = nil
                             exitToOverview = false
-                        }
+                        },
+                        focusedPlannerDay: selectedDate,
+                        draftDestinationDate: pendingDate
                     )
                     .environment(\.athlthStudioFullscreenEditing, true)
                     .id(activeDraftContext ?? "\(dateKey)-\(selectedActivity.rawValue)")

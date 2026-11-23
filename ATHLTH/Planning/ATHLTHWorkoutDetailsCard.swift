@@ -85,7 +85,7 @@ struct ATHLTHWorkoutDetailsCard<Details: View>: View {
                         english: "Workout name (optional)",
                         norwegian: "Øktnavn (valgfritt)"
                     ))
-                    .foregroundStyle(.secondary.opacity(0.55))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk.opacity(0.90))
                 )
                 .font(.subheadline.weight(.medium))
                 .tint(ATHLTHTrainDesign.bronze)

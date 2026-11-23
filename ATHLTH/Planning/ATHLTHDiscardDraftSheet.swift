@@ -245,3 +245,130 @@ struct ATHLTHDiscardDraftSheet: View {
     }
 
 }
+
+ 
+/// Compact day-switch decision, shared by the weekday rail and the back
+/// action. The parent only navigates after the builder has saved or deleted
+/// its checkpoint. Interactive dismissal never discards a workout.
+struct ATHLTHFocusedWorkoutDraftDecisionSheet: View {
+    let destination: Date?
+    let onKeepEditing: () -> Void
+    let onSaveDraftAndClose: () -> Void
+    let onDiscard: () -> Void
+
+    private let ink = ATHLTHTrainDesign.ink
+    private let bronze = ATHLTHTrainDesign.bronze
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private var heading: String {
+        destination == nil
+            ? tr("Keep your workout?", "Beholde øktutkastet?")
+            : tr("Change training day?", "Bytte treningsdag?")
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .center, spacing: 13) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 21, weight: .medium))
+                        .foregroundStyle(bronze)
+                        .frame(width: 52, height: 52)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 17))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ATHLTH · " + tr("DRAFT", "UTKAST"))
+                            .font(.caption2.weight(.bold))
+                            .tracking(1.8)
+                            .foregroundStyle(bronze)
+                        Text(heading)
+                            .font(.system(.title2, design: .serif, weight: .semibold))
+                            .foregroundStyle(ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: onKeepEditing) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .frame(width: 44, height: 44)
+                            .background(.white, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Cancel", "Avbryt"))
+                }
+
+                if let destination {
+                    Label(destination.formatted(.dateTime.weekday(.wide).day().month(.wide)),
+                          systemImage: "calendar")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(bronze)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                }
+
+                Text(tr("Your workout is not scheduled yet. Save it as a draft to continue later, or delete only this unfinished workout.",
+                        "Økten er ikke planlagt ennå. Behold den som utkast for å fortsette senere, eller slett kun denne uferdige økten."))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: 10) {
+                    Button(action: onSaveDraftAndClose) {
+                        Label(destination == nil
+                              ? tr("Keep draft and close", "Behold utkast og lukk")
+                              : tr("Keep draft and change day", "Behold utkast og bytt dag"),
+                              systemImage: "square.and.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(bronze.gradient, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .accessibilityIdentifier("athlth-focused-keep-draft")
+
+                    Button(action: onKeepEditing) {
+                        Label(tr("Continue editing", "Fortsett å redigere"),
+                              systemImage: "arrow.uturn.backward")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                            }
+                    }
+                    .accessibilityIdentifier("athlth-focused-continue-editing")
+
+                    Divider().padding(.vertical, 2)
+                    Button(role: .destructive, action: onDiscard) {
+                        Label(destination == nil
+                              ? tr("Delete draft and close", "Slett utkast og lukk")
+                              : tr("Delete draft and change day", "Slett utkast og bytt dag"),
+                              systemImage: "trash")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color(red: 0.66, green: 0.25, blue: 0.24))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityIdentifier("athlth-focused-delete-draft")
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(24)
+            .frame(maxWidth: 440)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .presentationDetents([.height(destination == nil ? 390 : 450), .large])
+        .presentationCornerRadius(28)
+        .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("athlth-focused-draft-decision")
+    }
+}

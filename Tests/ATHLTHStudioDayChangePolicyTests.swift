@@ -56,6 +56,16 @@ final class ATHLTHStudioDayChangePolicyTests: XCTestCase {
         }
     }
 
+    func testClockSelectionNeverMovesTheSelectedTrainingDay() {
+        let selected = calendar.date(byAdding: .day, value: 1, to: monday)!
+        let differentDay = calendar.date(bySettingHour: 7, minute: 35, second: 42, of: monday)!
+        let normalized = ATHLTHStudioDayChangePolicy.timeOnDay(differentDay, day: selected, calendar: calendar)
+        XCTAssertTrue(calendar.isDate(normalized, inSameDayAs: selected))
+        XCTAssertEqual(calendar.component(.hour, from: normalized), 7)
+        XCTAssertEqual(calendar.component(.minute, from: normalized), 35)
+        XCTAssertEqual(calendar.component(.second, from: normalized), 0)
+    }
+
     @MainActor
     func testSelectingSameDayNeverPrompts() {
         let laterOnSameDay = calendar.date(byAdding: .hour, value: 6, to: monday)!
