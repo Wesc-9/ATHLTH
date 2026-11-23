@@ -9,6 +9,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
     var globalScope: Bool = false
+    var triggerAvailability: ATHLTHCoachTriggerAvailability? = nil
 
     @State private var composerTarget: ATHLTHCoachEditorTarget?
     @State private var interruptedComposerTarget: ATHLTHCoachEditorTarget?
@@ -175,6 +176,10 @@ struct ATHLTHAudioCoachActiveListView: View {
                 target: target,
                 supportsStructured: showStructuredOptions,
                 showsRoutes: showRouteOptions,
+                triggerAvailability: triggerAvailability ??
+                    (globalScope ? .global :
+                        .session(hasRoute: showRouteOptions,
+                                 structured: showStructuredOptions)),
                 onClose: {
                     interruptedComposerTarget = nil
                     composerCheckpoint = nil
