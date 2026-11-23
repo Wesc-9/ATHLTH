@@ -18,6 +18,19 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
         return workout
     }
 
+    func testRepeatedExecutionRoundsKeepUniqueStepIDsAndSharedGhostSource() throws {
+        var blocks = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let sourceID = UUID()
+        blocks[0].ghostSegmentID = sourceID
+        let expanded = blocks.expandedForExecution()
+        XCTAssertEqual(expanded.first?.ghostSegmentID, sourceID)
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: planned(blocks), routeAlerts: .standard
+        )
+        XCTAssertEqual(Set(transfer.steps.map(\.id)).count, transfer.steps.count)
+        XCTAssertEqual(transfer.steps.first?.ghostSourceSegmentID, sourceID)
+    }
+
     func testSavedRecipeGhostSettingsAndSegmentIdentityReachLiveTransfer() throws {
         var blocks = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
         let selectedID = UUID()
