@@ -344,10 +344,21 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
 
-            ATHLTHTrainView(
-                navigationRequest: $trainNavigationRequest,
-                isActive: selectedTab == 1
-            )
+            Group {
+                // Do not mount Train's enormous SwiftUI/AttributeGraph tree
+                // while Home (or another tab) is selected. The inactive tree
+                // was previously built alongside Home, then invalidated again
+                // on Home -> Train, contributing to the stack-overflow crash.
+                if selectedTab == 1 {
+                    ATHLTHTrainView(
+                        navigationRequest: $trainNavigationRequest,
+                        isActive: true
+                    )
+                } else {
+                    Color.clear
+                        .accessibilityHidden(true)
+                }
+            }
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
