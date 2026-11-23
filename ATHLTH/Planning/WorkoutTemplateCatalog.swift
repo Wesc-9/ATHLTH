@@ -6472,6 +6472,10 @@ struct WorkoutTemplateBuilderView: View {
                                 // also restores the workout editor, not Coach,
                                 // if the app is reopened immediately.
                                 selectedWorkoutExtra = nil
+                                // Saving is an intentional exit. Clear any
+                                // stale background-resume marker so reopening
+                                // does not return to the just-closed Coach.
+                                resumeAuxiliarySheetAfterWake = nil
                                 persistWorkoutDraft()
                             }
                         }
