@@ -21,6 +21,14 @@ final class SocialStore: ObservableObject {
     @Published private(set) var coordinatedLobbySessionID: UUID?
     @Published private(set) var isCoordinatedLobbyMinimized = false
     @Published private(set) var currentJoinedWorkoutSessionID: UUID?
+    struct SharedRoomLaunch: Identifiable {
+        let id = UUID()
+        let workoutID: UUID
+        let sessionID: UUID
+        let accountID: UUID
+        let device: WorkoutCaptureDevice
+    }
+    @Published private(set) var pendingSharedRoomLaunch: SharedRoomLaunch?
     /// The creator must tap Start alone, even for remote workouts.
     /// This local intent is not the server-side participation mode.
     private var creatorIndependentStartRequestedID: UUID?
@@ -1278,6 +1286,20 @@ final class SocialStore: ObservableObject {
 
     /// Leave an invitation pending while starting a different workout.
     /// This only detaches the local launch; it never cancels the sent invites.
+    func requestSharedRoomLaunch(workoutID: UUID, sessionID: UUID, device: WorkoutCaptureDevice) {
+        guard let accountID = currentUserID, currentJoinedWorkoutSessionID == sessionID else { return }
+        pendingSharedRoomLaunch = SharedRoomLaunch(workoutID: workoutID, sessionID: sessionID,
+            accountID: accountID, device: device)
+    }
+
+    func takeSharedRoomLaunch() -> SharedRoomLaunch? {
+        let request = pendingSharedRoomLaunch
+        pendingSharedRoomLaunch = nil
+        guard let request, request.accountID == currentUserID,
+              request.sessionID == currentJoinedWorkoutSessionID else { return nil }
+        return request
+    }
+
     func proposedCreatorCaptureDevice(for sessionID: UUID) -> WorkoutCaptureDevice {
         creatorCaptureDevices[sessionID] ?? .iPhone
     }
@@ -3711,6 +3733,7 @@ final class SocialStore: ObservableObject {
     }
 
     private func reset() {
+        pendingSharedRoomLaunch = nil
         quickTrainFriendIDs = []
         preparedQuickTrainFriendIDs = nil
         quickTrainDiscoveredPartners = [:]

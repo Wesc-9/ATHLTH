@@ -1680,6 +1680,16 @@ struct ATHLTHHomeView: View {
                     }
                 )
             }
+            .onChange(of: social.pendingSharedRoomLaunch?.id, initial: true) { _, _ in
+                guard let request = social.takeSharedRoomLaunch() else { return }
+                guard request.accountID == session.profile.userID,
+                      let workout = session.standalonePlannedSessions.first(where: { $0.id == request.workoutID }) else {
+                    Task { await social.markCurrentJoinedWorkoutLaunchFailed() }
+                    return
+                }
+                onSelectTab(0)
+                startCalendarPreview(workout, planID: nil, device: request.device)
+            }
             .sheet(item: $selectedHomeStandaloneWorkout) { workout in
                 homeCalendarWorkoutSheet(workout)
                 .presentationDetents([.fraction(0.76), .large])

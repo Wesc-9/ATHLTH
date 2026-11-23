@@ -337,12 +337,19 @@ struct TrainTogetherLiveDraftRoomView: View {
     @State private var history: [RoomRevision] = []
     @State private var roomDataError: String?
     @State private var showingGuestLobby = false
+    @State private var openingReady = false
+    @State private var meetingEdit: MeetingEdit?
 
     let sourceWorkoutID: UUID
     var fallbackWorkout: PlannedSession? = nil
     var initiallyShowsChat = false
     var onOpenReady: (() -> Void)? = nil
 
+    private struct MeetingEdit: Identifiable {
+        let workout: PlannedSession
+        let revision: Int
+        var id: Int { revision }
+    }
     private enum RoomTab: String, CaseIterable { case workout, chat, history, recap }
     private struct EditorSelection: Identifiable {
         let workout: PlannedSession
@@ -485,6 +492,15 @@ struct TrainTogetherLiveDraftRoomView: View {
         .onDisappear {
             Task { await updateRoomPresence("away") }
         }
+        .sheet(item: $meetingEdit) { selection in
+            SharedWorkoutMeetingPicker(initial: selection.workout.meetingPoint) { point in
+                guard isOwner && canEdit else { return tr("Editing is unavailable.", "Redigering er ikke tilgjengelig.") }
+                var revised = selection.workout
+                revised.meetingPoint = point
+                return await live.save(revised, basedOn: selection.revision)
+                    ? nil : (live.errorMessage ?? tr("Could not save meeting point.", "Kunne ikke lagre møtested."))
+            }
+        }
         .sheet(isPresented: $showingGuestLobby) {
             if let invite = matchingInvite {
                 WorkoutInviteLaunchSheet(invite: invite)
@@ -617,6 +633,15 @@ struct TrainTogetherLiveDraftRoomView: View {
                 }
             } else {
                 Text(tr("No meeting point specified.", "Ingen møtested er valgt.")).font(.caption).foregroundStyle(.secondary)
+            }
+            if isOwner && canEdit, let draft = live.draft {
+                Button {
+                    meetingEdit = MeetingEdit(workout: workout, revision: draft.revision)
+                } label: {
+                    Label(tr("Choose meeting point", "Velg møtested"), systemImage: "mappin.circle")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered).tint(accent)
             }
         }
     }
@@ -778,26 +803,24 @@ struct TrainTogetherLiveDraftRoomView: View {
                          "Begge har godkjent. Klar-lobbyen kan åpnes."),
                       systemImage: "checkmark.seal.fill")
                     .font(.subheadline.weight(.medium)).foregroundStyle(accent)
-                if isOwner, let onOpenReady {
-                    Button(action: onOpenReady) {
+                if isOwner {
+                    Button {
+                        if let onOpenReady { onOpenReady() }
+                        else { Task { await openOwnerReady() } }
+                    } label: {
                         Label(tr("Open Ready lobby", "Åpne Klar-lobby"), systemImage: "person.2.fill")
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent).tint(accent)
-                    .disabled(live.isWorking || matchingSession?.resolvedWorkoutPhase == .completed)
+                    .disabled(live.isWorking || openingReady || matchingSession?.coordinatedStartAt != nil || matchingSession?.resolvedWorkoutPhase == .completed)
                 } else if !isOwner, matchingInvite != nil {
                     Button { showingGuestLobby = true } label: {
                         Label(tr("Join Ready lobby", "Gå til Klar-lobby"), systemImage: "person.2.fill")
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent).tint(accent)
-                } else if isOwner, social.coordinatedLobbySessionID == matchingSession?.id,
-                          social.coordinatedLobbySessionID != nil {
-                    Button { social.presentCoordinatedLobby() } label: {
-                        Label(tr("Return to Ready lobby", "Tilbake til Klar-lobby"), systemImage: "person.2.fill")
-                    }
                 } else {
-                    Text(isOwner ? tr("Open Ready from the planned workout in Calendar.", "Åpne Klar fra den planlagte økten i kalenderen.") : tr("Waiting for the host to open Ready.", "Venter på at arrangøren åpner Klar."))
+                    Text(tr("Waiting for the host to open Ready.", "Venter på at arrangøren åpner Klar."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
@@ -817,6 +840,46 @@ struct TrainTogetherLiveDraftRoomView: View {
             Text(tr("Editing resets both approvals.", "Endringer nullstiller begge godkjenningene."))
                 .font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    @MainActor private func openOwnerReady() async {
+        guard !openingReady, isOwner else { return }
+        if let current = social.coordinatedLobbySessionID {
+            if current == matchingSession?.id { social.presentCoordinatedLobby() }
+            else { roomDataError = tr("Another workout lobby is active.", "En annen øktlobby er aktiv.") }
+            return
+        }
+        openingReady = true
+        defer { openingReady = false }
+        await live.refresh(sourceWorkoutID)
+        guard let draft = live.draft, draft.bothApproved, isOwner,
+              var approved = live.workout,
+              let local = session.standalonePlannedSessions.first(where: {
+                  $0.id == sourceWorkoutID && $0.cancelledAt == nil && !$0.isExplicitRestDay
+              }), session.recordedTimes(for: sourceWorkoutID)?.endedAt == nil,
+              let friend = social.trainingPartners.first(where: { $0.userID == draft.partnerID }),
+              social.coordinatedLobbySessionID == nil else {
+            roomDataError = tr("The approved workout or training partner is unavailable.", "Godkjent økt eller treningspartner er ikke tilgjengelig.")
+            return
+        }
+        approved.gearIDs = local.gearIDs
+        approved.spotifyPlaylist = local.spotifyPlaylist
+        approved.spotifyAutoplayOnStart = local.spotifyAutoplayOnStart
+        approved.spotifyIntervalTrack = nil
+        let started = await social.beginWorkoutWithFriends(
+            title: approved.title, kind: approved.kind, friends: [friend],
+            creatorName: session.profile.displayName, creatorUsername: session.profile.username,
+            invitePayload: SocialWorkoutInvitePayload(workout: approved,
+                participationMode: draft.isPhysical ? .physical : .remote,
+                maxParticipants: 2, startIndependently: false),
+            creatorCaptureDevice: .iPhone
+        )
+        guard started, let joinedID = social.currentJoinedWorkoutSessionID else {
+            if let error = social.errorMessage { roomDataError = error }
+            return
+        }
+        social.requestSharedRoomLaunch(workoutID: sourceWorkoutID, sessionID: joinedID,
+                                       device: social.proposedCreatorCaptureDevice(for: joinedID))
     }
 
     private func approvalRow(_ label: String, approved: Bool) -> some View {
@@ -863,6 +926,102 @@ struct TrainTogetherLiveDraftRoomView: View {
                 return saved ? nil : (live.errorMessage ?? tr("Could not save the workout.", "Kunne ikke lagre økten."))
             }
         )
+    }
+}
+
+/// Only a deliberately chosen meeting pin is shared, never live GPS.
+private struct SharedWorkoutMeetingPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var point: PlannedWorkoutMeetingPoint?
+    @State private var query = ""
+    @State private var position: MapCameraPosition = .automatic
+    @State private var busy = false
+    @State private var error: String?
+    let onSave: (PlannedWorkoutMeetingPoint?) async -> String?
+
+    init(initial: PlannedWorkoutMeetingPoint?, onSave: @escaping (PlannedWorkoutMeetingPoint?) async -> String?) {
+        _point = State(initialValue: initial)
+        _query = State(initialValue: initial?.address ?? initial?.name ?? "")
+        self.onSave = onSave
+        if let initial {
+            _position = State(initialValue: .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: initial.latitude, longitude: initial.longitude),
+                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02))))
+        }
+    }
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                HStack {
+                    TextField(tr("Search for an address", "Søk etter sted eller adresse"), text: $query)
+                        .textFieldStyle(.roundedBorder).submitLabel(.search)
+                        .onSubmit { Task { await lookup() } }
+                    Button { Task { await lookup() } } label: {
+                        Image(systemName: "magnifyingglass")
+                    }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                MapReader { proxy in
+                    Map(position: $position) {
+                        if let point {
+                            Marker(point.name, coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude))
+                        }
+                    }
+                    .onTapGesture { location in
+                        if let coordinate = proxy.convert(location, from: .local), !busy {
+                            point = PlannedWorkoutMeetingPoint(name: query.isEmpty ? tr("Meeting point", "Møtested") : query,
+                                address: "", latitude: coordinate.latitude, longitude: coordinate.longitude)
+                        }
+                    }
+                }
+                .frame(minHeight: 220).clipShape(RoundedRectangle(cornerRadius: 16))
+                if let point { Label(point.name, systemImage: "mappin").font(.subheadline) }
+                Button(tr("Remove meeting point", "Fjern møtested"), role: .destructive) { point = nil }
+                    .disabled(busy || point == nil)
+                if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            }
+            .padding(16)
+            .background(ATHLTHTrainTogetherDesign.canvas)
+            .navigationTitle(tr("Meeting point", "Møtested"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel", "Avbryt")) { dismiss() }.disabled(busy)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Save", "Lagre")) {
+                        Task {
+                            busy = true
+                            let failure = await onSave(point)
+                            busy = false
+                            if let failure { error = failure } else { dismiss() }
+                        }
+                    }.disabled(busy)
+                }
+            }
+        }
+        .interactiveDismissDisabled(busy)
+    }
+    @MainActor private func lookup() async {
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty, !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = clean
+            let response = try await MKLocalSearch(request: request).start()
+            guard let item = response.mapItems.first else {
+                error = tr("No place found.", "Fant ikke stedet."); return
+            }
+            let coordinate = item.placemark.coordinate
+            point = PlannedWorkoutMeetingPoint(name: item.name ?? clean,
+                address: item.placemark.title ?? clean, latitude: coordinate.latitude, longitude: coordinate.longitude)
+            position = .region(MKCoordinateRegion(center: coordinate, span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)))
+            error = nil
+        } catch { self.error = error.localizedDescription }
     }
 }
 
