@@ -4124,10 +4124,30 @@ final class AppSessionStore: ObservableObject {
             .sorted { $0.createdAt > $1.createdAt }
 
         for existing in standalonePlannedSessions {
+            guard recordedTimes(for: existing.id) == nil else { continue }
+            if PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(existing) {
+                let invitations = PlannedWorkoutWithdrawalPolicy.invitations(
+                    in: messages, sourceID: existing.id, organizerID: profile.userID)
+                if !invitations.isEmpty && invitations.allSatisfy({ invitation in
+                    PlannedWorkoutWithdrawalPolicy.cancellation(
+                        in: messages, sourceID: existing.id, organizerID: profile.userID,
+                        recipientID: invitation.recipientID) != nil
+                }) {
+                    removeStandalonePlannedSession(existing.id)
+                    continue
+                }
+            }
             guard let ownerID = existing.sharedSourceOwnerID,
                   let sourceID = existing.sharedSourceSessionID
             else { continue }
 
+            if PlannedWorkoutWithdrawalPolicy.cancellation(
+                in: messages, sourceID: sourceID, organizerID: ownerID,
+                recipientID: profile.userID
+            ) != nil {
+                removeStandalonePlannedSession(existing.id)
+                continue
+            }
             let latest = events
                 .filter { event in
                     event.senderID == ownerID &&
@@ -4171,11 +4191,10 @@ final class AppSessionStore: ObservableObject {
         let cutoff = Date().addingTimeInterval(-86_400)
         let sourceIDs = Array(Set(
             standalonePlannedSessions.compactMap { item -> UUID? in
-                guard item.sharedSourceOwnerID != nil,
-                      let sourceID = item.sharedSourceSessionID,
-                      (item.scheduledStart ?? .distantPast) >= cutoff
-                else { return nil }
-                return sourceID
+                guard (item.scheduledStart ?? .distantPast) >= cutoff,
+                      recordedTimes(for: item.id) == nil else { return nil }
+                if item.sharedSourceOwnerID != nil { return item.sharedSourceSessionID }
+                return PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(item) ? item.id : nil
             }
         )).prefix(12)
         let service = SupabaseMessagingService()

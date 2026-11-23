@@ -118,8 +118,9 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                     exercisesCard
                 }
 
-                if currentWorkout.trainTogetherMode != nil {
+                if currentWorkout.trainTogetherMode != nil && !isLocked {
                     lobbyButton
+                    PlannedWorkoutWithdrawalButton(workout: currentWorkout)
                 }
             }
             .padding(.horizontal, 19)

@@ -347,4 +347,42 @@ final class PlannedWorkoutInviteTests: XCTestCase {
         )
     }
 
+    func testWithdrawalPolicyRejectsForgedAndUnrelatedEvents() throws {
+        let owner = UUID(), partner = UUID(), other = UUID(), source = UUID()
+        func message(sender: UUID, recipient: UUID, version: Int,
+                     event: WorkoutInviteLifecycleUpdate? = nil) throws -> DirectMessageRecord {
+            let payload = try event.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
+            return DirectMessageRecord(
+                id: UUID(), conversationID: UUID(), senderID: sender, recipientID: recipient,
+                body: nil, attachmentKindRaw: "workout", attachmentTitle: "Workout",
+                attachmentSubtitle: nil, attachmentPayload: payload, shareVersion: version,
+                sourceObjectID: source, sourceOwnerID: owner, createdAt: Date(),
+                readAt: nil, deletedAt: nil)
+        }
+        let event = WorkoutInviteLifecycleUpdate(sourceWorkoutID: source,
+            organizerID: owner, kind: .cancelled, updatedWorkout: nil, occurredAt: Date())
+        let valid = try message(sender: owner, recipient: partner, version: 6, event: event)
+        let forged = try message(sender: partner, recipient: partner, version: 6, event: event)
+        let unrelated = try message(sender: owner, recipient: other, version: 6, event: event)
+        XCTAssertNil(PlannedWorkoutWithdrawalPolicy.cancellation(
+            in: [forged, unrelated], sourceID: source, organizerID: owner, recipientID: partner))
+        XCTAssertEqual(PlannedWorkoutWithdrawalPolicy.cancellation(
+            in: [valid, forged, unrelated], sourceID: source, organizerID: owner, recipientID: partner), event)
+        let invite = try message(sender: owner, recipient: partner, version: 2)
+        XCTAssertEqual(PlannedWorkoutWithdrawalPolicy.invitations(
+            in: [invite, invite, forged], sourceID: source, organizerID: owner).count, 1)
+    }
+
+    func testWithdrawalOnlyOfferedToOrganizer() {
+        var workout = makeWorkout()
+        workout.invitedPartnerID = UUID()
+        workout.trainTogetherMode = .sameWorkout
+        XCTAssertTrue(PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(workout))
+        workout.sharedSourceOwnerID = UUID()
+        XCTAssertFalse(PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(workout))
+        workout.sharedSourceOwnerID = nil
+        workout.cancelledAt = Date()
+        XCTAssertFalse(PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(workout))
+    }
+
 }

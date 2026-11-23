@@ -5432,13 +5432,19 @@ struct DirectMessageThreadView: View {
         guard invitation.attachmentKind == .workout,
               invitation.shareVersion == 2,
               let sourceID = invitation.sourceObjectID else { return nil }
+        if let cancelled = PlannedWorkoutWithdrawalPolicy.cancellation(
+            in: messages, sourceID: sourceID, organizerID: invitation.senderID,
+            recipientID: invitation.recipientID
+        ) { return cancelled }
         return messages
             .filter {
+                $0.deletedAt == nil &&
                 $0.attachmentKind == .workout &&
                 $0.shareVersion == 6 &&
                 $0.sourceObjectID == sourceID &&
                 $0.sourceOwnerID == invitation.senderID &&
-                $0.senderID == invitation.senderID
+                $0.senderID == invitation.senderID &&
+                $0.recipientID == invitation.recipientID
             }
             .sorted { $0.createdAt > $1.createdAt }
             .compactMap {
@@ -5766,39 +5772,15 @@ struct DirectMessageThreadView: View {
 
     private func withdrawPlannedInvite(_ invitation: DirectMessageRecord) {
         guard invitation.senderID == session.profile.userID,
-              invitation.shareVersion == 2,
-              invitation.attachmentKind == .workout,
+              invitation.shareVersion == 2, invitation.attachmentKind == .workout,
               respondingToPlannedInviteID == nil,
-              let conversationID,
-              let sourceID = invitation.sourceObjectID,
-              let workout = invitation.decodeSnapshot(PlannedSession.self),
-              latestWorkoutLifecycle(for: invitation, in: messaging.messages(in: conversationID))?.kind != .cancelled
-        else { return }
+              let sourceID = invitation.sourceObjectID else { return }
         respondingToPlannedInviteID = invitation.id
         Task {
             defer { respondingToPlannedInviteID = nil }
             do {
-                let update = WorkoutInviteLifecycleUpdate(
-                    sourceWorkoutID: sourceID,
-                    organizerID: session.profile.userID,
-                    kind: .cancelled,
-                    updatedWorkout: nil,
-                    occurredAt: Date()
-                )
-                let attachment = try MessageShareDraft(
-                    kind: .workout, title: workout.title,
-                    subtitle: ATHLTHLocalization.choose(english: "Invitation withdrawn", norwegian: "Invitasjon trukket tilbake"),
-                    snapshot: update, sourceObjectID: sourceID,
-                    sourceOwnerID: session.profile.userID, shareVersion: 6
-                )
-                guard await messaging.send(to: friend.userID, conversationID: conversationID,
-                    body: ATHLTHLocalization.choose(english: "I withdrew the workout invitation.", norwegian: "Jeg har trukket tilbake treningsinvitasjonen."),
-                    attachment: attachment) else {
-                    plannedInviteError = messaging.errorMessage ?? "Kunne ikke trekke tilbake invitasjonen."
-                    return
-                }
-                await messaging.refreshConversation(conversationID)
-                session.syncSharedWorkoutLifecycles(from: messaging.messages(in: conversationID))
+                try await messaging.withdrawPlannedWorkout(
+                    sourceID: sourceID, session: session, social: social)
             } catch {
                 plannedInviteError = error.localizedDescription
             }
@@ -5848,6 +5830,18 @@ struct DirectMessageThreadView: View {
         Task {
             defer { respondingToPlannedInviteID = nil }
             do {
+                let fresh = try await SupabaseMessagingService()
+                    .loadPlannedWorkoutInvitationMessages(sourceWorkoutID: sourceID)
+                guard PlannedWorkoutWithdrawalPolicy.cancellation(
+                    in: fresh, sourceID: sourceID, organizerID: invitation.senderID,
+                    recipientID: invitation.recipientID
+                ) == nil, plannedInviteResponse(for: invitation, in: fresh) == nil else {
+                    await messaging.refreshConversation(conversationID)
+                    plannedInviteError = ATHLTHLocalization.choose(
+                        english: "This invitation is no longer open.",
+                        norwegian: "Invitasjonen er ikke lenger åpen.")
+                    return
+                }
                 let decision: PlannedWorkoutInviteDecision = accept
                     ? .accepted : .declined
                 let response = PlannedWorkoutInviteResponse(
@@ -5892,6 +5886,19 @@ struct DirectMessageThreadView: View {
                     return
                 }
 
+                let confirmed = try await SupabaseMessagingService()
+                    .loadPlannedWorkoutInvitationMessages(sourceWorkoutID: sourceID)
+                if PlannedWorkoutWithdrawalPolicy.cancellation(
+                    in: confirmed, sourceID: sourceID, organizerID: invitation.senderID,
+                    recipientID: invitation.recipientID
+                ) != nil {
+                    session.syncSharedWorkoutLifecycles(from: confirmed)
+                    await messaging.refreshConversation(conversationID)
+                    plannedInviteError = ATHLTHLocalization.choose(
+                        english: "The invitation was withdrawn.",
+                        norwegian: "Invitasjonen ble trukket tilbake.")
+                    return
+                }
                 if accept {
                     var copy = workout
                     copy.gearIDs = []

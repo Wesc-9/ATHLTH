@@ -79,7 +79,7 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                                           systemImage: "calendar.badge.minus")
                                 }
                             }
-                            if onDelete != nil {
+                            if onDelete != nil && !PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(workout) {
                                 Button(role: .destructive) {
                                     confirmingDeletion = true
                                 } label: {
@@ -104,6 +104,10 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         HomeDailyRecommendedWorkoutHero(workout: workout)
+
+                        if isCalendarWorkout && !isPlanWorkout {
+                            PlannedWorkoutWithdrawalButton(workout: workout)
+                        }
 
                         if !workout.resolvedWorkoutBlocks.isEmpty {
                             // Use the same grouped phases as the Simple
@@ -218,6 +222,63 @@ struct HomeDailyRecommendedWorkoutSheet: View {
                         .frame(height: 0.75)
                 }
                 }
+            }
+        }
+    }
+}
+
+/// One confirmed asynchronous action for both Calendar and Train.
+struct PlannedWorkoutWithdrawalButton: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var social: SocialStore
+    let workout: PlannedSession
+    @State private var confirming = false
+    @State private var working = false
+    @State private var failure: String?
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    var body: some View {
+        if let current = session.standalonePlannedSessions.first(where: { $0.id == workout.id }),
+           PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(current),
+           session.recordedTimes(for: current.id) == nil {
+            VStack(alignment: .leading, spacing: 8) {
+                Button(role: .destructive) { confirming = true } label: {
+                    Label(tr("Withdraw invitation", "Trekk tilbake invitasjon"),
+                          systemImage: "xmark.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .disabled(working)
+                .accessibilityIdentifier("athlth-withdraw-planned-invitation")
+                if working { ProgressView(tr("Notifying participant…", "Varsler deltakeren…")) }
+                if let failure {
+                    Text(failure).font(.caption).foregroundStyle(.red)
+                }
+            }
+            .confirmationDialog(tr("Withdraw invitation?", "Trekke tilbake invitasjonen?"),
+                isPresented: $confirming, titleVisibility: .visible) {
+                Button(tr("Withdraw invitation", "Trekk tilbake invitasjon"), role: .destructive) {
+                    working = true
+                    failure = nil
+                    Task {
+                        defer { working = false }
+                        do {
+                            try await messaging.withdrawPlannedWorkout(
+                                sourceID: current.id, session: session, social: social)
+                            dismiss()
+                        } catch { failure = error.localizedDescription }
+                    }
+                }
+                Button(tr("Keep workout", "Behold økt"), role: .cancel) {}
+            } message: {
+                Text(tr("The shared workout will be cancelled for both participants. Recorded training is kept.",
+                        "Fellesøkten avlyses for begge. Registrert trening beholdes."))
             }
         }
     }

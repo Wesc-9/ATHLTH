@@ -18,6 +18,7 @@ final class MessagingStore: ObservableObject {
     private var preferences: [UUID: ATHLTHConversationPreference] = [:]
     private var preferenceSyncTask: Task<Void, Never>?
     private var isPreferencesSyncing = false
+    private var withdrawalsInFlight: Set<UUID> = []
 
     init(service: SupabaseMessagingService = SupabaseMessagingService()) {
         self.service = service
@@ -691,6 +692,86 @@ final class MessagingStore: ObservableObject {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    /// Shared by Messages, Calendar, Train and the planned lobby.
+    /// Never remove the organizer's entry until all invitations are notified.
+    func withdrawPlannedWorkout(
+        sourceID: UUID, session: AppSessionStore, social: SocialStore
+    ) async throws {
+        func failure(_ english: String, _ norwegian: String) -> NSError {
+            NSError(domain: "ATHLTH.WorkoutWithdrawal", code: 1,
+                userInfo: [NSLocalizedDescriptionKey:
+                    ATHLTHLocalization.choose(english: english, norwegian: norwegian)])
+        }
+        guard let organizerID = currentUserID,
+              organizerID == session.profile.userID,
+              session.recordedTimes(for: sourceID) == nil else {
+            throw failure("This workout cannot be withdrawn.", "Denne økten kan ikke trekkes tilbake.")
+        }
+        guard withdrawalsInFlight.insert(sourceID).inserted else {
+            throw failure("Withdrawal is already in progress.", "Tilbaketrekking pågår allerede.")
+        }
+        defer { withdrawalsInFlight.remove(sourceID) }
+        let messages = try await service.loadPlannedWorkoutInvitationMessages(sourceWorkoutID: sourceID)
+        guard currentUserID == organizerID, session.profile.userID == organizerID else {
+            throw failure("Account changed.", "Kontoen er endret.")
+        }
+        let invitations = PlannedWorkoutWithdrawalPolicy.invitations(
+            in: messages, sourceID: sourceID, organizerID: organizerID
+        )
+        guard !invitations.isEmpty else {
+            throw failure("No sent invitation was found.", "Fant ingen sendt invitasjon.")
+        }
+        await social.refresh()
+        let matchingLobbies = social.workoutSessions.filter {
+            $0.creatorID == organizerID && $0.status == .active &&
+            $0.invitePayload?.workout.id == sourceID
+        }
+        let lobbyIDs = Set(matchingLobbies.map(\.id))
+        guard session.recordedTimes(for: sourceID) == nil,
+              !social.workoutParticipants.contains(where: {
+                  lobbyIDs.contains($0.sessionID) && $0.workoutStartedAt != nil
+              }) else {
+            throw failure("The shared workout has already started.", "Fellesøkten er allerede startet.")
+        }
+        for lobby in matchingLobbies {
+            await social.cancelActiveWorkout(sessionID: lobby.id)
+            guard !social.workoutSessions.contains(where: { $0.id == lobby.id }) else {
+                throw failure("Could not close the ready lobby.", "Kunne ikke lukke klar-lobbyen.")
+            }
+        }
+        let change = WorkoutInviteLifecycleUpdate(
+            sourceWorkoutID: sourceID, organizerID: organizerID,
+            kind: .cancelled, updatedWorkout: nil, occurredAt: Date()
+        )
+        for invitation in invitations {
+            guard currentUserID == organizerID, session.profile.userID == organizerID else {
+                throw failure("Account changed.", "Kontoen er endret.")
+            }
+            if PlannedWorkoutWithdrawalPolicy.cancellation(
+                in: messages, sourceID: sourceID, organizerID: organizerID,
+                recipientID: invitation.recipientID
+            ) != nil { continue }
+            let attachment = try MessageShareDraft(
+                kind: .workout, title: invitation.attachmentTitle ?? "ATHLTH",
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Invitation withdrawn", norwegian: "Invitasjon trukket tilbake"),
+                snapshot: change, sourceObjectID: sourceID,
+                sourceOwnerID: organizerID, shareVersion: 6
+            )
+            try await service.sendMessage(
+                conversationID: invitation.conversationID, to: invitation.recipientID,
+                body: ATHLTHLocalization.choose(
+                    english: "The planned shared workout has been cancelled.",
+                    norwegian: "Den planlagte fellesøkten er avlyst."),
+                attachment: attachment
+            )
+            await refreshConversation(invitation.conversationID)
+        }
+        guard currentUserID == organizerID, session.profile.userID == organizerID else { return }
+        let latest = try await service.loadPlannedWorkoutInvitationMessages(sourceWorkoutID: sourceID)
+        session.syncSharedWorkoutLifecycles(from: latest)
     }
 
     func reset() {

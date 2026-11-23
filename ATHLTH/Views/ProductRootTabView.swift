@@ -3182,7 +3182,8 @@ struct ATHLTHHomeView: View {
             isCalendarWorkout: true,
             canStart: !completed && !skipped && !workout.isExplicitRestDay
                 && session.recordedTimes(for: workout.id)?.endedAt == nil,
-            onDelete: completed ? nil : { removeHomeCalendarWorkout(workout) }
+            onDelete: completed || PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(workout)
+                ? nil : { removeHomeCalendarWorkout(workout) }
         )
     }
 
@@ -3339,6 +3340,9 @@ struct ATHLTHHomeView: View {
     }
 
     private func removeHomeCalendarWorkout(_ workout: PlannedSession) {
+        // Organizer-owned shared sessions must go through the confirmed
+        // withdrawal action, not a local calendar deletion.
+        guard !PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout(workout) else { return }
         if let planID = HomeWeeklyProgressCalendar.containingPlanID(
             for: workout, in: session.activePlan
         ), let plan = session.trainingPlan(withID: planID) {
@@ -4445,7 +4449,7 @@ struct ATHLTHHomeView: View {
                 where: { $0.id == workout.id }
             ) ?? session.activePlan?.weeks.flatMap(\.days)
                 .flatMap(\.sessions).first(where: { $0.id == workout.id })
-            guard let persisted, !persisted.isExplicitRestDay,
+            guard let persisted, !persisted.isExplicitRestDay, persisted.cancelledAt == nil,
                   session.recordedTimes(for: persisted.id)?.endedAt == nil,
                   planID.map({ !session.isPlanSessionSkipped(
                       planID: $0, sessionID: persisted.id
@@ -6979,7 +6983,7 @@ struct ATHLTHTrainView: View {
     ) {
         guard let original = session.standalonePlannedSessions.first(where: {
             $0.id == selected.id
-        }), !original.isExplicitRestDay,
+        }), !original.isExplicitRestDay, original.cancelledAt == nil,
             session.recordedTimes(for: original.id)?.endedAt == nil,
             !hasOngoingTrainWorkout else { return }
 
@@ -6993,7 +6997,7 @@ struct ATHLTHTrainView: View {
             guard !hasOngoingTrainWorkout,
                   let current = session.standalonePlannedSessions.first(where: {
                       $0.id == original.id
-                  }), !current.isExplicitRestDay,
+                  }), !current.isExplicitRestDay, current.cancelledAt == nil,
                   session.recordedTimes(for: current.id)?.endedAt == nil
             else { return }
 

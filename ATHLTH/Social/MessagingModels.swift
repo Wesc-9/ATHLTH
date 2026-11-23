@@ -176,6 +176,47 @@ enum PlannedWorkoutInvitationPresentationState: Equatable {
     var canRespond: Bool { self == .pending }
 }
 
+/// A cancellation is terminal for a source/organizer/recipient tuple.
+enum PlannedWorkoutWithdrawalPolicy {
+    static func isOrganizerWorkout(_ workout: PlannedSession) -> Bool {
+        workout.sharedSourceOwnerID == nil &&
+            workout.invitedPartnerID != nil &&
+            workout.trainTogetherMode != nil &&
+            workout.cancelledAt == nil
+    }
+
+    static func invitations(
+        in messages: [DirectMessageRecord], sourceID: UUID, organizerID: UUID
+    ) -> [DirectMessageRecord] {
+        var seen = Set<UUID>()
+        return messages.filter {
+            $0.deletedAt == nil && $0.attachmentKind == .workout &&
+            $0.shareVersion == 2 && $0.sourceObjectID == sourceID &&
+            $0.sourceOwnerID == organizerID && $0.senderID == organizerID &&
+            $0.recipientID != organizerID
+        }.sorted { $0.createdAt > $1.createdAt }.filter {
+            seen.insert($0.recipientID).inserted
+        }
+    }
+
+    static func cancellation(
+        in messages: [DirectMessageRecord], sourceID: UUID,
+        organizerID: UUID, recipientID: UUID
+    ) -> WorkoutInviteLifecycleUpdate? {
+        messages.filter {
+            $0.deletedAt == nil && $0.attachmentKind == .workout &&
+            $0.shareVersion == 6 && $0.sourceObjectID == sourceID &&
+            $0.sourceOwnerID == organizerID && $0.senderID == organizerID &&
+            $0.recipientID == recipientID
+        }.sorted { $0.createdAt > $1.createdAt }.compactMap {
+            $0.decodeSnapshot(WorkoutInviteLifecycleUpdate.self)
+        }.first {
+            $0.sourceWorkoutID == sourceID && $0.organizerID == organizerID &&
+            $0.kind == .cancelled
+        }
+    }
+}
+
 struct PlannedWorkoutInviteResponse: Codable, Hashable {
     let sourceWorkoutID: UUID
     let decision: PlannedWorkoutInviteDecision

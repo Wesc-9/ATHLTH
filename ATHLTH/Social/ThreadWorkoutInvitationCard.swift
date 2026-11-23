@@ -674,7 +674,18 @@ struct PlannedWorkoutLobbyView: View {
     private var canEnterReadyLobby: Bool {
         // Existing invitations (before the live-draft migration) keep their
         // old behavior. New invitations require both approvals of one revision.
-        sharedDraft.draft?.bothApproved ?? true
+        hasLoaded && loadError == nil &&
+            !hasCancelledInvitation &&
+            (sharedDraft.draft?.bothApproved ?? true)
+    }
+
+    private var hasCancelledInvitation: Bool {
+        let recipient = isOrganizer ? workout.invitedPartnerID : session.profile.userID
+        guard let recipient else { return false }
+        return PlannedWorkoutWithdrawalPolicy.cancellation(
+            in: messages, sourceID: sourceWorkoutID, organizerID: organizerID,
+            recipientID: recipient
+        ) != nil
     }
 
     private var isOrganizer: Bool {
@@ -693,7 +704,7 @@ struct PlannedWorkoutLobbyView: View {
 
     private var persistedWorkout: PlannedSession? {
         session.standalonePlannedSessions.first {
-            $0.id == workout.id && !$0.isExplicitRestDay
+            $0.id == workout.id && !$0.isExplicitRestDay && $0.cancelledAt == nil
         }
     }
 
@@ -947,6 +958,14 @@ struct PlannedWorkoutLobbyView: View {
         isPublishingLifecycle = true
         defer { isPublishingLifecycle = false }
         lifecycleError = nil
+        if kind == .cancelled {
+            do {
+                try await messaging.withdrawPlannedWorkout(
+                    sourceID: sourceWorkoutID, session: session, social: social)
+                dismiss()
+            } catch { lifecycleError = error.localizedDescription }
+            return
+        }
         let change = WorkoutInviteLifecycleUpdate(
             sourceWorkoutID: sourceWorkoutID,
             organizerID: organizerID,
@@ -1529,6 +1548,7 @@ struct PlannedWorkoutLobbyView: View {
             )
             // Do not invalidate the lobby when the status has not changed.
             if messages != latest { messages = latest }
+            session.syncSharedWorkoutLifecycles(from: latest)
             if loadError != nil { loadError = nil }
         } catch {
             loadError = ATHLTHLocalization.choose(
