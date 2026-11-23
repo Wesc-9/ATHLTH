@@ -535,48 +535,14 @@ struct ATHLTHiPadStudioRootView: View {
                 studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
-                    .overlay(alignment: .topTrailing) {
-                        // Keep the same panel-edge handle available whenever
-                        // the inbox is collapsed, on every Studio destination.
-                        if !showingInspector {
-                            Button {
-                                openMessageHub()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(gold)
-                                    .frame(width: 26, height: 44)
-                                    .background(canvas, in: RoundedRectangle(cornerRadius: 12))
-                                    .overlay(RoundedRectangle(cornerRadius: 12)
-                                        .stroke(gold.opacity(0.3)))
-                                    // Preserve the slim visual grip with a
-                                    // comfortable 44pt touch target.
-                                    .frame(width: 44, height: 48)
-                                    .contentShape(Rectangle())
+                    // This belongs to the navigation bar, not an overlay on
+                    // Studio content. Overlaying the planner obscures its
+                    // next-week control and blocks taps in the top-right.
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            if !showingInspector {
+                                inboxNavigationHandle
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                ATHLTHLocalization.choose(
-                                    english: "Open Inbox",
-                                    norwegian: "Åpne innboks"
-                                )
-                            )
-                            .accessibilityIdentifier("athlth-ipad-message-edge")
-                            .accessibilityHint(ATHLTHLocalization.choose(
-                                english: "Tap or swipe left on this handle to open Inbox",
-                                norwegian: "Trykk eller sveip mot venstre på håndtaket for å åpne Innboks"
-                            ))
-                            .padding(.top, 2)
-                            .simultaneousGesture(
-                                DragGesture(minimumDistance: 15)
-                                    .onEnded { value in
-                                        if ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
-                                            translation: value.translation
-                                        ) {
-                                            openMessageHub()
-                                        }
-                                    }
-                            )
                         }
                     }
                     // Overview owns its compact title/metrics inside the
@@ -601,6 +567,48 @@ struct ATHLTHiPadStudioRootView: View {
             }
             .id(detailNavigationIdentity)
         }
+    }
+
+    /// One global Inbox affordance in the top navigation bar. It stays
+    /// outside day / week controls in every Studio destination, including
+    /// the nested Basic and Advanced workout editor.
+    private var inboxNavigationHandle: some View {
+        Button {
+            openMessageHub()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(gold)
+                .frame(width: 26, height: 40)
+                .background(canvas, in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(gold.opacity(0.3))
+                        .allowsHitTesting(false)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Open Inbox",
+            norwegian: "Åpne innboks"
+        ))
+        .accessibilityIdentifier("athlth-ipad-message-edge")
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Tap or swipe left on this handle to open Inbox",
+            norwegian: "Trykk eller sveip mot venstre på håndtaket for å åpne Innboks"
+        ))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 15)
+                .onEnded { value in
+                    if ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+                        translation: value.translation
+                    ) {
+                        openMessageHub()
+                    }
+                }
+        )
     }
 
     private func openMessageHub() {
