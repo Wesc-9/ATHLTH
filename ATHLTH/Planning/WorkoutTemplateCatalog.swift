@@ -6397,29 +6397,57 @@ struct WorkoutTemplateBuilderView: View {
             }) {
                 blockPickerSheet
             }
-            .sheet(isPresented: $showingSavedWorkoutPicker) {
-                if isPlannedWorkout {
-                    WorkoutTemplateLibraryView(
-                        onSelectPlanned: { workout in
-                            showingSavedWorkoutPicker = false
-                            if !studioAdvanced {
-                                if !blocks.isEmpty {
-                                    pendingBasicLibraryWorkout = workout
-                                    confirmingBasicLibraryReplacement = true
-                                } else {
-                                    applyBasicLibraryWorkout(workout)
-                                }
-                            } else {
-                                let wasBlank = blocks.isEmpty
-                                appendSavedWorkout(workout)
-                                if wasBlank && !blocks.isEmpty { title = workout.title }
-                            }
-                        },
-                        initialCategory: initialActivity
-                    )
-                } else {
-                    savedWorkoutPickerSheet
+            .sheet(isPresented: $showingSavedWorkoutPicker, onDismiss: {
+                // An intentional swipe/Close must restore the SAME workout
+                // builder, not reopen the picker on the next scene activation.
+                if scenePhase == .active &&
+                   resumeAuxiliarySheetAfterWake == "savedWorkoutPicker" {
+                    resumeAuxiliarySheetAfterWake = nil
                 }
+                persistWorkoutDraft()
+            }) {
+                Group {
+                    if isPlannedWorkout {
+                        NavigationStack {
+                            WorkoutTemplateLibraryView(
+                                onSelectPlanned: { workout in
+                                    showingSavedWorkoutPicker = false
+                                    if !studioAdvanced {
+                                        if !blocks.isEmpty {
+                                            pendingBasicLibraryWorkout = workout
+                                            confirmingBasicLibraryReplacement = true
+                                        } else {
+                                            applyBasicLibraryWorkout(workout)
+                                        }
+                                    } else {
+                                        let wasBlank = blocks.isEmpty
+                                        appendSavedWorkout(workout)
+                                        if wasBlank && !blocks.isEmpty { title = workout.title }
+                                    }
+                                },
+                                initialCategory: initialActivity
+                            )
+                            .navigationTitle(tr("Add workout", "Legg til treningsøkt"))
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button(tr("Close", "Lukk")) {
+                                        showingSavedWorkoutPicker = false
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        savedWorkoutPickerSheet
+                    }
+                }
+                // Use a wide iPad page sheet instead of the narrow form
+                // popup. Native drag-to-dismiss keeps the underlying
+                // exercise draft, scroll position and selected mode alive.
+                .presentationSizing(.page)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
             }
             .sheet(isPresented: $showingStudioRoutePicker) {
                 SavedRoutesView(
@@ -6625,7 +6653,12 @@ struct WorkoutTemplateBuilderView: View {
             .sheet(item: $selectedExerciseInfo) { block in
                 ATHLTHLinkedExerciseDetailView(block: block)
             }
-            .sheet(isPresented: $showingExercisePicker) {
+            .sheet(isPresented: $showingExercisePicker, onDismiss: {
+                if scenePhase == .active {
+                    resumeExercisePickerAfterWake = false
+                }
+                persistWorkoutDraft()
+            }) {
                 NavigationStack {
                     ExerciseLibraryView(
                         source: nil,
@@ -6648,9 +6681,25 @@ struct WorkoutTemplateBuilderView: View {
                         addExerciseBlock(entry, toGroup: exerciseTargetGroupID)
                         showingExercisePicker = false
                     }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(tr("Close", "Lukk")) {
+                                showingExercisePicker = false
+                            }
+                        }
+                    }
                 }
+                .presentationSizing(.page)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
             }
-            .sheet(isPresented: $showingRunningExercisePicker) {
+            .sheet(isPresented: $showingRunningExercisePicker, onDismiss: {
+                if scenePhase == .active {
+                    resumeRunningPickerAfterWake = false
+                }
+                persistWorkoutDraft()
+            }) {
                 NavigationStack {
                     ATHLTHRunningExercisePickerView(
                         userID: session.profile.userID,
@@ -6659,8 +6708,18 @@ struct WorkoutTemplateBuilderView: View {
                         appendRunningExerciseBlocks(selected)
                         showingRunningExercisePicker = false
                     }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(tr("Close", "Lukk")) {
+                                showingRunningExercisePicker = false
+                            }
+                        }
+                    }
                 }
+                .presentationSizing(.page)
                 .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
             }
     }
 
