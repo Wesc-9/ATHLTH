@@ -11,6 +11,7 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
     let canStart: Bool
     let onOpen: () -> Void
     let onStart: () -> Void
+    var compact: Bool = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -20,11 +21,13 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
     private let outline = ATHLTHStudioStyle.outline
 
     private var horizontal: Bool {
-        availableWidth >= 760 && !dynamicTypeSize.isAccessibilitySize
+        (compact ? availableWidth >= 360 : availableWidth >= 760) &&
+            !dynamicTypeSize.isAccessibilitySize
     }
 
     private var mediaWidth: CGFloat {
-        min(365, max(230, (availableWidth - 100) * 0.35))
+        compact ? min(175, max(118, availableWidth * 0.32))
+            : min(365, max(230, (availableWidth - 100) * 0.35))
     }
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -117,9 +120,9 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
             if horizontal {
                 HStack(spacing: 0) {
                     image
-                        .frame(width: mediaWidth, height: 225)
+                        .frame(width: mediaWidth, height: compact ? 182 : 225)
                     information
-                        .padding(18)
+                        .padding(compact ? 12 : 18)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
@@ -171,7 +174,7 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
     }
 
     private var information: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: compact ? 7 : 10) {
             HStack(spacing: 8) {
                 Text(tr("PLANNED WORKOUT", "PLANLAGT ØKT"))
                     .font(.system(size: 10, weight: .bold))
@@ -190,7 +193,7 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
             .font(.caption2.weight(.medium))
 
             Text(workout.title)
-                .font(.system(size: horizontal ? 21 : 19, weight: .semibold, design: .serif))
+                .font(.system(size: compact ? 18 : (horizontal ? 21 : 19), weight: .semibold, design: .serif))
                 .foregroundStyle(ink)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -232,7 +235,18 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
                 }
             }
 
-            HStack(spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { workoutButtons }
+                VStack(alignment: .leading, spacing: 5) { workoutButtons }
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var workoutButtons: some View {
                 if canStart {
                     Button(action: onStart) {
                         Label(tr("Start workout", "Start økt"),
@@ -254,11 +268,6 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
                         .background(canvas, in: Capsule())
                 }
                 .accessibilityIdentifier("athlth-ipad-featured-workout-details")
-            }
-            .font(.system(size: 12, weight: .semibold))
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func featureLabel(_ feature: Fact) -> some View {

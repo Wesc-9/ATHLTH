@@ -17,11 +17,35 @@ enum ATHLTHStudioWeekTileLayout {
 
 /// No day is complete just because its first planned workout is done.
 enum ATHLTHStudioDayCompletionPolicy {
+    /// Stable partition: never reorder workouts within their original group.
+    static func partition<Item>(
+        _ items: [Item], isFinished: (Item) -> Bool
+    ) -> (pending: [Item], finished: [Item]) {
+        var pending: [Item] = []
+        var finished: [Item] = []
+        for item in items {
+            if isFinished(item) { finished.append(item) }
+            else { pending.append(item) }
+        }
+        return (pending, finished)
+    }
+
     static func allPlannedCompleted<Item>(
         _ items: [Item],
         isCompleted: (Item) -> Bool
     ) -> Bool {
         !items.isEmpty && items.allSatisfy(isCompleted)
+    }
+}
+
+enum ATHLTHStudioDayWorkoutLayout {
+    static func contentWidth(viewport: CGFloat, accessibilityText: Bool) -> CGFloat {
+        let outerInset: CGFloat = viewport >= 730 && !accessibilityText ? 44 : 28
+        return max(0, min(1500, viewport - outerInset) - 40)
+    }
+
+    static func columns(contentWidth: CGFloat, count: Int, accessibilityText: Bool) -> Int {
+        count > 1 && contentWidth >= 780 && !accessibilityText ? 2 : 1
     }
 }
 
@@ -201,10 +225,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     ) -> ATHLTHStudioSchedule.Occurrence? {
         upcoming.first { item in
             guard ATHLTHStudioSchedule.isUpcoming(item) else { return false }
-            guard let planID = item.planID else { return true }
-            return !session.isPlanSessionSkipped(planID: planID, sessionID: item.workout.id)
-                && !completed(item)
-                && !item.workout.isExplicitRestDay
+            return !skipped(item) && !completed(item) && !item.workout.isExplicitRestDay
         }
     }
 
@@ -759,183 +780,172 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
     }
 
-    /// Full planned workout details sit immediately below the selected-day
-    /// count. Reuses the same occurrence and workout detail actions as Plan.
+    /// Equal cards for pending sessions, compact text rows for completed
+    /// sessions and actual recordings. Do not infer a plan completion from
+    /// an unrelated Health workout on the same date.
     private func selectedDayWorkouts(
         _ day: ATHLTHStudioHomeWeek.Day, availableWidth: CGFloat
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(day.planned) { entry in
-                let isCompleted = completed(entry)
-                let isSkipped = entry.planID.map {
-                    session.isPlanSessionSkipped(
-                        planID: $0, sessionID: entry.workout.id
-                    )
-                } ?? false
+        let grouped = ATHLTHStudioDayCompletionPolicy.partition(day.planned) {
+            completed($0) || skipped($0)
+        }
+        let contentWidth = ATHLTHStudioDayWorkoutLayout.contentWidth(
+            viewport: availableWidth, accessibilityText: dynamicTypeSize.isAccessibilitySize)
+        let columns = ATHLTHStudioDayWorkoutLayout.columns(
+            contentWidth: contentWidth, count: grouped.pending.count,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize)
+        let cardWidth = max(0, (contentWidth - CGFloat(columns - 1) * 12) / CGFloat(columns) - 50)
+        let representedRecordingIDs = Set(grouped.finished.filter { completed($0) }
+            .flatMap { linkedRecordingIDs(for: $0) })
+        let remainingRecorded = day.recorded.filter { !representedRecordingIDs.contains($0.id) }
 
-                HStack(alignment: .top, spacing: 8) {
-                    if day.planned.first?.id == entry.id {
-                        ATHLTHStudioPlannedWorkoutHeroCard(
-                            workout: entry.workout,
-                            availableWidth: availableWidth,
-                            isCompleted: isCompleted,
-                            isSkipped: isSkipped,
-                            canStart: canStart(entry, alreadyCompleted: isCompleted),
-                            onOpen: { onOpenWorkout(entry) },
-                            onStart: { onStartWorkout(entry) }
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityIdentifier(
-                            "athlth-ipad-planned-workout-\(entry.id)"
-                        )
-                        .contextMenu { workoutActions(entry) }
-                    } else {
-                    Button {
-                        onOpenWorkout(entry)
-                    } label: {
-                        HStack(alignment: .center, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                if let scheduled = entry.workout.scheduledStart {
-                                    Text(scheduled.formatted(
-                                        date: .omitted, time: .shortened
-                                    ))
-                                    .font(.system(size: 17, weight: .bold,
-                                                  design: .rounded))
-                                    .monospacedDigit()
-                                    .foregroundStyle(ink)
-                                } else {
-                                    Text(tr("No time", "Uten tid"))
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                }
-                                Text(tr("Start time", "Klokkeslett"))
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(width: 84, alignment: .leading)
-
-                            Rectangle()
-                                .fill(outline.opacity(0.8))
-                                .frame(width: 1, height: 40)
-
-                            Image(systemName: entry.workout.kind.systemImage)
-                                .font(.system(size: 19, weight: .medium))
-                                .foregroundStyle(bronze)
-                                .frame(width: 35, height: 35)
-                                .background(.white.opacity(0.7),
-                                            in: RoundedRectangle(cornerRadius: 11))
-
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(entry.workout.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ink)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.leading)
-                                HStack(spacing: 8) {
-                                    if let minutes = entry.workout.durationMinutes {
-                                        Label("\(minutes) min", systemImage: "clock")
-                                    }
-                                    if isCompleted {
-                                        Label(tr("Completed", "Fullført"),
-                                              systemImage: "checkmark.circle.fill")
-                                    } else if isSkipped {
-                                        Text(tr("Skipped", "Hoppet over"))
-                                    } else {
-                                        Text(tr("Planned", "Planlagt"))
-                                    }
-                                }
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            }
+        return VStack(alignment: .leading, spacing: 12) {
+            if !grouped.pending.isEmpty {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0),
+                    spacing: 12, alignment: .top), count: columns),
+                    alignment: .leading, spacing: 12) {
+                    ForEach(grouped.pending) { entry in
+                        HStack(alignment: .top, spacing: 8) {
+                            ATHLTHStudioPlannedWorkoutHeroCard(
+                                workout: entry.workout,
+                                availableWidth: cardWidth,
+                                isCompleted: false,
+                                isSkipped: false,
+                                canStart: canStart(entry, alreadyCompleted: false),
+                                onOpen: { onOpenWorkout(entry) },
+                                onStart: { onStartWorkout(entry) },
+                                compact: columns == 2
+                            )
                             .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(bronze)
+                            .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
+                            .contextMenu { workoutActions(entry) }
+                            Menu {
+                                workoutActions(entry)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.headline)
+                                    .foregroundStyle(ink)
+                                    .frame(width: 42, height: 44)
+                                    .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                            }
+                            .accessibilityLabel(tr("Workout actions", "Valg for økten"))
                         }
-                        .padding(.horizontal, 13)
-                        .frame(minHeight: 74)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(cream, in: RoundedRectangle(cornerRadius: 15))
-                        .contentShape(RoundedRectangle(cornerRadius: 15))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        (entry.workout.scheduledStart?.formatted(
-                            date: .omitted, time: .shortened
-                        ) ?? tr("No set time", "Uten klokkeslett"))
-                        + ", " + entry.workout.title
-                    )
-                    .accessibilityHint(tr(
-                        "Open full workout details",
-                        "Åpne alle detaljer for treningsøkten"
-                    ))
-                    .accessibilityIdentifier(
-                        "athlth-ipad-planned-workout-\(entry.id)"
-                    )
-                    .contextMenu { workoutActions(entry) }
-                    }
-
-                    Menu {
-                        workoutActions(entry)
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.headline)
-                            .foregroundStyle(ink)
-                            .frame(width: 42, height: 44)
-                            .background(cream,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .accessibilityLabel(tr("Workout actions", "Valg for økten"))
                 }
+                .accessibilityIdentifier("athlth-ipad-pending-workout-grid")
             }
 
-            ForEach(day.recorded) { workout in
-                Button {
-                    onInspect(workout)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ATHLTHStudioRecordedWorkouts.timeRange(workout))
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.78)
-                            Text(tr("Start–finish", "Start–slutt"))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+            if !grouped.finished.isEmpty || !remainingRecorded.isEmpty {
+                if !grouped.pending.isEmpty { Divider() }
+                Text(tr("Completed and recorded", "Fullførte og registrerte økter"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                VStack(spacing: 0) {
+                    ForEach(grouped.finished) { entry in
+                        let done = completed(entry)
+                        let receipt = session.recordedTimes(for: entry.workout.id)
+                        let ids = linkedRecordingIDs(for: entry)
+                        let recording = day.recorded.first { ids.contains($0.id) }
+                        let time = recording.map(ATHLTHStudioRecordedWorkouts.timeRange)
+                            ?? receipt?.startedAt.formatted(date: .omitted, time: .shortened)
+                            ?? entry.workout.scheduledStart?.formatted(date: .omitted, time: .shortened)
+                        let duration: String? = {
+                            if let recording {
+                                return "\(Int(recording.duration / 60)) min"
+                            }
+                            if let receipt, let end = receipt.endedAt, end >= receipt.startedAt {
+                                return "\(Int(end.timeIntervalSince(receipt.startedAt) / 60)) min"
+                            }
+                            return nil
+                        }()
+                        compactFinishedRow(
+                            title: entry.workout.title, time: time, duration: duration,
+                            status: done ? tr("Completed", "Fullført") : tr("Skipped", "Hoppet over"),
+                            symbol: done ? "checkmark.circle.fill" : "minus.circle",
+                            action: { onOpenWorkout(entry) }
+                        )
+                        .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
+                        .contextMenu { workoutActions(entry) }
+                        if entry.id != grouped.finished.last?.id || !remainingRecorded.isEmpty {
+                            Divider().padding(.leading, 28)
                         }
-                        .frame(width: 125, alignment: .leading)
-
-                        Rectangle()
-                            .fill(outline.opacity(0.8))
-                            .frame(width: 1, height: 30)
-
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(bronze)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(workout.activity.rawValue.capitalized)
-                                .font(.subheadline.weight(.semibold))
-                            Text("\(Int(workout.duration / 60)) min · " +
-                                 tr("Recorded workout", "Registrert økt"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 4)
-                        Image(systemName: "arrow.up.right")
-                            .foregroundStyle(bronze)
                     }
-                    .foregroundStyle(ink)
-                    .padding(13)
-                    .background(cream, in: RoundedRectangle(cornerRadius: 15))
-                    .contentShape(RoundedRectangle(cornerRadius: 15))
+                    ForEach(remainingRecorded) { workout in
+                        compactFinishedRow(
+                            title: recordedActivityTitle(workout),
+                            time: ATHLTHStudioRecordedWorkouts.timeRange(workout),
+                            duration: "\(Int(workout.duration / 60)) min",
+                            status: tr("Recorded", "Registrert"),
+                            symbol: "checkmark.circle.fill",
+                            action: { onInspect(workout) }
+                        )
+                        if workout.id != remainingRecorded.last?.id {
+                            Divider().padding(.leading, 28)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 10)
+                .background(cream.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityIdentifier("athlth-ipad-finished-workout-list")
             }
         }
         .accessibilityIdentifier("athlth-ipad-selected-day-workouts")
+    }
+
+    private func recordedActivityTitle(_ workout: WorkoutSummary) -> String {
+        switch workout.activity {
+        case .strength: return ATHLTHPlannedWorkoutType.strength.title
+        case .running: return ATHLTHPlannedWorkoutType.running.title
+        case .walking, .hiking: return ATHLTHPlannedWorkoutType.walking.title
+        case .cycling: return ATHLTHPlannedWorkoutType.cycling.title
+        case .yoga: return tr("Yoga", "Yoga")
+        default: return workout.activity.rawValue.capitalized
+        }
+    }
+
+    private func linkedRecordingIDs(for entry: ATHLTHStudioSchedule.Occurrence) -> Set<UUID> {
+        var ids = Set<UUID>()
+        if let planID = entry.planID,
+           let id = session.linkedHealthWorkoutID(planID: planID, sessionID: entry.workout.id) {
+            ids.insert(id)
+        }
+        for log in strength.workoutHistory where log.isFinished && log.plannedSessionID == entry.workout.id {
+            ids.insert(log.id)
+            if let id = log.healthMetrics.healthKitWorkoutUUID { ids.insert(id) }
+        }
+        return ids
+    }
+
+    private func compactFinishedRow(
+        title: String, time: String?, duration: String?, status: String,
+        symbol: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 9) {
+                Image(systemName: symbol)
+                    .font(.subheadline)
+                    .foregroundStyle(bronze)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
+                    Text([status, time, duration].compactMap { $0 }.joined(separator: " · "))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(bronze)
+            }
+            .padding(.vertical, 6)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func weekSelectionSummary(
@@ -1089,8 +1099,18 @@ struct ATHLTHStudioEditorialDashboardView: View {
         )
     }
 
+    private func skipped(_ item: ATHLTHStudioSchedule.Occurrence) -> Bool {
+        item.planID.map { session.isPlanSessionSkipped(planID: $0, sessionID: item.workout.id) } ?? false
+    }
+
     private func completed(_ item: ATHLTHStudioSchedule.Occurrence) -> Bool {
-        guard let planID = item.planID else { return false }
+        guard !item.workout.isExplicitRestDay, !skipped(item) else { return false }
+        if session.recordedTimes(for: item.workout.id)?.endedAt != nil { return true }
+        guard let planID = item.planID else {
+            return strength.workoutHistory.contains {
+                $0.isFinished && $0.plannedSessionID == item.workout.id
+            }
+        }
         let key = "\(planID.uuidString):\(item.workout.id.uuidString)"
         if let projection = homeProjection,
            projection.accountID == session.profile.userID,
