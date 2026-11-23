@@ -988,7 +988,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var planPresentations: some View {
         AnyView(planSecondaryObservers)
-        .sheet(isPresented: $showingPlanExitSheet) {
+        .sheet(isPresented: $showingPlanExitSheet.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHDiscardDraftSheet(
                 kind: .trainingPlan,
                 onKeepEditing: {
@@ -1058,7 +1058,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         } message: {
             Text(creationError ?? "")
         }
-        .sheet(isPresented: $showingNewGoalFromPlan, onDismiss: {
+        .sheet(isPresented: $showingNewGoalFromPlan.keepingPresentedWhenInactive(scenePhase), onDismiss: {
             // Link the actual newly created goal, not an illustrated preset.
             if let newGoal = goalStore.activeGoals.first(where: {
                 $0.status == .active && !goalIDsBeforeCreation.contains($0.id)
@@ -1069,10 +1069,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }) {
             GoalCreationView()
         }
-        .sheet(isPresented: $showingPlanDesignLab) {
+        .sheet(isPresented: $showingPlanDesignLab.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHPlanDesignLabView()
         }
-        .sheet(isPresented: $showingAIBuilder, onDismiss: {
+        .sheet(isPresented: $showingAIBuilder.keepingPresentedWhenInactive(scenePhase), onDismiss: {
             // Coach-created plans use exactly the same persisted preview
             // and navigation flow as manually created plans.
             if createdPlanID != nil {
@@ -1091,7 +1091,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             )
         }
-        .sheet(isPresented: $showingGuidedAIConsent) {
+        .sheet(isPresented: $showingGuidedAIConsent.keepingPresentedWhenInactive(scenePhase)) {
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -1130,7 +1130,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .presentationDetents([.large])
             .tint(ATHLTHPlanDesign.accentInk)
         }
-        .sheet(item: $guidedAIFillPreview) { preview in
+        .sheet(item: $guidedAIFillPreview.keepingPresentedItemWhenInactive(scenePhase)) { preview in
             guidedAIFillReview(preview)
         }
         .alert(
@@ -1145,7 +1145,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         } message: {
             Text(guidedAIError ?? "")
         }
-        .sheet(item: $editingWeekDay, onDismiss: {
+        .sheet(item: $editingWeekDay.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
             if let pendingTrainingPlaceDay {
                 self.pendingTrainingPlaceDay = nil
                 editingTrainingPlaceDay = pendingTrainingPlaceDay
@@ -1159,7 +1159,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }) { selection in
             planDayActionsSheet(for: selection.id)
         }
-        .sheet(item: $editingTrainingPlaceDay, onDismiss: {
+        .sheet(item: $editingTrainingPlaceDay.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
             if let reopenDayAfterPlace {
                 self.reopenDayAfterPlace = nil
                 editingWeekDay = reopenDayAfterPlace
@@ -1174,7 +1174,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 editingTrainingPlaceDay = nil
             }
         }
-        .sheet(item: $advancedAddDestination) { destination in
+        .sheet(item: $advancedAddDestination.keepingPresentedItemWhenInactive(scenePhase)) { destination in
             if destination.kind == .stretching {
                 ATHLTHAdvancedStretchingPickerView(
                     phase: destination.phase
@@ -1203,7 +1203,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             }
         }
-        .sheet(item: $selectingLibraryDay) { selection in
+        .sheet(item: $selectingLibraryDay.keepingPresentedItemWhenInactive(scenePhase)) { selection in
             ATHLTHPlanWorkoutLibraryPicker { workout in
                 assignLibraryWorkout(workout, to: selection.id, asExtra: selectingExtraFromLibrary)
                 selectingExtraFromLibrary = false
