@@ -344,21 +344,13 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
 
-            Group {
-                // Do not mount Train's enormous SwiftUI/AttributeGraph tree
-                // while Home (or another tab) is selected. The inactive tree
-                // was previously built alongside Home, then invalidated again
-                // on Home -> Train, contributing to the stack-overflow crash.
-                if selectedTab == 1 {
-                    ATHLTHTrainView(
-                        navigationRequest: $trainNavigationRequest,
-                        isActive: true
-                    )
-                } else {
-                    Color.clear
-                        .accessibilityHidden(true)
-                }
-            }
+            // Keep the Train NavigationStack mounted across tab changes so
+            // open editors, sheets and scroll positions are never discarded.
+            // Its heavy dashboard content is gated inside ATHLTHTrainView.
+            ATHLTHTrainView(
+                navigationRequest: $trainNavigationRequest,
+                isActive: selectedTab == 1
+            )
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
@@ -5911,9 +5903,15 @@ struct ATHLTHTrainView: View {
                         .athlthStablePresentationBoundary()
                         .transition(.opacity)
                 } else {
-                    trainRootScroll(for: .today)
-                        .athlthStablePresentationBoundary()
-                        .transition(.opacity)
+                    if isActive {
+                        trainRootScroll(for: .today)
+                            .athlthStablePresentationBoundary()
+                            .transition(.opacity)
+                    } else {
+                        // Retain the NavigationStack and its state, but do not
+                        // evaluate the expensive Today dashboard offscreen.
+                        Color.clear
+                    }
                 }
             }
             // A short crossfade replaces the jerky animated height changes
