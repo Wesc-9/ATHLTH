@@ -49,6 +49,7 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var allowedPhases: [ATHLTHCoachWorkoutPhase]?
     @State private var metrics: [ATHLTHAudioCoachRule.Metric]
     @State private var motivationPhrase: String
+    @State private var motivationStyle: ATHLTHCoachEncouragementStyle
 
     private let bronze = ATHLTHPlanDesign.accentInk
     private let ink = ATHLTHPlanDesign.ink
@@ -104,6 +105,8 @@ struct ATHLTHCoachRuleComposer: View {
                 ? target.legacyOption.map { [Self.legacyMetric($0)] } ?? []
                 : uniqueMetrics).prefix(1)))
         _motivationPhrase = State(initialValue: original?.customPhrase ?? "")
+        _motivationStyle = State(initialValue:
+            original?.encouragementStyle ?? .encouragement)
     }
 
     private var isEditing: Bool {
@@ -412,6 +415,15 @@ struct ATHLTHCoachRuleComposer: View {
             }
             if metrics.contains(.motivation) {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text(tr("COACH STYLE", "MOTIVASJONSSTIL"))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(bronze)
+                    Picker(tr("Style", "Stil"), selection: $motivationStyle) {
+                        Text(tr("Encourage", "Motiver")).tag(ATHLTHCoachEncouragementStyle.encouragement)
+                        Text(tr("Push", "Push")).tag(ATHLTHCoachEncouragementStyle.push)
+                        Text(tr("Praise", "Ros")).tag(ATHLTHCoachEncouragementStyle.praise)
+                    }
+                    .pickerStyle(.segmented)
                     Text(tr("PERSONAL MESSAGE (OPTIONAL)", "EGEN MELDING (VALGFRITT)"))
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(bronze)
@@ -437,7 +449,23 @@ struct ATHLTHCoachRuleComposer: View {
             if !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 stage = .trigger
             }
-        case .trigger: stage = .commands
+        case .trigger:
+            // New triggers should work on first save without searching a
+            // 20-item command list for the obvious matching readout.
+            if metrics.isEmpty {
+                switch trigger {
+                case .heartRateAbove, .heartRateBelow:
+                    metrics = [.heartRate]
+                case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow:
+                    metrics = [.heartRateZone]
+                case .randomMotivation, .nearFinishTime, .nearFinishDistance,
+                     .elevationGain, .uphillDetected,
+                     .paceFasterThanTarget, .paceSlowerThanTarget:
+                    metrics = [.motivation]
+                default: break
+                }
+            }
+            stage = .commands
         case .commands: save()
         }
     }
@@ -464,6 +492,9 @@ struct ATHLTHCoachRuleComposer: View {
             eventSelection: eventSelection
         )
         if let previous { rule.id = previous.id }
+        if metrics.contains(.motivation) {
+            rule.encouragementStyle = motivationStyle
+        }
         if metrics.contains(.motivation), !phrase.isEmpty {
             rule.customPhrase = phrase
         }
