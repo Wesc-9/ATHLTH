@@ -4,6 +4,7 @@ import SwiftUI
 /// This does not change the global Ghost notification preferences.
 struct ATHLTHGhostSessionUpdatesControls: View {
     @Binding var configuration: WatchGhostRaceAudioConfiguration
+    @State private var showAdvancedOptions = false
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -109,7 +110,12 @@ struct ATHLTHGhostSessionUpdatesControls: View {
             }
 
             Divider().overlay(ATHLTHPlanDesign.warmDivider)
-            Picker(tr("Compare", "Sammenlign"), selection: statusMode) {
+            DisclosureGroup(
+                tr("Advanced notifications", "Avanserte varsler"),
+                isExpanded: $showAdvancedOptions
+            ) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Picker(tr("Compare", "Sammenlign"), selection: statusMode) {
                 ForEach(GhostRaceStatusDetailMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -147,6 +153,9 @@ struct ATHLTHGhostSessionUpdatesControls: View {
                     Text("1 km").tag(1_000.0)
                 }
                 .pickerStyle(.menu)
+            }
+                }
+                .padding(.top, 8)
             }
         }
         .foregroundStyle(ATHLTHPlanDesign.ink)
