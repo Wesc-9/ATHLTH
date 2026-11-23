@@ -318,17 +318,15 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     metric("heart", ATHLTHLocalization.choose(
                         english: "Zone", norwegian: "Sone"
                     ), zoneText)
-                    if runningLocation == .treadmill || blocks.contains(where: {
-                        $0.kind == .run && $0.treadmillInclinePercent != nil
-                    }) {
-                        metric("mountain.2", ATHLTHLocalization.choose(
-                            english: "Incline", norwegian: "Stigning"
-                        ), inclineText)
-                    } else if runningLocation != nil {
+                    if runningLocation == .treadmill {
                         metric("speedometer", ATHLTHLocalization.choose(
                             english: "Pace (min/km)",
                             norwegian: "Tempo (min/km)"
                         ), paceText)
+                    } else if runningLocation == .outdoor {
+                        metric("mountain.2", ATHLTHLocalization.choose(
+                            english: "Incline", norwegian: "Stigning"
+                        ), inclineText)
                     } else {
                         metric("mountain.2", ATHLTHLocalization.choose(
                             english: "Incline", norwegian: "Stigning"
