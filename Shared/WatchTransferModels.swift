@@ -2303,6 +2303,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStageSummaries: [ATHLTHWatchRunningStageSummary]? = nil
     var socialCompletedRunningStepIndices: [Int]? = nil
     var socialCompletedStrengthExerciseCount: Int? = nil
+    var socialStrengthExerciseQueue: [WatchStrengthExerciseSummary]? = nil
     /// Efforts only (not warm-up/recovery). Optional for older snapshots.
     var runningIntervalOrdinal: Int? = nil
     var runningIntervalTotal: Int? = nil

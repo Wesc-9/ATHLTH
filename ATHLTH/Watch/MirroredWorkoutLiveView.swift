@@ -231,14 +231,28 @@ struct MirroredWorkoutLiveView: View {
                             displayName: appSession.profile.displayName, walking: snapshot.kind == .walking,
                             title: snapshot.runningStepTitle ?? snapshot.workoutDisplayTitle,
                             distanceMeters: snapshot.distanceMeters, elapsedSeconds: snapshot.confirmedActiveDuration,
-                            paceSecondsPerKilometer: snapshot.currentPaceSecondsPerKilometer, progress: progress)
+                            paceSecondsPerKilometer: snapshot.currentPaceSecondsPerKilometer, progress: progress,
+                            progressItems: snapshot.runningStageSummaries.flatMap { stages in
+                                snapshot.socialCompletedRunningStepIndices.map { indices in
+                                    let done = Set(indices)
+                                    return stages.filter { $0.phase != "recovery" && $0.phase != "rest" }.map { stage in
+                                        SocialWorkoutProgressItem(id: String(stage.index), title: stage.title,
+                                            completed: done.contains(stage.index), current: stage.index == snapshot.runningStepIndex && !done.contains(stage.index))
+                                    }
+                                }
+                            })
                     } else if snapshot.kind == .strength, strength.activeWorkout == nil,
                               let done = snapshot.socialCompletedStrengthExerciseCount,
                               let total = snapshot.strengthExerciseCount, total > 0 {
                         await socialCompanion.publishProgress(sessionID: sessionID, userID: userID,
                             displayName: appSession.profile.displayName, kind: WorkoutKind.strength.rawValue,
                             title: snapshot.strengthExerciseName, progress: SocialWorkoutProgress(completed: min(done,total), total: total),
-                            elapsed: snapshot.confirmedActiveDuration)
+                            elapsed: snapshot.confirmedActiveDuration,
+                            progressItems: snapshot.socialStrengthExerciseQueue?.map { exercise in
+                                SocialWorkoutProgressItem(id: String(exercise.index), title: exercise.name,
+                                    completed: exercise.isCompleted == true && (exercise.skippedSets ?? 0) == 0,
+                                    current: exercise.index == snapshot.strengthExerciseIndex)
+                            })
                     }
                 }
                 do { try await Task.sleep(for: .seconds(3)) } catch { break }

@@ -25,6 +25,8 @@ struct TrainTogetherStatusStrip: View {
     @State private var showingCompanion = false
     @State private var showingChat = false
     @State private var sharedSourceID: UUID?
+    @State private var chatLookupComplete = false
+    @State private var sharedRoomWithdrawn = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var sessionID: UUID? { social.recordingWorkoutSessionID }
@@ -137,15 +139,26 @@ struct TrainTogetherStatusStrip: View {
             .padding(11)
             .athlthTrainTogetherCard(radius: 16, subtle: true)
             .task(id: sessionID) {
+                sharedSourceID = nil
+                chatLookupComplete = false
+                sharedRoomWithdrawn = false
                 while !Task.isCancelled {
                     if scenePhase == .active {
                         try? await social.refreshWorkoutLobby(sessionID: sessionID)
                         await companion.refresh(sessionID: sessionID)
-                        if sharedSourceID == nil,
-                           let source = social.workoutSessions.first(where: { $0.id == sessionID })?.invitePayload?.workout.id {
-                            let draft = TrainTogetherLiveDraftStore()
-                            await draft.refresh(source)
-                            if draft.draft != nil { sharedSourceID = source }
+                        if !chatLookupComplete,
+                           let active = social.workoutSessions.first(where: { $0.id == sessionID }) {
+                            if let source = active.invitePayload?.workout.id {
+                                let draft = TrainTogetherLiveDraftStore()
+                                await draft.refresh(source)
+                                if draft.isWithdrawn(source) {
+                                    sharedRoomWithdrawn = true
+                                    chatLookupComplete = true
+                                } else if draft.errorMessage == nil {
+                                    if draft.draft != nil { sharedSourceID = source }
+                                    chatLookupComplete = true
+                                }
+                            } else { chatLookupComplete = true }
                         }
                     }
                     do { try await Task.sleep(for: .seconds(3)) } catch { break }
@@ -163,6 +176,14 @@ struct TrainTogetherStatusStrip: View {
                             .padding(16)
                     }
                     .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+                } else if !chatLookupComplete || sharedRoomWithdrawn {
+                    VStack(spacing: 12) {
+                        if !chatLookupComplete { ProgressView() }
+                        Text(sharedRoomWithdrawn ? tr("Shared chat is no longer available.", "Felleschatten er ikke lenger tilgjengelig.")
+                             : tr("Finding the shared chat…", "Henter felleschatten…"))
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .presentationDetents([.medium]).presentationDragIndicator(.visible)
                 } else {
                     SocialWorkoutCompanionSheet(sessionID: sessionID, chatOnly: true)
                         .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
@@ -258,12 +279,20 @@ struct SocialWorkoutLiveExerciseSnapshot:
         [SocialWorkoutLiveSetSnapshot]
 }
 
+struct SocialWorkoutProgressItem: Codable, Hashable, Identifiable {
+    let id: String
+    let title: String
+    let completed: Bool
+    let current: Bool
+}
+
 struct SocialWorkoutLivePayload:
     Codable,
     Hashable
 {
     var currentTitle: String?
     var progress: SocialWorkoutProgress? = nil
+    var progressItems: [SocialWorkoutProgressItem]? = nil
     var exerciseIndex: Int?
     var exerciseCount: Int?
     var currentSetNumber: Int?
@@ -608,7 +637,8 @@ final class SocialWorkoutCompanionStore:
             TimeInterval,
         paceSecondsPerKilometer:
             TimeInterval?,
-        progress: SocialWorkoutProgress? = nil
+        progress: SocialWorkoutProgress? = nil,
+        progressItems: [SocialWorkoutProgressItem]? = nil
     ) async {
         await upsert(
             sessionID:
@@ -639,6 +669,7 @@ final class SocialWorkoutCompanionStore:
                                     .title
                         ),
                     progress: progress,
+                    progressItems: progressItems,
                     exerciseIndex:
                         nil,
                     exerciseCount:
@@ -662,10 +693,12 @@ final class SocialWorkoutCompanionStore:
     func publishProgress(sessionID: UUID, userID: UUID, displayName: String,
                          kind: String, title: String?, progress: SocialWorkoutProgress?,
                          elapsed: TimeInterval, distance: Double? = nil,
-                         exercises: [SocialWorkoutLiveExerciseSnapshot]? = nil) async {
+                         exercises: [SocialWorkoutLiveExerciseSnapshot]? = nil,
+                         progressItems: [SocialWorkoutProgressItem]? = nil) async {
         await upsert(sessionID: sessionID, userID: userID, displayName: displayName,
                      workoutKind: kind, payload: SocialWorkoutLivePayload(
-                        currentTitle: title, progress: progress, exerciseIndex: nil, exerciseCount: progress?.total,
+                        currentTitle: title, progress: progress, progressItems: progressItems,
+                        exerciseIndex: nil, exerciseCount: progress?.total,
                         currentSetNumber: nil, currentSetCount: nil, isResting: nil,
                         distanceMeters: distance, elapsedSeconds: elapsed, paceSecondsPerKilometer: nil,
                         exercises: exercises))
@@ -1002,6 +1035,21 @@ private struct SocialWorkoutCompanionSheet:
                 ProgressView(value: p.fraction).tint(ATHLTHTheme.accentDeep)
                 Text("\(p.completed)/\(p.total) " + ATHLTHLocalization.choose(english: "completed", norwegian: "fullført"))
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            if let items = state.payload.progressItems, !items.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(items) { item in
+                        HStack(spacing: 8) {
+                            Image(systemName: item.completed ? "checkmark.circle.fill" : item.current ? "play.circle.fill" : "circle")
+                                .foregroundStyle(item.completed || item.current ? ATHLTHTheme.accentDeep : Color.secondary)
+                            Text(item.title).font(.caption.weight(item.current ? .semibold : .regular))
+                            Spacer()
+                            if item.current && !item.completed {
+                                Text(ATHLTHLocalization.choose(english: "Current", norwegian: "Pågår")).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
             }
             if state.payload.exercises != nil || state.workoutKind ==
                 WorkoutKind

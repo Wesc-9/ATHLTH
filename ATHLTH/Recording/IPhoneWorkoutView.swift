@@ -2551,6 +2551,14 @@ struct IPhoneWorkoutView: View {
                             SocialWorkoutProgress.counted(
                                 planned: plan.steps.indices.filter { plan.steps[$0].phase != "recovery" && plan.steps[$0].phase != "rest" },
                                 completed: Set((workout.recordedRunningSteps ?? []).map(\.index)))
+                        },
+                        progressItems: workout.structuredRunningWorkout.map { plan in
+                            let done = Set((workout.recordedRunningSteps ?? []).map(\.index))
+                            return plan.steps.enumerated().compactMap { index, step in
+                                guard step.phase != "recovery" && step.phase != "rest" else { return nil }
+                                return SocialWorkoutProgressItem(id: String(index), title: step.title,
+                                    completed: done.contains(index), current: index == workout.structuredStepIndex && !done.contains(index))
+                            }
                         }
                     )
 

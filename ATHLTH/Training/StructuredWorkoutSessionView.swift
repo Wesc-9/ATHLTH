@@ -576,7 +576,11 @@ struct StructuredWorkoutSessionView: View {
                     let progress = SocialWorkoutProgress.counted(planned: work.map(\.id), completed: completedBlockIDs)
                     await socialCompanion.publishProgress(sessionID: sessionID, userID: userID,
                         displayName: session.profile.displayName, kind: workout.kind.rawValue,
-                        title: currentBlock?.title, progress: progress, elapsed: activeElapsed(at: Date()))
+                        title: currentBlock?.title, progress: progress, elapsed: activeElapsed(at: Date()),
+                        progressItems: work.map { block in
+                            SocialWorkoutProgressItem(id: block.id, title: block.title,
+                                completed: completedBlockIDs.contains(block.id), current: block.id == currentBlock?.id)
+                        })
                     do { try await Task.sleep(for: .seconds(3)) } catch { break }
                 }
             }

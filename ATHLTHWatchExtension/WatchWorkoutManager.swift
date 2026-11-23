@@ -9550,7 +9550,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             }
         snapshot.socialCompletedRunningStepIndices = structuredRunningWorkout == nil ? nil : recordedStructuredRunSteps.map(\.index)
-        snapshot.socialCompletedStrengthExerciseCount = strengthSession?.exerciseQueue.map { $0.filter { $0.isCompleted == true }.count }
+        snapshot.socialCompletedStrengthExerciseCount = strengthSession?.exerciseQueue.map {
+            $0.filter { $0.isCompleted == true && ($0.skippedSets ?? 0) == 0 }.count
+        }
+        snapshot.socialStrengthExerciseQueue = strengthSession?.exerciseQueue
         snapshot.watchAudioCoachEnabled = audioCoachConfiguration.enabled
 
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
