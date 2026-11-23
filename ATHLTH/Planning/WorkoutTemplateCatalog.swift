@@ -4962,6 +4962,9 @@ struct WorkoutTemplateBuilderView: View {
             initialGhostDraft.updatesConfiguration = updates
         }
         _ghostDraft = State(initialValue: initialGhostDraft)
+        _intervalGhostConfiguration = State(initialValue:
+            initialExtras.intervalGhostConfiguration ??
+                ATHLTHIntervalGhostPacer.WorkoutConfiguration())
         _manualDurationMinutes = State(initialValue: initialMinutes)
         _durationInputText = State(initialValue: (initialMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: initialRecipe)).map(String.init) ?? "")
