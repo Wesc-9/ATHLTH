@@ -4,7 +4,8 @@ import SwiftUI
 /// owns persistence and closing that one sheet. The child supplies the Save
 /// action in the toolbar instead of introducing a separate Done button.
 private struct ATHLTHAudioCoachSaveAndCloseKey: EnvironmentKey {
-    static let defaultValue: (() -> Void)? = nil
+    // The shared default is immutable nil; the host supplies a scene-local action.
+    nonisolated(unsafe) static let defaultValue: (() -> Void)? = nil
 }
 
 extension EnvironmentValues {
