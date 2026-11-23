@@ -435,3 +435,55 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         ))
     }
 }
+
+
+final class ATHLTHIntervalGhostPacerPolicyTests: XCTestCase {
+    func testWorkIntervalsExcludePassiveRecovery() throws {
+        let start = ATHLTHIntervalGhostPacer.VirtualProgress()
+        let first = try XCTUnwrap(ATHLTHIntervalGhostPacer.advance(
+            start, kind: .work, scope: .mainOnly,
+            elapsedSeconds: 300, actualMeters: 1_050,
+            workPaceSecondsPerKilometer: 300, recovery: .freeze
+        ))
+        let paused = try XCTUnwrap(ATHLTHIntervalGhostPacer.advance(
+            first, kind: .passiveRecovery, scope: .mainOnly,
+            elapsedSeconds: 120, actualMeters: 0,
+            workPaceSecondsPerKilometer: 300, recovery: .freeze
+        ))
+        XCTAssertEqual(paused.ghostMeters, 1_000, accuracy: 0.01)
+        XCTAssertEqual(paused.leadMeters, 50, accuracy: 0.01)
+        let second = try XCTUnwrap(ATHLTHIntervalGhostPacer.advance(
+            paused, kind: .work, scope: .mainOnly,
+            elapsedSeconds: 300, actualMeters: 950,
+            workPaceSecondsPerKilometer: 300, recovery: .freeze
+        ))
+        XCTAssertEqual(second.leadMeters, 0, accuracy: 0.01)
+    }
+
+    func testActiveRecoveryCanFollowActualDistance() throws {
+        let start = ATHLTHIntervalGhostPacer.VirtualProgress()
+        let next = try XCTUnwrap(ATHLTHIntervalGhostPacer.advance(
+            start, kind: .activeRecovery, scope: .mainOnly,
+            elapsedSeconds: 90, actualMeters: 180,
+            workPaceSecondsPerKilometer: 300,
+            recovery: .followActualDistance
+        ))
+        XCTAssertEqual(next.ghostMeters, 180, accuracy: 0.01)
+        XCTAssertEqual(next.leadMeters, 0, accuracy: 0.01)
+    }
+
+    func testMainOnlyIgnoresWarmupAndInvalidPace() throws {
+        let start = ATHLTHIntervalGhostPacer.VirtualProgress()
+        let next = try XCTUnwrap(ATHLTHIntervalGhostPacer.advance(
+            start, kind: .warmup, scope: .mainOnly,
+            elapsedSeconds: 600, actualMeters: 1_000,
+            workPaceSecondsPerKilometer: 300, recovery: .freeze
+        ))
+        XCTAssertEqual(next.ghostMeters, 0)
+        XCTAssertNil(ATHLTHIntervalGhostPacer.advance(
+            start, kind: .work, scope: .mainOnly,
+            elapsedSeconds: 300, actualMeters: 1_000,
+            workPaceSecondsPerKilometer: .nan, recovery: .freeze
+        ))
+    }
+}
