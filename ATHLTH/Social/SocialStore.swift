@@ -1438,24 +1438,36 @@ final class SocialStore: ObservableObject {
                 sessionID: sessionID
             )
 
+        // Ready lobby checks the server while waiting for both athletes.
+        // @Published array mutations used to rebuild Home, Challenge and
+        // every Train Together view on EACH poll, even with identical data.
         if let index = workoutSessions.firstIndex(
             where: { $0.id == session.id }
         ) {
-            workoutSessions[index] = session
+            if workoutSessions[index] != session {
+                workoutSessions[index] = session
+            }
         } else {
             workoutSessions.insert(session, at: 0)
         }
 
-        workoutParticipants.removeAll {
+        let existingParticipants = workoutParticipants.filter {
             $0.sessionID == sessionID
         }
-        workoutParticipants.append(
-            contentsOf: participants
-        )
+        if Set(existingParticipants) != Set(participants) {
+            // Assign once rather than removeAll + append (two redraws).
+            workoutParticipants =
+                workoutParticipants.filter { $0.sessionID != sessionID } +
+                participants
+        }
 
         if session.creatorID == currentUserID {
-            activeWorkoutSession = session
-            activeWorkoutParticipants = participants
+            if activeWorkoutSession != session {
+                activeWorkoutSession = session
+            }
+            if activeWorkoutParticipants != participants {
+                activeWorkoutParticipants = participants
+            }
         }
     }
 
