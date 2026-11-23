@@ -792,7 +792,8 @@ enum ATHLTHAudioCoachRuleDelivery {
                 } else {
                     state = heartRateCondition(
                         rule, bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM,
-                        context: context
+                        context: context,
+                        previousActive: (lastSlots[rule.id] ?? 0) % 2 == 1
                     )
                 }
                 guard let active = state else { continue }
@@ -971,14 +972,19 @@ enum ATHLTHAudioCoachRuleDelivery {
         _ rule: ATHLTHAudioCoachRule,
         bpm: Double?,
         maximumBPM: Double?,
-        context: ATHLTHCoachReadoutContext
+        context: ATHLTHCoachReadoutContext,
+        previousActive: Bool
     ) -> Bool? {
         guard let bpm, bpm.isFinite, (35...250).contains(bpm) else {
             return nil
         }
         switch rule.trigger {
-        case .heartRateAbove: return bpm >= Double(rule.validatedInterval)
-        case .heartRateBelow: return bpm <= Double(rule.validatedInterval)
+        case .heartRateAbove:
+            let threshold = Double(rule.validatedInterval)
+            return bpm >= (previousActive ? threshold - 3 : threshold)
+        case .heartRateBelow:
+            let threshold = Double(rule.validatedInterval)
+            return bpm <= (previousActive ? threshold + 3 : threshold)
         case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow:
             guard let zone = ATHLTHHeartRateZones.measuredZone(
                 heartRateBPM: bpm, maximumBPM: maximumBPM
