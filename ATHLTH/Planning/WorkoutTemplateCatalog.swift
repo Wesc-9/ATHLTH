@@ -1079,6 +1079,30 @@ enum ATHLTHWorkoutAlphabetPage {
     }
 }
 
+enum ATHLTHWorkoutLibraryActivityScope: String {
+    case all, runningOnly, other
+
+    static func isPureRunning(_ blocks: [WorkoutTemplateBlock], declaredRunning: Bool) -> Bool {
+        declaredRunning && !blocks.contains {
+            $0.kind == .exercise || $0.cardioActivity == .walking ||
+                $0.activityTag == "cycling" || $0.wellnessKind != nil
+        }
+    }
+
+    func includes(_ workout: PlannedSession) -> Bool {
+        guard self != .all else { return true }
+        let pure = Self.isPureRunning(ATHLTHUnifiedWorkout.editorBlocks(from: workout),
+                                    declaredRunning: ATHLTHPlannedWorkoutType.running.matches(workout))
+        return self == .runningOnly ? pure : !pure
+    }
+
+    func includes(_ entry: WorkoutTemplateCatalogEntry) -> Bool {
+        guard self != .all else { return true }
+        let pure = Self.isPureRunning(entry.blocks, declaredRunning: ATHLTHPlannedWorkoutType.running.matches(entry))
+        return self == .runningOnly ? pure : !pure
+    }
+}
+
 struct WorkoutTemplateLibraryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
@@ -1093,6 +1117,7 @@ struct WorkoutTemplateLibraryView: View {
     /// Optional category from the new premium planned-workout selector.
     /// Other library entry points continue to start with "All".
     var initialCategory: ATHLTHPlannedWorkoutType? = nil
+    var activityScope: ATHLTHWorkoutLibraryActivityScope = .all
 
     @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
     @State private var query = ""
@@ -1224,8 +1249,10 @@ struct WorkoutTemplateLibraryView: View {
     init(
         onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil,
         onSelectPlanned: ((PlannedSession) -> Void)? = nil,
-        initialCategory: ATHLTHPlannedWorkoutType? = nil
+        initialCategory: ATHLTHPlannedWorkoutType? = nil,
+        activityScope: ATHLTHWorkoutLibraryActivityScope = .all
     ) {
+        self.activityScope = activityScope
         self.onStartRunning = onStartRunning
         self.onSelectPlanned = onSelectPlanned
         self.initialCategory = initialCategory
@@ -1615,7 +1642,8 @@ struct WorkoutTemplateLibraryView: View {
     /// Built-in running workouts share the same search, category and favorite
     /// filters as catalog workouts, without creating another library section.
     private var filteredRunningTemplates: [RunningWorkoutTemplate] {
-        guard (selectedCategory == "All" || selectedCategory == "Running") &&
+        guard activityScope != .other,
+              (selectedCategory == "All" || selectedCategory == "Running") &&
                 selectedMuscleFocus == "all" && selectedWorkoutLevel == "all"
         else { return [] }
 
@@ -1679,7 +1707,7 @@ struct WorkoutTemplateLibraryView: View {
                  ATHLTHPlannedWorkoutType.custom.matches(entry)) ||
                 (selectedCategory == "Custom" &&
                  ATHLTHPlannedWorkoutType.custom.matches(entry))
-            guard categoryMatches, levelMatches(entry) else { return false }
+            guard categoryMatches, levelMatches(entry), activityScope.includes(entry) else { return false }
             // Search, source tags and favorite IDs are cheap metadata checks.
             // Reject these first, before walking blocks or estimating duration.
             guard catalog.matchesSearch(entry, normalizedNeedle: needle),
@@ -1731,7 +1759,7 @@ struct WorkoutTemplateLibraryView: View {
                     rawValue: selectedCategory.lowercased()
                 )?.matches(workout) ??
                     (workout.kind.title == selectedCategory))
-            guard matchesCategory else { return false }
+            guard matchesCategory, activityScope.includes(workout) else { return false }
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
             guard filter.matches(workout, catalogEntry: source),
@@ -1786,7 +1814,7 @@ struct WorkoutTemplateLibraryView: View {
                  ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
                 (matchingType?.matches(workout) ??
                  (workout.kind.title == selectedCategory))
-            guard categoryMatches else { return false }
+            guard categoryMatches, activityScope.includes(workout) else { return false }
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
             guard filter.matches(workout, catalogEntry: source),
@@ -2075,7 +2103,7 @@ struct WorkoutTemplateLibraryView: View {
                         }
 
                         if initialCategory == nil {
-                        ForEach(categories, id: \.self) {
+                        ForEach(categories.filter { activityScope != .other || $0 != "Running" }, id: \.self) {
                             category in
                             Button {
                                 selectedCategory = category
@@ -4792,6 +4820,8 @@ struct WorkoutTemplateBuilderView: View {
     @State private var draftNotice = false
     @State private var pendingDraftCheckpoint: Task<Void, Never>?
     @State private var showingBlockPicker = false
+    @State private var addingOtherRunningContent = false
+    @State private var savedWorkoutActivityScope: ATHLTHWorkoutLibraryActivityScope = .all
     @State private var showingSavedWorkoutPicker = false
     @State private var showingStudioRoutePicker = false
     @State private var showingStudioRouteBuilder = false
@@ -5428,8 +5458,13 @@ struct WorkoutTemplateBuilderView: View {
     /// Strength modes belong only to strength editing. A generic mixed editor
     /// may offer them after a strength station exists, but an explicit
     /// running/walking/cycling/wellness editor can never create them.
+    private var allowsMixedRunningContent: Bool {
+        isPlannedWorkout && studioAdvanced && initialActivity == .running
+    }
+
     private var mayInsertStrengthModes: Bool {
-        ATHLTHStrengthModeAvailability.canCreate(
+        if allowsMixedRunningContent { return true }
+        return ATHLTHStrengthModeAvailability.canCreate(
             initialActivity: initialActivity, containsStrength: hasStrength
         )
     }
@@ -5437,7 +5472,7 @@ struct WorkoutTemplateBuilderView: View {
     private var hasStrengthGroupsInNonStrengthWorkout: Bool {
         // Basic may import a full library strength workout even when its
         // original quick-choice category was walking or mixed.
-        if isPlannedWorkout && !studioAdvanced { return false }
+        if isPlannedWorkout && (!studioAdvanced || allowsMixedRunningContent) { return false }
         guard let activity = initialActivity, activity != .strength else {
             return false
         }
@@ -5492,6 +5527,7 @@ struct WorkoutTemplateBuilderView: View {
                 $0.isIndoor != true }
         // A distance-based outdoor route is a complete planned workout,
         // even without an estimated finishing time.
+        let advancedFreeRun = allowsMixedRunningContent && ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks)
         let basicFreeRun = isPlannedWorkout && !studioAdvanced &&
             initialActivity == .running && studioBasicRunMode == .free &&
             (blocks.isEmpty || ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks))
@@ -5501,7 +5537,7 @@ struct WorkoutTemplateBuilderView: View {
             !hasInvalidDropSetWeights &&
             !hasStrengthGroupsInNonStrengthWorkout &&
             (!isPlannedWorkout || resolvedDurationMinutes != nil ||
-             routeDistanceGoal || basicFreeRun)
+             routeDistanceGoal || basicFreeRun || advancedFreeRun)
     }
 
     private var hasIncompleteStrengthGroup: Bool {
@@ -6485,7 +6521,13 @@ struct WorkoutTemplateBuilderView: View {
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
                 if pendingStandaloneExercise {
                     pendingStandaloneExercise = false
-                    openExercisePicker()
+                    if addingOtherRunningContent {
+                        exerciseTargetGroupID = nil
+                        pendingNewGroupKind = nil
+                        showingExercisePicker = true
+                    } else {
+                        openExercisePicker()
+                    }
                 } else if let group = pendingExerciseChoice {
                     pendingExerciseChoice = nil
                     switch group {
@@ -6496,8 +6538,10 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 } else if pendingSavedWorkoutPicker {
                     pendingSavedWorkoutPicker = false
+                    savedWorkoutActivityScope = addingOtherRunningContent ? .other : .all
                     showingSavedWorkoutPicker = true
                 }
+                addingOtherRunningContent = false
             }) {
                 blockPickerSheet
             }
@@ -6529,7 +6573,8 @@ struct WorkoutTemplateBuilderView: View {
                                         if wasBlank && !blocks.isEmpty { title = workout.title }
                                     }
                                 },
-                                initialCategory: initialActivity
+                                initialCategory: savedWorkoutActivityScope == .other ? nil : initialActivity,
+                                activityScope: savedWorkoutActivityScope == .all && initialActivity == .running ? .runningOnly : savedWorkoutActivityScope
                             )
                             .navigationTitle(tr("Add workout", "Legg til treningsøkt"))
                             .navigationBarTitleDisplayMode(.inline)
@@ -7545,8 +7590,12 @@ struct WorkoutTemplateBuilderView: View {
             hasSelectedRoute: activeRouteID != nil,
             onAddRun: { phase in
                 selectedPhase = phase
-                studioVisiblePhases.insert(phase)
                 switch initialActivity {
+                case .running:
+                    var block = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+                    block.phase = phase
+                    insertBlock(block, toGroup: nil)
+                    synchronizeRunningEnvironment()
                 case .strength:
                     openExercisePicker()
                 case .walking:
@@ -7578,7 +7627,6 @@ struct WorkoutTemplateBuilderView: View {
             },
             onAddExercise: { phase in
                 selectedPhase = phase
-                studioVisiblePhases.insert(phase)
                 openExercisePicker()
             },
             onAddFreeStrength: { phase in
@@ -7709,10 +7757,11 @@ struct WorkoutTemplateBuilderView: View {
             },
             onAddWorkout: { phase in
                 selectedPhase = phase
-                studioVisiblePhases.insert(phase)
+                savedWorkoutActivityScope = initialActivity == .running ? .runningOnly : .all
                 showingSavedWorkoutPicker = true
             },
             onChooseLibraryWorkout: {
+                savedWorkoutActivityScope = initialActivity == .running ? .runningOnly : .all
                 // Reuse the existing ATHLTH / Mine workout selection, not a
                 // file picker or a second workout engine.
                 showingSavedWorkoutPicker = true
@@ -7726,6 +7775,11 @@ struct WorkoutTemplateBuilderView: View {
                 selectedPhase = phase
                 studioRoutePhase = phase
                 showingStudioRouteBuilder = true
+            },
+            onAddOther: { phase in
+                selectedPhase = phase
+                addingOtherRunningContent = true
+                showingBlockPicker = true
             },
             onEdit: { id in
                 openStudioStepEditor(blockID: id)
@@ -8920,9 +8974,11 @@ struct WorkoutTemplateBuilderView: View {
                 ScrollView {
                     LazyVStack(spacing: 2) {
                         Color.clear.frame(height: 1).id("picker-top")
-                        pickerRow(tr("Running", "Løping"), icon: "figure.run") {
-                            addRunBlock(activity: .running)
-                            showingBlockPicker = false
+                        if !addingOtherRunningContent {
+                            pickerRow(tr("Running", "Løping"), icon: "figure.run") {
+                                addRunBlock(activity: .running)
+                                showingBlockPicker = false
+                            }
                         }
                         pickerRow(tr("Walking", "Gå"), icon: "figure.walk") {
                             addRunBlock(activity: .walking)
@@ -8941,18 +8997,25 @@ struct WorkoutTemplateBuilderView: View {
                             showingBlockPicker = false
                         }
                         Divider().padding(.vertical, 10)
-                        pickerRow(tr("Exercise", "Øvelse"), icon: "dumbbell.fill") {
+                        pickerRow(addingOtherRunningContent ? tr("Strength exercise", "Styrkeøvelse") : tr("Exercise", "Øvelse"), icon: "dumbbell.fill") {
                             pendingStandaloneExercise = true
                             showingBlockPicker = false
                         }
-                        pickerRow(tr("Workout", "Treningsøkt"), icon: "rectangle.stack") {
+                        pickerRow(addingOtherRunningContent ? tr("Other workout", "Annen treningsøkt") : tr("Workout", "Treningsøkt"), icon: "rectangle.stack") {
                             pendingSavedWorkoutPicker = true
                             showingBlockPicker = false
                         }
                         Divider().padding(.vertical, 10)
-                        pickerRow(tr("Intervals", "Intervall"), icon: "repeat") {
-                            createIntervals()
-                            showingBlockPicker = false
+                        if !addingOtherRunningContent {
+                            pickerRow(tr("Intervals", "Intervall"), icon: "repeat") {
+                                createIntervals()
+                                showingBlockPicker = false
+                            }
+                        } else {
+                            pickerRow(tr("Free strength training", "Fri styrketrening"), icon: "dumbbell") {
+                                addFreeStrengthBlock(in: selectedPhase)
+                                showingBlockPicker = false
+                            }
                         }
                         if mayInsertStrengthModes {
                             ForEach([
@@ -8965,9 +9028,11 @@ struct WorkoutTemplateBuilderView: View {
                                 }
                             }
                         }
-                        pickerRow(tr("Rest", "Pause"), icon: "pause.fill") {
-                            addRestBlock()
-                            showingBlockPicker = false
+                        if !addingOtherRunningContent {
+                            pickerRow(tr("Rest", "Pause"), icon: "pause.fill") {
+                                addRestBlock()
+                                showingBlockPicker = false
+                            }
                         }
                         pickerRow(tr("Stretching", "Uttøying"), icon: "figure.flexibility") {
                             addWellnessBlock(.stretching)
@@ -8983,7 +9048,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .background(studioBackground.ignoresSafeArea())
-            .navigationTitle(tr("Add block", "Legg til blokk"))
+            .navigationTitle(addingOtherRunningContent ? tr("Add other", "Legg til annet") : tr("Add block", "Legg til blokk"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -9154,7 +9219,9 @@ struct WorkoutTemplateBuilderView: View {
         case "yoga": addWellnessBlock(.yoga)
         case "meditation": addWellnessBlock(.meditation)
         case "exercise": openExercisePicker()
-        case "workout": showingSavedWorkoutPicker = true
+        case "workout":
+            savedWorkoutActivityScope = initialActivity == .running ? .runningOnly : .all
+            showingSavedWorkoutPicker = true
         case "interval": createIntervals()
         case "superset": createSuperset()
         case "circuit": createCircuit()
@@ -9186,11 +9253,14 @@ struct WorkoutTemplateBuilderView: View {
         // recipe; an older library workout must never insert zero exercises.
         let source = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
         guard !source.isEmpty,
-              ATHLTHStrengthModeAvailability.canImport(
+              allowsMixedRunningContent || ATHLTHStrengthModeAvailability.canImport(
                   source, initialActivity: initialActivity,
                   containsStrength: hasStrength
               )
-        else { return }
+        else {
+            actionNotice = tr("This workout cannot be added here.", "Denne treningsøkten kan ikke legges til her.")
+            return
+        }
         if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
             removeBasicOwnedBlocks()
         }
@@ -9405,7 +9475,8 @@ struct WorkoutTemplateBuilderView: View {
             studioBasicRunMode = .structured
         }
         let destination = selectedPhase
-        studioVisiblePhases.insert(destination)
+        // The actual inserted blocks define their phase; opening or closing
+        // a picker must not create an empty category.
         // The picker already returns an ordered, editable recipe. Insert
         // every effort and its recovery as one atomic sequence in the
         // selected section, irrespective of each block's source phase.
@@ -9537,7 +9608,7 @@ struct WorkoutTemplateBuilderView: View {
             exerciseSlug: nil, distanceMeters: nil,
             repetitions: nil, durationSeconds: minutes * 60,
             targetWeightKilograms: nil, loadNote: nil,
-            notes: nil, phase: wellness == .meditation ? .recovery : selectedPhase
+            notes: nil, phase: addingOtherRunningContent ? selectedPhase : (wellness == .meditation ? .recovery : selectedPhase)
         )
         block.wellnessKind = wellness
         insertBlock(block, toGroup: nil)
@@ -9778,7 +9849,8 @@ struct WorkoutTemplateBuilderView: View {
                 fallback: settings.ghostRaceAudioConfiguration
               )
             : nil
-        if isPlannedWorkout, initialActivity == .running {
+        if isPlannedWorkout, initialActivity == .running,
+           category == "running" || (blocks.isEmpty && !studioAdvanced) {
             switch studioBasicRunEnvironment {
             case .outdoor: workout.workoutCategory = "running"
             case .indoor: workout.workoutCategory = "indoor"

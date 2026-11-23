@@ -9,6 +9,15 @@ final class ATHLTHPlannedWorkoutTypePickerTests: XCTestCase {
         ))
     }
 
+    func testRunningLibraryScopeSeparatesMixedAndPureRecipes() {
+        let run = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+        var walk = run
+        walk.cardioActivity = .walking
+        XCTAssertTrue(ATHLTHWorkoutLibraryActivityScope.isPureRunning([run], declaredRunning: true))
+        XCTAssertFalse(ATHLTHWorkoutLibraryActivityScope.isPureRunning([run, walk], declaredRunning: true))
+        XCTAssertFalse(ATHLTHWorkoutLibraryActivityScope.isPureRunning([run], declaredRunning: false))
+    }
+
     func testBasicQuickStepsUseOnlyActualPlannerCategories() {
         let walking = ATHLTHBasicWorkoutQuickStepPolicy.makeStep(for: .walking)
         XCTAssertEqual(walking?.cardioActivity, .walking)
