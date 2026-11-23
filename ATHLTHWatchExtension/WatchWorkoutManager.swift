@@ -5510,6 +5510,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 .maximumHeartRateBPM ?? structuredRunningWorkout?.heartRateZoneMaximumBPM,
             context: running || kind == .strength
                 ? coachReadoutContext : .init(),
+            sport: sport,
             lastSlots: &customAudioCoachLastSlots
         )
     }
@@ -9010,7 +9011,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         paceSecondsPerKilometer: nil,
                         heartRateBPM: nil,
                         norwegian: self.coachPhrase(english: "en", norwegian: "no") == "no",
-                        context: context, lastSlots: &lastSlots
+                        context: context, sport: self.kind.rawValue,
+                        lastSlots: &lastSlots
                     ).map(\.text).joined(separator: ". ")
                     for _ in 0..<60 {
                         guard self.state == .completed,
