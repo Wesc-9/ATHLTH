@@ -3640,6 +3640,15 @@ struct TrainingPlanCatalogDetailView: View {
                 }
             }
 
+            if entry.tags.contains("no equipment") {
+                Label(ATHLTHLocalization.choose(
+                    english: "No equipment needed · bodyweight only",
+                    norwegian: "Ingen utstyr nødvendig · kun kroppsvekt"
+                ), systemImage: "checkmark.circle")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
             Rectangle()
                 .fill(ATHLTHPlanDesign.warmDivider)
                 .frame(height: 1)
@@ -3659,6 +3668,30 @@ struct TrainingPlanCatalogDetailView: View {
                     String(entry.durationWeeks * entry.sessionsPerWeek),
                     label: ATHLTHLocalization.choose(english: "Total sessions", norwegian: "Økter totalt")
                 )
+            }
+
+            if !distinctWorkoutKinds.isEmpty {
+                HStack(spacing: 9) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "WORKOUT TYPES", norwegian: "ØKTTYPER"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(distinctWorkoutKinds.enumerated()), id: \.offset) { _, kind in
+                                Label(kind.title, systemImage: kind.systemImage)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(detailAccent)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 6)
+                                    .background(ATHLTHPlanDesign.selectedSurface,
+                                                in: Capsule())
+                            }
+                        }
+                    }
+                }
             }
 
             if !displayedMuscleFocus.isEmpty {
@@ -3697,6 +3730,11 @@ struct TrainingPlanCatalogDetailView: View {
         }
         .shadow(color: .black.opacity(0.035), radius: 15, y: 6)
         .accessibilityIdentifier("athlth-premium-plan-overview")
+    }
+
+    private var distinctWorkoutKinds: [WorkoutKind] {
+        var seen = Set<WorkoutKind>()
+        return entry.workoutKinds.filter { seen.insert($0).inserted }
     }
 
     private var planLevelTitle: String {
