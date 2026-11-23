@@ -2876,7 +2876,7 @@ final class IPhoneWorkoutStore:
             guard plan.steps.indices.contains(recorded.index) else { continue }
             let step = plan.steps[recorded.index]
             guard let next = configuration.progress(
-                from: progress, segmentID: step.id,
+                from: progress, segmentID: step.ghostSourceSegmentID ?? step.id,
                 kind: intervalGhostKind(for: step),
                 elapsedSeconds: recorded.activeSeconds,
                 actualMeters: recorded.distanceMeters
@@ -2889,7 +2889,7 @@ final class IPhoneWorkoutStore:
            plan.steps.indices.contains(index) {
             let step = plan.steps[index]
             guard let next = configuration.progress(
-                from: progress, segmentID: step.id,
+                from: progress, segmentID: step.ghostSourceSegmentID ?? step.id,
                 kind: intervalGhostKind(for: step),
                 elapsedSeconds: max(0, workout.elapsed(at: date) -
                     (workout.structuredStepStartElapsedTime ?? 0)),
