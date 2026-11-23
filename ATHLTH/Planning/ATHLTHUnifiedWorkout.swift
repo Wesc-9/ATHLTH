@@ -224,7 +224,7 @@ enum ATHLTHUnifiedWorkout {
                 }
                 guard blockPhase == phase else { continue }
                 let rounds = min(max(interval.repetitions, 1), 60)
-                let groupID: UUID? = rounds > 1 && interval.kind == .work ? UUID() : nil
+                let groupID: UUID? = rounds > 1 && interval.kind == .work ? interval.id : nil
                 for repetition in 1...rounds {
                     let target = interval.resolvedWork(at: repetition)
                     let stepPhase: WorkoutPhaseKind =

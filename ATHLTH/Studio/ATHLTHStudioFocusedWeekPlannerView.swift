@@ -88,7 +88,8 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     @State private var activeDraftContext: String?
     @State private var resumingDraft = false
     @State private var drafts: [ATHLTHStudioFocusedWorkoutDraft] = []
-    @State private var confirmingExit = false
+    @State private var exitToOverview = false
+    @State private var externalCloseRequest = 0
     @State private var pendingDraftDeletion: ATHLTHStudioFocusedWorkoutDraft?
     // Chosen before entering the same Basic/Advanced editor used on iPhone.
     // The editor still allows switching modes without losing the recipe.
@@ -159,15 +160,6 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         }
         .task { await favorites.refresh() }
         .confirmationDialog(
-            ATHLTHLocalization.choose(english: "Keep this workout draft?", norwegian: "Beholde øktutkastet?"),
-            isPresented: $confirmingExit, titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(english: "Keep draft and leave", norwegian: "Behold utkast og gå ut")) {
-                onClose()
-            }
-            Button(ATHLTHLocalization.choose(english: "Continue editing", norwegian: "Fortsett å redigere"), role: .cancel) {}
-        }
-        .confirmationDialog(
             ATHLTHLocalization.choose(english: "Delete draft?", norwegian: "Slette utkast?"),
             isPresented: Binding(get: { pendingDraftDeletion != nil },
                                  set: { if !$0 { pendingDraftDeletion = nil } }),
@@ -185,40 +177,15 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 pendingDraftDeletion = nil
             }
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Change day and keep this draft?",
-                norwegian: "Bytt dag og behold øktutkastet?"
-            ),
-            isPresented: Binding(
-                get: { pendingDate != nil },
-                set: { if !$0 { pendingDate = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Save draft and change day",
-                norwegian: "Behold utkast og bytt dag"
-            )) {
-                if let pendingDate { switchToDay(pendingDate) }
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Continue editing", norwegian: "Fortsett å redigere"
-            ), role: .cancel) {
-                pendingDate = nil
-            }
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Your workout draft is stored locally for this date. Switching dates does not save it as a scheduled workout.",
-                norwegian: "Øktutkastet lagres lokalt for denne datoen. Å bytte dato betyr ikke at økten er ferdig planlagt."
-            ))
-        }
     }
 
     private var topBar: some View {
         HStack(spacing: 13) {
             Button {
-                if selectedActivity != nil { confirmingExit = true } else { onClose() }
+                if selectedActivity != nil {
+                    exitToOverview = true
+                    externalCloseRequest += 1
+                } else { onClose() }
             } label: {
                 Label(
                     ATHLTHLocalization.choose(
@@ -469,9 +436,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                         initialStudioAdvanced: preferredAdvanced,
                         onScheduledTimeChanged: { scheduledTime = $0 },
                         onAddStandalone: { draft in
-                            let saved = saveWorkout(draft, for: selectedDate)
-                            if saved { closeEditor() }
-                            return saved
+                            saveWorkout(draft, for: selectedDate)
                         },
                         onValidateSave: { _ in
                             validateDay()
@@ -480,7 +445,12 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                             english: "Save planned workout",
                             norwegian: "Lagre planlagt økt"
                         ),
-                        onCloseInline: { closeEditor() }
+                        onCloseInline: { finishEditorClose() },
+                        externalCloseRequest: externalCloseRequest,
+                        onKeepEditingInline: {
+                            pendingDate = nil
+                            exitToOverview = false
+                        }
                     )
                     .environment(\.athlthStudioFullscreenEditing, true)
                     .id(activeDraftContext ?? "\(dateKey)-\(selectedActivity.rawValue)")
@@ -549,6 +519,18 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
 
     private func reloadDrafts() {
         drafts = WorkoutTemplateBuilderView.focusedDayDrafts(userID: session.profile.userID)
+    }
+
+    private func finishEditorClose() {
+        if exitToOverview {
+            exitToOverview = false
+            closeEditor()
+            onClose()
+        } else if let next = pendingDate {
+            switchToDay(next)
+        } else {
+            closeEditor()
+        }
     }
 
     private func closeEditor() {
@@ -701,6 +683,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
             // The user entered the shared workout builder. Keep its local,
             // date-scoped draft and ask before replacing that editor.
             pendingDate = nextDate
+            externalCloseRequest += 1
         }
     }
 

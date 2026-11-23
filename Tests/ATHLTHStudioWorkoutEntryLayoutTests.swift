@@ -62,11 +62,16 @@ final class ATHLTHStudioWorkoutEntryLayoutTests: XCTestCase {
         XCTAssertEqual(result.count, source.count)
         XCTAssertEqual(result.map(\.kind), source.map(\.kind))
         XCTAssertEqual(result.map(\.durationSeconds), source.map(\.durationSeconds))
-        XCTAssertTrue(result.allSatisfy { $0.resolvedPhase == .warmup })
+        XCTAssertTrue(result.filter { !$0.isRestOrActiveRecovery }.allSatisfy { $0.resolvedPhase == .warmup })
         XCTAssertTrue(result.indices.allSatisfy {
             ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(at: $0, in: result, visiblePhases: [.warmup]) == .warmup
         })
         XCTAssertEqual(result.map(\.sequence), Array(1...result.count))
+        let second = ATHLTHWorkoutPhasePlacement.insertingRecipe(source, into: result, destination: .warmup)
+        XCTAssertEqual(second.prefix(result.count).map(\.editorDragID), result.map(\.editorDragID))
+        XCTAssertEqual(second.count, source.count * 2)
+        XCTAssertTrue(Set(second.prefix(result.count).compactMap(\.groupID))
+            .isDisjoint(with: Set(second.dropFirst(result.count).compactMap(\.groupID))))
     }
 
     func testSidebarUsesOneNativeControllerAndDoesNotNeedCustomHamburger() {

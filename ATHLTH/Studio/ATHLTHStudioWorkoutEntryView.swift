@@ -327,6 +327,9 @@ struct ATHLTHStudioWorkoutEntryView: View {
         .buttonStyle(.plain)
         .disabled(!plannedWorkouts.isEmpty)
         .opacity(plannedWorkouts.isEmpty ? 1 : 0.55)
+        .accessibilityHint(plannedWorkouts.isEmpty
+            ? tr("Schedules a rest day", "Planlegger en hviledag")
+            : tr("Remove planned workouts first", "Fjern planlagte økter først"))
         .accessibilityIdentifier("athlth-ipad-add-rest-day")
     }
 

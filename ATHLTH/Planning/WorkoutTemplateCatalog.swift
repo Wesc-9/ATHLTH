@@ -4889,6 +4889,8 @@ struct WorkoutTemplateBuilderView: View {
     /// Called only for explicit destructive deletion, never for Save Draft.
     /// The host also owns a legacy resume marker, which must be removed.
     private let onDraftDiscarded: (() -> Void)?
+    private let externalCloseRequest: Int
+    private let onKeepEditingInline: (() -> Void)?
 
     init(
         initialTitle: String = "",
@@ -4922,7 +4924,9 @@ struct WorkoutTemplateBuilderView: View {
         saveButtonTitle: String? = nil,
         onCloseInline: (() -> Void)? = nil,
         onCloseRequested: (() -> Void)? = nil,
-        onDraftDiscarded: (() -> Void)? = nil
+        onDraftDiscarded: (() -> Void)? = nil,
+        externalCloseRequest: Int = 0,
+        onKeepEditingInline: (() -> Void)? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -5037,6 +5041,8 @@ struct WorkoutTemplateBuilderView: View {
         self.onCloseInline = onCloseInline
         self.onCloseRequested = onCloseRequested
         self.onDraftDiscarded = onDraftDiscarded
+        self.externalCloseRequest = externalCloseRequest
+        self.onKeepEditingInline = onKeepEditingInline
         self.collaborationPartnerName = collaborationPartnerName
         self.collaborationWorkoutID = collaborationWorkoutID
         self.collaborationInviteSent = collaborationInviteSent
@@ -6142,6 +6148,9 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
             }
+            .onChange(of: externalCloseRequest) { _, _ in
+                showingDiscardConfirmation = true
+            }
             .onDisappear { persistWorkoutDraft() }
             .onChange(of: showingExercisePicker) { _, showing in
                 if !showing {
@@ -6661,7 +6670,7 @@ struct WorkoutTemplateBuilderView: View {
                            ? tr("Cancel", "Avbryt")
                            : tr("Back", "Tilbake")) {
                         if ATHLTHScratchComposerPresentationPolicy.requiresExitDecision(
-                            isScratchHost: onCloseRequested != nil,
+                            isScratchHost: onCloseRequested != nil || draftContext.hasPrefix("ipad-focused-day-"),
                             hasEdits: !blocks.isEmpty || !title.isEmpty ||
                                 selectedRouteID != nil || !studioVisiblePhases.isEmpty
                         ) {
@@ -6675,13 +6684,16 @@ struct WorkoutTemplateBuilderView: View {
             .sheet(
                 isPresented: $showingDiscardConfirmation,
                 onDismiss: {
-                    guard closeAfterDraftDecision else { return }
+                    guard closeAfterDraftDecision else {
+                        onKeepEditingInline?()
+                        return
+                    }
                     closeAfterDraftDecision = false
                     closeWorkoutEditor()
                 }
             ) {
                 ATHLTHDiscardDraftSheet(
-                    kind: onCloseRequested != nil ? .standaloneWorkoutDraft : .workout,
+                    kind: onCloseRequested != nil || draftContext.hasPrefix("ipad-focused-day-") ? .standaloneWorkoutDraft : .workout,
                     onKeepEditing: {
                         showingDiscardConfirmation = false
                     },

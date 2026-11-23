@@ -11,8 +11,11 @@ enum ATHLTHWorkoutPhasePlacement {
         let candidate: Int
         switch phase {
         case .warmup:
-            candidate = blocks.firstIndex { $0.resolvedPhase != .warmup }
-                ?? blocks.count
+            candidate = blocks.indices.first {
+                ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                    at: $0, in: blocks, visiblePhases: [.warmup, .main, .cooldown, .recovery]
+                ) != .warmup
+            } ?? blocks.count
         case .main, .recovery:
             candidate = blocks.firstIndex { $0.resolvedPhase == .cooldown }
                 ?? blocks.count
@@ -41,6 +44,8 @@ enum ATHLTHWorkoutPhasePlacement {
     ) -> WorkoutTemplateBlock {
         var next = block
         next.sequence = sequence
+        next.assessmentMethod = ATHLTHAssessmentMethod.normalized(block.assessmentMethod, for: next)
+        if next.assessmentMethod == nil { next.assessmentScope = nil }
         return next
     }
 
@@ -61,7 +66,15 @@ enum ATHLTHWorkoutPhasePlacement {
         let copies = source.map { original -> WorkoutTemplateBlock in
             var copy = original
             copy.editorDragID = UUID()
-            if let destination { copy.phase = destination }
+            if let destination {
+                // Recoveries retain their execution phase; the visible
+                // section is determined from their interval group.
+                if original.groupKind == .intervals && original.isRestOrActiveRecovery {
+                    copy.phase = .recovery
+                } else {
+                    copy.phase = destination
+                }
+            }
             if let id = original.groupID { copy.groupID = fresh(id) }
             if let id = original.executionGroupID { copy.executionGroupID = fresh(id) }
             return copy
