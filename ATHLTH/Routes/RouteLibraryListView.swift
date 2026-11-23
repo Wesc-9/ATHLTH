@@ -477,14 +477,8 @@ struct RouteLibraryListView: View {
               : "") {
             if viewMode == .map { await loadMapRouteGeometry() }
         }
-        .onChange(of: viewMode) { _, mode in
-            if mode != .map && mode != .largeCards {
-                // Route geometry is only retained while needed for a map
-                // or a visible full-width card.
-                hydratedRoutes.removeAll(keepingCapacity: false)
-                loadingDetails.removeAll()
-            }
-        }
+        // All browse layouts now display route maps, so switching between
+        // list / compact / premium must not evict already loaded GPS previews.
         .onChange(of: publicFilter) { _, _ in
             // Favorites filter is local; server sorting and pagination persist.
             if viewMode == .map {
@@ -842,8 +836,59 @@ struct RouteLibraryListView: View {
         return entry.isPublicTrail ? "figure.hiking" : "point.topleft.down.to.point.bottomright.curvepath"
     }
 
-    /// Fast, metadata-only route tile. No GPS, MapKit or network work can be
-    /// triggered when hundreds of catalogue items scroll past the viewport.
+    /// Real route geometry in the catalog. The thumbnail immediately draws
+    /// the GPS track offline, then resolves the cached MapKit image after
+    /// scrolling stops. The metadata-only catalog still loads quickly.
+    private func databaseRoutePreview(
+        _ entry: RouteLibraryEntry,
+        height: CGFloat,
+        radius: CGFloat = 12
+    ) -> some View {
+        Group {
+            if let route = hydratedRoutes[entry.id],
+               route.coordinates.count >= 2 {
+                RouteMapSnapshotThumbnail(
+                    route: route,
+                    height: height,
+                    allowsLiveSnapshot: !routeCardsScrolling
+                )
+            } else {
+                ZStack {
+                    ATHLTHPlanDesign.selectedSurface
+                    VStack(spacing: 5) {
+                        if loadingDetails.contains(entry.id) {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "map")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Text(tr(
+                            "Route map preview", "Forhåndsvisning av rutekart"
+                        ))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    }
+                    .padding(5)
+                }
+                .frame(height: height)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .task(id: entry.id) {
+            await loadRouteDetail(entry.id)
+        }
+        .accessibilityLabel(tr(
+            "Route map preview for \(entry.title)",
+            "Rutekart for \(entry.title)"
+        ))
+    }
+
     private func databaseCompactTile(_ entry: RouteLibraryEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             NavigationLink {
@@ -853,22 +898,7 @@ struct RouteLibraryListView: View {
                 )
             } label: {
                 VStack(alignment: .leading, spacing: 7) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 11)
-                            .fill(ATHLTHPlanDesign.selectedSurface)
-                        VStack(spacing: 7) {
-                            Image(systemName: catalogSourceSymbol(entry))
-                                .font(.system(size: 25, weight: .medium))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                            Text(catalogSourceTitle(entry))
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .padding(7)
-                    }
-                    .frame(height: 100)
+                    databaseRoutePreview(entry, height: 100, radius: 11)
 
                     Text(entry.title)
                         .font(.subheadline.weight(.semibold))
@@ -883,11 +913,17 @@ struct RouteLibraryListView: View {
             .buttonStyle(.plain)
             .simultaneousGesture(TapGesture().onEnded { markRecent(entry) })
 
-            HStack {
+            HStack(spacing: 6) {
                 if let climb = entry.elevationGainMeters {
-                    Text("\(Int(climb.rounded())) hm")
+                    Label("\(Int(climb.rounded())) hm", systemImage: "mountain.2")
                         .font(.caption2)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
+                } else {
+                    Text(catalogSourceTitle(entry))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 LibraryFavoriteButton(
@@ -904,6 +940,7 @@ struct RouteLibraryListView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 17)
                 .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
+                .allowsHitTesting(false)
         }
     }
 
@@ -1085,20 +1122,23 @@ struct RouteLibraryListView: View {
                 )
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: catalogSourceSymbol(entry))
-                        .font(.system(size: 23, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 68, height: 68)
-                        .background(ATHLTHPlanDesign.selectedSurface,
-                                    in: RoundedRectangle(cornerRadius: 12))
+                    databaseRoutePreview(entry, height: 68, radius: 12)
+                        .frame(width: 88)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.title)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
                             .lineLimit(2)
-                        Text(String(format: "%.1f km", entry.distanceKilometers))
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        HStack(spacing: 7) {
+                            Text(String(format: "%.1f km", entry.distanceKilometers))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            if let climb = entry.elevationGainMeters {
+                                Text("· \(Int(climb.rounded())) hm")
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                        }
+                        .font(.caption.weight(.medium))
+                        .lineLimit(1)
                         Text(catalogSourceTitle(entry))
                             .font(.caption2)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -1146,11 +1186,12 @@ struct RouteLibraryListView: View {
 
     @MainActor
     private func loadRouteDetail(_ id: UUID) async {
-        guard (viewMode == .map || viewMode == .largeCards),
+        guard selectedCollection == .athlth,
               hydratedRoutes[id] == nil,
               !loadingDetails.contains(id),
               let entry = entries.first(where: { $0.id == id })
         else { return }
+        let requestedAccount = session.profile.userID
         loadingDetails.insert(id)
         defer { loadingDetails.remove(id) }
 
@@ -1166,7 +1207,8 @@ struct RouteLibraryListView: View {
                 resolved = record.trainingRoute
             }
             guard !Task.isCancelled,
-                  viewMode == .map || viewMode == .largeCards,
+                  session.profile.userID == requestedAccount,
+                  selectedCollection == .athlth,
                   (viewMode == .map
                    ? entries.prefix(20).contains(where: { $0.id == id })
                    : entries.contains(where: { $0.id == id }))
@@ -1783,6 +1825,12 @@ struct RouteLibraryListView: View {
             guard catalogRequestID == requestID else { return }
             if reset {
                 catalog = page
+                // Release GPS geometry from old filtered results while keeping
+                // previews for IDs still present in the refreshed catalog.
+                let allowedIDs = Set(page.map(\.id))
+                hydratedRoutes = hydratedRoutes.filter {
+                    allowedIDs.contains($0.key)
+                }
             } else {
                 let existingIDs = Set(catalog.map(\.id))
                 catalog.append(contentsOf: page.filter { !existingIDs.contains($0.id) })
