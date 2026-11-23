@@ -36,7 +36,7 @@ enum ATHLTHIntervalGhostPacer {
 
     /// Persisted per-workout Ghost preferences. Stable raw values allow the
     /// same settings to travel with a planned workout to Apple Watch.
-    struct WorkoutConfiguration: Codable, Equatable {
+    struct WorkoutConfiguration: Codable, Hashable {
         enum Coverage: String, Codable {
             case entireWorkout
             case mainOnly
@@ -49,7 +49,7 @@ enum ATHLTHIntervalGhostPacer {
             case customPace
         }
 
-        struct SegmentSetting: Codable, Equatable, Identifiable {
+        struct SegmentSetting: Codable, Hashable, Identifiable {
             var id: UUID
             var enabled: Bool
             var paceSecondsPerKilometer: Double?
