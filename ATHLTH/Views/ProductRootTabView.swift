@@ -1831,19 +1831,6 @@ struct ATHLTHHomeView: View {
                 guard isActive, !session.previewModeEnabled else { return }
                 _ = await tournamentCalendar.refresh(for: session.profile.userID)
             }
-            .task(id: isActive) {
-                guard isActive, !trainDashboardReady else { return }
-                // Yield past the native tab selection/layout transaction before
-                // mounting the full Train dashboard. Cancellation on a quick
-                // tab switch avoids mounting an offscreen dashboard.
-                do {
-                    try await Task.sleep(for: .milliseconds(350))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled, isActive else { return }
-                trainDashboardReady = true
-            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
                 // Let the Home hierarchy paint before starting refresh work.
