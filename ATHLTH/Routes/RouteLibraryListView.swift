@@ -1192,6 +1192,25 @@ struct RouteLibraryListView: View {
               let entry = entries.first(where: { $0.id == id })
         else { return }
         let requestedAccount = session.profile.userID
+        // Compact four-column browsing can expose many thumbnails at once.
+        // Limit GPS-data requests just as the existing map snapshot renderer
+        // limits MapKit work. Cancel offscreen queued requests immediately.
+        while loadingDetails.count >= 3 {
+            guard !Task.isCancelled,
+                  selectedCollection == .athlth,
+                  session.profile.userID == requestedAccount else { return }
+            do {
+                try await Task.sleep(for: .milliseconds(80))
+            } catch {
+                return
+            }
+        }
+        guard !Task.isCancelled,
+              selectedCollection == .athlth,
+              session.profile.userID == requestedAccount,
+              hydratedRoutes[id] == nil,
+              !loadingDetails.contains(id),
+              entries.contains(where: { $0.id == id }) else { return }
         loadingDetails.insert(id)
         defer { loadingDetails.remove(id) }
 
