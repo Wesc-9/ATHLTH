@@ -179,6 +179,19 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 }
             }
 
+            if family == .finish {
+                choice(.nearFinishTime)
+                choice(.nearFinishDistance)
+            }
+            if family == .elevation {
+                choice(.elevationGain)
+                choice(.uphillDetected)
+                Text(tr("Uphill detection uses reliable outdoor GPS altitude and ignores uncertain terrain.",
+                        "Motbakkeregistrering krever pålitelige høydemålinger utendørs."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
             if trigger == .distance || trigger == .time ||
                 trigger == .randomMotivation || trigger == .nearFinishTime ||
                 trigger == .nearFinishDistance || trigger == .elevationGain {
@@ -284,16 +297,6 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                     }
                     .pickerStyle(.segmented)
                 }
-            } else if family == .finish {
-                choice(.nearFinishTime)
-                choice(.nearFinishDistance)
-            } else if family == .elevation {
-                choice(.elevationGain)
-                choice(.uphillDetected)
-                Text(tr("Uphill detection uses reliable outdoor GPS altitude and ignores uncertain terrain.",
-                        "Motbakkeregistrering krever pålitelige høydemålinger utendørs."))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             } else if family == .pace {
                 choice(.paceFasterThanTarget)
                 choice(.paceSlowerThanTarget)
