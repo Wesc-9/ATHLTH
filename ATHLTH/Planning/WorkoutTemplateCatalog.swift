@@ -6933,9 +6933,7 @@ struct WorkoutTemplateBuilderView: View {
     /// Only one compact list is visible in Basic: no phase cards, groups,
     /// interval editors or per-set wizard until the athlete chooses Advanced.
     private var basicWorkoutContents: some View {
-        let items = ATHLTHSimpleWorkoutOutline.stages(
-            for: blocks
-        ).flatMap(\.items)
+        let items = ATHLTHBasicRunningExerciseOutline.items(for: blocks)
         let visibleCount = basicContentsExpanded ? items.count : min(6, items.count)
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
