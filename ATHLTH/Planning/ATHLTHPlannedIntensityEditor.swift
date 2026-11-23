@@ -11,10 +11,21 @@ struct ATHLTHPlannedIntensityEditor: View {
 
     private var zone: Binding<Int> {
         Binding(
-            get: { block.targetHeartRateZone ?? 0 },
+            get: {
+                if let selected = block.targetHeartRateZone,
+                   (1...5).contains(selected) { return selected }
+                let source = block.sourceIntensityZoneLabel?
+                    .uppercased()
+                    .replacingOccurrences(of: " ", with: "")
+                    .replacingOccurrences(of: "-", with: "–")
+                if source == "Z4–Z5" || source == "S4–S5" { return 45 }
+                return 0
+            },
             set: { selected in
-                block.targetHeartRateZone = (1...5).contains(selected) ? selected : nil
-                block.sourceIntensityZoneLabel = nil
+                block.targetHeartRateZone = (1...5).contains(selected)
+                    ? selected : nil
+                block.sourceIntensityZoneLabel = selected == 45
+                    ? "Z4–Z5" : nil
                 block.targetHeartRatePercentMin = nil
                 block.targetHeartRatePercentMax = nil
             }
@@ -188,6 +199,8 @@ struct ATHLTHPlannedIntensityEditor: View {
                         Text((ATHLTHLocalization.isNorwegian ? "S" : "Z") + "\(value)")
                             .tag(value)
                     }
+                    Text(ATHLTHLocalization.isNorwegian ? "S4–S5" : "Z4–Z5")
+                        .tag(45)
                 }
                 .pickerStyle(.menu)
                 .tint(ATHLTHTrainDesign.bronze)
