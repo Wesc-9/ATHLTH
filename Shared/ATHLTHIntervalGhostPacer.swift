@@ -34,6 +34,92 @@ enum ATHLTHIntervalGhostPacer {
         var leadMeters: Double { runnerMeters - ghostMeters }
     }
 
+    /// Persisted per-workout Ghost preferences. Stable raw values allow the
+    /// same settings to travel with a planned workout to Apple Watch.
+    struct WorkoutConfiguration: Codable, Equatable {
+        enum Coverage: String, Codable {
+            case entireWorkout
+            case mainOnly
+            case selectedSegments
+        }
+
+        enum PauseBehavior: String, Codable {
+            case freeze
+            case followActualDistance
+            case customPace
+        }
+
+        struct SegmentSetting: Codable, Equatable, Identifiable {
+            var id: UUID
+            var enabled: Bool
+            var paceSecondsPerKilometer: Double?
+        }
+
+        var isEnabled: Bool = false
+        var defaultPaceSecondsPerKilometer: Double = 300
+        var coverage: Coverage = .mainOnly
+        var pauseBehavior: PauseBehavior = .freeze
+        var recoveryPaceSecondsPerKilometer: Double? = nil
+        var segments: [SegmentSetting] = []
+
+        var isValid: Bool {
+            guard defaultPaceSecondsPerKilometer.isFinite,
+                  (30...3_600).contains(defaultPaceSecondsPerKilometer),
+                  segments.count <= 500,
+                  Set(segments.map(\.id)).count == segments.count
+            else { return false }
+            if pauseBehavior == .customPace {
+                guard let recoveryPaceSecondsPerKilometer,
+                      recoveryPaceSecondsPerKilometer.isFinite,
+                      (30...3_600).contains(recoveryPaceSecondsPerKilometer)
+                else { return false }
+            }
+            return segments.allSatisfy { segment in
+                guard let pace = segment.paceSecondsPerKilometer else { return true }
+                return pace.isFinite && (30...3_600).contains(pace)
+            }
+        }
+
+        var scope: Scope {
+            coverage == .entireWorkout ? .wholeWorkout : .mainOnly
+        }
+
+        var recoveryPolicy: RecoveryPolicy {
+            switch pauseBehavior {
+            case .freeze: return .freeze
+            case .followActualDistance: return .followActualDistance
+            case .customPace:
+                return .targetPace(secondsPerKilometer:
+                    recoveryPaceSecondsPerKilometer ?? defaultPaceSecondsPerKilometer)
+            }
+        }
+
+        func progress(
+            from previous: VirtualProgress,
+            segmentID: UUID,
+            kind: SegmentKind,
+            elapsedSeconds: TimeInterval,
+            actualMeters: Double
+        ) -> VirtualProgress? {
+            guard isEnabled, isValid else { return nil }
+            if coverage == .selectedSegments &&
+                !segments.contains(where: { $0.id == segmentID && $0.enabled }) {
+                return previous
+            }
+            return advanceSegment(
+                previous, segmentID: segmentID, kind: kind,
+                scope: scope, elapsedSeconds: elapsedSeconds,
+                actualMeters: actualMeters,
+                defaultPaceSecondsPerKilometer: defaultPaceSecondsPerKilometer,
+                recovery: recoveryPolicy,
+                overrides: segments.map {
+                    SegmentOverride(segmentID: $0.id, enabled: $0.enabled,
+                                    paceSecondsPerKilometer: $0.paceSecondsPerKilometer)
+                }
+            )
+        }
+    }
+
     /// Stable segment identifiers allow a workout editor to target a single
     /// interval without changing other work or recovery segments.
     struct SegmentOverride {
