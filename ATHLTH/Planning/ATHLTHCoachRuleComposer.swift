@@ -45,6 +45,7 @@ struct ATHLTHCoachComposerCheckpoint: Equatable {
     let motivationPhrase: String
     let motivationStyle: ATHLTHCoachEncouragementStyle
     let historicalWorkoutID: UUID?
+    let activityFilter: ATHLTHCoachActivityFilter
 }
 
 struct ATHLTHCoachRuleComposer: View {
@@ -73,6 +74,7 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var motivationStyle: ATHLTHCoachEncouragementStyle
     @State private var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @State private var historicalWorkoutID: UUID?
+    @State private var activityFilter: ATHLTHCoachActivityFilter
 
     private var currentCheckpoint: ATHLTHCoachComposerCheckpoint {
         ATHLTHCoachComposerCheckpoint(
@@ -81,7 +83,8 @@ struct ATHLTHCoachRuleComposer: View {
             eventSelection: eventSelection, allowedPhases: allowedPhases,
             metrics: metrics, motivationPhrase: motivationPhrase,
             motivationStyle: motivationStyle,
-            historicalWorkoutID: historicalWorkoutID
+            historicalWorkoutID: historicalWorkoutID,
+            activityFilter: activityFilter
         )
     }
 
@@ -159,6 +162,9 @@ struct ATHLTHCoachRuleComposer: View {
             original?.encouragementStyle ?? .encouragement)
         _historicalWorkoutID = State(initialValue:
             checkpoint?.historicalWorkoutID ?? original?.historicalWorkoutID)
+        _activityFilter = State(initialValue:
+            checkpoint?.activityFilter ?? group?.activityFilter ??
+            original?.activityFilter ?? .all)
     }
 
     private var isEditing: Bool {
@@ -222,7 +228,7 @@ struct ATHLTHCoachRuleComposer: View {
     }
 
     private var canAdvanceTrigger: Bool {
-        triggerAvailability.supports(trigger) &&
+        triggerAvailability.supports(trigger, for: activityFilter) &&
             (trigger != .slowerThanPreviousWorkout || selectedHistory != nil)
     }
 
@@ -284,6 +290,7 @@ struct ATHLTHCoachRuleComposer: View {
                             phases: $allowedPhases,
                             supportsStructured: supportsStructured,
                             triggerAvailability: triggerAvailability,
+                            activityFilter: $activityFilter,
                             historicalReferences: historicalReferences,
                             historicalWorkoutID: $historicalWorkoutID
                         )
@@ -576,6 +583,7 @@ struct ATHLTHCoachRuleComposer: View {
             eventSelection: eventSelection
         )
         if let previous { rule.id = previous.id }
+        rule.activityFilter = activityFilter == .all ? nil : activityFilter
         if trigger == .slowerThanPreviousWorkout,
            let reference = selectedHistory {
             rule.historicalWorkoutID = reference.id
@@ -615,6 +623,7 @@ struct ATHLTHCoachRuleComposer: View {
                 draft.coachGroups[groupIndex].ruleIDs = [rule.id]
                 draft.coachGroups[groupIndex].eventSelection = eventSelection
                 draft.coachGroups[groupIndex].phases = allowedPhases
+                draft.coachGroups[groupIndex].activityFilter = rule.activityFilter
             } else {
                 var group = ATHLTHAudioCoachGroup(name: name)
                 group.trigger = trigger
@@ -622,6 +631,7 @@ struct ATHLTHCoachRuleComposer: View {
                 group.ruleIDs = [rule.id]
                 group.eventSelection = eventSelection
                 group.phases = allowedPhases
+                group.activityFilter = rule.activityFilter
                 group.enabled = true
                 draft.customRules.append(rule)
                 draft.coachGroups.append(group)
