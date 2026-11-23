@@ -3,6 +3,33 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachAdvancedTriggerTests: XCTestCase {
+    func testCommandSelectionIsUniqueAndSpeakingOrderCanChange() {
+        let initial: [ATHLTHAudioCoachRule.Metric] = [.heartRate, .speed]
+        XCTAssertEqual(ATHLTHCoachCommandSelection.adding(.heartRate, to: initial, multiple: true), initial)
+        XCTAssertEqual(ATHLTHCoachCommandSelection.adding(.distance, to: initial, multiple: false), [.distance])
+        XCTAssertEqual(ATHLTHCoachCommandSelection.moving(.speed, earlierIn: initial), [.speed, .heartRate])
+    }
+
+    func testCommandCatalogueRespectsActivityAndContext() {
+        let strength = ATHLTHCoachCommandSelection.available(activity: .strength, structured: true, routes: false, distance: false)
+        XCTAssertTrue(strength.contains(.nextExercise))
+        XCTAssertTrue(strength.contains(.heartRate))
+        XCTAssertFalse(strength.contains(.pace))
+        XCTAssertFalse(strength.contains(.speed))
+        let running = ATHLTHCoachCommandSelection.available(activity: .running, structured: false, routes: false, distance: true)
+        XCTAssertTrue(running.contains(.speed))
+        XCTAssertFalse(running.contains(.nextExercise))
+        XCTAssertFalse(running.contains(.routeRemainingDistance))
+    }
+
+    func testCommandPreviewUsesRuleFormatterAndSelectedOrder() {
+        var rule = ATHLTHAudioCoachRule(trigger: .time, metric: .heartRate, interval: 60,
+                                       additionalMetrics: [.motivation, .speed])
+        rule.customPhrase = "Hold flyten"
+        let preview = ATHLTHCoachCommandSelection.example(for: rule, activity: .running, norwegian: true)
+        XCTAssertTrue(preview?.hasPrefix("Puls 154. Hold flyten. Hastighet") == true)
+    }
+
     private func due(
         _ rule: ATHLTHAudioCoachRule,
         time: Double = 300,

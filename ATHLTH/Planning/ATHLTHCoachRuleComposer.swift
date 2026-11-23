@@ -48,6 +48,97 @@ struct ATHLTHCoachComposerCheckpoint: Equatable {
     let activityFilter: ATHLTHCoachActivityFilter
 }
 
+/// Presentation policy only. Keep the persisted rule and its speech formatter
+/// authoritative across global templates and the workout-specific editor.
+enum ATHLTHCoachCommandSelection {
+    typealias Metric = ATHLTHAudioCoachRule.Metric
+
+    static func available(
+        activity: ATHLTHCoachActivityFilter,
+        structured: Bool, routes: Bool, distance: Bool
+    ) -> [Metric] {
+        Metric.allCases.filter { metric in
+            switch metric {
+            case .stepName, .stepRemainingTime, .groupRemainingTime,
+                 .remainingExercises, .nextExercise, .previousExerciseSummary,
+                 .previousMainSectionSummary:
+                guard structured else { return false }
+            case .routeRemainingDistance, .estimatedRouteTime:
+                guard routes else { return false }
+            case .distance:
+                guard distance else { return false }
+            default: break
+            }
+            switch activity {
+            case .strength:
+                let probe = ATHLTHAudioCoachRule(trigger: .time, metric: metric, interval: 60)
+                return !ATHLTHAudioCoachSportPolicy.eligibleStrengthRules([probe]).isEmpty
+            case .cycling, .swimming, .functional:
+                switch metric {
+                case .pace, .averagePace, .lastKilometerPace, .speed,
+                     .personalRecord, .routeRemainingDistance, .estimatedRouteTime,
+                     .stepName, .stepRemainingTime, .groupRemainingTime,
+                     .workoutRemainingTime, .estimatedFinishTime, .remainingExercises,
+                     .nextExercise, .previousExerciseSummary, .previousMainSectionSummary:
+                    return false
+                case .distance: return activity != .functional && distance
+                default: return true
+                }
+            default: return true
+            }
+        }
+    }
+
+    static func adding(_ metric: Metric, to selected: [Metric], multiple: Bool) -> [Metric] {
+        if multiple {
+            return selected.contains(metric) ? selected : selected + [metric]
+        }
+        return [metric]
+    }
+
+    static func moving(_ metric: Metric, earlierIn selected: [Metric]) -> [Metric] {
+        guard let index = selected.firstIndex(of: metric), index > 0 else { return selected }
+        var result = selected
+        result.swapAt(index, index - 1)
+        return result
+    }
+
+    static func example(
+        for rule: ATHLTHAudioCoachRule, activity: ATHLTHCoachActivityFilter,
+        norwegian: Bool
+    ) -> String? {
+        let strength = activity == .strength
+        let walking = activity == .walking
+        var context = ATHLTHCoachReadoutContext()
+        context.stepName = strength ? (norwegian ? "Knebøy" : "Squat")
+            : walking ? (norwegian ? "Gåing" : "Walking") : (norwegian ? "Løping" : "Running")
+        context.stepRemainingSeconds = 45
+        context.groupRemainingSeconds = 240
+        context.workoutRemainingSeconds = 900
+        context.routeRemainingMeters = 2400
+        context.lastKilometerPaceSecondsPerKilometer = walking ? 600 : 330
+        context.overallPaceSecondsPerKilometer = walking ? 600 : 330
+        context.remainingExerciseCount = 3
+        context.nextExerciseName = strength ? (norwegian ? "Skulderpress" : "Shoulder press")
+            : (norwegian ? "Aktiv pause" : "Active recovery")
+        context.nextExerciseDetails = strength ? (norwegian ? "3 sett, 10 repetisjoner" : "3 sets, 10 repetitions") : nil
+        context.previousExerciseName = context.stepName
+        context.previousExerciseSeconds = 120
+        context.previousExerciseDistanceMeters = strength ? nil : 400
+        context.previousMainSectionExerciseCount = 4
+        context.previousMainSectionSeconds = 600
+        context.verifiedPersonalRecordNorwegian = "Ny personlig rekord!"
+        context.verifiedPersonalRecordEnglish = "New personal record!"
+        return rule.phrase(
+            distanceMeters: strength ? 0 : 2000,
+            elapsedSeconds: walking ? 1200 : 660,
+            paceSecondsPerKilometer: strength ? nil : walking ? 600 : 320,
+            heartRateBPM: 154, norwegian: norwegian, maximumHeartRateBPM: 190,
+            context: context
+        )
+    }
+}
+
 struct ATHLTHCoachRuleComposer: View {
     @EnvironmentObject private var session: AppSessionStore
     @Binding private var draft: AudioCoachDraft
@@ -233,32 +324,24 @@ struct ATHLTHCoachRuleComposer: View {
     }
 
     private var canSave: Bool {
-        canAdvanceTrigger && !metrics.isEmpty && (!target.isGroup ||
+        canAdvanceTrigger && !metrics.isEmpty && unavailableSelected.isEmpty && (!target.isGroup ||
             !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
             (isEditing || draft.customRules.count < 20)
     }
 
+    private var effectiveActivity: ATHLTHCoachActivityFilter {
+        activityFilter == .all ? (triggerAvailability.workoutActivity ?? .all) : activityFilter
+    }
+
     private var availableMetrics: [ATHLTHAudioCoachRule.Metric] {
-        let wanted: [ATHLTHAudioCoachRule.Metric] = [
-            .distance, .elapsedTime, .pace, .averagePace,
-            .lastKilometerPace, .speed, .clockTime, .date, .heartRate,
-            .heartRateZone, .motivation, .hydrationReminder, .stepName,
-            .stepRemainingTime, .workoutRemainingTime, .estimatedFinishTime,
-            .remainingExercises, .nextExercise, .previousExerciseSummary,
-            .previousMainSectionSummary, .routeRemainingDistance,
-            .estimatedRouteTime, .personalRecord, .groupRemainingTime
-        ]
-        return wanted.filter {
-            switch $0 {
-            case .stepName, .stepRemainingTime, .remainingExercises,
-                 .nextExercise, .previousExerciseSummary,
-                 .previousMainSectionSummary, .groupRemainingTime:
-                return supportsStructured
-            case .routeRemainingDistance, .estimatedRouteTime:
-                return showsRoutes
-            default: return true
-            }
-        }
+        ATHLTHCoachCommandSelection.available(
+            activity: effectiveActivity, structured: supportsStructured,
+            routes: showsRoutes, distance: triggerAvailability.supportsDistance
+        )
+    }
+
+    private var unavailableSelected: [ATHLTHAudioCoachRule.Metric] {
+        metrics.filter { !availableMetrics.contains($0) }
     }
 
     var body: some View {
@@ -322,18 +405,6 @@ struct ATHLTHCoachRuleComposer: View {
                             (stage == .trigger && !canAdvanceTrigger)
                             ? 0.45 : 1
                         )
-                    } else {
-                        Button(action: save) {
-                            Text(target.isGroup
-                                ? tr("Save group", "Lagre gruppe")
-                                : tr("Save command", "Lagre kommando"))
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity, minHeight: 52)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(bronze)
-                        .disabled(!canSave)
-                        .accessibilityIdentifier("athlth-coach-composer-save")
                     }
                 }
                 .padding(18)
@@ -341,6 +412,9 @@ struct ATHLTHCoachRuleComposer: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if stage == .commands { commandFooter }
+            }
             .scrollDismissesKeyboard(.interactively)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle(target.isGroup
@@ -354,12 +428,6 @@ struct ATHLTHCoachRuleComposer: View {
                         if stage == .commands { stage = .trigger }
                         else if stage == .trigger && target.isGroup { stage = .name }
                         else { onClose() }
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if stage == .commands {
-                        Button(tr("Save", "Lagre"), action: save)
-                            .disabled(!canSave)
                     }
                 }
             }
@@ -404,10 +472,10 @@ struct ATHLTHCoachRuleComposer: View {
             "Choose one trigger. It controls every command in this group or single command.",
             "Velg én trigger. Den styrer alle kommandoene i gruppen eller enkeltkommandoen.")
         case .commands: target.isGroup
-            ? tr("Select several values. Coach speaks them together once per trigger.",
-                 "Velg flere verdier. Coach leser dem samlet én gang per trigger.")
-            : tr("Choose exactly one command.",
-                 "Velg nøyaktig én kommando.")
+            ? tr("Build one message, in the order you want to hear it.",
+                 "Sett sammen én melding, i den rekkefølgen du vil høre den.")
+            : tr("Choose what Coach should read aloud.",
+                 "Velg hva Coach skal lese opp.")
         }
     }
 
@@ -427,108 +495,319 @@ struct ATHLTHCoachRuleComposer: View {
         }
     }
 
+    // The old duplicated selected/list interface is replaced by one
+    // ordered composer and a compact, unselected-only catalogue.
     private var commandStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(trigger.summary(interval: interval), systemImage: "waveform")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(bronze)
-            if !metrics.isEmpty {
-                Text(tr("SELECTED", "VALGT"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.3)
-                    .foregroundStyle(bronze)
-                VStack(spacing: 4) {
-                    ForEach(metrics) { metric in
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(bronze)
-                            Text(metric.title)
-                                .font(.subheadline.weight(.medium))
-                            Spacer()
-                            Button {
-                                metrics.removeAll { $0 == metric }
-                            } label: {
-                                Image(systemName: "xmark.circle")
-                                    .frame(width: 44, height: 44)
-                            }
-                            .accessibilityLabel(tr("Remove", "Fjern") + " " + metric.title)
-                        }
-                    }
-                }
-                .padding(13)
-                .background(ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 16))
-            }
-            ForEach(ATHLTHCoachMetricCategory.allCases) { category in
-                let choices = availableMetrics.filter { $0.category == category }
-                if !choices.isEmpty {
-                    Text(category.title.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.1)
-                        .foregroundStyle(bronze)
-                        .padding(.top, 8)
-                    VStack(spacing: 5) {
-                        ForEach(choices) { metric in
-                            Button {
-                                if target.isGroup {
-                                    if metrics.contains(metric) {
-                                        metrics.removeAll { $0 == metric }
-                                    } else {
-                                        metrics.append(metric)
-                                    }
-                                } else {
-                                    metrics = [metric]
-                                }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: metrics.contains(metric)
-                                        ? "checkmark.circle.fill" : "plus.circle")
-                                        .font(.title3)
-                                        .foregroundStyle(bronze)
-                                    Text(metric.title)
-                                        .font(.subheadline)
-                                        .foregroundStyle(ink)
-                                    Spacer()
-                                }
-                                .padding(14)
-                                .frame(maxWidth: .infinity, minHeight: 48)
-                                .background(metrics.contains(metric)
-                                    ? ATHLTHPlanDesign.selectedSurface : Color.white,
-                                    in: RoundedRectangle(cornerRadius: 14))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            if metrics.contains(.motivation) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(tr("COACH STYLE", "MOTIVASJONSSTIL"))
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(bronze)
-                    Picker(tr("Style", "Stil"), selection: $motivationStyle) {
-                        Text(tr("Encourage", "Motiver")).tag(ATHLTHCoachEncouragementStyle.encouragement)
-                        Text(tr("Push", "Push")).tag(ATHLTHCoachEncouragementStyle.push)
-                        Text(tr("Praise", "Ros")).tag(ATHLTHCoachEncouragementStyle.praise)
-                    }
-                    .pickerStyle(.segmented)
-                    Text(tr("PERSONAL MESSAGE (OPTIONAL)", "EGEN MELDING (VALGFRITT)"))
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(bronze)
-                    TextField(tr("Your own encouragement", "Din egen motivasjon"),
-                              text: $motivationPhrase, axis: .vertical)
-                        .lineLimit(2...5)
-                        .padding(13)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
-                }
-            }
+        VStack(alignment: .leading, spacing: 22) {
+            commandPreview
+            selectedCommandCard
+            if metrics.contains(.motivation) { motivationEditor }
+            commandCatalogue
             if draft.customRules.count >= 20 && !isEditing {
                 Text(tr("Maximum 20 active rules per template.",
                         "Maks 20 regler per mal."))
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(muted)
             }
         }
+        .accessibilityIdentifier("athlth-coach-command-builder")
+    }
+
+    private var exampleText: String? {
+        guard let first = metrics.first else { return nil }
+        var rule = ATHLTHAudioCoachRule(
+            trigger: trigger, metric: first, interval: interval,
+            additionalMetrics: Array(metrics.dropFirst())
+        )
+        rule.encouragementStyle = motivationStyle
+        let phrase = motivationPhrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        rule.customPhrase = phrase.isEmpty ? nil : String(phrase.prefix(180))
+        if let reference = selectedHistory {
+            rule.historicalWorkoutFirstKilometerSeconds = reference.firstKilometerSeconds
+        }
+        return ATHLTHCoachCommandSelection.example(
+            for: rule, activity: effectiveActivity,
+            norwegian: tr("en", "nb") == "nb"
+        )
+    }
+
+    private var commandPreview: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 23, weight: .medium))
+                    .foregroundStyle(bronze)
+                    .frame(width: 46, height: 46)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("WHEN COACH SPEAKS", "NÅR COACH SNAKKER"))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.1)
+                        .foregroundStyle(muted)
+                    Text(trigger.summary(interval: interval))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            Divider()
+            Text(tr("Message preview", "Forhåndsvisning"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(bronze)
+            Text(exampleText ?? tr(
+                "Add content to see your message here.",
+                "Legg til innhold for å se meldingen her."))
+                .font(.system(.title3, design: .serif))
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("athlth-coach-command-preview")
+            Text(tr("Example values. Coach uses available live data during your workout.",
+                    "Eksempelverdier. Coach bruker tilgjengelige sanntidsdata under økten."))
+                .font(.caption)
+                .foregroundStyle(muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 24))
+    }
+
+    private var commandColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 148), spacing: 8, alignment: .top)]
+    }
+
+    private var selectedCommandCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(tr("Your message", "Din melding"))
+                    .font(.headline)
+                    .foregroundStyle(ink)
+                Spacer()
+                Text("\(metrics.count)")
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(bronze)
+            }
+            if metrics.isEmpty {
+                Text(tr("Choose content from the options below.",
+                        "Velg innhold fra alternativene nedenfor."))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+            } else {
+                if target.isGroup && metrics.count > 1 {
+                    Text(tr("Numbered in speaking order. Use the arrow to move a choice earlier.",
+                            "Nummerert i opplesningsrekkefølge. Bruk pilen for å flytte et valg frem."))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                }
+                LazyVGrid(columns: commandColumns, alignment: .leading, spacing: 8) {
+                    ForEach(metrics) { metric in
+                        selectedCommand(metric)
+                    }
+                }
+            }
+            if !unavailableSelected.isEmpty {
+                Text(tr("Some saved choices are unavailable for this activity. Remove them before saving.",
+                        "Noen lagrede valg er ikke tilgjengelige for denne aktiviteten. Fjern dem før du lagrer."))
+                    .font(.caption)
+                    .foregroundStyle(bronze)
+            }
+        }
+    }
+
+    private func selectedCommand(_ metric: ATHLTHAudioCoachRule.Metric) -> some View {
+        let index = metrics.firstIndex(of: metric) ?? 0
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 0) {
+                Text(String(index + 1))
+                    .font(.caption2.weight(.bold).monospacedDigit())
+                    .foregroundStyle(bronze)
+                    .frame(width: 24, height: 24)
+                    .background(Color.white, in: Circle())
+                    .accessibilityLabel(tr("Speaking order", "Opplesningsrekkefølge") + " " + String(index + 1))
+                Spacer(minLength: 0)
+                if target.isGroup && index > 0 {
+                    Button {
+                        metrics = ATHLTHCoachCommandSelection.moving(metric, earlierIn: metrics)
+                    } label: {
+                        Image(systemName: "arrow.left")
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(tr("Move earlier", "Flytt frem") + " " + metric.title)
+                }
+                Button {
+                    metrics.removeAll { $0 == metric }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(tr("Remove", "Fjern") + " " + metric.title)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(bronze)
+            Label(metric.title, systemImage: commandSymbol(metric))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 8)
+            if unavailableSelected.contains(metric) {
+                Text(tr("Unavailable", "Ikke tilgjengelig"))
+                    .font(.caption2)
+                    .foregroundStyle(muted)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityIdentifier("athlth-coach-selected-" + metric.rawValue)
+    }
+
+    private var commandCatalogue: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(tr("Add content", "Velg innhold"))
+                    .font(.headline)
+                    .foregroundStyle(ink)
+                Spacer()
+                Text(effectiveActivity.title)
+                    .font(.caption)
+                    .foregroundStyle(muted)
+            }
+            let remaining = availableMetrics.filter { !metrics.contains($0) }
+            if remaining.isEmpty {
+                Text(tr("All available content has been added.",
+                        "Alt tilgjengelig innhold er lagt til."))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+            }
+            ForEach(ATHLTHCoachMetricCategory.allCases) { category in
+                let choices = remaining.filter { $0.category == category }
+                if !choices.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(category.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(bronze)
+                        LazyVGrid(columns: commandColumns, alignment: .leading, spacing: 8) {
+                            ForEach(choices) { metric in
+                                commandTile(metric)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func commandTile(_ metric: ATHLTHAudioCoachRule.Metric) -> some View {
+        Button {
+            metrics = ATHLTHCoachCommandSelection.adding(metric, to: metrics, multiple: target.isGroup)
+        } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Image(systemName: commandSymbol(metric))
+                        .font(.system(size: 19, weight: .medium))
+                    Spacer()
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.semibold))
+                        .padding(7)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                }
+                .foregroundStyle(bronze)
+                Text(metric.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 82, alignment: .topLeading)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tr("Add", "Legg til") + " " + metric.title)
+        .accessibilityIdentifier("athlth-coach-add-" + metric.rawValue)
+    }
+
+    private func commandSymbol(_ metric: ATHLTHAudioCoachRule.Metric) -> String {
+        switch metric {
+        case .pace, .averagePace, .lastKilometerPace: return "figure.run"
+        case .speed: return "speedometer"
+        case .distance, .routeRemainingDistance: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .heartRate: return "heart.fill"
+        case .heartRateZone: return "heart.text.square"
+        case .motivation: return "quote.bubble"
+        case .hydrationReminder: return "drop"
+        case .clockTime, .estimatedFinishTime: return "clock"
+        case .date: return "calendar"
+        case .personalRecord: return "trophy"
+        case .stepName, .nextExercise: return "list.bullet"
+        case .remainingExercises: return "list.number"
+        case .previousExerciseSummary, .previousMainSectionSummary: return "chart.bar"
+        case .estimatedRouteTime: return "map"
+        case .elapsedTime, .stepRemainingTime, .groupRemainingTime,
+             .workoutRemainingTime: return "timer"
+        }
+    }
+
+    private var motivationEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(tr("Make it personal", "Gjør meldingen personlig"))
+                .font(.headline)
+                .foregroundStyle(ink)
+            Picker(tr("Style", "Stil"), selection: $motivationStyle) {
+                Text(tr("Encourage", "Motiver")).tag(ATHLTHCoachEncouragementStyle.encouragement)
+                Text(tr("Push", "Push")).tag(ATHLTHCoachEncouragementStyle.push)
+                Text(tr("Praise", "Ros")).tag(ATHLTHCoachEncouragementStyle.praise)
+            }
+            .pickerStyle(.segmented)
+            TextField(tr("Your own message (optional)", "Din egen melding (valgfritt)"),
+                      text: $motivationPhrase, axis: .vertical)
+                .lineLimit(2...5)
+                .padding(13)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    private var commandFooter: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                Button {
+                    metrics.removeAll()
+                } label: {
+                    Text(tr("Clear", "Tøm valg"))
+                        .font(.subheadline.weight(.medium))
+                        .frame(minHeight: 48)
+                        .padding(.horizontal, 10)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(bronze)
+                .disabled(metrics.isEmpty)
+                Button(action: save) {
+                    Label(target.isGroup ? tr("Save group", "Lagre gruppe")
+                          : tr("Save command", "Lagre kommando"),
+                          systemImage: "checkmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(bronze.opacity(canSave ? 1 : 0.45),
+                                    in: RoundedRectangle(cornerRadius: 17))
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
+                .accessibilityIdentifier("athlth-coach-composer-save")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 650)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
     }
 
     private func next() {
