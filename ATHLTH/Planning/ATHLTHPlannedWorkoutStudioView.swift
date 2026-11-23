@@ -612,6 +612,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             for: rows,
             defaultActivity: activity == .walking ? .walking : .running
         )
+        // Collapse group membership once, not inside every row. Hidden
+        // phases don't build a presentation plan at all.
+        let displayRows = expanded
+            ? ATHLTHStudioPhaseRenderRows.make(from: rows) : []
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 11) {
                 Image(systemName: "line.3.horizontal")
@@ -679,64 +683,52 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 15)
                 } else {
-                    // The main ScrollView owns scrolling. Keep offscreen
-                    // rows unmounted instead of building all 35+ steps and
-                    // their gestures/menus at every small scroll delta.
+                    // Group deduplication is precomputed once. LazyVStack
+                    // mounts only the rows near the viewport, not all 35+
+                    // individual gestures, menus and expensive labels.
                     LazyVStack(spacing: 3) {
-                        ForEach(Array(rows.enumerated()), id: \.element.editorDragID) { position, block in
-                            if block.groupKind?.isStrengthGroup == true,
-                               let groupID = block.groupID {
-                                if !rows.prefix(position).contains(where: {
-                                    $0.groupID == groupID
+                        ForEach(displayRows) { item in
+                            switch item.kind {
+                            case .strengthGroup(let groupID):
+                                strengthGroupCard(groupID, rows: rows, phase: phase)
+                            case .intervalGroup(let groupID):
+                                intervalGroupCard(groupID, rows: rows, phase: phase)
+                            case .strengthSets:
+                                if let liveIndex = blocks.firstIndex(where: {
+                                    $0.editorDragID == item.id
                                 }) {
-                                    strengthGroupCard(groupID, rows: rows, phase: phase)
-                                }
-                            } else if let groupID = ATHLTHIntervalRecipeEditing.explicitGroupID(
-                                for: block, in: rows
-                            ) {
-                                if !rows.prefix(position).contains(where: {
-                                    $0.groupID == groupID
-                                }) {
-                                    intervalGroupCard(groupID, rows: rows, phase: phase)
-                                }
-                            } else if block.kind == .exercise,
-                                      block.groupID == nil,
-                                      (block.setCount ?? 1) > 1,
-                                      let liveIndex = blocks.firstIndex(where: {
-                                          $0.editorDragID == block.editorDragID
-                                      }) {
-                                ATHLTHStrengthGroupRow(
-                                    block: $blocks[liveIndex],
-                                    canMoveUp: position > 0,
-                                    canMoveDown: position + 1 < rows.count,
-                                    onEdit: { onEdit(block.editorDragID) },
-                                    onDelete: { onRemove(block.editorDragID) },
-                                    onMoveBy: { offset in
-                                        let destination = position + offset
-                                        guard rows.indices.contains(destination) else { return }
-                                        onMove(block.editorDragID, phase,
-                                               rows[destination].editorDragID)
-                                    },
-                                    onMoveToPhase: { destination in
-                                        moveToPhase(block.editorDragID, destination)
-                                    },
-                                    onReorderMove: { point in
-                                        liveReorder(block.editorDragID, finger: point)
-                                    },
-                                    onReorderEnd: endLiveReorder
-                                )
-                                .onGeometryChange(for: CGRect.self) { geometry in
-                                    geometry.frame(in: .named("athlthWorkoutStudio"))
-                                } action: { _, frame in
-                                    if dragGeometry.rowFrames[block.editorDragID] != frame {
-                                        dragGeometry.rowFrames[block.editorDragID] = frame
+                                    ATHLTHStrengthGroupRow(
+                                        block: $blocks[liveIndex],
+                                        canMoveUp: item.position > 0,
+                                        canMoveDown: item.position + 1 < rows.count,
+                                        onEdit: { onEdit(item.id) },
+                                        onDelete: { onRemove(item.id) },
+                                        onMoveBy: { offset in
+                                            let destination = item.position + offset
+                                            guard rows.indices.contains(destination) else { return }
+                                            onMove(item.id, phase, rows[destination].editorDragID)
+                                        },
+                                        onMoveToPhase: { destination in
+                                            moveToPhase(item.id, destination)
+                                        },
+                                        onReorderMove: { point in
+                                            liveReorder(item.id, finger: point)
+                                        },
+                                        onReorderEnd: endLiveReorder
+                                    )
+                                    .onGeometryChange(for: CGRect.self) { geometry in
+                                        geometry.frame(in: .named("athlthWorkoutStudio"))
+                                    } action: { _, frame in
+                                        if dragGeometry.rowFrames[item.id] != frame {
+                                            dragGeometry.rowFrames[item.id] = frame
+                                        }
                                     }
+                                    .opacity(draggingID == item.id ? 0.13 : 1)
                                 }
-                                .opacity(draggingID == block.editorDragID ? 0.13 : 1)
-                            } else {
+                            case .step:
                                 stepRow(
-                                    block, position: position + 1, phase: phase,
-                                    phaseRows: rows
+                                    item.block, position: item.position + 1,
+                                    phase: phase, phaseRows: rows
                                 )
                             }
                         }
