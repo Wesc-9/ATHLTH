@@ -6011,6 +6011,10 @@ struct ATHLTHTrainView: View {
                     )
                 }
             }
+            // Bound the generic presentation chain before adding more destinations.
+            // This prevents one enormous nested modifier type from propagating
+            // through the entire Train root view graph on iOS 27.3.
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 guard scenePhase == .active else { return }
                 if let selected = trainRunningWorkoutSelection {
@@ -6048,6 +6052,10 @@ struct ATHLTHTrainView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
+            // Bound the generic presentation chain before adding more destinations.
+            // This prevents one enormous nested modifier type from propagating
+            // through the entire Train root view graph on iOS 27.3.
+            .athlthStablePresentationBoundary()
             .athlthStudioEditor(item: $trainProgramCreationLaunch.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
                 guard scenePhase == .active else { return }
                 // Only an actual dismissed presentation warrants a recovery.
@@ -6101,6 +6109,10 @@ struct ATHLTHTrainView: View {
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
             }
+            // Bound the generic presentation chain before adding more destinations.
+            // This prevents one enormous nested modifier type from propagating
+            // through the entire Train root view graph on iOS 27.3.
+            .athlthStablePresentationBoundary()
             .sheet(item: $selectedTrainStandaloneWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
                 HomeDailyRecommendedWorkoutSheet(
                     workout: workout,
