@@ -1084,8 +1084,10 @@ enum ATHLTHWorkoutLibraryActivityScope: String {
 
     static func isPureRunning(_ blocks: [WorkoutTemplateBlock], declaredRunning: Bool) -> Bool {
         declaredRunning && !blocks.contains {
-            $0.kind == .exercise || $0.cardioActivity == .walking ||
+            !$0.isRestOrActiveRecovery && (
+                $0.kind == .exercise || $0.cardioActivity == .walking ||
                 $0.activityTag == "cycling" || $0.wellnessKind != nil
+            )
         }
     }
 
@@ -1164,6 +1166,7 @@ struct WorkoutTemplateLibraryView: View {
         let strengthStyle: String?
         let sort: String
         let initialCategory: String?
+        let activityScope: String
     }
 
     private final class CatalogResultsCache {
@@ -1685,7 +1688,8 @@ struct WorkoutTemplateLibraryView: View {
             exerciseName: selectedExerciseName,
             strengthStyle: selectedStrengthStyle.map { String(describing: $0) },
             sort: selectedDiscoverySort.rawValue,
-            initialCategory: initialCategory?.rawValue
+            initialCategory: initialCategory?.rawValue,
+            activityScope: activityScope.rawValue
         )
         // Favorites are mutable outside this view. Recalculate while that
         // filter is active; otherwise source data + all predicates are keyed.
@@ -6560,6 +6564,12 @@ struct WorkoutTemplateBuilderView: View {
                             WorkoutTemplateLibraryView(
                                 onSelectPlanned: { workout in
                                     showingSavedWorkoutPicker = false
+                                    let scope = savedWorkoutActivityScope == .all && initialActivity == .running
+                                        ? ATHLTHWorkoutLibraryActivityScope.runningOnly : savedWorkoutActivityScope
+                                    guard scope.includes(workout) else {
+                                        actionNotice = tr("Choose a workout matching this activity.", "Velg en økt som passer treningsformen.")
+                                        return
+                                    }
                                     if !studioAdvanced {
                                         if !blocks.isEmpty {
                                             pendingBasicLibraryWorkout = workout
@@ -7752,8 +7762,7 @@ struct WorkoutTemplateBuilderView: View {
             },
             onAddActiveRest: { phase in
                 selectedPhase = phase
-                studioVisiblePhases.insert(phase)
-                addActiveRecoveryBlock()
+                addActiveRecoveryBlock(preservingSelectedPhase: true)
             },
             onAddWorkout: { phase in
                 selectedPhase = phase
@@ -9625,7 +9634,10 @@ struct WorkoutTemplateBuilderView: View {
         ), toGroup: groupID)
     }
 
-    private func addActiveRecoveryBlock(toGroup groupID: UUID? = nil) {
+    private func addActiveRecoveryBlock(
+        toGroup groupID: UUID? = nil,
+        preservingSelectedPhase: Bool = false
+    ) {
         let rest = WorkoutTemplateBlock(
             sequence: 0, kind: .rest, title: tr("Rest", "Pause"),
             exerciseSlug: nil, distanceMeters: nil,
@@ -9633,7 +9645,9 @@ struct WorkoutTemplateBuilderView: View {
             targetWeightKilograms: nil, loadNote: nil,
             notes: nil, phase: selectedPhase
         )
-        insertBlock(ATHLTHActiveRecovery.convert(rest, active: true), toGroup: groupID)
+        var active = ATHLTHActiveRecovery.convert(rest, active: true)
+        if preservingSelectedPhase { active.phase = selectedPhase }
+        insertBlock(active, toGroup: groupID)
     }
 
     private func addFreeStrengthBlock(

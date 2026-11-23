@@ -293,6 +293,17 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
         XCTAssertEqual(daySections[0].blocks.first?.title, "Aktiv pause")
     }
 
+    func testExplicitActivePauseStaysInSelectedSection() {
+        var active = block("Active pause", phase: .warmup)
+        active.activityTag = "active_recovery"
+        active.cardioActivity = .running
+        let steps = [block("Warmup", phase: .warmup), active]
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.orderedVisiblePhases(
+            for: steps, visiblePhases: [.warmup]), [.warmup])
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            at: 1, in: steps, visiblePhases: [.warmup]), .warmup)
+    }
+
     func testOrdinaryRecoveryRestStillUsesMainWithoutSeparateCategory() {
         var ordinaryRest = block("Pause", phase: .recovery)
         ordinaryRest.kind = .rest

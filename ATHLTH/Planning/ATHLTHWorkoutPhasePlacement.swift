@@ -146,7 +146,9 @@ enum ATHLTHWorkoutPhaseDeletionPolicy {
         for block: WorkoutTemplateBlock,
         visiblePhases: Set<WorkoutPhaseKind>
     ) -> WorkoutPhaseKind {
-        if block.isActiveRecovery { return .recovery }
+        if block.isActiveRecovery {
+            return block.resolvedPhase
+        }
         return block.resolvedPhase == .recovery && !visiblePhases.contains(.recovery)
             ? .main : block.resolvedPhase
     }
@@ -171,6 +173,11 @@ enum ATHLTHWorkoutPhaseDeletionPolicy {
         }
         guard block.isRestOrActiveRecovery else {
             return presentedPhase(for: block, visiblePhases: visiblePhases)
+        }
+        // Explicitly authored recovery in a workout section belongs there.
+        // Legacy standalone recovery uses phase=.recovery as before.
+        if block.isActiveRecovery && block.resolvedPhase != .recovery {
+            return block.resolvedPhase
         }
 
         if index > 0 {
