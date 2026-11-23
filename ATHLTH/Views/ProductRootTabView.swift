@@ -5890,12 +5890,18 @@ struct ATHLTHTrainView: View {
                         header: premiumTrainBrandHeader(for: .progress),
                         scrollPosition: $progressScrollPosition
                     )
+                    // Keep each root branch behind a separate concrete-type
+                    // boundary. iOS 27.3 beta has crashed resolving the
+                    // deeply nested Train view graph (stack overflow).
+                    .athlthStablePresentationBoundary()
                     .transition(.opacity)
                 } else if selectedSection == .plan {
                     trainRootScroll(for: .plan)
+                        .athlthStablePresentationBoundary()
                         .transition(.opacity)
                 } else {
                     trainRootScroll(for: .today)
+                        .athlthStablePresentationBoundary()
                         .transition(.opacity)
                 }
             }
