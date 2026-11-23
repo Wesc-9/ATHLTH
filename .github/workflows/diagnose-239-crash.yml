@@ -1,0 +1,64 @@
+name: Diagnose ATHLTH 2.3.0 crash symbols
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v3.0.0
+    paths:
+      - .github/workflows/diagnose-239-crash.yml
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect-symbols:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download archived 2.3.0 TestFlight symbols
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/symbols"
+          gh run download 45219204890 -R "$GITHUB_REPOSITORY" \
+            -n athlth-release-symbols-45219204890 \
+            -D "$RUNNER_TEMP/symbols"
+          find "$RUNNER_TEMP/symbols" -maxdepth 4 -type f -print | head -80
+
+      - name: Locate matching app dSYM and verify UUID
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/symbols"
+          find . -type f -name '*.zip' -print0 | while IFS= read -r -d '' archive; do
+            mkdir -p "${archive%.zip}.unpacked"
+            unzip -oq "$archive" -d "${archive%.zip}.unpacked"
+          done
+          python3 - <<'PY'
+          import os, subprocess, sys
+          target = "39E25408-55AE-3FE5-8155-104D26A9CF8C"
+          root = os.environ["RUNNER_TEMP"] + "/symbols"
+          found = []
+          for base, _, files in os.walk(root):
+              for name in files:
+                  if not base.endswith("/Contents/Resources/DWARF"):
+                      continue
+                  binary = os.path.join(base, name)
+                  result = subprocess.run(["xcrun", "dwarfdump", "--uuid", binary], text=True, capture_output=True)
+                  if result.returncode == 0 and target in result.stdout.upper():
+                      found.append((binary, result.stdout.strip()))
+          if not found:
+              print("::error::No dSYM matching crash UUID " + target + " was found.")
+              sys.exit(1)
+          for binary, uuid in found:
+              print("MATCHING_DSYM=" + binary)
+              print(uuid)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+                  out.write("### Matching 2.3.0 build 139 dSYM\n\n")
+                  out.write("Verified UUID: `" + target + "`\n\n")
+                  out.write("Binary: `" + binary + "`\n\n")
+                  out.write("To symbolicate, use `xcrun atos -arch arm64 -o <DWARF binary> -l 0x104f48000 <crash frame addresses>`.\n")
+          PY
