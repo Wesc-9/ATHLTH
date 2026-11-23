@@ -115,6 +115,18 @@ struct ATHLTHPlannedWorkoutStepRow: View {
         return paceText + " " + measurement.runningPaceUnit
     }
 
+    private var zoneSummary: String {
+        if let label = ATHLTHWorkoutStepTargetSummary.zoneLabel(for: block) {
+            return ATHLTHLocalization.isNorwegian
+                ? label.replacingOccurrences(of: "Z", with: "S")
+                : label
+        }
+        return isActivePause
+            ? ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
+            : isPause ? ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause")
+                : "–"
+    }
+
     // A local, long-press-driven gesture avoids iOS system drag-and-drop's
     // green plus badge and keeps the whole card attached to the finger.
     private var reorderGesture: some Gesture {
@@ -227,14 +239,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                             }
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            Text(block.targetHeartRateZone.map {
-                                    (ATHLTHLocalization.isNorwegian ? "S" : "Z") + "\($0)"
-                                }
-                                ?? (isActivePause
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Active", norwegian: "Aktiv"
-                                    )
-                                    : isPause ? "Pause" : "–"))
+                            Text(zoneSummary)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHTrainDesign.bronze)
                                 .frame(minWidth: 26)
