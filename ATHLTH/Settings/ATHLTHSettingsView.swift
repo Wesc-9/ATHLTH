@@ -1372,6 +1372,14 @@ settingsSection("Connections") {
     private var trainingSettingsSection: some View {
 settingsSection("Preferences") {
                         PremiumSettingsCard {
+                            DatePicker(
+                                ATHLTHLocalization.choose(english: "Default workout start time", norwegian: "Standard starttid for økter"),
+                                selection: $settings.defaultPlannedWorkoutTime,
+                                displayedComponents: .hourAndMinute
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            SettingsDivider()
                             NavigationLink {
                                 ATHLTHTrainingSettingsView()
                             } label: {

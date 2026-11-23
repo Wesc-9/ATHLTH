@@ -4394,6 +4394,14 @@ final class AppSessionStore: ObservableObject {
         return copy
     }
 
+    func independentScheduledWorkout(from source: PlannedSession, on date: Date) -> PlannedSession {
+        var copy = makeIndependentPlanStudioCopy(source: source, scheduled: date)
+        // A favorite is a private new occurrence, not another invitation.
+        copy.sharedSourceOwnerID = nil
+        copy.sharedSourceSessionID = nil
+        return copy
+    }
+
     /// Reuses the exact independent-copy engine (including fresh exercise,
     /// superset and set-target IDs) before retaining the replaced workout's
     /// calendar identity. Completion and version guards are applied by save.

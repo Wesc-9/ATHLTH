@@ -223,23 +223,37 @@ enum ATHLTHUnifiedWorkout {
                 case .recovery, .work, .steady: blockPhase = .main
                 }
                 guard blockPhase == phase else { continue }
-                for repetition in 1...min(max(interval.repetitions, 1), 60) {
+                let rounds = min(max(interval.repetitions, 1), 60)
+                let groupID: UUID? = rounds > 1 && interval.kind == .work ? UUID() : nil
+                for repetition in 1...rounds {
                     let target = interval.resolvedWork(at: repetition)
                     let stepPhase: WorkoutPhaseKind =
                         interval.kind == .recovery ? .recovery : blockPhase
-                    blocks.append(step(
+                    var effort = step(
                         target, title: interval.title,
                         phase: stepPhase, sequence: blocks.count + 1,
                         notes: interval.notes
-                    ))
+                    )
+                    if let groupID {
+                        effort.groupID = groupID
+                        effort.groupKind = .intervals
+                        effort.groupRounds = 1
+                    }
+                    blocks.append(effort)
                     if let rest = interval.resolvedRecovery(after: repetition) {
-                        blocks.append(step(
+                        var recovery = step(
                             rest,
                             title: ATHLTHLocalization.choose(
                                 english: "Recovery", norwegian: "Pause"
                             ),
                             phase: .recovery, sequence: blocks.count + 1
-                        ))
+                        )
+                        if let groupID {
+                            recovery.groupID = groupID
+                            recovery.groupKind = .intervals
+                            recovery.groupRounds = 1
+                        }
+                        blocks.append(recovery)
                     }
                 }
             }

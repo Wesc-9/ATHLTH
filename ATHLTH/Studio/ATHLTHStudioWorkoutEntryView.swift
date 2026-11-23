@@ -15,7 +15,7 @@ enum ATHLTHStudioWorkoutEntryLayoutPolicy {
 
     static func tileHeight(for width: CGFloat, accessibility: Bool = false) -> CGFloat {
         if accessibility { return 216 }
-        return width < 620 ? 160 : 179
+        return width < 620 ? 146 : 154
     }
 }
 
@@ -25,9 +25,15 @@ enum ATHLTHStudioWorkoutEntryLayoutPolicy {
 struct ATHLTHStudioWorkoutEntryView: View {
     let date: Date
     let plannedWorkouts: [PlannedSession]
+    var drafts: [ATHLTHStudioFocusedWorkoutDraft] = []
+    var favoriteWorkouts: [PlannedSession] = []
     @Binding var scheduledTime: Date
     @Binding var advanced: Bool
     let onChoose: (ATHLTHPlannedWorkoutType) -> Void
+    var onResumeDraft: (ATHLTHStudioFocusedWorkoutDraft) -> Void = { _ in }
+    var onDeleteDraft: (ATHLTHStudioFocusedWorkoutDraft) -> Void = { _ in }
+    var onFavorite: (PlannedSession) -> Void = { _ in }
+    var onRestDay: () -> Void = {}
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -50,13 +56,13 @@ struct ATHLTHStudioWorkoutEntryView: View {
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 18) {
                         intro(compact: narrow)
-                        if !hasSidePanel {
-                            compactPlanningStrip
-                        }
+                        dayOverview
                         activityGrid(
                             width: geometry.size.width - (hasSidePanel ? 310 : 56),
                             narrow: narrow
                         )
+                        restDayButton
+                        if !hasSidePanel { planningInspector }
                         workflowFooter
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -237,7 +243,7 @@ struct ATHLTHStudioWorkoutEntryView: View {
                     .foregroundStyle(gold)
                     .padding(.top, 3)
                 }
-                .padding(16)
+                .padding(13)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
             .frame(height: height)
@@ -260,147 +266,154 @@ struct ATHLTHStudioWorkoutEntryView: View {
         .accessibilityIdentifier("athlth-ipad-planner-activity-\(type.rawValue)")
     }
 
-    private var compactPlanningStrip: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.title3)
-                .foregroundStyle(gold)
-                .frame(width: 33)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(tr("Scheduled for", "Planlagt til"))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(date.formatted(.dateTime.day().month(.abbreviated)))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ink)
-            }
-            Spacer(minLength: 8)
-            DatePicker(
-                tr("Start time", "Starttid"),
-                selection: $scheduledTime,
-                displayedComponents: .hourAndMinute
-            )
-            .datePickerStyle(.compact)
-            .tint(gold)
-            .fixedSize()
-            .accessibilityIdentifier("athlth-ipad-planner-start-time")
-            if !plannedWorkouts.isEmpty {
-                Text(tr("\(plannedWorkouts.count) planned",
-                        "\(plannedWorkouts.count) planlagt"))
-                    .font(.caption2.weight(.medium))
+    private var hasRestDay: Bool { plannedWorkouts.contains(where: \.isExplicitRestDay) }
+
+    private var dayOverview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(tr("YOUR TRAINING DAY", "DIN TRENINGSDAG"), systemImage: "calendar")
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(gold)
-                    .lineLimit(1)
+                Spacer()
+                DatePicker(tr("Start time", "Starttid"), selection: $scheduledTime,
+                           displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.compact)
+                    .tint(gold)
+                    .fixedSize()
+                    .accessibilityIdentifier("athlth-ipad-planner-start-time")
             }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
-        .background(.white, in: RoundedRectangle(cornerRadius: 17))
-        .overlay {
-            RoundedRectangle(cornerRadius: 17)
-                .stroke(outline.opacity(0.58), lineWidth: 0.8)
-        }
-    }
-
-    private var planningInspector: some View {
-        VStack(alignment: .leading, spacing: 17) {
-            VStack(alignment: .leading, spacing: 13) {
-                Label(
-                    tr("YOUR WORKOUT", "DIN ØKTPLAN"),
-                    systemImage: "calendar.badge.clock"
-                )
-                .font(.caption.weight(.bold))
-                .foregroundStyle(gold)
-
-                Text(date.formatted(.dateTime.weekday(.wide)))
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(ink)
-
-                Text(date.formatted(.dateTime.day().month(.wide)))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Divider().overlay(outline.opacity(0.5))
-
-                Text(tr("START TIME", "STARTTID"))
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.1)
-                    .foregroundStyle(.secondary)
-
-                DatePicker(
-                    tr("Start time", "Starttid"),
-                    selection: $scheduledTime,
-                    displayedComponents: .hourAndMinute
-                )
-                .datePickerStyle(.compact)
-                .tint(gold)
-                .accessibilityIdentifier("athlth-ipad-planner-start-time")
-
-                Divider().overlay(outline.opacity(0.5))
-
-                Text(tr("Already planned", "Allerede planlagt"))
+            if plannedWorkouts.isEmpty {
+                Label(tr("No workout planned", "Ingen økt planlagt"), systemImage: "calendar.badge.plus")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ink)
-
-                if plannedWorkouts.isEmpty {
-                    Text(tr("No workouts planned for this day yet.",
-                            "Ingen økter planlagt denne dagen ennå."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ForEach(plannedWorkouts.prefix(4)) { workout in
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: workout.kind.systemImage)
-                                .font(.caption)
-                                .foregroundStyle(gold)
-                                .frame(width: 18)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(workout.title)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(ink)
-                                    .lineLimit(2)
-                                if let duration = workout.durationMinutes {
-                                    Text("\(duration) min")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+            } else {
+                ForEach(plannedWorkouts) { workout in
+                    HStack(spacing: 10) {
+                        Image(systemName: workout.isExplicitRestDay ? "moon.zzz" : workout.kind.systemImage)
+                            .foregroundStyle(gold)
+                            .frame(width: 22)
+                        Text(workout.isExplicitRestDay ? tr("Rest day", "Hviledag") : workout.title)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ink)
+                        Spacer()
+                        if !workout.isExplicitRestDay, let time = workout.scheduledStart {
+                            Text(time.formatted(date: .omitted, time: .shortened))
+                                .font(.caption.monospacedDigit())
                         }
-                    }
-                    if plannedWorkouts.count > 4 {
-                        Text(tr("And \(plannedWorkouts.count - 4) more",
-                                "Og \(plannedWorkouts.count - 4) til"))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        if !workout.isExplicitRestDay, let minutes = workout.durationMinutes {
+                            Text("\(minutes) min").font(.caption)
+                        }
                     }
                 }
             }
-            .padding(18)
-            .background(.white, in: RoundedRectangle(cornerRadius: 20))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(outline.opacity(0.7), lineWidth: 0.8)
-            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).stroke(outline.opacity(0.65), lineWidth: 0.8) }
+        .padding(.bottom, 4)
+        .accessibilityIdentifier("athlth-ipad-planner-day-overview")
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label(tr("Next step", "NESTE STEG"), systemImage: "sparkles")
+    private var restDayButton: some View {
+        Button(action: onRestDay) {
+            Label(tr("Add rest day", "Legg til hviledag"), systemImage: "moon.zzz")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .foregroundStyle(gold)
+                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                .overlay { RoundedRectangle(cornerRadius: 13).stroke(outline, lineWidth: 0.8) }
+        }
+        .buttonStyle(.plain)
+        .disabled(!plannedWorkouts.isEmpty)
+        .opacity(plannedWorkouts.isEmpty ? 1 : 0.55)
+        .accessibilityIdentifier("athlth-ipad-add-rest-day")
+    }
+
+    private var planningInspector: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label(tr("DRAFTS", "UTKAST"), systemImage: "doc.text")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(gold)
+                    Spacer()
+                    Text("\(drafts.count)").font(.caption).foregroundStyle(.secondary)
+                }
+                if drafts.isEmpty {
+                    Text(tr("No drafts yet", "Ingen utkast ennå"))
+                        .font(.subheadline.weight(.semibold))
+                    Text(tr("Keep a workout draft to continue later.", "Behold et øktutkast for å fortsette senere."))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(drafts) { draft in
+                        HStack(alignment: .center, spacing: 7) {
+                            Button { onResumeDraft(draft) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(draft.title.isEmpty ? draft.activity.title : draft.title)
+                                        .font(.subheadline.weight(.semibold)).foregroundStyle(ink)
+                                        .lineLimit(2)
+                                    Text(draft.date.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    Text(tr("\(draft.blockCount) steps", "\(draft.blockCount) deløkter"))
+                                        .font(.caption2).foregroundStyle(gold)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            Button(role: .destructive) { onDeleteDraft(draft) } label: {
+                                Image(systemName: "trash").font(.caption)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(tr("Delete draft", "Slett utkast"))
+                        }
+                        Divider()
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .frame(minHeight: 245, alignment: .topLeading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 19))
+            .overlay { RoundedRectangle(cornerRadius: 19).stroke(outline.opacity(0.7), lineWidth: 0.8) }
+            .accessibilityIdentifier("athlth-ipad-workout-drafts")
+
+            VStack(alignment: .leading, spacing: 10) {
+                Label(tr("FAVORITE WORKOUTS", "FAVORITTØKTER"), systemImage: "star.fill")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(gold)
-                Text(tr("Choose an activity. The shared editor lets you build from scratch or reuse workouts from the library.",
-                        "Velg aktivitet. I den felles øktbyggeren kan du starte tomt eller bruke økter fra biblioteket."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if favoriteWorkouts.isEmpty {
+                    Text(tr("Star a workout in the library to add it here.", "Merk en økt som favoritt i biblioteket for å få den her."))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(favoriteWorkouts) { workout in
+                        Button { onFavorite(workout) } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: workout.kind.systemImage).foregroundStyle(gold)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.title).font(.caption.weight(.semibold)).foregroundStyle(ink)
+                                    if let duration = workout.durationMinutes {
+                                        Text("\(duration) min").font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "plus.circle").foregroundStyle(gold)
+                            }
+                            .frame(minHeight: 38)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(hasRestDay)
+                    }
+                }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                ATHLTHStudioStyle.paper.opacity(0.8),
-                in: RoundedRectangle(cornerRadius: 17)
-            )
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+            .overlay { RoundedRectangle(cornerRadius: 17).stroke(outline.opacity(0.7), lineWidth: 0.8) }
+            .accessibilityIdentifier("athlth-ipad-favorite-workouts")
         }
-        .accessibilityIdentifier("athlth-ipad-planner-day-inspector")
     }
 
     private var workflowFooter: some View {

@@ -58,10 +58,25 @@ enum ATHLTHStudioWeekRailLayout {
 /// Focused iPad day planning: week navigation and one reusable iPhone
 /// workout builder on the same screen. No modal, parallel workout engine,
 /// or implicit completion of saved Health workouts.
+struct ATHLTHStudioFocusedWorkoutDraft: Identifiable {
+    let context: String
+    let activity: ATHLTHPlannedWorkoutType
+    let title: String
+    let date: Date
+    let updatedAt: Date
+    let advanced: Bool
+    let blockCount: Int
+    var id: String { context }
+}
+
 struct ATHLTHStudioFocusedWeekPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
 
     let onClose: () -> Void
     @State private var selectedDate: Date
@@ -70,6 +85,11 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     @State private var saveMessage: String?
     @State private var saveSucceeded = false
     @State private var selectedActivity: ATHLTHPlannedWorkoutType?
+    @State private var activeDraftContext: String?
+    @State private var resumingDraft = false
+    @State private var drafts: [ATHLTHStudioFocusedWorkoutDraft] = []
+    @State private var confirmingExit = false
+    @State private var pendingDraftDeletion: ATHLTHStudioFocusedWorkoutDraft?
     // Chosen before entering the same Basic/Advanced editor used on iPhone.
     // The editor still allows switching modes without losing the recipe.
     @State private var preferredAdvanced = false
@@ -133,6 +153,38 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .onAppear {
+            scheduledTime = settings.defaultPlannedWorkoutStart(on: selectedDate)
+            reloadDrafts()
+        }
+        .task { await favorites.refresh() }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(english: "Keep this workout draft?", norwegian: "Beholde øktutkastet?"),
+            isPresented: $confirmingExit, titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(english: "Keep draft and leave", norwegian: "Behold utkast og gå ut")) {
+                onClose()
+            }
+            Button(ATHLTHLocalization.choose(english: "Continue editing", norwegian: "Fortsett å redigere"), role: .cancel) {}
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(english: "Delete draft?", norwegian: "Slette utkast?"),
+            isPresented: Binding(get: { pendingDraftDeletion != nil },
+                                 set: { if !$0 { pendingDraftDeletion = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(english: "Delete draft", norwegian: "Slett utkast"), role: .destructive) {
+                if let draft = pendingDraftDeletion {
+                    UserDefaults.standard.removeObject(forKey: WorkoutTemplateBuilderView.checkpointKey(
+                        userID: session.profile.userID, context: draft.context))
+                    reloadDrafts()
+                }
+                pendingDraftDeletion = nil
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {
+                pendingDraftDeletion = nil
+            }
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Change day and keep this draft?",
@@ -165,7 +217,9 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
 
     private var topBar: some View {
         HStack(spacing: 13) {
-            Button(action: onClose) {
+            Button {
+                if selectedActivity != nil { confirmingExit = true } else { onClose() }
+            } label: {
                 Label(
                     ATHLTHLocalization.choose(
                         english: "Back to overview", norwegian: "Tilbake til oversikt"
@@ -330,6 +384,10 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 .foregroundStyle(ATHLTHStudioStyle.ink)
 
                 HStack(spacing: 5) {
+                    if !day.restDays.isEmpty {
+                        Image(systemName: "moon.zzz")
+                        Text(ATHLTHLocalization.choose(english: "Rest", norwegian: "Hvile"))
+                    }
                     if !day.planned.isEmpty {
                         Image(systemName: "calendar")
                         Text("\(day.planned.count)")
@@ -339,7 +397,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                             .foregroundStyle(ATHLTHStudioStyle.gold)
                         Text("\(max(day.recorded.count, completedPlanned))")
                     }
-                    if day.planned.isEmpty &&
+                    if day.planned.isEmpty && day.restDays.isEmpty &&
                        day.recorded.isEmpty && completedPlanned == 0 {
                         Text(ATHLTHLocalization.choose(
                             english: "Free", norwegian: "Ledig"
@@ -404,14 +462,15 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 }
                 if let selectedActivity {
                     WorkoutTemplateBuilderView(
-                        draftContext: "ipad-focused-day-\(session.profile.userID.uuidString)-\(dateKey)-\(selectedActivity.rawValue)",
+                        draftContext: activeDraftContext ?? "ipad-focused-day-\(session.profile.userID.uuidString)-\(dateKey)-\(selectedActivity.rawValue)",
+                        resumeSavedScratchDraft: resumingDraft,
                         plannedDate: scheduledTime,
                         initialActivity: selectedActivity,
                         initialStudioAdvanced: preferredAdvanced,
                         onScheduledTimeChanged: { scheduledTime = $0 },
                         onAddStandalone: { draft in
                             let saved = saveWorkout(draft, for: selectedDate)
-                            if saved { self.selectedActivity = nil }
+                            if saved { closeEditor() }
                             return saved
                         },
                         onValidateSave: { _ in
@@ -421,10 +480,10 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                             english: "Save planned workout",
                             norwegian: "Lagre planlagt økt"
                         ),
-                        onCloseInline: { self.selectedActivity = nil }
+                        onCloseInline: { closeEditor() }
                     )
                     .environment(\.athlthStudioFullscreenEditing, true)
-                    .id("\(dateKey)-\(selectedActivity.rawValue)")
+                    .id(activeDraftContext ?? "\(dateKey)-\(selectedActivity.rawValue)")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     activitySelection
@@ -436,18 +495,81 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     /// The iPad-specific choice surface shares the iPhone activity catalog
     /// and opens the existing WorkoutTemplateBuilderView. No second engine
     /// or duplicate draft persistence is introduced by this presentation.
+    private var selectedDay: ATHLTHStudioHomeWeek.Day? {
+        snapshot.days.first { Calendar.current.isDate($0.date, inSameDayAs: selectedDate) }
+    }
+
+    private var favoriteWorkouts: [PlannedSession] {
+        let saved = session.savedWorkoutTemplates.filter {
+            favorites.isFavorite(.workout, itemID: $0.id.uuidString)
+        }
+        let publicRecipes = catalog.entries.filter {
+            favorites.isFavorite(.workout, itemID: $0.id.uuidString)
+        }.map { $0.plannedSession(useOriginalID: true) }
+        let runs = runningLibrary.allTemplates.filter {
+            favorites.isFavorite(.workout, itemID: $0.id.uuidString)
+        }.map { $0.plannedSession() }
+        return (saved + publicRecipes + runs).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
     private var activitySelection: some View {
         ATHLTHStudioWorkoutEntryView(
             date: selectedDate,
-            plannedWorkouts: snapshot.days.first(where: {
-                Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
-            })?.planned.map(\.workout) ?? [],
+            plannedWorkouts: (selectedDay?.planned.map(\.workout) ?? []) +
+                (selectedDay?.restDays.map(\.workout) ?? []),
+            drafts: drafts,
+            favoriteWorkouts: favoriteWorkouts,
             scheduledTime: $scheduledTime,
             advanced: $preferredAdvanced,
             onChoose: { type in
+                activeDraftContext = "ipad-focused-day-\(session.profile.userID.uuidString)-\(dateKey)-\(type.rawValue)-\(UUID().uuidString)"
+                resumingDraft = false
                 selectedActivity = type
-            }
+            },
+            onResumeDraft: { draft in
+                selectedDate = Calendar.current.startOfDay(for: draft.date)
+                scheduledTime = draft.date
+                preferredAdvanced = draft.advanced
+                activeDraftContext = draft.context
+                resumingDraft = true
+                selectedActivity = draft.activity
+            },
+            onDeleteDraft: { pendingDraftDeletion = $0 },
+            onFavorite: { source in
+                let previous = scheduledTime
+                scheduledTime = settings.defaultPlannedWorkoutStart(on: selectedDate)
+                let copy = session.independentScheduledWorkout(from: source, on: scheduledTime)
+                _ = saveWorkout(copy, for: selectedDate)
+                scheduledTime = previous
+            },
+            onRestDay: { addRestDay() }
         )
+        .onAppear { reloadDrafts() }
+    }
+
+    private func reloadDrafts() {
+        drafts = WorkoutTemplateBuilderView.focusedDayDrafts(userID: session.profile.userID)
+    }
+
+    private func closeEditor() {
+        selectedActivity = nil
+        activeDraftContext = nil
+        resumingDraft = false
+        reloadDrafts()
+    }
+
+    private func addRestDay() {
+        // Never silently replace an existing workout or recorded activity.
+        guard editable, let day = selectedDay,
+              day.planned.isEmpty, day.restDays.isEmpty, day.recorded.isEmpty else { return }
+        var rest = PlannedSession(
+            id: UUID(), title: ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"),
+            kind: .recovery, scheduledStart: nil, durationMinutes: nil,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        rest.workoutCategory = "rest_day"
+        _ = saveWorkout(rest, for: selectedDate)
     }
 
     private var dateKey: String {
@@ -487,8 +609,8 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     }
 
     private func validateDay() -> String? {
-        if let match = matchingPlanDay(for: selectedDate),
-           match.hasRestDay {
+        if selectedDay?.restDays.isEmpty == false ||
+           matchingPlanDay(for: selectedDate)?.hasRestDay == true {
             return ATHLTHLocalization.choose(
                 english: "This is a rest day. Remove the rest day in Plan Studio before adding a workout.",
                 norwegian: "Dette er en hviledag. Fjern hviledagen i Plan Studio før du legger til en økt."
@@ -505,6 +627,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 Calendar.current.startOfDay(for: .now),
               Calendar.current.isDate(date, inSameDayAs: selectedDate)
         else { return false }
+        if validateDay() != nil { return false }
 
         // The shared recipe editor returns a workout without a scheduled date.
         // Use the user's chosen day/time rather than silently saving a
@@ -583,13 +706,10 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
 
     private func switchToDay(_ date: Date) {
         selectedDate = Calendar.current.startOfDay(for: date)
-        scheduledTime = Calendar.current.date(
-            bySettingHour: 18, minute: 0, second: 0,
-            of: selectedDate
-        ) ?? selectedDate
+        scheduledTime = settings.defaultPlannedWorkoutStart(on: selectedDate)
         pendingDate = nil
         saveMessage = nil
         saveSucceeded = false
-        selectedActivity = nil
+        closeEditor()
     }
 }

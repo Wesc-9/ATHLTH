@@ -39,63 +39,37 @@ enum ATHLTHWorkoutPhasePlacement {
         _ block: WorkoutTemplateBlock,
         sequence: Int
     ) -> WorkoutTemplateBlock {
-        var next = WorkoutTemplateBlock(
-            sequence: sequence, kind: block.kind,
-            title: block.title, exerciseSlug: block.exerciseSlug,
-            distanceMeters: block.distanceMeters,
-            repetitions: block.repetitions,
-            durationSeconds: block.durationSeconds,
-            targetWeightKilograms: block.targetWeightKilograms,
-            loadNote: block.loadNote, notes: block.notes,
-            phase: block.phase,
-            targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
-            targetHeartRateZone: block.targetHeartRateZone
-        )
-        next.routeID = block.routeID
-        next.sourceIntensityZoneLabel = block.sourceIntensityZoneLabel
-        next.targetHeartRatePercentMin = block.targetHeartRatePercentMin
-        next.targetHeartRatePercentMax = block.targetHeartRatePercentMax
-        next.targetVMAPercent = block.targetVMAPercent
-        next.targetIntensityType = block.targetIntensityType
-        next.targetElevationGainMeters = block.targetElevationGainMeters
-        next.targetGradientPercent = block.targetGradientPercent
-        next.targetTerrainType = block.targetTerrainType
-        next.targetRepetitionsMaximum = block.targetRepetitionsMaximum
-        next.targetRepsInReserve = block.targetRepsInReserve
-        next.targetMovementTempo = block.targetMovementTempo
-        next.sourceSupersetGroupIndex = block.sourceSupersetGroupIndex
-        next.sourceLoadAlternativesKilograms = block.sourceLoadAlternativesKilograms
-        next.targetEffortRPE = block.targetEffortRPE
-        next.treadmillInclinePercent = block.treadmillInclinePercent
-        next.setCount = block.setCount
-        next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
-        next.individualSetTargets = block.individualSetTargets
-        next.groupID = block.groupID
-        next.groupKind = block.groupKind
-        next.groupRounds = block.groupRounds
-        // Renumbering happens on *every* editor insert, delete and reorder.
-        // Dropping these fields would silently reset timed strength programs.
-        next.groupClockSeconds = block.groupClockSeconds
-        next.executionGroupKind = block.executionGroupKind
-        next.executionGroupID = block.executionGroupID
-        next.executionRound = block.executionRound
-        next.executionTotalRounds = block.executionTotalRounds
-        next.executionGroupClockSeconds = block.executionGroupClockSeconds
-        next.executionStationCount = block.executionStationCount
-        next.cardioActivity = block.cardioActivity
-        next.assessmentMethod = ATHLTHAssessmentMethod.normalized(
-            block.assessmentMethod, for: next
-        )
-        next.assessmentScope = next.assessmentMethod == nil
-            ? nil : block.assessmentScope
-        next.measurementStepID = block.measurementStepID
-        next.isIndoor = block.isIndoor
-        next.exerciseSnapshot = block.exerciseSnapshot
-        next.exerciseID = block.exerciseID
-        next.wellnessKind = block.wellnessKind
-        next.activityTag = block.activityTag
-        next.editorDragID = block.editorDragID
+        var next = block
+        next.sequence = sequence
         return next
+    }
+
+    /// Insert a complete ordered recipe in one operation. Never insert each
+    /// effort/recovery individually using its own phase boundary.
+    static func insertingRecipe(
+        _ source: [WorkoutTemplateBlock], into blocks: [WorkoutTemplateBlock],
+        destination: WorkoutPhaseKind?
+    ) -> [WorkoutTemplateBlock] {
+        guard !source.isEmpty else { return blocks }
+        var groupIDs: [UUID: UUID] = [:]
+        func fresh(_ id: UUID) -> UUID {
+            if let value = groupIDs[id] { return value }
+            let value = UUID()
+            groupIDs[id] = value
+            return value
+        }
+        let copies = source.map { original -> WorkoutTemplateBlock in
+            var copy = original
+            copy.editorDragID = UUID()
+            if let destination { copy.phase = destination }
+            if let id = original.groupID { copy.groupID = fresh(id) }
+            if let id = original.executionGroupID { copy.executionGroupID = fresh(id) }
+            return copy
+        }
+        let index = destination.map { insertionIndex(for: $0, in: blocks) } ?? blocks.count
+        var result = blocks
+        result.insert(contentsOf: copies, at: index)
+        return result.enumerated().map { renumbered($0.element, sequence: $0.offset + 1) }
     }
 
     /// Move a selected activity (or its entire interval/superset group) to
@@ -175,6 +149,13 @@ enum ATHLTHWorkoutPhaseDeletionPolicy {
     ) -> WorkoutPhaseKind {
         guard blocks.indices.contains(index) else { return .main }
         let block = blocks[index]
+        // Group membership takes precedence over individual recovery phase.
+        if let id = block.groupID, block.groupKind == .intervals,
+           let effort = blocks.first(where: {
+               $0.groupID == id && !$0.isRestOrActiveRecovery
+           }) {
+            return effort.resolvedPhase
+        }
         guard block.isRestOrActiveRecovery else {
             return presentedPhase(for: block, visiblePhases: visiblePhases)
         }

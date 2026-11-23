@@ -617,6 +617,22 @@ final class AppSettingsStore: ObservableObject {
             dailyCheckInReminderMinuteOfDay = (parts.hour ?? 12) * 60 + (parts.minute ?? 0)
         }
     }
+    @Published var plannedWorkoutStartMinuteOfDay: Int { didSet { persist() } }
+
+    func defaultPlannedWorkoutStart(on date: Date, calendar: Calendar = .current) -> Date {
+        let minutes = min(1439, max(0, plannedWorkoutStartMinuteOfDay))
+        return calendar.date(bySettingHour: minutes / 60, minute: minutes % 60,
+                             second: 0, of: date) ?? calendar.startOfDay(for: date)
+    }
+
+    var defaultPlannedWorkoutTime: Date {
+        get { defaultPlannedWorkoutStart(on: Date()) }
+        set {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+            plannedWorkoutStartMinuteOfDay = (parts.hour ?? 18) * 60 + (parts.minute ?? 0)
+        }
+    }
+
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
@@ -1198,6 +1214,8 @@ final class AppSettingsStore: ObservableObject {
                 defaults.object(forKey: "settings.dailyCheckInReminderMinuteOfDay")
                     as? Int ?? ATHLTHDailyCheckInReminderScheduler.defaultMinuteOfDay
             )
+        plannedWorkoutStartMinuteOfDay = min(1439, max(0,
+            defaults.object(forKey: "settings.plannedWorkoutStartMinuteOfDay") as? Int ?? 1080))
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
@@ -1562,6 +1580,7 @@ final class AppSettingsStore: ObservableObject {
                      forKey: "settings.dailyCheckInReminders")
         defaults.set(dailyCheckInReminderMinuteOfDay,
                      forKey: "settings.dailyCheckInReminderMinuteOfDay")
+        defaults.set(plannedWorkoutStartMinuteOfDay, forKey: "settings.plannedWorkoutStartMinuteOfDay")
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
         defaults.set(challengeNotificationsEnabled, forKey: "settings.challengeNotifications")

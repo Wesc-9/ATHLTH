@@ -55,6 +55,20 @@ final class ATHLTHStudioWorkoutEntryLayoutTests: XCTestCase {
         }
     }
 
+    func testIntervalRecipeIsInsertedAtomicallyIntoSelectedPhase() {
+        let source = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let result = ATHLTHWorkoutPhasePlacement.insertingRecipe(
+            source, into: [], destination: .warmup)
+        XCTAssertEqual(result.count, source.count)
+        XCTAssertEqual(result.map(\.kind), source.map(\.kind))
+        XCTAssertEqual(result.map(\.durationSeconds), source.map(\.durationSeconds))
+        XCTAssertTrue(result.allSatisfy { $0.resolvedPhase == .warmup })
+        XCTAssertTrue(result.indices.allSatisfy {
+            ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(at: $0, in: result, visiblePhases: [.warmup]) == .warmup
+        })
+        XCTAssertEqual(result.map(\.sequence), Array(1...result.count))
+    }
+
     func testSidebarUsesOneNativeControllerAndDoesNotNeedCustomHamburger() {
         XCTAssertEqual(ATHLTHStudioSidebarLayoutPolicy.fixedWidth, 280)
     }

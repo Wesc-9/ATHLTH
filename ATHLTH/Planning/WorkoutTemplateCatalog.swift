@@ -5090,9 +5090,39 @@ struct WorkoutTemplateBuilderView: View {
         let basicOwnedBlockIndices: [Int]?
     }
 
+    static func checkpointKey(userID: UUID, context: String) -> String {
+        let encodedContext = Data(context.utf8).base64EncodedString()
+        return "athlth.workoutBuilder.draft.v1.\(userID.uuidString).\(encodedContext)"
+    }
+
     private var draftStorageKey: String {
-        let encodedContext = Data(draftContext.utf8).base64EncodedString()
-        return "athlth.workoutBuilder.draft.v1.\(session.profile.userID.uuidString).\(encodedContext)"
+        Self.checkpointKey(userID: session.profile.userID, context: draftContext)
+    }
+
+    static func focusedDayDrafts(userID: UUID, defaults: UserDefaults = .standard)
+        -> [ATHLTHStudioFocusedWorkoutDraft] {
+        let prefix = "athlth.workoutBuilder.draft.v1.\(userID.uuidString)."
+        let scoped = "ipad-focused-day-\(userID.uuidString)-"
+        return defaults.dictionaryRepresentation().keys.compactMap { key in
+            guard key.hasPrefix(prefix),
+                  let bytes = Data(base64Encoded: String(key.dropFirst(prefix.count))),
+                  let context = String(data: bytes, encoding: .utf8),
+                  context.hasPrefix(scoped),
+                  let data = defaults.data(forKey: key),
+                  let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data),
+                  let date = stored.studioDate,
+                  !stored.blocks.isEmpty || !stored.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else { return nil }
+            let suffix = String(context.dropFirst(scoped.count))
+            guard let activity = ATHLTHPlannedWorkoutType.defaultOrder.first(where: {
+                suffix.contains("-\($0.rawValue)-") || suffix.hasSuffix("-\($0.rawValue)")
+            }) else { return nil }
+            return ATHLTHStudioFocusedWorkoutDraft(
+                context: context, activity: activity, title: stored.title,
+                date: date, updatedAt: stored.updatedAt,
+                advanced: stored.studioAdvanced ?? false, blockCount: stored.blocks.count
+            )
+        }.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     private func restoreWorkoutDraft() {
@@ -5108,7 +5138,8 @@ struct WorkoutTemplateBuilderView: View {
         // old hosting Form normalizes blank titles on app recreation.
         // The unique draft context is authoritative in this one case.
         let explicitlyResumedScratch = resumeSavedScratchDraft &&
-            draftContext.hasPrefix("session-scratch.\(session.profile.userID.uuidString).")
+            (draftContext.hasPrefix("session-scratch.\(session.profile.userID.uuidString).") ||
+             draftContext.hasPrefix("ipad-focused-day-\(session.profile.userID.uuidString)-"))
         let matchingSource = ATHLTHWorkoutDraftRecoveryPolicy.accepts(
             storedSignature: stored.signature,
             currentSignature: initialDraftSignature,
@@ -5164,6 +5195,7 @@ struct WorkoutTemplateBuilderView: View {
         if let restored = stored.studioDate,
            restored.timeIntervalSinceReferenceDate > 0 {
             studioBasicDate = restored
+            onScheduledTimeChanged?(restored)
         }
         if initialActivity == .running {
             studioBasicRunMode = ATHLTHBasicFreeRunPolicy.restoredMode(
@@ -9123,25 +9155,13 @@ struct WorkoutTemplateBuilderView: View {
         // warm-up, main and cool-down. In an existing recipe, the athlete's
         // selected destination phase is honored as before.
         let importingWholeWorkout = blocks.isEmpty
-        var newGroups: [UUID: UUID] = [:]
-        let insertAt = ATHLTHWorkoutPhasePlacement.insertionIndex(
-            for: selectedPhase, in: blocks
+        let oldIDs = Set(blocks.map(\.editorDragID))
+        blocks = ATHLTHWorkoutPhasePlacement.insertingRecipe(
+            source, into: blocks, destination: importingWholeWorkout ? nil : selectedPhase
         )
-        let copied = source.map { original -> WorkoutTemplateBlock in
-            var copy = original
-            copy.editorDragID = UUID()
-            copy.phase = importingWholeWorkout ? original.resolvedPhase : selectedPhase
-            if let id = original.groupID {
-                if newGroups[id] == nil { newGroups[id] = UUID() }
-                copy.groupID = newGroups[id]
-            }
-            return copy
-        }
-        blocks.insert(contentsOf: copied, at: insertAt)
         if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
-            studioBasicOwnedBlockIDs.formUnion(copied.map(\.editorDragID))
+            studioBasicOwnedBlockIDs.formUnion(blocks.map(\.editorDragID).filter { !oldIDs.contains($0) })
         }
-        resequence()
         // Flush immediately after importing a library recipe; the user may
         // close the app before the next SwiftUI onChange/scene callback.
         persistWorkoutDraft()
@@ -9328,37 +9348,15 @@ struct WorkoutTemplateBuilderView: View {
             }
             studioBasicRunMode = .structured
         }
-        // A saved main set retains its own main section; individual presets
-        // use the phase chosen by the athlete in the add menu.
-        if selected.allSatisfy({ $0.resolvedPhase == .main }) {
-            studioVisiblePhases.insert(.main)
-        }
-        let suggestedFourByFour = ATHLTHCompoundExerciseCatalog
-            .fourByFourRecovery(selected) != nil
-        var groupIDs: [UUID: UUID] = [:]
-        for original in selected {
-            var block = original
-            if suggestedFourByFour, block.kind == .run,
-               !block.isRestOrActiveRecovery,
-               block.targetHeartRateZone == nil,
-               block.sourceIntensityZoneLabel == nil,
-               block.targetHeartRatePercentMin == nil,
-               block.targetHeartRatePercentMax == nil {
-                // An estimated 4×4 guidance range, not a sensor measurement
-                // and not a personal HR-max calculation.
-                block.sourceIntensityZoneLabel = "Z4–Z5"
-            }
-            block.editorDragID = UUID()
-            if let originalID = original.groupID {
-                if groupIDs[originalID] == nil { groupIDs[originalID] = UUID() }
-                block.groupID = groupIDs[originalID]
-            }
-            let position = ATHLTHWorkoutPhasePlacement.insertionIndex(
-                for: block.resolvedPhase, in: blocks
-            )
-            blocks.insert(block, at: position)
-        }
-        resequence()
+        let destination = selectedPhase
+        studioVisiblePhases.insert(destination)
+        // The picker already returns an ordered, editable recipe. Insert
+        // every effort and its recovery as one atomic sequence in the
+        // selected section, irrespective of each block's source phase.
+        blocks = ATHLTHWorkoutPhasePlacement.insertingRecipe(
+            selected, into: blocks, destination: destination
+        )
+        persistWorkoutDraft()
     }
 
     private func createSuperset() {
