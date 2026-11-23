@@ -161,6 +161,11 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var libraryPage: ATHLTHStudioLibraryPage?
     /// Reset pushed detail cards when switching sidebar destinations.
     @State private var detailNavigationPath = NavigationPath()
+    // Per-window, account-scoped checkpoint for Codable NavigationStack
+    // destinations. SwiftUI occasionally discards the detail host when the
+    // scene backgrounds; never silently rewind to the Studio root on resume.
+    @SceneStorage("athlth.studio.detailPath") private var savedDetailPath: Data?
+    @SceneStorage("athlth.studio.detailPathAccount") private var savedDetailPathAccount = ""
     // Some destination-based links do not round-trip through NavigationPath.
     // Recreating the detail stack when a sidebar item is tapped guarantees
     // that a deep Settings/Widgets page cannot remain above the new destination.
@@ -291,6 +296,7 @@ struct ATHLTHiPadStudioRootView: View {
                     communityTab = ATHLTHCommunityMainTab(
                         rawValue: savedCommunityTab
                     ) ?? .overview
+                    restoreDetailPathIfNeeded()
                     let restoredDate = Date(
                         timeIntervalSince1970: savedHomeDayEpoch
                     )
@@ -357,11 +363,20 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                // Restore only if UIKit unexpectedly reset the stack while
+                // inactive. User-initiated Back/Sidebar actions checkpoint an
+                // empty path while active and must never be undone.
+                restoreDetailPathIfNeeded()
                 goalAccountSync.scheduleSync(session: session, goals: goalStore)
                 if studioPlanSync.enabled {
                     Task { await studioPlanSync.sync(session: session) }
                 }
             }
+        }
+        .onChange(of: detailNavigationPath) { _, _ in
+            // Background path write-backs are not user navigation and must
+            // not erase the last valid foreground checkpoint.
+            checkpointDetailPathIfPossible()
         }
         .onChange(of: sidebarVisibility) { _, visibility in
             // Persist only user-driven native sidebar changes after restore.
@@ -1135,7 +1150,29 @@ struct ATHLTHiPadStudioRootView: View {
     /// iPad scene restoration is intentionally per-window. A signed-out or
     /// newly authenticated athlete must not inherit the previous athlete's
     /// workout inspector, plan sheet or pending live navigation request.
+    private func checkpointDetailPathIfPossible() {
+        guard session.signedIn, scenePhase == .active,
+              didRestoreStudioScene else { return }
+        savedDetailPathAccount = session.profile.userID.uuidString
+        savedDetailPath = detailNavigationPath.codable.flatMap {
+            try? JSONEncoder().encode($0)
+        }
+    }
+
+    private func restoreDetailPathIfNeeded() {
+        guard session.signedIn,
+              detailNavigationPath.isEmpty,
+              savedDetailPathAccount == session.profile.userID.uuidString,
+              let bytes = savedDetailPath,
+              let restored = try? JSONDecoder().decode(
+                NavigationPath.CodableRepresentation.self, from: bytes
+              ) else { return }
+        detailNavigationPath = NavigationPath(restored)
+    }
+
     private func clearAccountBoundStudioSelection() {
+        savedDetailPath = nil
+        savedDetailPathAccount = ""
         showingInspector = false
         showingWorkoutDetail = false
         inspectedWeekDate = nil
