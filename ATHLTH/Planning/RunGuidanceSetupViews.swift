@@ -301,7 +301,15 @@ struct RunGuidanceSetupView: View {
                             draft: $audioCoach,
                             showRouteOptions:
                                 routeAvailable || structuredWorkout?.routeID != nil,
-                            showStructuredOptions: structuredWorkout != nil
+                            showStructuredOptions: structuredWorkout != nil,
+                            triggerAvailability: .running(
+                                steps: structuredWorkout.map {
+                                    watchRunningWorkoutTransfer(from: $0).steps
+                                } ?? [],
+                                hasRoute: routeAvailable ||
+                                    structuredWorkout?.routeID != nil,
+                                isOutdoor: routeAvailable
+                            )
                         )
                     } label: {
                         featureRow(
