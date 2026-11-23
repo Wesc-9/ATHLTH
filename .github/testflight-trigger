@@ -326,3 +326,5 @@ ATHLTH 2.2.8 build 137 gated TestFlight retry 2026-11-23: resolve Swift 6 main-a
 ATHLTH 2.2.8 build 137 — gated TestFlight retry 2026-11-23 after fixing XCTest compile errors: PublicTrailRecord elevation argument ordering and missing iPad Studio sidebar visibility toggle policy. Require all five successful CI workflows on this exact commit; preserve Apple signing and do not bypass gates.
 
 ATHLTH 2.2.8 build 137 gated retry 2026-11-23 after fixing two stale XCTest assertions: shared composer must remain frontmost while preparing partner proposals, and pause subtitle must respect app localization. Previous run 45112156653: 3530/3532 tests passed; all other four CI gates green. Require five same-commit successes, do not bypass TestFlight release checks or upload stale code.
+
+ATHLTH 2.2.9: request TestFlight after five-workflow release gate, interval Ghost integration, 2026-11-23.
