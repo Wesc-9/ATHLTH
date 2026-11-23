@@ -162,6 +162,8 @@ struct ATHLTHWorkoutCompactOutlineView: View {
     let isRunning: Bool
 
     @State private var expandedRows: Set<Int> = []
+    @State private var advancedMode = false
+    @State private var mainExpanded = true
 
     private var ink: Color { ATHLTHPlanDesign.ink }
     private var muted: Color { ATHLTHPlanDesign.secondaryInk }
@@ -178,6 +180,16 @@ struct ATHLTHWorkoutCompactOutlineView: View {
             .foregroundStyle(muted)
             .padding(.bottom, 4)
 
+            Picker(
+                ATHLTHLocalization.choose(english: "Editing mode", norwegian: "Redigeringsmodus"),
+                selection: $advancedMode
+            ) {
+                Text("Enkel").tag(false)
+                Text("Avansert").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("athlth-workout-outline-mode")
+
             if rows.isEmpty {
                 Text(ATHLTHLocalization.choose(
                     english: "No detailed workout steps are available.",
@@ -191,10 +203,10 @@ struct ATHLTHWorkoutCompactOutlineView: View {
                         if row.beginsMainSection {
                             mainSectionHeading
                         }
-                        disclosure(row)
-                            // Visually nest efforts under Hoveddel without
-                            // adding another large expandable container.
-                            .padding(.leading, row.kind == .work ? 14 : 0)
+                        if row.kind != .work || mainExpanded {
+                            disclosure(row)
+                                .padding(.leading, row.kind == .work ? 14 : 0)
+                        }
                     }
                 }
             }
@@ -208,6 +220,11 @@ struct ATHLTHWorkoutCompactOutlineView: View {
     /// Hoveddel is always visible, while the individual descriptions
     /// and recovery details remain hidden until a subsection is opened.
     private var mainSectionHeading: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                mainExpanded.toggle()
+            }
+        } label: {
         HStack(spacing: 9) {
             Image(systemName: "figure.run")
                 .font(.subheadline.weight(.semibold))
@@ -220,7 +237,13 @@ struct ATHLTHWorkoutCompactOutlineView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(ink)
             Spacer(minLength: 0)
+            Image(systemName: "chevron.down")
+                .font(.caption2)
+                .rotationEffect(.degrees(mainExpanded ? 180 : 0))
+                .foregroundStyle(muted)
         }
+        }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
         .padding(.horizontal, 5)
         .padding(.top, 5)
@@ -290,17 +313,19 @@ struct ATHLTHWorkoutCompactOutlineView: View {
             .accessibilityIdentifier("athlth-workout-outline-row-\(row.id)")
 
             if expanded {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: advancedMode ? 10 : 3) {
                     ForEach(row.blocks.indices, id: \.self) { index in
                         let block = row.blocks[index]
                         VStack(alignment: .leading, spacing: 4) {
                             Text(block.title)
-                                .font(.subheadline.weight(.medium))
+                                .font(block.isRestOrActiveRecovery
+                                    ? .system(size: advancedMode ? 13 : 11, weight: .regular)
+                                    : .subheadline.weight(.semibold))
                                 .foregroundStyle(ink)
                             let details = stepFacts(block)
                             if !details.isEmpty {
                                 Text(details)
-                                    .font(.caption)
+                                    .font(block.isRestOrActiveRecovery ? .caption2 : .caption)
                                     .foregroundStyle(muted)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -311,7 +336,7 @@ struct ATHLTHWorkoutCompactOutlineView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
-                        if index < row.blocks.count - 1 {
+                        if advancedMode && index < row.blocks.count - 1 {
                             Divider().opacity(0.35)
                         }
                     }
