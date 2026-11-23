@@ -1845,6 +1845,19 @@ struct ATHLTHHomeView: View {
                 guard isActive, !session.previewModeEnabled else { return }
                 _ = await tournamentCalendar.refresh(for: session.profile.userID)
             }
+            .task(id: isActive) {
+                guard isActive, !trainDashboardReady else { return }
+                // Yield past the native tab selection/layout transaction before
+                // mounting the full Train dashboard. Cancellation on a quick
+                // tab switch avoids mounting an offscreen dashboard.
+                do {
+                    try await Task.sleep(for: .milliseconds(350))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, isActive else { return }
+                trainDashboardReady = true
+            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
                 // Let the Home hierarchy paint before starting refresh work.
@@ -5798,6 +5811,9 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var pets: ATHLTHPetStore
 
+    // Do not instantiate the deep Train dashboard in the same AttributeGraph
+    // transaction as the native Home -> Train TabView selection.
+    @State private var trainDashboardReady = false
     @State private var selectedSection: ATHLTHTrainSection = .today
     @SceneStorage("athlth.train.selectedSection") private var persistedTrainSection = "today"
     @SceneStorage("athlth.train.selectedSectionAccount") private var persistedTrainSectionAccount = ""
@@ -5886,7 +5902,7 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                if !isActive {
+                if !isActive || !trainDashboardReady {
                     // Retain the NavigationStack and presentation state while
                     // avoiding all three expensive Train root trees offscreen.
                     Color.clear
