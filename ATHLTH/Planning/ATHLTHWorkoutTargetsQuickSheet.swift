@@ -6,6 +6,9 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var blocks: [WorkoutTemplateBlock]
     var advanced = false
+    /// The selected Basic exercise, if opened from its own card. Global
+    /// workout settings keep nil and edit the entire running prescription.
+    var includedBlockIDs: Set<UUID>? = nil
 
     private let bronze = ATHLTHTrainDesign.bronze
     private let ink = ATHLTHPlanDesign.ink
@@ -22,6 +25,8 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
     }
 
     private func isTarget(_ block: WorkoutTemplateBlock, recovery: Bool) -> Bool {
+        if let includedBlockIDs,
+           !includedBlockIDs.contains(block.editorDragID) { return false }
         if recovery { return block.isRestOrActiveRecovery }
         return block.kind == .run && !block.isRestOrActiveRecovery
     }
@@ -89,7 +94,7 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
                     .plannedHeartRateZoneRange(
                         for: matchingBlocks(recovery: recovery)
                     ) else { return 0 }
-                return range == 4...5 ? 45 : range.lowerBound
+                return range == (4...5) ? 45 : range.lowerBound
             },
             set: { zone in
                 for index in blocks.indices where
