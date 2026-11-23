@@ -525,7 +525,10 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .task {
             if social.mutualFollows.isEmpty {
-                await social.refresh()
+                // Opening the picker only needs mutual friends; a full
+                // social refresh also fetches feed, inbox, sessions and
+                // challenges and can stall the entire editor.
+                await social.refreshHomeFriends()
             }
         }
     }
