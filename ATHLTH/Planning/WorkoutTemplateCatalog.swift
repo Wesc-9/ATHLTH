@@ -4770,6 +4770,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioStepEditorSelection: ATHLTHWorkoutStudioStepEditorSelection?
     @State private var showingStudioStepSongPicker = false
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
+    @State private var selectedBasicTargetBlockIDs: Set<UUID>?
     @State private var audioCoachDraft: AudioCoachDraft
     @State private var routeGuardianDraft: RouteGuardianDraft
     @State private var ghostDraft: GhostQuickStartDraft
@@ -5616,7 +5617,10 @@ struct WorkoutTemplateBuilderView: View {
                 selectedWorkoutExtra = .planWithFriend
             },
             onSpotify: { selectedWorkoutExtra = .spotify },
-            onHeartRateAndPace: { selectedWorkoutExtra = .heartRateAndPace },
+            onHeartRateAndPace: {
+                selectedBasicTargetBlockIDs = nil
+                selectedWorkoutExtra = .heartRateAndPace
+            },
             onAudioCoach: openAudioCoach,
             onGhostRace: {
                 loadGuidanceDefaultsIfNeeded()
@@ -5671,7 +5675,10 @@ struct WorkoutTemplateBuilderView: View {
                     tr("Goals", "Mål og tempo"),
                     icon: "scope",
                     detail: tr("Heart rate, pace", "Puls og fart")
-                ) { selectedWorkoutExtra = .heartRateAndPace }
+                ) {
+                    selectedBasicTargetBlockIDs = nil
+                    selectedWorkoutExtra = .heartRateAndPace
+                }
 
                 workoutSettingButton(
                     tr("Gear", "Utstyr"),
@@ -6432,7 +6439,10 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     )
                 case .heartRateAndPace:
-                    ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks, advanced: studioAdvanced)
+                    ATHLTHWorkoutTargetsQuickSheet(
+                        blocks: $blocks, advanced: studioAdvanced,
+                        includedBlockIDs: selectedBasicTargetBlockIDs
+                    )
                 case .audioCoach:
                     NavigationStack {
                         ScrollView {
@@ -6966,6 +6976,9 @@ struct WorkoutTemplateBuilderView: View {
                 HStack(spacing: 7) {
                     Button {
                         if initialActivity == .running {
+                            selectedBasicTargetBlockIDs = Set(
+                                portion.map(\.editorDragID)
+                            )
                             selectedWorkoutExtra = .heartRateAndPace
                         } else if let first = portion.first {
                             openStudioStepEditor(blockID: first.editorDragID)
