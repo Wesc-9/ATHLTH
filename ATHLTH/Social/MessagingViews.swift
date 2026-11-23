@@ -3789,6 +3789,7 @@ struct DirectMessageThreadView: View {
                                 onRespondToInvite: { accept in
                                     respondToPlannedInvite(message, accept: accept)
                                 },
+                                onWithdrawInvite: { withdrawPlannedInvite(message) },
                                 agreedWorkout: latestSharedWorkout(
                                     for: message, in: messages
                                 ),
@@ -5763,6 +5764,47 @@ struct DirectMessageThreadView: View {
             .first { $0.sourceWorkoutID == sourceID }
     }
 
+    private func withdrawPlannedInvite(_ invitation: DirectMessageRecord) {
+        guard invitation.senderID == session.profile.userID,
+              invitation.shareVersion == 2,
+              invitation.attachmentKind == .workout,
+              respondingToPlannedInviteID == nil,
+              let conversationID,
+              let sourceID = invitation.sourceObjectID,
+              let workout = invitation.decodeSnapshot(PlannedSession.self),
+              latestWorkoutLifecycle(for: invitation, in: messaging.messages(in: conversationID))?.kind != .cancelled
+        else { return }
+        respondingToPlannedInviteID = invitation.id
+        Task {
+            defer { respondingToPlannedInviteID = nil }
+            do {
+                let update = WorkoutInviteLifecycleUpdate(
+                    sourceWorkoutID: sourceID,
+                    organizerID: session.profile.userID,
+                    kind: .cancelled,
+                    updatedWorkout: nil,
+                    occurredAt: Date()
+                )
+                let attachment = try MessageShareDraft(
+                    kind: .workout, title: workout.title,
+                    subtitle: ATHLTHLocalization.choose(english: "Invitation withdrawn", norwegian: "Invitasjon trukket tilbake"),
+                    snapshot: update, sourceObjectID: sourceID,
+                    sourceOwnerID: session.profile.userID, shareVersion: 6
+                )
+                guard await messaging.send(to: friend.userID, conversationID: conversationID,
+                    body: ATHLTHLocalization.choose(english: "I withdrew the workout invitation.", norwegian: "Jeg har trukket tilbake treningsinvitasjonen."),
+                    attachment: attachment) else {
+                    plannedInviteError = messaging.errorMessage ?? "Kunne ikke trekke tilbake invitasjonen."
+                    return
+                }
+                await messaging.refreshConversation(conversationID)
+                session.syncSharedWorkoutLifecycles(from: messaging.messages(in: conversationID))
+            } catch {
+                plannedInviteError = error.localizedDescription
+            }
+        }
+    }
+
     private func respondToPlannedInvite(
         _ invitation: DirectMessageRecord,
         accept: Bool
@@ -6831,6 +6873,7 @@ private struct MessageBubble: View {
     let inviteResponse: PlannedWorkoutInviteResponse?
     let respondingToInvite: Bool
     let onRespondToInvite: (Bool) -> Void
+    let onWithdrawInvite: () -> Void
     let agreedWorkout: PlannedSession?
     let lifecycleUpdate: WorkoutInviteLifecycleUpdate?
     let workoutChangeDecision: WorkoutChangeDecision?
@@ -7167,6 +7210,7 @@ private struct MessageBubble: View {
                             ? friend.resolvedName : currentUserProfile.resolvedName,
                         onAccept: { onRespondToInvite(true) },
                         onDecline: { onRespondToInvite(false) },
+                        onWithdraw: onWithdrawInvite,
                         onProposeChanges: onProposeWorkoutChange
                     )
                 } else if let attachmentKind = message.attachmentKind {
