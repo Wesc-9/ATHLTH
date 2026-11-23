@@ -9682,7 +9682,9 @@ struct WorkoutTemplateBuilderView: View {
             audioCoachConfiguration: workout.audioCoachConfiguration,
             routeAlertConfiguration: workout.routeAlertConfiguration,
             ghostTargetDurationSeconds: workout.ghostTargetDurationSeconds,
-            ghostUpdates: workout.ghostUpdates
+            ghostUpdates: workout.ghostUpdates,
+            intervalGhostConfiguration: intervalGhostConfiguration.isEnabled &&
+                intervalGhostConfiguration.isValid ? intervalGhostConfiguration : nil
         )
         if let onAddStandalone {
             guard onAddStandalone(workout) else {
