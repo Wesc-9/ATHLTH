@@ -112,12 +112,21 @@ struct ATHLTHWorkoutContentsPreview: View {
                 emptyState
             } else {
                 HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "\(stats.exerciseCount) exercises · \(stats.setCount) sets · \(stats.pauseCount) pauses",
-                        norwegian: "\(stats.exerciseCount) øvelser · \(stats.setCount) sett · \(stats.pauseCount) pauser"
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    if stats.exerciseCount > 0 {
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(stats.exerciseCount) exercises · \(stats.setCount) sets · \(stats.pauseCount) pauses",
+                            norwegian: "\(stats.exerciseCount) øvelser · \(stats.setCount) sett · \(stats.pauseCount) pauser"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "\(max(0, stats.executedStepCount - stats.pauseCount)) work steps · \(stats.pauseCount) pauses",
+                            norwegian: "\(max(0, stats.executedStepCount - stats.pauseCount)) øktdeler · \(stats.pauseCount) pauser"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
                     Spacer(minLength: 0)
                 }
 
