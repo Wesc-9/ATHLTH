@@ -172,7 +172,7 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
         refreshInFlight = true
         if !quiet && draft == nil { isLoading = true }
         defer {
-            isLoading = false
+            if isLoading { isLoading = false }
             refreshInFlight = false
             if let pending = pendingRefreshSourceID {
                 pendingRefreshSourceID = nil
