@@ -108,7 +108,8 @@ enum ATHLTHIntervalGhostPacer {
             }
             return advanceSegment(
                 previous, segmentID: segmentID, kind: kind,
-                scope: scope, elapsedSeconds: elapsedSeconds,
+                scope: coverage == .selectedSegments ? .wholeWorkout : scope,
+                elapsedSeconds: elapsedSeconds,
                 actualMeters: actualMeters,
                 defaultPaceSecondsPerKilometer: defaultPaceSecondsPerKilometer,
                 recovery: recoveryPolicy,
