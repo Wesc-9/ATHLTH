@@ -187,7 +187,10 @@ final class ATHLTHScratchComposerPresentationPolicyTests: XCTestCase {
     }
 
     func testFriendInviteFixDoesNotBypassExistingSharingOrPlanEdits() {
-        XCTAssertFalse(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+        // While the shared composer is frontmost, it must remain the only
+        // editor even when preparing a partner proposal. The original
+        // sharing confirmation still runs after the composer closes.
+        XCTAssertTrue(ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
             isStandalone: true,
             hasScratchSource: true,
             preparesForSharing: true,
