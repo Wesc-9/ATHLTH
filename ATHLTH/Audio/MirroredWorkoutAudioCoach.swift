@@ -788,6 +788,7 @@ final class MirroredWorkoutAudioCoach:
                 ? (snapshot.coachReadoutContext ??
                     .init(routeRemainingMeters: snapshot.routeRemainingMeters))
                 : .init(),
+            sport: sport,
             lastSlots: &customAudioCoachLastSlots
         )
     }
