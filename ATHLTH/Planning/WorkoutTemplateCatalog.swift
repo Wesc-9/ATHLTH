@@ -5558,6 +5558,16 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    /// A free cardio segment advances manually, even when followed by
+    /// strength or an interval. Calendar estimates must not become targets.
+    private var containsOpenCardio: Bool {
+        blocks.contains {
+            $0.kind == .run && !$0.isRestOrActiveRecovery &&
+            $0.groupID == nil && $0.executionGroupID == nil &&
+            ($0.durationSeconds ?? 0) == 0 && ($0.distanceMeters ?? 0) == 0
+        }
+    }
+
     private var canSave: Bool {
         let routeDistanceGoal = selectedRouteID != nil &&
             blocks.contains { $0.kind == .run &&
@@ -5565,7 +5575,7 @@ struct WorkoutTemplateBuilderView: View {
                 $0.isIndoor != true }
         // A distance-based outdoor route is a complete planned workout,
         // even without an estimated finishing time.
-        let advancedFreeRun = allowsMixedRunningContent && ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks)
+        let advancedFreeRun = isPlannedWorkout && containsOpenCardio
         let basicFreeRun = isPlannedWorkout && !studioAdvanced &&
             initialActivity == .running && studioBasicRunMode == .free &&
             (blocks.isEmpty || ATHLTHBasicFreeRunPolicy.isFreeRunning(blocks))
@@ -7656,8 +7666,11 @@ struct WorkoutTemplateBuilderView: View {
             },
             onAddWalk: { phase in
                 selectedPhase = phase
-                studioVisiblePhases.insert(phase)
-                addRunBlock(activity: .walking)
+                var block = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
+                block.title = tr("Free walking", "Fri gå")
+                block.cardioActivity = .walking
+                block.phase = phase
+                insertBlock(block, toGroup: nil)
                 synchronizeRunningEnvironment()
             },
             onAddIntervals: { phase in
@@ -9899,7 +9912,7 @@ struct WorkoutTemplateBuilderView: View {
             title: cleanTitle,
             kind: basicFreeRunningKind,
             scheduledStart: nil,
-            durationMinutes: resolvedDurationMinutes,
+            durationMinutes: resolvedDurationMinutes ?? (containsOpenCardio ? 30 : nil),
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
             routeID: hasOutdoorCardio ? activeRouteID : nil,
@@ -9949,7 +9962,7 @@ struct WorkoutTemplateBuilderView: View {
         // must not be injected into its open-ended running step.
         let planningMinutes = ATHLTHBasicFreeRunPolicy.scheduledMinutes(
             blocks: workout.workoutBlocks ?? blocks,
-            requestedMinutes: resolvedDurationMinutes,
+            requestedMinutes: resolvedDurationMinutes ?? (containsOpenCardio ? 30 : nil),
             basicFreeRunning: isPlannedWorkout && !studioAdvanced &&
                 initialActivity == .running && studioBasicRunMode == .free
         )
