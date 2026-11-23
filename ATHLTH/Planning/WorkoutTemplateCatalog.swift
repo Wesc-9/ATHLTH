@@ -9839,3 +9839,103 @@ struct SavedWorkoutPickerView: View {
 
 
 
+
+
+/// Workout-specific virtual Ghost settings. This does not change global Ghost
+/// preferences and keeps the simple on/off + pace flow above advanced options.
+private struct ATHLTHIntervalGhostSettingsView: View {
+    @Binding var configuration: ATHLTHIntervalGhostPacer.WorkoutConfiguration
+    let blocks: [WorkoutTemplateBlock]
+    @State private var showAdvanced = false
+
+    private var paceText: Binding<String> {
+        Binding(
+            get: {
+                let value = Int(configuration.defaultPaceSecondsPerKilometer)
+                return String(format: "%d:%02d", value / 60, value % 60)
+            },
+            set: {
+                if let pace = ATHLTHGhostPaceTimeConversion.paceSeconds(from: $0) {
+                    configuration.defaultPaceSecondsPerKilometer = pace
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Virtuell Ghost for intervaller", isOn: $configuration.isEnabled)
+                .font(.headline)
+            if configuration.isEnabled {
+                HStack {
+                    Text("Måltempo")
+                    Spacer()
+                    TextField("5:00", text: paceText)
+                        .keyboardType(.numbersAndPunctuation)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 90)
+                    Text("min/km")
+                        .font(.caption)
+                }
+                Picker("Gjelder", selection: $configuration.coverage) {
+                    Text("Hele økten").tag(
+                        ATHLTHIntervalGhostPacer.WorkoutConfiguration.Coverage.entireWorkout)
+                    Text("Kun hoveddel").tag(
+                        ATHLTHIntervalGhostPacer.WorkoutConfiguration.Coverage.mainOnly)
+                    Text("Valgte deler").tag(
+                        ATHLTHIntervalGhostPacer.WorkoutConfiguration.Coverage.selectedSegments)
+                }
+                .pickerStyle(.menu)
+
+                DisclosureGroup("Avanserte Ghost-innstillinger", isExpanded: $showAdvanced) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Picker("Aktiv pause", selection: $configuration.pauseBehavior) {
+                            Text("Stopp Ghost").tag(
+                                ATHLTHIntervalGhostPacer.WorkoutConfiguration.PauseBehavior.freeze)
+                            Text("Følg min distanse").tag(
+                                ATHLTHIntervalGhostPacer.WorkoutConfiguration.PauseBehavior.followActualDistance)
+                            Text("Eget tempo").tag(
+                                ATHLTHIntervalGhostPacer.WorkoutConfiguration.PauseBehavior.customPace)
+                        }
+                        if configuration.pauseBehavior == .customPace {
+                            Stepper(
+                                "Pausetempo: \(Int(configuration.recoveryPaceSecondsPerKilometer ?? 420) / 60):\(String(format: "%02d", Int(configuration.recoveryPaceSecondsPerKilometer ?? 420) % 60)) min/km",
+                                value: Binding(
+                                    get: { Int(configuration.recoveryPaceSecondsPerKilometer ?? 420) },
+                                    set: { configuration.recoveryPaceSecondsPerKilometer = Double($0) }
+                                ),
+                                in: 120...1800,
+                                step: 15
+                            )
+                        }
+                        if configuration.coverage == .selectedSegments {
+                            ForEach(blocks, id: \.editorDragID) { block in
+                                Toggle(block.title, isOn: Binding(
+                                    get: {
+                                        configuration.segments.first {
+                                            $0.id == block.editorDragID
+                                        }?.enabled ?? false
+                                    },
+                                    set: { enabled in
+                                        configuration.segments.removeAll {
+                                            $0.id == block.editorDragID
+                                        }
+                                        configuration.segments.append(.init(
+                                            id: block.editorDragID,
+                                            enabled: enabled,
+                                            paceSecondsPerKilometer: nil
+                                        ))
+                                    }
+                                ))
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+        }
+        .padding(15)
+        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 18))
+        .tint(ATHLTHPlanDesign.accentInk)
+    }
+}
