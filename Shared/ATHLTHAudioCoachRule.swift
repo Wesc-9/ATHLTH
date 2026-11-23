@@ -576,8 +576,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 return norwegian ? "Motbakke foran deg. Finn din rytme!"
                     : "You're climbing. Find your rhythm!"
             }
-            if trigger == .plannedZoneBelow ||
-               trigger == .plannedZoneOutside || trigger == .zoneBelow {
+            if trigger == .plannedZoneOutside {
+                return norwegian ? "Pulsen er utenfor øktens målsone. Finn tilbake til riktig intensitet."
+                    : "Heart rate is outside your workout target zone. Find your way back."
+            }
+            if trigger == .plannedZoneBelow || trigger == .zoneBelow {
                 return norwegian ? "Pulsen ligger under valgt sone. Juster innsatsen om det passer."
                     : "Heart rate is below your chosen zone. Adjust if appropriate."
             }
