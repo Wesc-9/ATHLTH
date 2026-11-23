@@ -387,9 +387,11 @@ struct ATHLTHSideMenuView: View {
         Button {
             onSelect(destination)
         } label: {
-            HStack(spacing: 12) {
-                menuIcon(icon)
-                menuLabel(english: english, norwegian: norwegian)
+            HStack(spacing: 0) {
+                HStack(spacing: 11) {
+                    menuIcon(icon)
+                    menuLabel(english: english, norwegian: norwegian)
+                }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .medium))
@@ -516,9 +518,11 @@ struct ATHLTHSideMenuView: View {
     private var footer: some View {
         VStack(spacing: 9) {
             Button { onSelect(.settings) } label: {
-                HStack(spacing: 12) {
-                    menuIcon("gearshape")
-                    menuLabel(english: "Settings", norwegian: "Innstillinger")
+                HStack(spacing: 0) {
+                    HStack(spacing: 11) {
+                        menuIcon("gearshape")
+                        menuLabel(english: "Settings", norwegian: "Innstillinger")
+                    }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .medium))
@@ -534,14 +538,14 @@ struct ATHLTHSideMenuView: View {
             .accessibilityIdentifier("athlth-side-menu-settings")
 
             Button { onSelect(.profile) } label: {
-                HStack(spacing: 11) {
+                HStack(spacing: 8) {
                     profileImage
                     Text(session.profile.displayName.isEmpty
                          ? "ATHLTH" : session.profile.displayName)
                         .font(.system(size: rowTextSize, weight: .semibold))
                         .foregroundStyle(menuInk)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .minimumScaleFactor(0.88)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.up.right")
