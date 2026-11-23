@@ -309,6 +309,8 @@ struct ATHLTHCoachBoundaryCountdownRule: Codable, Hashable, Identifiable {
     /// nil = every section; warmup/main/cooldown limit a rule to that part.
     var sectionFilter: String? = nil
     var enabled = true
+    /// Linked preparation rules target actual interval efforts, not rests.
+    var nextEffortOnly: Bool? = nil
 
     var resolvedSeconds: Int? {
         guard enabled, (1...30).contains(seconds) else { return nil }
@@ -332,7 +334,8 @@ enum ATHLTHCoachBoundaryCountdown {
         let lastSet = setIndex == setCount - 1
         let lastExercise = exerciseIndex == exerciseCount - 1
         return best(rules.filter { rule in
-            guard rule.resolvedSeconds != nil, rule.boundary == .ends else { return false }
+            guard rule.resolvedSeconds != nil, rule.boundary == .ends,
+                  rule.nextEffortOnly != true else { return false }
             switch rule.scope {
             case .step: return true
             case .section: return lastSet
@@ -350,7 +353,8 @@ enum ATHLTHCoachBoundaryCountdown {
         nextGroup: Bool = false
     ) -> ATHLTHCoachBoundaryCountdownRule? {
         best(rules.filter { rule in
-            guard rule.resolvedSeconds != nil, rule.boundary == .starts else { return false }
+            guard rule.resolvedSeconds != nil, rule.boundary == .starts,
+                  rule.nextEffortOnly != true else { return false }
             switch rule.scope {
             case .step: return true
             case .section: return nextExercise
@@ -457,6 +461,7 @@ enum ATHLTHCoachBoundaryCountdown {
             : currentSection != nextSection
         let eligible = rules.filter { rule in
             guard rule.resolvedSeconds != nil else { return false }
+            if rule.nextEffortOnly == true && nextPhase != "work" { return false }
             let targetSection = rule.boundary == .starts ? nextSection : currentSection
             if let filter = rule.sectionFilter, rule.scope == .section,
                filter != targetSection { return false }

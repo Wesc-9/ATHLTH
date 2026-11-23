@@ -351,6 +351,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// An optional single-shot cue before a planned finish. Nothing is
     /// announced if the workout has no reliable remaining-duration estimate.
     var beforeEndSeconds: Int? = nil
+    /// Optional linked second-by-second countdown after a preparation cue.
+    /// Uses the existing deadline-based running countdown, never queued speech.
+    var linkedCountdownSeconds: Int? = nil
     var customPhrase: String? = nil
     /// Nil on legacy profiles means all supported workout types.
     var activityFilter: ATHLTHCoachActivityFilter? = nil
@@ -368,7 +371,17 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         guard selection != .every else { return true }
         guard let index = context.stepIndex, index >= 0 else { return false }
         switch trigger {
-        case .stepStart, .stepEnd, .beforeNextStep:
+        case .beforeNextStep:
+            guard context.hasNextStep == true else { return false }
+            let nextIndex = index + 1
+            switch selection {
+            case .every: return true
+            case .first: return nextIndex == 1
+            case .last: return nextIndex == (context.stepCount ?? 0) - 1
+            case .mainOnly: return ["work", "steady", "main"].contains(context.nextStepPhase ?? "")
+            case .withoutRest: return context.nextStepPhase != nil && context.nextStepPhase != "recovery"
+            }
+        case .stepStart, .stepEnd:
             switch selection {
             case .every: return true
             case .first: return index == 0
@@ -623,13 +636,14 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             }
             // Context-specific motivation for goals, rather than a generic
             // encouragement which does not explain what was achieved.
-            if trigger == .nearFinishTime {
-                return norwegian ? "Du er snart ved tidsmålet. Hold flyten!"
-                    : "You're close to your time goal. Keep it going!"
+            if trigger == .nearFinishTime || trigger == .nearFinishDistance {
+                return ATHLTHAudioCoachScheduledMotivation.finish(
+                    byDistance: trigger == .nearFinishDistance,
+                    style: encouragementStyle ?? .encouragement, norwegian: norwegian)
             }
-            if trigger == .nearFinishDistance {
-                return norwegian ? "Det er kort vei igjen til målet. Fortsett!"
-                    : "The finish is close. Keep going!"
+            if trigger == .beforeNextStep || trigger == .beforeMain || trigger == .beforeCooldown {
+                return norwegian ? "Gjør deg klar. Neste deløkt starter snart."
+                    : "Get ready. Your next step starts soon."
             }
             if trigger == .elevationGain {
                 return norwegian ? "Flott klatring! Du har passert et høydemetermål."
@@ -671,6 +685,19 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
 /// Deterministic, offline motivational cues. A rule generates one short phrase
 /// per distance/time milestone, without waiting for a network coach service.
 enum ATHLTHAudioCoachScheduledMotivation {
+    static func finish(byDistance: Bool, style: ATHLTHCoachEncouragementStyle, norwegian: Bool) -> String {
+        switch (style, norwegian) {
+        case (.push, true): return "Nå nærmer du deg mål! Hold fokus, fortsett å presse kontrollert helt inn!"
+        case (.push, false): return "The finish is close! Stay focused and keep pushing with control!"
+        case (.praise, true): return "Sterk innsats! Du er snart i mål. Fortsett slik!"
+        case (.praise, false): return "Great effort! You're nearly there. Keep it up!"
+        case (.encouragement, true):
+            return byDistance ? "Det er kort vei igjen til målet. Fortsett!" : "Du er snart ved tidsmålet. Hold flyten!"
+        case (.encouragement, false):
+            return byDistance ? "The finish is close. Keep going!" : "You're close to your time goal. Keep it going!"
+        }
+    }
+
     static func phrase(
         slot: Int,
         style: ATHLTHCoachEncouragementStyle,
@@ -1184,7 +1211,13 @@ enum ATHLTHAudioCoachRuleDelivery {
             return phase == "cooldown" &&
                 index == (context.stepCount ?? 0) - 1 && nearEnd ? index + 1 : nil
         case .beforeNextStep:
-            return context.hasNextStep == true && beforeBoundary ? index + 1 : nil
+            guard context.hasNextStep == true && beforeBoundary else { return nil }
+            if let length = rule.linkedCountdownSeconds {
+                // A missed preparation cue must never interrupt the numbers.
+                guard context.nextStepPhase == "work",
+                      let remaining, remaining > Double(length + 2) else { return nil }
+            }
+            return index + 1
         case .beforeMain:
             return phase == "warmup" &&
                 (next == "work" || next == "recovery") &&

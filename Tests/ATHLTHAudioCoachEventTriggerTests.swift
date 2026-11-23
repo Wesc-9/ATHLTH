@@ -3,6 +3,36 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachEventTriggerTests: XCTestCase {
+    func testPreparationTargetsUpcomingEffortAndDoesNotInterruptCountdown() {
+        var rule = ATHLTHAudioCoachRule(trigger: .beforeNextStep, metric: .motivation,
+                                       interval: 15, eventSelection: .withoutRest)
+        rule.linkedCountdownSeconds = 10
+        var context = ATHLTHCoachReadoutContext()
+        context.stepIndex = 1
+        context.stepCount = 5
+        context.hasNextStep = true
+        context.stepPhase = "recovery"
+        context.nextStepPhase = "work"
+        context.stepRemainingSeconds = 15
+        var slots: [UUID: Int] = [:]
+        XCTAssertEqual(speak(rule, slots: &slots, context: context).count, 1)
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+        slots.removeAll()
+        context.stepRemainingSeconds = 10
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+        context.stepRemainingSeconds = 15
+        context.nextStepPhase = "recovery"
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+    }
+
+    func testPushBeforeFinishHonorsSelectedStyle() {
+        var rule = ATHLTHAudioCoachRule(trigger: .nearFinishDistance, metric: .motivation, interval: 100)
+        rule.encouragementStyle = .push
+        let phrase = rule.phrase(distanceMeters: 4900, elapsedSeconds: 1500,
+                                 paceSecondsPerKilometer: 300, heartRateBPM: nil, norwegian: true)
+        XCTAssertTrue(phrase?.contains("presse kontrollert") == true)
+    }
+
     private func speak(
         _ rule: ATHLTHAudioCoachRule,
         slots: inout [UUID: Int],

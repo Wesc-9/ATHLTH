@@ -711,8 +711,25 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     }
 
     var effectiveBoundaryCountdownRules: [ATHLTHCoachBoundaryCountdownRule] {
-        Array((boundaryCountdownRules ?? smartPrompts?.boundaryCountdownRules ?? [])
-            .filter { $0.resolvedSeconds != nil }.prefix(20))
+        let authored = (boundaryCountdownRules ?? smartPrompts?.boundaryCountdownRules ?? [])
+            .filter { $0.resolvedSeconds != nil }
+        let linked = activeCustomRules.compactMap { rule -> ATHLTHCoachBoundaryCountdownRule? in
+            guard rule.trigger == .beforeNextStep,
+                  rule.eventSelection == .withoutRest,
+                  rule.allowedPhases?.isEmpty != false,
+                  rule.activityFilter == nil || rule.activityFilter == .all || rule.activityFilter == .intervals,
+                  let seconds = rule.linkedCountdownSeconds,
+                  (1...30).contains(seconds), rule.validatedInterval >= seconds + 5 else { return nil }
+            var countdown = ATHLTHCoachBoundaryCountdownRule()
+            countdown.id = rule.id
+            countdown.scope = .step
+            countdown.boundary = .starts
+            countdown.seconds = seconds
+            countdown.after = .numbersOnly
+            countdown.nextEffortOnly = true
+            return countdown
+        }
+        return Array((linked + authored).prefix(20))
     }
 
     var resolvedStrengthRestCountdownSeconds: Int {

@@ -46,6 +46,7 @@ struct ATHLTHCoachComposerCheckpoint: Equatable {
     let motivationStyle: ATHLTHCoachEncouragementStyle
     let historicalWorkoutID: UUID?
     let activityFilter: ATHLTHCoachActivityFilter
+    var linkedCountdownSeconds: Int? = nil
 }
 
 /// Presentation policy only. Keep the persisted rule and its speech formatter
@@ -166,6 +167,7 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @State private var historicalWorkoutID: UUID?
     @State private var activityFilter: ATHLTHCoachActivityFilter
+    @State private var linkedCountdownSeconds: Int?
 
     private var currentCheckpoint: ATHLTHCoachComposerCheckpoint {
         ATHLTHCoachComposerCheckpoint(
@@ -175,7 +177,8 @@ struct ATHLTHCoachRuleComposer: View {
             metrics: metrics, motivationPhrase: motivationPhrase,
             motivationStyle: motivationStyle,
             historicalWorkoutID: historicalWorkoutID,
-            activityFilter: activityFilter
+            activityFilter: activityFilter,
+            linkedCountdownSeconds: linkedCountdownSeconds
         )
     }
 
@@ -256,6 +259,8 @@ struct ATHLTHCoachRuleComposer: View {
         _activityFilter = State(initialValue:
             checkpoint?.activityFilter ?? group?.activityFilter ??
             original?.activityFilter ?? .all)
+        _linkedCountdownSeconds = State(initialValue:
+            checkpoint != nil ? checkpoint?.linkedCountdownSeconds : original?.linkedCountdownSeconds)
     }
 
     private var isEditing: Bool {
@@ -321,6 +326,21 @@ struct ATHLTHCoachRuleComposer: View {
     private var canAdvanceTrigger: Bool {
         triggerAvailability.supports(trigger, for: activityFilter) &&
             (trigger != .slowerThanPreviousWorkout || selectedHistory != nil)
+    }
+
+    private var canLinkCountdown: Bool {
+        trigger == .beforeNextStep && eventSelection == .withoutRest &&
+            allowedPhases?.isEmpty != false && supportsStructured &&
+            (activityFilter == .all || activityFilter == .intervals) &&
+            (effectiveActivity == .running || effectiveActivity == .walking ||
+             effectiveActivity == .intervals || effectiveActivity == .all) &&
+            interval >= 8
+    }
+
+    private var resolvedLinkedCountdown: Int? {
+        guard canLinkCountdown, let seconds = linkedCountdownSeconds,
+              seconds >= 1, seconds <= min(30, interval - 5) else { return nil }
+        return seconds
     }
 
     private var canSave: Bool {
@@ -502,6 +522,7 @@ struct ATHLTHCoachRuleComposer: View {
             commandPreview
             selectedCommandCard
             if metrics.contains(.motivation) { motivationEditor }
+            if canLinkCountdown { linkedCountdownEditor }
             commandCatalogue
             if draft.customRules.count >= 20 && !isEditing {
                 Text(tr("Maximum 20 active rules per template.",
@@ -563,6 +584,13 @@ struct ATHLTHCoachRuleComposer: View {
                 .foregroundStyle(ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("athlth-coach-command-preview")
+            if let seconds = resolvedLinkedCountdown {
+                Label(tr("Then countdown", "Deretter nedtelling") + ": " +
+                      (1...seconds).reversed().map { String($0) }.joined(separator: " · "),
+                      systemImage: "timer")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(bronze)
+            }
             Text(tr("Example values. Coach uses available live data during your workout.",
                     "Eksempelverdier. Coach bruker tilgjengelige sanntidsdata under økten."))
                 .font(.caption)
@@ -755,6 +783,32 @@ struct ATHLTHCoachRuleComposer: View {
         }
     }
 
+    private var linkedCountdownEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(tr("Prepare & count down", "Gjør deg klar og tell ned"))
+                .font(.headline)
+                .foregroundStyle(ink)
+            Toggle(tr("Count down before the next effort", "Nedtelling før neste drag"),
+                   isOn: Binding(
+                    get: { resolvedLinkedCountdown != nil },
+                    set: { enabled in
+                        linkedCountdownSeconds = enabled ? min(10, interval - 5) : nil
+                    }))
+                .tint(bronze)
+            if let seconds = resolvedLinkedCountdown {
+                Stepper("\(seconds) " + tr("seconds", "sekunder"),
+                        value: Binding(get: { seconds }, set: { linkedCountdownSeconds = $0 }),
+                        in: 3...min(30, interval - 5))
+                Text(tr("The preparation message comes first. Numbers use the workout timer and override ordinary speech.",
+                        "Klargjøringsmeldingen kommer først. Tallene følger økttimeren og overstyrer vanlig tale."))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+            }
+        }
+        .padding(16)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+    }
+
     private var motivationEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(tr("Make it personal", "Gjør meldingen personlig"))
@@ -762,7 +816,7 @@ struct ATHLTHCoachRuleComposer: View {
                 .foregroundStyle(ink)
             Picker(tr("Style", "Stil"), selection: $motivationStyle) {
                 Text(tr("Encourage", "Motiver")).tag(ATHLTHCoachEncouragementStyle.encouragement)
-                Text(tr("Push", "Push")).tag(ATHLTHCoachEncouragementStyle.push)
+                Text(tr("Push", "Push-beskjed")).tag(ATHLTHCoachEncouragementStyle.push)
                 Text(tr("Praise", "Ros")).tag(ATHLTHCoachEncouragementStyle.praise)
             }
             .pickerStyle(.segmented)
@@ -827,7 +881,8 @@ struct ATHLTHCoachRuleComposer: View {
                 case .zoneEnter, .zoneExit, .zoneBelow,
                      .plannedZoneBelow, .plannedZoneOutside:
                     metrics = [.heartRateZone]
-                case .randomMotivation, .nearFinishTime, .nearFinishDistance,
+                case .beforeNextStep, .beforeMain, .beforeCooldown,
+                     .randomMotivation, .nearFinishTime, .nearFinishDistance,
                      .elevationGain, .uphillDetected,
                      .paceFasterThanTarget, .paceSlowerThanTarget,
                      .slowerThanPreviousWorkout:
@@ -863,6 +918,7 @@ struct ATHLTHCoachRuleComposer: View {
         )
         if let previous { rule.id = previous.id }
         rule.activityFilter = activityFilter == .all ? nil : activityFilter
+        rule.linkedCountdownSeconds = resolvedLinkedCountdown
         if trigger == .slowerThanPreviousWorkout,
            let reference = selectedHistory {
             rule.historicalWorkoutID = reference.id

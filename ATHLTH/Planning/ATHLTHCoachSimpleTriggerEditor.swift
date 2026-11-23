@@ -64,7 +64,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
              .zoneBelow, .plannedZoneBelow, .plannedZoneOutside: .heartZone
         case .randomMotivation: .motivation
         case .nearFinishTime: .finish
-        case .nearFinishDistance: .distance
+        case .nearFinishDistance: .finish
         case .slowerThanPreviousWorkout: .history
         case .elevationGain, .uphillDetected: .elevation
         case .paceFasterThanTarget, .paceSlowerThanTarget,
@@ -151,7 +151,12 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .pause: trigger = .recoveryStart; interval = 1
         case .heartZone: trigger = .zoneEnter; interval = 3
         case .motivation: trigger = .randomMotivation; interval = 240
-        case .finish: trigger = .nearFinishTime; interval = 60
+        case .finish:
+            if triggerAvailability.supports(.nearFinishTime, for: activityFilter) {
+                trigger = .nearFinishTime; interval = 60
+            } else {
+                trigger = .nearFinishDistance; interval = 100
+            }
         case .elevation: trigger = .elevationGain; interval = 50
         case .pace: trigger = .paceSlowerThanTarget; interval = 1
         case .history: trigger = .slowerThanPreviousWorkout; interval = 1
@@ -169,7 +174,21 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             triggerAvailability.supports(item, for: activityFilter)
         return Button {
             guard isAvailable else { return }
+            guard trigger != item else { return }
             trigger = item
+            switch item {
+            case .beforeNextStep, .beforeMain, .beforeCooldown:
+                interval = 15
+                eventSelection = item == .beforeNextStep ? .withoutRest : .every
+                phases = nil
+            case .nearFinishTime: interval = 30
+            case .nearFinishDistance: interval = 100
+            case .distance: interval = 1000
+            case .stepStart, .stepEnd, .effortStart, .effortEnd,
+                 .activeRecoveryStart, .activeRecoveryEnd, .recoveryStart, .recoveryEnd:
+                eventSelection = .every
+            default: break
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: trigger == item ? "checkmark.circle.fill" : "circle")
@@ -368,17 +387,30 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                         ATHLTHAudioCoachRule.Trigger.warmupStart, .warmupEnd,
                         .mainStart, .mainEnd, .cooldownStart, .cooldownEnd
                     ], id: \.self) { choice($0) }
+                    choice(.beforeMain)
+                    choice(.beforeCooldown)
+                    if trigger == .beforeMain || trigger == .beforeCooldown {
+                        boundaryLeadPicker
+                    }
                 }
             } else if family == .step {
                 choice(.stepStart)
                 choice(.stepEnd)
-                eventPicker([
-                    .every, .first, .last, .mainOnly, .withoutRest
-                ])
+                choice(.effortStart)
+                choice(.effortEnd)
+                choice(.beforeNextStep)
+                if trigger == .beforeNextStep { boundaryLeadPicker }
+                if trigger == .stepStart || trigger == .stepEnd || trigger == .beforeNextStep {
+                    eventPicker([.every, .first, .last, .mainOnly, .withoutRest])
+                }
             } else if family == .pause {
                 choice(.recoveryStart)
                 choice(.recoveryEnd)
-                eventPicker([.every, .first, .last])
+                choice(.activeRecoveryStart)
+                choice(.activeRecoveryEnd)
+                if trigger == .recoveryStart || trigger == .recoveryEnd {
+                    eventPicker([.every, .first, .last])
+                }
             } else if family == .heartZone {
                 Text(tr("CHOOSE HEART-RATE TYPE", "VELG PULSTYPE"))
                     .font(.caption2.weight(.bold))
@@ -451,13 +483,29 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         .padding(16)
         .background(ATHLTHPlanDesign.canvas, in: RoundedRectangle(cornerRadius: 20))
         .onAppear {
-            if trigger == .distance {
+            if trigger == .distance || trigger == .nearFinishDistance || trigger == .elevationGain {
                 distanceUnit = interval >= 10_000 && interval % 10_000 == 0 ? 2 :
                     (interval >= 1_000 && interval % 1_000 == 0 ? 1 : 0)
-            } else if trigger == .time {
+            } else if trigger == .time || trigger == .randomMotivation || trigger == .nearFinishTime {
                 timeUnit = interval >= 3_600 && interval % 3_600 == 0 ? 2 :
                     (interval >= 60 && interval % 60 == 0 ? 1 : 0)
             }
+        }
+    }
+
+    private var boundaryLeadPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("SECONDS BEFORE", "SEKUNDER FØR"))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Stepper("\(min(max(interval, 5), 60)) " + tr("sec", "sek"),
+                    value: $interval, in: 5...60)
+                .padding(12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+            Text(tr("Uses the current timed step's remaining time.",
+                    "Bruker gjenstående tid i deløkten som pågår."))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
     }
 
