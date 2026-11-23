@@ -566,7 +566,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         _ next: ATHLTHStudioSchedule.Occurrence?,
         availableWidth: CGFloat
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 10) {
                 Text(tr("Next workout", "Neste økt"))
                     .font(.system(size: 22, weight: .medium, design: .serif))
@@ -606,18 +606,13 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                // The week calendar already offers planning; avoid a duplicate
+                // call to action in the compact, empty next-session card.
                 Spacer(minLength: 0)
-                Button {
-                    focusedPlanningDate = Calendar.current.startOfDay(for: .now)
-                } label: {
-                    Label(tr("Plan workout", "Planlegg økt"), systemImage: "plus")
-                        .frame(minHeight: 44)
-                }
-                .buttonStyle(.bordered)
             }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 246, alignment: .leading)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 222, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20)
             .stroke(outline.opacity(0.45), lineWidth: 0.6))
@@ -1320,7 +1315,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// Shared HealthKit recovery data; compact premium iPad presentation
     /// mirrors the iPhone Insights hierarchy without inventing a score.
     private var compactReadinessCard: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tr("ATHLTH INSIGHT", "ATHLTH INNSIKT"))
@@ -1337,7 +1332,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(bronze)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 34, height: 34)
                         .background(cream, in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -1351,9 +1346,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 114, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 98, alignment: .leading)
             } else if hasHealth, let score = health.recovery.score {
-                HStack(alignment: .center, spacing: 16) {
+                HStack(alignment: .center, spacing: 12) {
                     ZStack {
                         Circle()
                             .stroke(bronze.opacity(0.13), lineWidth: 8)
@@ -1375,7 +1370,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .frame(width: 108, height: 108)
+                    .frame(width: 96, height: 96)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(tr(
                         "Readiness score", "Dagsform"
@@ -1408,7 +1403,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 114,
+                .frame(maxWidth: .infinity, minHeight: 98,
                        alignment: .leading)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -1425,7 +1420,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 114,
+                .frame(maxWidth: .infinity, minHeight: 98,
                        alignment: .leading)
             }
 
@@ -1468,11 +1463,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(bronze)
-                .frame(minHeight: 38)
+                .frame(minHeight: 34)
             }
             .buttonStyle(.plain)
         }
-        .padding(20)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 22)
@@ -1491,7 +1486,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func readinessSignal(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -1504,8 +1499,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.80)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.white.opacity(0.86),
                     in: RoundedRectangle(cornerRadius: 12))
