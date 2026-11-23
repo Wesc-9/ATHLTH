@@ -3,7 +3,7 @@ import XCTest
 
 final class ATHLTHStudioWeekRailLayoutTests: XCTestCase {
     func testSevenDayCardsAlwaysFitRegularHeightWithoutScrolling() {
-        for windowHeight: CGFloat in [600, 700, 768, 900, 1056, 1200] {
+        for windowHeight in [CGFloat(600), 700, 768, 900, 1056, 1200] {
             let railHeight = windowHeight - 66 // Planner header minimum height.
             let cardHeight = ATHLTHStudioWeekRailLayout.dayHeight(
                 for: railHeight
@@ -36,7 +36,7 @@ final class ATHLTHStudioWeekRailLayoutTests: XCTestCase {
     }
 
     func testRailWidthDoesNotTakeOverEditor() {
-        for width: CGFloat in [680, 900, 1024, 1366] {
+        for width in [CGFloat(680), 900, 1024, 1366] {
             let rail = ATHLTHStudioWeekRailLayout.width(in: width)
             XCTAssertLessThanOrEqual(rail, 256)
             XCTAssertGreaterThan(width - rail, 450)
