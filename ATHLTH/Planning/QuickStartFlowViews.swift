@@ -4651,12 +4651,14 @@ struct AudioCoachSetupCard: View {
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
+    var triggerAvailability: ATHLTHCoachTriggerAvailability? = nil
 
     var body: some View {
         ATHLTHAudioCoachSessionStudio(
             draft: $draft,
             showRouteOptions: showRouteOptions,
-            showStructuredOptions: showStructuredOptions
+            showStructuredOptions: showStructuredOptions,
+            triggerAvailability: triggerAvailability
         )
     }
 }
