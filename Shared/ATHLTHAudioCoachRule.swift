@@ -1463,6 +1463,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     static func needsSegmentData(_ rules: [ATHLTHAudioCoachRule]) -> Bool {
         rules.contains { rule in
             rule.isEnabled && ((rule.allowedPhases?.isEmpty == false) ||
+                rule.activityFilter == .intervals ||
                 rule.trigger.isPaceCondition ||
                 rule.trigger.usesLiveContext ||
                 rule.beforeEndSeconds != nil ||
