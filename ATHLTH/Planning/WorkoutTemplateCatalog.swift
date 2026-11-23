@@ -204,6 +204,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var measurementStepID: UUID? = nil
     /// Persisted Ghost segment identity, unlike the editor-only drag token.
     var ghostSegmentID: UUID? = nil
+    /// Workout-wide Ghost preferences anchored to the first persisted block.
+    /// This survives both standalone and plan recipes without a new plan schema.
+    var intervalGhostConfiguration: ATHLTHIntervalGhostPacer.WorkoutConfiguration? = nil
     /// Original intensity target from Zoned (which uses six heart-rate zones).
     /// This displays normalized ATHLTH Z1-Z5 ranges; original source is in JSON.
     var sourceIntensityZoneLabel: String? = nil
@@ -298,6 +301,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.assessmentScope == rhs.assessmentScope &&
         lhs.measurementStepID == rhs.measurementStepID &&
         lhs.ghostSegmentID == rhs.ghostSegmentID &&
+        lhs.intervalGhostConfiguration == rhs.intervalGhostConfiguration &&
         lhs.sourceIntensityZoneLabel == rhs.sourceIntensityZoneLabel &&
         lhs.targetHeartRatePercentMin == rhs.targetHeartRatePercentMin &&
         lhs.targetHeartRatePercentMax == rhs.targetHeartRatePercentMax &&
@@ -357,6 +361,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(assessmentScope)
         hasher.combine(measurementStepID)
         hasher.combine(ghostSegmentID)
+        hasher.combine(intervalGhostConfiguration)
         hasher.combine(sourceIntensityZoneLabel)
         hasher.combine(targetHeartRatePercentMin)
         hasher.combine(targetHeartRatePercentMax)
@@ -424,6 +429,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case assessmentScope = "assessment_scope"
         case measurementStepID = "measurement_step_id"
         case ghostSegmentID = "ghost_segment_id"
+        case intervalGhostConfiguration = "interval_ghost_configuration"
         case sourceIntensityZoneLabel = "source_intensity_zone"
         case targetHeartRatePercentMin = "target_hr_percent_min"
         case targetHeartRatePercentMax = "target_hr_percent_max"
@@ -4964,6 +4970,7 @@ struct WorkoutTemplateBuilderView: View {
         _ghostDraft = State(initialValue: initialGhostDraft)
         _intervalGhostConfiguration = State(initialValue:
             initialExtras.intervalGhostConfiguration ??
+                initialRecipe.compactMap(\.intervalGhostConfiguration).first ??
                 ATHLTHIntervalGhostPacer.WorkoutConfiguration())
         _manualDurationMinutes = State(initialValue: initialMinutes)
         _durationInputText = State(initialValue: (initialMinutes ??
@@ -9591,12 +9598,18 @@ struct WorkoutTemplateBuilderView: View {
             ? suggestedAdvancedTitle : suggestedBasicTitle
         let cleanTitle = requestedTitle.isEmpty ? fallbackTitle : requestedTitle
 
-        let snapshotBlocks: [WorkoutTemplateBlock] =
+        var snapshotBlocks: [WorkoutTemplateBlock] =
             isPlannedWorkout && !studioAdvanced &&
             initialActivity == .running && studioBasicRunMode == .free &&
             blocks.isEmpty
             ? [ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()]
             : blocks
+
+        if !snapshotBlocks.isEmpty {
+            snapshotBlocks[0].intervalGhostConfiguration =
+                intervalGhostConfiguration.isEnabled && intervalGhostConfiguration.isValid
+                    ? intervalGhostConfiguration : nil
+        }
 
         var workout = PlannedSession(
             id: collaborationWorkoutID ?? UUID(),
