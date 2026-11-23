@@ -131,6 +131,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var hybridDistanceAnchor: ATHLTHHybridWatchDistanceAnchor?
     private var routeBuilder: HKWorkoutRouteBuilder?
     private var workoutLocation: CLLocation?
+    private var coachElevation = ATHLTHCoachElevationTracker()
     private var workoutLocationMetadataAttached = false
     private var timer: Timer?
     private var startedAt: Date?
@@ -4450,6 +4451,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         collectingHybridTreadmillDistance = false
         routeBuilder = nil
         workoutLocation = nil
+        coachElevation.reset()
         workoutLocationMetadataAttached = false
         startedAt = nil
         universalWorkoutID = nil
@@ -4648,6 +4650,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.routePoints = []
         }
         workoutLocation = nil
+        coachElevation.reset()
         workoutLocationMetadataAttached = false
         structuredStepStartElapsedTime = 0
         structuredStepStartDistanceMeters = 0
@@ -5447,6 +5450,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeRemainingMeters: routeRemainingMeters
         )
         if kind == .running || kind == .walking {
+            // Only the active exercise's prescribed zone may trigger a
+            // target-zone alert. No inferred zone when not configured.
+            context.plannedHeartRateZone =
+                currentStructuredRunningStep?.targetHeartRateZone ??
+                audioCoachConfiguration.smartPrompts?.preferredHeartRateZone
+            if usesOutdoorGPS, coachElevation.hasReliableGain {
+                context.elevationGainMeters = coachElevation.gainMeters
+                context.isUphill = coachElevation.uphill
+            }
             // Measured values, never a programmed treadmill speed.
             context.overallPaceSecondsPerKilometer =
                 distanceMeters >= 1_000 ? averagePaceSecondsPerKilometer : nil
@@ -10687,6 +10699,9 @@ private extension WatchWorkoutManager {
             return
         }
 
+        if !automaticPauseActive {
+            coachElevation.observe(location)
+        }
         defer {
             lastAcceptedOutdoorLocation = location
         }
