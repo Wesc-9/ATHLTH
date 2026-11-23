@@ -13,6 +13,9 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
     var hasPaceGoal: Bool
     var hasZoneGoal: Bool
     var hasStructuredSteps: Bool
+    /// Concrete sport when the editor is opened for a known workout.
+    /// Nil for global templates and legacy generic quick-start entries.
+    var workoutActivity: ATHLTHCoachActivityFilter? = nil
 
     static let global = Self(
         isWorkoutSpecific: false,
@@ -69,8 +72,58 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
             hasZoneGoal: steps.contains {
                 $0.targetHeartRateZone != nil
             },
-            hasStructuredSteps: !steps.isEmpty
+            hasStructuredSteps: !steps.isEmpty,
+            workoutActivity: .running
         )
+    }
+
+    func supports(
+        _ trigger: ATHLTHAudioCoachRule.Trigger,
+        for activity: ATHLTHCoachActivityFilter
+    ) -> Bool {
+        guard supports(trigger) else { return false }
+
+        // A planned running workout cannot silently become a strength,
+        // cycling or swimming trigger. Intervals are a running sub-mode
+        // only when an actual structured recipe is present.
+        if let workoutActivity, isWorkoutSpecific,
+           activity != .all && activity != workoutActivity {
+            let isRunningInterval = activity == .intervals &&
+                workoutActivity == .running && hasStructuredSteps
+            guard isRunningInterval else { return false }
+        }
+
+        if activity == .intervals && !hasStructuredSteps &&
+            isWorkoutSpecific { return false }
+
+        switch activity {
+        case .strength, .functional:
+            switch trigger {
+            case .distance, .nearFinishDistance, .elevationGain,
+                 .uphillDetected, .slowerThanPreviousWorkout,
+                 .paceFasterOverall, .paceFasterLastKilometer,
+                 .paceFasterThanTarget, .paceSlowerThanTarget:
+                return false
+            default: return true
+            }
+        case .swimming:
+            switch trigger {
+            case .elevationGain, .uphillDetected,
+                 .slowerThanPreviousWorkout,
+                 .paceFasterOverall, .paceFasterLastKilometer,
+                 .paceFasterThanTarget, .paceSlowerThanTarget:
+                return false
+            default: return true
+            }
+        case .cycling:
+            return trigger != .slowerThanPreviousWorkout &&
+                trigger != .paceFasterThanTarget &&
+                trigger != .paceSlowerThanTarget
+        case .walking:
+            return trigger != .slowerThanPreviousWorkout
+        case .all, .running, .intervals:
+            return true
+        }
     }
 
     func supports(_ trigger: ATHLTHAudioCoachRule.Trigger) -> Bool {
