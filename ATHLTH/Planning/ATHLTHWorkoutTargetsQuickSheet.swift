@@ -10,6 +10,13 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
     private let bronze = ATHLTHTrainDesign.bronze
     private let ink = ATHLTHPlanDesign.ink
 
+    private var treadmillSelected: Bool {
+        blocks.contains {
+            $0.kind == .run && $0.isIndoor == true &&
+                $0.treadmillInclinePercent != nil
+        }
+    }
+
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
@@ -59,19 +66,38 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
         )
     }
 
+    private func speedValue(recovery: Bool) -> Binding<Double> {
+        Binding(
+            get: {
+                let seconds = paceValue(recovery: recovery).wrappedValue
+                return 3_600.0 / Double(max(120, seconds))
+            },
+            set: { speed in
+                guard speed.isFinite, (3...25).contains(speed) else { return }
+                for index in blocks.indices where
+                    isTarget(blocks[index], recovery: recovery) {
+                    blocks[index].targetPaceSecondsPerKilometer = 3_600.0 / speed
+                }
+            }
+        )
+    }
+
     private func zoneValue(recovery: Bool) -> Binding<Int> {
         Binding(
             get: {
-                ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(
-                    for: matchingBlocks(recovery: recovery)
-                )?.lowerBound ?? 0
+                guard let range = ATHLTHPlannedWorkoutMetrics
+                    .plannedHeartRateZoneRange(
+                        for: matchingBlocks(recovery: recovery)
+                    ) else { return 0 }
+                return range == 4...5 ? 45 : range.lowerBound
             },
             set: { zone in
                 for index in blocks.indices where
                     isTarget(blocks[index], recovery: recovery) {
                     blocks[index].targetHeartRateZone =
                         (1...5).contains(zone) ? zone : nil
-                    blocks[index].sourceIntensityZoneLabel = nil
+                    blocks[index].sourceIntensityZoneLabel =
+                        zone == 45 ? "Z4–Z5" : nil
                     blocks[index].targetHeartRatePercentMin = nil
                     blocks[index].targetHeartRatePercentMax = nil
                 }
@@ -166,6 +192,7 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
                         Text((ATHLTHLocalization.isNorwegian ? "S" : "Z") +
                              "\(zone)").tag(zone)
                     }
+                    Text(tr("Z4–Z5", "S4–S5")).tag(45)
                 }
                 .pickerStyle(.menu)
                 .tint(bronze)
@@ -181,18 +208,34 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
 
             if paceEnabled(recovery: recovery).wrappedValue {
                 VStack(alignment: .leading, spacing: 7) {
-                    Stepper(value: pace, in: 120...960, step: 5) {
+                    if treadmillSelected {
+                        Stepper(value: speedValue(recovery: recovery),
+                                in: 3...25, step: 0.1) {
+                            Text(speedValue(recovery: recovery).wrappedValue
+                                .formatted(.number.precision(.fractionLength(1))) +
+                                (ATHLTHLocalization.isNorwegian ? " km/t" : " km/h"))
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(ink)
+                        }
                         Text(String(format: "%d:%02d min/km",
                                     pace.wrappedValue / 60,
                                     pace.wrappedValue % 60))
-                            .font(.headline.monospacedDigit())
-                            .foregroundStyle(ink)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    } else {
+                        Stepper(value: pace, in: 120...960, step: 1) {
+                            Text(String(format: "%d:%02d min/km",
+                                        pace.wrappedValue / 60,
+                                        pace.wrappedValue % 60))
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(ink)
+                        }
+                        Text((3_600.0 / Double(max(120, pace.wrappedValue)))
+                            .formatted(.number.precision(.fractionLength(1))) +
+                            (ATHLTHLocalization.isNorwegian ? " km/t" : " km/h"))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
-                    Text((3_600.0 / Double(max(120, pace.wrappedValue)))
-                        .formatted(.number.precision(.fractionLength(1))) +
-                        (ATHLTHLocalization.isNorwegian ? " km/t" : " km/h"))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
             }
         }
@@ -214,7 +257,8 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 16) {
                                 ATHLTHPlannedIntensityEditor(block: $blocks[index])
-                                if blocks[index].kind == .run {
+                                if blocks[index].kind == .run ||
+                                   blocks[index].isRestOrActiveRecovery {
                                     ATHLTHPlannedRunStepEditor(block: $blocks[index])
                                 }
                             }
