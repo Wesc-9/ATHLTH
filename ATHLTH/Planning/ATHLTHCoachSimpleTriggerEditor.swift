@@ -9,6 +9,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     @Binding var phases: [ATHLTHCoachWorkoutPhase]?
     let supportsStructured: Bool
     var triggerAvailability: ATHLTHCoachTriggerAvailability = .global
+    @Binding var activityFilter: ATHLTHCoachActivityFilter
     var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @Binding var historicalWorkoutID: UUID?
 
@@ -120,19 +121,23 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     }
 
     private func familyAvailable(_ item: Family) -> Bool {
+        let available: (ATHLTHAudioCoachRule.Trigger) -> Bool = {
+            triggerAvailability.supports($0, for: activityFilter)
+        }
         switch item {
-        case .distance: return triggerAvailability.supports(.distance)
-        case .time, .section, .heartZone, .motivation: return true
-        case .step: return supportsStructured &&
-            triggerAvailability.supports(.stepStart)
-        case .pause: return supportsStructured &&
-            triggerAvailability.supports(.recoveryStart)
-        case .finish: return triggerAvailability.supports(.nearFinishTime) ||
-            triggerAvailability.supports(.nearFinishDistance)
-        case .elevation: return triggerAvailability.supports(.elevationGain)
-        case .pace: return triggerAvailability.supports(.paceSlowerThanTarget)
+        case .distance: return available(.distance)
+        case .time: return available(.time)
+        case .section: return available(.workoutStart)
+        case .heartZone: return available(.heartRateAbove)
+        case .motivation: return available(.randomMotivation)
+        case .step: return supportsStructured && available(.stepStart)
+        case .pause: return supportsStructured && available(.recoveryStart)
+        case .finish: return available(.nearFinishTime) ||
+            available(.nearFinishDistance)
+        case .elevation: return available(.elevationGain)
+        case .pace: return available(.paceSlowerThanTarget)
         case .history: return !historicalReferences.isEmpty &&
-            triggerAvailability.supports(.slowerThanPreviousWorkout)
+            available(.slowerThanPreviousWorkout)
         }
     }
 
@@ -160,7 +165,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         title: String? = nil,
         enabled: Bool = true
     ) -> some View {
-        let isAvailable = enabled && triggerAvailability.supports(item)
+        let isAvailable = enabled &&
+            triggerAvailability.supports(item, for: activityFilter)
         return Button {
             guard isAvailable else { return }
             trigger = item
@@ -186,6 +192,38 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
+            Text(tr("WORKOUT MODE", "TRENINGSFORM"))
+                .font(.caption2.weight(.bold))
+                .tracking(1.4)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Picker(tr("Applies to", "Gjelder for"), selection: $activityFilter) {
+                ForEach(ATHLTHCoachActivityFilter.allCases) { activity in
+                    Text(activity.title).tag(activity)
+                        .disabled(
+                            triggerAvailability.isWorkoutSpecific &&
+                            triggerAvailability.workoutActivity != nil &&
+                            activity != .all &&
+                            activity != triggerAvailability.workoutActivity &&
+                            !(activity == .intervals &&
+                              triggerAvailability.workoutActivity == .running &&
+                              supportsStructured)
+                        )
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(.white, in: RoundedRectangle(cornerRadius: 14))
+            .onChange(of: activityFilter) { _, next in
+                if !triggerAvailability.supports(trigger, for: next) {
+                    // An incompatible trigger must not remain selected or
+                    // survive a save while its new sport lacks that metric.
+                    trigger = .time
+                    interval = 60
+                }
+            }
+
             Text(tr("CHOOSE TRIGGER", "VELG TRIGGER"))
                 .font(.caption2.weight(.bold))
                 .tracking(1.5)
