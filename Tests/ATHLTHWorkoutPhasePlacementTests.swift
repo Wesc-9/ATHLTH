@@ -366,4 +366,51 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
         ), [.recovery, .main])
     }
 
+    func testFourByFourStepGuidanceDescribesCorrectRoundAndZone() {
+        let group = UUID()
+        var source: [WorkoutTemplateBlock] = []
+        for round in 1...4 {
+            var effort = block("Intervall", phase: .main, group: group)
+            effort.kind = .run
+            effort.groupKind = .intervals
+            effort.groupRounds = 1
+            effort.durationSeconds = 240
+            effort.targetPaceSecondsPerKilometer = 240
+            source.append(effort)
+            if round < 4 {
+                var rest = block("Aktiv pause", phase: .recovery, group: group)
+                rest.kind = .run
+                rest.activityTag = "active_recovery"
+                rest.cardioActivity = .running
+                rest.groupKind = .intervals
+                rest.groupRounds = 1
+                rest.durationSeconds = 120
+                rest.targetHeartRateZone = 1
+                rest.targetPaceSecondsPerKilometer = 600
+                source.append(rest)
+            }
+        }
+        let effort = ATHLTHWorkoutStepGuidance.detail(
+            for: source[2], in: source
+        )
+        XCTAssertTrue(effort.context.contains("2"))
+        XCTAssertTrue(effort.context.contains("4"))
+        XCTAssertTrue(effort.instructions.contains(
+            ATHLTHLocalization.isNorwegian ? "4 min" : "4 min"
+        ))
+        XCTAssertNotNil(effort.zone)
+
+        let recovery = ATHLTHWorkoutStepGuidance.detail(
+            for: source[3], in: source
+        )
+        XCTAssertTrue(recovery.context.contains("2"))
+        XCTAssertTrue(recovery.context.contains("4"))
+        XCTAssertTrue(recovery.instructions.contains(
+            ATHLTHLocalization.isNorwegian ? "pausefart" : "recovery speed"
+        ))
+        XCTAssertNotNil(recovery.zone)
+        XCTAssertEqual(source.map(\.durationSeconds),
+                       [240, 120, 240, 120, 240, 120, 240])
+    }
+
 }
