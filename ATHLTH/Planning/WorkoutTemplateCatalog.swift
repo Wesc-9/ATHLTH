@@ -1082,7 +1082,31 @@ enum ATHLTHWorkoutAlphabetPage {
 }
 
 enum ATHLTHWorkoutLibraryActivityScope: String {
-    case all, runningOnly, other
+    case all, runningOnly, other, strengthOnly, nonStrength
+
+    static func primary(for activity: ATHLTHPlannedWorkoutType?) -> Self {
+        switch activity {
+        case .running, .walking: return .runningOnly
+        case .strength: return .strengthOnly
+        default: return .all
+        }
+    }
+
+    static func additional(for activity: ATHLTHPlannedWorkoutType?) -> Self {
+        activity == .strength ? .nonStrength : .other
+    }
+
+    var includesRunningTemplates: Bool {
+        self == .all || self == .runningOnly || self == .nonStrength
+    }
+
+    var initialCategory: ATHLTHPlannedWorkoutType? {
+        switch self {
+        case .runningOnly: return .running
+        case .strengthOnly: return .strength
+        default: return nil
+        }
+    }
 
     static func isPureRunning(_ blocks: [WorkoutTemplateBlock], declaredRunning: Bool) -> Bool {
         declaredRunning && !blocks.contains {
@@ -1095,6 +1119,10 @@ enum ATHLTHWorkoutLibraryActivityScope: String {
 
     func includes(_ workout: PlannedSession) -> Bool {
         guard self != .all else { return true }
+        if self == .strengthOnly || self == .nonStrength {
+            let strength = ATHLTHPlannedWorkoutType.strength.matches(workout)
+            return self == .strengthOnly ? strength : !strength
+        }
         let pure = Self.isPureRunning(ATHLTHUnifiedWorkout.editorBlocks(from: workout),
                                     declaredRunning: ATHLTHPlannedWorkoutType.running.matches(workout))
         return self == .runningOnly ? pure : !pure
@@ -1102,6 +1130,10 @@ enum ATHLTHWorkoutLibraryActivityScope: String {
 
     func includes(_ entry: WorkoutTemplateCatalogEntry) -> Bool {
         guard self != .all else { return true }
+        if self == .strengthOnly || self == .nonStrength {
+            let strength = ATHLTHPlannedWorkoutType.strength.matches(entry)
+            return self == .strengthOnly ? strength : !strength
+        }
         let pure = Self.isPureRunning(entry.blocks, declaredRunning: ATHLTHPlannedWorkoutType.running.matches(entry))
         return self == .runningOnly ? pure : !pure
     }
@@ -1647,7 +1679,7 @@ struct WorkoutTemplateLibraryView: View {
     /// Built-in running workouts share the same search, category and favorite
     /// filters as catalog workouts, without creating another library section.
     private var filteredRunningTemplates: [RunningWorkoutTemplate] {
-        guard activityScope != .other,
+        guard activityScope.includesRunningTemplates,
               (selectedCategory == "All" || selectedCategory == "Running") &&
                 selectedMuscleFocus == "all" && selectedWorkoutLevel == "all"
         else { return [] }
@@ -5465,7 +5497,7 @@ struct WorkoutTemplateBuilderView: View {
     /// may offer them after a strength station exists, but an explicit
     /// running/walking/cycling/wellness editor can never create them.
     private var allowsMixedRunningContent: Bool {
-        isPlannedWorkout && studioAdvanced && initialActivity == .running
+        isPlannedWorkout && (initialActivity == .running || initialActivity == .walking)
     }
 
     private var mayInsertStrengthModes: Bool {
@@ -6530,7 +6562,11 @@ struct WorkoutTemplateBuilderView: View {
                     if addingOtherRunningContent {
                         exerciseTargetGroupID = nil
                         pendingNewGroupKind = nil
-                        showingExercisePicker = true
+                        if initialActivity == .strength {
+                            showingRunningExercisePicker = true
+                        } else {
+                            showingExercisePicker = true
+                        }
                     } else {
                         openExercisePicker()
                     }
@@ -6544,7 +6580,8 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 } else if pendingSavedWorkoutPicker {
                     pendingSavedWorkoutPicker = false
-                    savedWorkoutActivityScope = addingOtherRunningContent ? .other : .all
+                    savedWorkoutActivityScope = addingOtherRunningContent
+                        ? .additional(for: initialActivity) : .primary(for: initialActivity)
                     showingSavedWorkoutPicker = true
                 }
                 addingOtherRunningContent = false
@@ -6566,8 +6603,8 @@ struct WorkoutTemplateBuilderView: View {
                             WorkoutTemplateLibraryView(
                                 onSelectPlanned: { workout in
                                     showingSavedWorkoutPicker = false
-                                    let scope = savedWorkoutActivityScope == .all && initialActivity == .running
-                                        ? ATHLTHWorkoutLibraryActivityScope.runningOnly : savedWorkoutActivityScope
+                                    let scope = savedWorkoutActivityScope == .all
+                                        ? ATHLTHWorkoutLibraryActivityScope.primary(for: initialActivity) : savedWorkoutActivityScope
                                     guard scope.includes(workout) else {
                                         actionNotice = tr("Choose a workout matching this activity.", "Velg en økt som passer treningsformen.")
                                         return
@@ -6585,8 +6622,9 @@ struct WorkoutTemplateBuilderView: View {
                                         if wasBlank && !blocks.isEmpty { title = workout.title }
                                     }
                                 },
-                                initialCategory: savedWorkoutActivityScope == .other ? nil : initialActivity,
-                                activityScope: savedWorkoutActivityScope == .all && initialActivity == .running ? .runningOnly : savedWorkoutActivityScope
+                                initialCategory: savedWorkoutActivityScope.initialCategory ??
+                                    (savedWorkoutActivityScope == .all ? initialActivity : nil),
+                                activityScope: savedWorkoutActivityScope == .all ? .primary(for: initialActivity) : savedWorkoutActivityScope
                             )
                             .navigationTitle(tr("Add workout", "Legg til treningsøkt"))
                             .navigationBarTitleDisplayMode(.inline)
@@ -7603,15 +7641,11 @@ struct WorkoutTemplateBuilderView: View {
             onAddRun: { phase in
                 selectedPhase = phase
                 switch initialActivity {
-                case .running:
+                case .running, .walking, .strength:
                     var block = ATHLTHBasicFreeRunPolicy.makeOpenRunningBlock()
                     block.phase = phase
                     insertBlock(block, toGroup: nil)
                     synchronizeRunningEnvironment()
-                case .strength:
-                    openExercisePicker()
-                case .walking:
-                    addRunBlock(activity: .walking)
                 case .cycling:
                     addCyclingBlock()
                 case .mobility:
@@ -7642,6 +7676,10 @@ struct WorkoutTemplateBuilderView: View {
                    ) {
                     blocks = individual
                 }
+            },
+            onAddRunningPreset: { phase, preset in
+                selectedPhase = phase
+                appendRunningExerciseBlocks(ATHLTHIntervalRecipeEditing.forEditing(preset.blocks(in: phase)))
             },
             onAddExercise: { phase in
                 selectedPhase = phase
@@ -7775,11 +7813,11 @@ struct WorkoutTemplateBuilderView: View {
             },
             onAddWorkout: { phase in
                 selectedPhase = phase
-                savedWorkoutActivityScope = initialActivity == .running ? .runningOnly : .all
+                savedWorkoutActivityScope = .primary(for: initialActivity)
                 showingSavedWorkoutPicker = true
             },
             onChooseLibraryWorkout: {
-                savedWorkoutActivityScope = initialActivity == .running ? .runningOnly : .all
+                savedWorkoutActivityScope = .primary(for: initialActivity)
                 // Reuse the existing ATHLTH / Mine workout selection, not a
                 // file picker or a second workout engine.
                 showingSavedWorkoutPicker = true
@@ -9017,7 +9055,7 @@ struct WorkoutTemplateBuilderView: View {
                             showingBlockPicker = false
                         }
                         Divider().padding(.vertical, 10)
-                        pickerRow(addingOtherRunningContent ? tr("Strength exercise", "Styrkeøvelse") : tr("Exercise", "Øvelse"), icon: "dumbbell.fill") {
+                        pickerRow(addingOtherRunningContent ? (initialActivity == .strength ? tr("Running exercise", "Løpeøvelse") : tr("Strength exercise", "Styrkeøvelse")) : tr("Exercise", "Øvelse"), icon: "dumbbell.fill") {
                             pendingStandaloneExercise = true
                             showingBlockPicker = false
                         }
@@ -9031,13 +9069,13 @@ struct WorkoutTemplateBuilderView: View {
                                 createIntervals()
                                 showingBlockPicker = false
                             }
-                        } else {
+                        } else if initialActivity != .strength {
                             pickerRow(tr("Free strength training", "Fri styrketrening"), icon: "dumbbell") {
                                 addFreeStrengthBlock(in: selectedPhase)
                                 showingBlockPicker = false
                             }
                         }
-                        if mayInsertStrengthModes {
+                        if mayInsertStrengthModes && !(addingOtherRunningContent && initialActivity == .strength) {
                             ForEach([
                                 WorkoutBlockGroupKind.superset, .circuit,
                                 .emom, .amrap, .dropSet
@@ -9051,6 +9089,12 @@ struct WorkoutTemplateBuilderView: View {
                         if !addingOtherRunningContent {
                             pickerRow(tr("Rest", "Pause"), icon: "pause.fill") {
                                 addRestBlock()
+                                showingBlockPicker = false
+                            }
+                        }
+                        if addingOtherRunningContent && initialActivity == .strength {
+                            pickerRow(tr("Running intervals", "Løpeintervall"), icon: "repeat") {
+                                createIntervals()
                                 showingBlockPicker = false
                             }
                         }
@@ -9240,7 +9284,7 @@ struct WorkoutTemplateBuilderView: View {
         case "meditation": addWellnessBlock(.meditation)
         case "exercise": openExercisePicker()
         case "workout":
-            savedWorkoutActivityScope = initialActivity == .running ? .runningOnly : .all
+            savedWorkoutActivityScope = .primary(for: initialActivity)
             showingSavedWorkoutPicker = true
         case "interval": createIntervals()
         case "superset": createSuperset()
@@ -9475,7 +9519,7 @@ struct WorkoutTemplateBuilderView: View {
         exerciseTargetGroupID = groupID
         pendingNewGroupKind = nil
         // A running workout must never open the strength/equipment catalog.
-        if initialActivity == .running {
+        if groupID == nil && (initialActivity == .running || initialActivity == .walking) {
             showingRunningExercisePicker = true
         } else {
             showingExercisePicker = true

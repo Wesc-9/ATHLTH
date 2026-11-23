@@ -23,6 +23,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddRun: (WorkoutPhaseKind) -> Void
     let onAddWalk: (WorkoutPhaseKind) -> Void
     let onAddIntervals: (WorkoutPhaseKind) -> Void
+    var onAddRunningPreset: (WorkoutPhaseKind, ATHLTHRunningExercisePreset) -> Void = { _, _ in }
     let onAddExercise: (WorkoutPhaseKind) -> Void
     let onAddFreeStrength: (WorkoutPhaseKind) -> Void
     let onAddSuperset: (WorkoutPhaseKind) -> Void
@@ -65,6 +66,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @State private var draggingID: UUID?
     @State private var addSheetPhase: WorkoutPhaseKind?
     @State private var queuedAddAction: AddSheetAction?
+    @State private var addPage: AddPage = .root
+
+    private enum AddPage { case root, freeCardio, recovery, runningMode, strengthMode }
+    private var usesActivityActions: Bool {
+        activity == .running || activity == .walking || activity == .strength
+    }
 
     private enum AddSheetAction {
         case run(WorkoutPhaseKind)
@@ -76,6 +83,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         case strengthMode(WorkoutPhaseKind, WorkoutBlockGroupKind)
         case workout(WorkoutPhaseKind)
         case intervals(WorkoutPhaseKind)
+        case runningPreset(WorkoutPhaseKind, ATHLTHRunningExercisePreset)
         case rest(WorkoutPhaseKind)
         case activeRest(WorkoutPhaseKind)
         case route(WorkoutPhaseKind)
@@ -199,8 +207,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    if activity == .running {
-                        runningEmptyActions
+                    if usesActivityActions {
+                        activityEmptyActions
                     } else {
                     // All three starting points have the same visual
                     // priority. Reuse the existing picker and add callbacks.
@@ -262,11 +270,18 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         // live workout/settings data updates the parent. A persistent sheet
         // owns scrolling independently of those updates and keeps the same
         // underlying add callbacks, with no duplicated workout engine.
-        .sheet(item: $addSheetPhase, onDismiss: performQueuedAddAction) { phase in
+        .sheet(item: $addSheetPhase, onDismiss: {
+            addPage = .root
+            performQueuedAddAction()
+        }) { phase in
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        addSheetOptions(for: phase)
+                        if addPage == .root {
+                            addSheetOptions(for: phase)
+                        } else {
+                            addSubpage(for: phase)
+                        }
                     }
                     .padding(17)
                     .frame(maxWidth: 560)
@@ -274,10 +289,18 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 }
                 .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
                 .navigationTitle(ATHLTHLocalization.choose(
-                    english: "Add to workout", norwegian: "Legg til i økten"
+                    english: addPage == .runningMode ? "Running mode" : addPage == .strengthMode ? "Strength mode" : addPage == .recovery ? "Recovery" : addPage == .freeCardio ? "Free walking or running" : "Add to workout",
+                    norwegian: addPage == .runningMode ? "Løpemodus" : addPage == .strengthMode ? "Styrkemodus" : addPage == .recovery ? "Pause" : addPage == .freeCardio ? "Fri gå eller løping" : "Legg til i økten"
                 ))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        if addPage != .root {
+                            Button(ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")) {
+                                addPage = .root
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button(ATHLTHLocalization.choose(
                             english: "Close", norwegian: "Lukk"
@@ -495,7 +518,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     @ViewBuilder
     private func simplePhaseAddMenu(_ phase: WorkoutPhaseKind) -> some View {
-        if activity == .running {
+        if usesActivityActions {
             addContentMenu(phase)
         } else {
         Menu {
@@ -557,27 +580,46 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     /// Compact, equal-priority actions in the empty workout builder.
     /// A shared capsule style prevents the library action from dominating
     /// the exercise and route actions on narrow iPhone displays.
-    private var runningEmptyActions: some View {
+    private func openAddPage(_ page: AddPage, phase: WorkoutPhaseKind) {
+        addPage = page
+        addSheetPhase = phase
+    }
+
+    private var activityEmptyActions: some View {
         VStack(spacing: 8) {
             HStack(spacing: 7) {
-                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"),
-                    symbol: "figure.walk", identifier: "athlth-workout-add-free-walk") { onAddWalk(.main) }
-                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
-                    symbol: "figure.run", identifier: "athlth-workout-add-free-run") { onAddRun(.main) }
+                if activity == .strength {
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Free strength", norwegian: "Fri styrke"),
+                        symbol: "dumbbell", identifier: "athlth-workout-add-free-strength") { onAddFreeStrength(.main) }
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Walk / run", norwegian: "Gå / løping"),
+                        symbol: "figure.walk", identifier: "athlth-workout-add-free-cardio") { openAddPage(.freeCardio, phase: .main) }
+                } else {
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"),
+                        symbol: "figure.walk", identifier: "athlth-workout-add-free-walk") { onAddWalk(.main) }
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
+                        symbol: "figure.run", identifier: "athlth-workout-add-free-run") { onAddRun(.main) }
+                }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
-                    symbol: "plus", identifier: "athlth-workout-add-exercise") { onAddExercise(.main) }
+                    symbol: activity == .strength ? "dumbbell" : "plus", identifier: "athlth-workout-add-exercise") { onAddExercise(.main) }
             }
             HStack(spacing: 7) {
-                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
-                    symbol: "map", identifier: "athlth-workout-add-route") { onSelectRoute(.main) }
+                if activity == .strength {
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Strength mode", norwegian: "Styrkemodus"),
+                        symbol: "square.stack.3d.up", identifier: "athlth-workout-add-strength-mode") { openAddPage(.strengthMode, phase: .main) }
+                } else {
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                        symbol: "map", identifier: "athlth-workout-add-route") { onSelectRoute(.main) }
+                }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"),
                     symbol: "books.vertical", identifier: "athlth-workout-choose-from-library") { onAddWorkout(.main) }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
-                    symbol: "pause", identifier: "athlth-workout-add-rest") { onAddRest(.main) }
+                    symbol: "pause", identifier: "athlth-workout-add-rest") { openAddPage(.recovery, phase: .main) }
             }
             HStack(spacing: 7) {
-                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Active rest", norwegian: "Aktiv pause"),
-                    symbol: "figure.walk", identifier: "athlth-workout-add-active-rest") { onAddActiveRest(.main) }
+                if activity != .strength {
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running mode", norwegian: "Løpemodus"),
+                        symbol: "timer", identifier: "athlth-workout-add-running-mode") { openAddPage(.runningMode, phase: .main) }
+                }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Add other", norwegian: "Legg til annet"),
                     symbol: "square.grid.2x2", identifier: "athlth-workout-add-other") { onAddOther(.main) }
             }
@@ -1401,11 +1443,11 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     private func addContentMenu(_ phase: WorkoutPhaseKind) -> some View {
         Button {
-            addSheetPhase = phase
+            openAddPage(.root, phase: phase)
         } label: {
             Label(ATHLTHLocalization.choose(
-                english: activity == .running ? "Add content" : "Add exercise, workout or route",
-                norwegian: activity == .running ? "Legg til innhold" : "Legg til øvelse, økt eller rute"
+                english: usesActivityActions ? "Add content" : "Add exercise, workout or route",
+                norwegian: usesActivityActions ? "Legg til innhold" : "Legg til øvelse, økt eller rute"
             ), systemImage: "plus")
             .font(.subheadline.weight(.medium))
             .foregroundStyle(bronze)
@@ -1419,24 +1461,27 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     @ViewBuilder
     private func addSheetOptions(for phase: WorkoutPhaseKind) -> some View {
-        if activity == .running {
-            addSheetRow(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"),
-                        "figure.walk", action: .walk(phase))
-            addSheetRow(ATHLTHLocalization.choose(english: "Free running", norwegian: "Løping (friløp)"),
-                        "figure.run", action: .run(phase))
-            addSheetRow(ATHLTHLocalization.choose(english: "Running exercise", norwegian: "Øvelse"),
-                        "figure.run", action: .exercise(phase))
-            addSheetRow(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
-                        "map", action: .route(phase))
-            addSheetRow(ATHLTHLocalization.choose(english: "Running workout", norwegian: "Treningsøkt"),
-                        "books.vertical", action: .workout(phase))
-            addSheetRow(ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
-                        "pause", action: .rest(phase))
-            addSheetRow(ATHLTHLocalization.choose(english: "Active rest", norwegian: "Aktiv pause"),
-                        "figure.walk", action: .activeRest(phase))
+        if usesActivityActions {
+            if activity == .strength {
+                addSheetRow(ATHLTHLocalization.choose(english: "Free strength", norwegian: "Fri styrkeøkt"), "dumbbell", action: .freeStrength(phase))
+                addPageRow(ATHLTHLocalization.choose(english: "Walk / run", norwegian: "Gå / løping"), "figure.walk", page: .freeCardio)
+            } else {
+                addSheetRow(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"), "figure.walk", action: .walk(phase))
+                addSheetRow(ATHLTHLocalization.choose(english: "Free running", norwegian: "Løping (friløp)"), "figure.run", action: .run(phase))
+            }
+            addSheetRow(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"), activity == .strength ? "dumbbell" : "figure.run", action: .exercise(phase))
+            if activity != .strength {
+                addSheetRow(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"), "map", action: .route(phase))
+            }
+            addSheetRow(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"), "books.vertical", action: .workout(phase))
+            addPageRow(ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"), "pause", page: .recovery)
+            if activity == .strength {
+                addPageRow(ATHLTHLocalization.choose(english: "Strength mode", norwegian: "Styrkemodus"), "square.stack.3d.up", page: .strengthMode)
+            } else {
+                addPageRow(ATHLTHLocalization.choose(english: "Running mode", norwegian: "Løpemodus"), "timer", page: .runningMode)
+            }
             Divider().padding(.vertical, 4)
-            addSheetRow(ATHLTHLocalization.choose(english: "Add other", norwegian: "Legg til annet"),
-                        "square.grid.2x2", action: .other(phase))
+            addSheetRow(ATHLTHLocalization.choose(english: "Add other", norwegian: "Legg til annet"), "square.grid.2x2", action: .other(phase))
         } else {
         if activity != .strength {
             addSheetRow(
@@ -1503,6 +1548,45 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
     }
 
+    @ViewBuilder
+    private func addSubpage(for phase: WorkoutPhaseKind) -> some View {
+        switch addPage {
+        case .root: EmptyView()
+        case .freeCardio:
+            addSheetRow(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Fri gå"), "figure.walk", action: .walk(phase))
+            addSheetRow(ATHLTHLocalization.choose(english: "Free running", norwegian: "Fri løping"), "figure.run", action: .run(phase))
+        case .recovery:
+            addSheetRow(ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"), "pause", action: .rest(phase))
+            addSheetRow(ATHLTHLocalization.choose(english: "Active rest", norwegian: "Aktiv pause"), "figure.walk", action: .activeRest(phase))
+        case .runningMode:
+            addSheetRow(ATHLTHLocalization.choose(english: "Custom intervals", norwegian: "Egendefinert intervall"), "repeat", action: .intervals(phase))
+            ForEach(ATHLTHRunningExercisePreset.allCases.filter { $0 != .running }) { preset in
+                addSheetRow(preset.title, "figure.run", action: .runningPreset(phase, preset))
+            }
+        case .strengthMode:
+            addSheetRow(WorkoutBlockGroupKind.superset.title, WorkoutBlockGroupKind.superset.symbol, action: .superset(phase))
+            addSheetRow(WorkoutBlockGroupKind.circuit.title, WorkoutBlockGroupKind.circuit.symbol, action: .circuit(phase))
+            ForEach([WorkoutBlockGroupKind.emom, .amrap, .dropSet], id: \.self) { kind in
+                addSheetRow(kind.title, kind.symbol, action: .strengthMode(phase, kind))
+            }
+        }
+    }
+
+    private func addPageRow(_ title: String, _ symbol: String, page: AddPage) -> some View {
+        Button { addPage = page } label: {
+            HStack(spacing: 13) {
+                Image(systemName: symbol).foregroundStyle(bronze).frame(width: 28)
+                Text(title).font(.subheadline.weight(.medium)).foregroundStyle(ink)
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(bronze)
+            }
+            .padding(.horizontal, 15)
+            .frame(minHeight: 53)
+            .background(paper, in: RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+    }
+
     private func addSheetRow(
         _ title: String,
         _ icon: String,
@@ -1545,6 +1629,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         case let .strengthMode(phase, kind): onAddStrengthMode(phase, kind)
         case .workout(let phase): onAddWorkout(phase)
         case .intervals(let phase): onAddIntervals(phase)
+        case .runningPreset(let phase, let preset): onAddRunningPreset(phase, preset)
         case .rest(let phase): onAddRest(phase)
         case .activeRest(let phase): onAddActiveRest(phase)
         case .route(let phase): onSelectRoute(phase)

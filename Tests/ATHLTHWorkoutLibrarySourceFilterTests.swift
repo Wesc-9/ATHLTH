@@ -2,6 +2,17 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHWorkoutLibrarySourceFilterTests: XCTestCase {
+    func testActivitySpecificAddScopes() {
+        XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.primary(for: .running), .runningOnly)
+        XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.primary(for: .walking), .runningOnly)
+        XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.primary(for: .strength), .strengthOnly)
+        XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.additional(for: .strength), .nonStrength)
+        XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.additional(for: .walking), .other)
+        XCTAssertTrue(ATHLTHWorkoutLibraryActivityScope.nonStrength.includesRunningTemplates)
+        XCTAssertFalse(ATHLTHWorkoutLibraryActivityScope.strengthOnly.includesRunningTemplates)
+        XCTAssertFalse(ATHLTHWorkoutLibraryActivityScope.other.includesRunningTemplates)
+    }
+
     func testFavoritesOnlyExcludesUnstarredWorkoutsFromEverySource() {
         let filter = ATHLTHWorkoutLibrarySourceFilter(
             favoritesOnly: true, mineOnly: false
