@@ -34,7 +34,7 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
             from: workout, routeAlerts: .standard
         )
         XCTAssertEqual(transfer.intervalGhostConfiguration, ghost)
-        XCTAssertEqual(transfer.steps.first?.id, selectedID)
+        XCTAssertEqual(transfer.steps.first?.ghostSourceSegmentID, selectedID)
         let restored = try JSONDecoder().decode(
             WatchRunningWorkoutTransfer.self,
             from: JSONEncoder().encode(transfer)
