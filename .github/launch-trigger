@@ -19,3 +19,4 @@ validate-after-compile-fixes-launch-trigger
 
 HA full feature final smoke 2026-10-04
 ATHLTH 2.0.3 build 111 user-approved TestFlight release smoke 2026-10-28
+ATHLTH 2.3.0 P0 Home-to-Train crash regression smoke — issue #58 — commit 70746958
