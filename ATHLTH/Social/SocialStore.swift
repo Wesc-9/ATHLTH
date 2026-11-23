@@ -81,22 +81,29 @@ final class SocialStore: ObservableObject {
         let ordered = feed.sorted {
             $0.activity.createdAt > $1.activity.createdAt
         }
-        let visibleCreatorBySession: [UUID: UUID] = Dictionary(
-            uniqueKeysWithValues: workoutSessions.compactMap { session in
-                guard ordered.contains(where: {
-                    $0.activity.workoutSessionID == session.id &&
-                    $0.activity.actorID == session.creatorID
-                }) else { return nil }
-                return (session.id, session.creatorID)
+        // Home can recompute this property while scrolling. Index creators
+        // once instead of searching the full feed for every shared session
+        // (O(sessions + feed) rather than O(sessions * feed)).
+        var creators: [UUID: UUID] = [:]
+        creators.reserveCapacity(workoutSessions.count)
+        for session in workoutSessions {
+            creators[session.id] = session.creatorID
+        }
+        let creatorPosts = Set(ordered.compactMap { item -> UUID? in
+            guard item.activity.kind == "workout",
+                  let sessionID = item.activity.workoutSessionID,
+                  item.activity.actorID == creators[sessionID] else {
+                return nil
             }
-        )
+            return sessionID
+        })
         var seenSessions = Set<UUID>()
         return ordered.filter { item in
             guard item.activity.kind == "workout",
                   let sessionID = item.activity.workoutSessionID
             else { return true }
-            if let creatorID = visibleCreatorBySession[sessionID],
-               item.activity.actorID != creatorID {
+            if creatorPosts.contains(sessionID),
+               item.activity.actorID != creators[sessionID] {
                 return false
             }
             return seenSessions.insert(sessionID).inserted
