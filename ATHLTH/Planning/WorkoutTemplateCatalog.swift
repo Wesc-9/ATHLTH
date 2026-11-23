@@ -6024,6 +6024,7 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: studioBasicRunMode) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGoalSelected) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGhostSelected) { _, _ in persistWorkoutDraft() }
+            .onChange(of: intervalGhostConfiguration) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGoalKind) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGoalDistance) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicGoalMinutes) { _, _ in persistWorkoutDraft() }
@@ -6489,7 +6490,18 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 case .ghostRace:
                     NavigationStack {
-                        PerWorkoutGhostView(draft: $ghostDraft, route: activeRoute)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 16) {
+                                PerWorkoutGhostView(draft: $ghostDraft, route: activeRoute)
+                                if initialActivity == .running {
+                                    ATHLTHIntervalGhostSettingsView(
+                                        configuration: $intervalGhostConfiguration,
+                                        blocks: blocks
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                        }
                             .toolbar {
                                 ToolbarItem(placement: .confirmationAction) {
                                     Button(tr("Done", "Ferdig")) {
