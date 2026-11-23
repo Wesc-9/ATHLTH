@@ -6623,13 +6623,21 @@ struct ATHLTHTrainView: View {
                 restoreDelayedPlanStartIfNeeded()
             }
             .onChange(of: selectedSection) { _, section in
-                persistedTrainSectionAccount = session.profile.userID.uuidString
+                let account = session.profile.userID.uuidString
+                if persistedTrainSectionAccount != account {
+                    persistedTrainSectionAccount = account
+                }
+                let key: String
                 switch section {
-                case .today:
-                    persistedTrainSection = "today"
+                case .today: key = "today"
+                case .plan: key = "plan"
+                case .progress: key = "progress"
+                }
+                if persistedTrainSection != key {
+                    persistedTrainSection = key
+                }
+                if section == .today {
                     scheduleTrainDailyRecommendationRefresh()
-                case .plan: persistedTrainSection = "plan"
-                case .progress: persistedTrainSection = "progress"
                 }
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
@@ -7461,14 +7469,23 @@ struct ATHLTHTrainView: View {
             persistedAccountID: persistedTrainSectionAccount,
             currentAccountID: userID
         )
-        // Bind the owner before changing the selected SwiftUI state.
-        persistedTrainSectionAccount = userID.uuidString
-        persistedTrainSection = section
+        // Avoid publishing redundant SceneStorage and State mutations
+        // during the initial Home -> Train AttributeGraph evaluation.
+        if persistedTrainSectionAccount != userID.uuidString {
+            persistedTrainSectionAccount = userID.uuidString
+        }
+        if persistedTrainSection != section {
+            persistedTrainSection = section
+        }
         restoredTrainSectionAccount = userID
+        let destination: ATHLTHTrainSection
         switch section {
-        case "plan": selectedSection = .plan
-        case "progress": selectedSection = .progress
-        default: selectedSection = .today
+        case "plan": destination = .plan
+        case "progress": destination = .progress
+        default: destination = .today
+        }
+        if selectedSection != destination {
+            selectedSection = destination
         }
     }
 
