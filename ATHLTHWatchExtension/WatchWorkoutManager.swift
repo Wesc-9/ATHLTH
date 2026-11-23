@@ -3443,7 +3443,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         case "warmup": kind = .warmup
         case "cooldown": kind = .cooldown
         case "recovery":
-            kind = step.recoveryStyle == .active ? .activeRecovery : .passiveRecovery
+            kind = step.ghostFollowsRecovery == true
+                ? .activeRecovery : .passiveRecovery
         default: kind = .work
         }
         let segmentID = step.id
