@@ -115,6 +115,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
                     identity
                         .padding(.top, 4)
 
+                    TrainTogetherStatusStrip()
+
                     if wide {
                         HStack(alignment: .top, spacing: 20) {
                             VStack(spacing: 20) {

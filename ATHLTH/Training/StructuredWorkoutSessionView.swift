@@ -225,6 +225,7 @@ struct StructuredWorkoutSessionView: View {
     let workout: PlannedSession
     var linkedPlanID: UUID? = nil
 
+    @StateObject private var socialCompanion = SocialWorkoutCompanionStore()
     @State private var startedAt = Date()
     @State private var completionID = UUID()
     // Never replace an already recorded plan ID on app restoration.
@@ -321,6 +322,7 @@ struct StructuredWorkoutSessionView: View {
                         }
                     }
                     sessionHeader
+                    if !savedCompletion { TrainTogetherStatusStrip() }
                     if ATHLTHThreeMinuteAllOut.isRunningTest(
                         title: workout.title, blocks: workout.resolvedWorkoutBlocks
                     ) {
@@ -566,6 +568,17 @@ struct StructuredWorkoutSessionView: View {
                 guard !restoringCheckpoint else { return }
                 setupCurrentStep()
                 persistCheckpoint()
+            }
+            .task(id: social.recordingWorkoutSessionID) {
+                guard let sessionID = social.recordingWorkoutSessionID, let userID = social.currentUserID else { return }
+                while !Task.isCancelled && !savedCompletion {
+                    let work = blocks.filter { $0.kind != .rest && !$0.isActiveRecovery }
+                    let progress = SocialWorkoutProgress.counted(planned: work.map(\.id), completed: completedBlockIDs)
+                    await socialCompanion.publishProgress(sessionID: sessionID, userID: userID,
+                        displayName: session.profile.displayName, kind: workout.kind.rawValue,
+                        title: currentBlock?.title, progress: progress, elapsed: activeElapsed(at: Date()))
+                    do { try await Task.sleep(for: .seconds(3)) } catch { break }
+                }
             }
             .onChange(of: completedBlockIDs) { _, _ in
                 persistCheckpoint()

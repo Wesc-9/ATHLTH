@@ -88,10 +88,10 @@ struct ActiveStrengthWorkoutView: View {
                                 strength
                                     .currentExercise {
                         ScrollView {
-                            focusedStrengthContent(
-                                workout: workout,
-                                exercise: exercise
-                            )
+                            VStack(spacing: 12) {
+                                TrainTogetherStatusStrip()
+                                focusedStrengthContent(workout: workout, exercise: exercise)
+                            }
                             .frame(maxWidth: 720)
                             .frame(maxWidth: .infinity)
                             .padding(

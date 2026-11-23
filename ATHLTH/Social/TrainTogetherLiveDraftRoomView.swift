@@ -1053,7 +1053,7 @@ private struct TrainTogetherRoomMessageInsert: Encodable {
     }
 }
 
-private struct TrainTogetherRoomChat: View {
+struct TrainTogetherRoomChat: View {
     @Environment(\.scenePhase) private var scenePhase
     let sourceID: UUID
     let userID: UUID

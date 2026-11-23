@@ -1520,6 +1520,7 @@ struct IPhoneWorkoutView: View {
                         spacing: 13
                     ) {
                         premiumWorkoutHeader(workout)
+                        TrainTogetherStatusStrip()
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
@@ -2545,7 +2546,12 @@ struct IPhoneWorkoutView: View {
                             elapsed,
                         paceSecondsPerKilometer:
                             workout
-                                .currentPaceSecondsPerKilometer
+                                .currentPaceSecondsPerKilometer,
+                        progress: workout.structuredRunningWorkout.flatMap { plan in
+                            SocialWorkoutProgress.counted(
+                                planned: plan.steps.indices.filter { plan.steps[$0].phase != "recovery" && plan.steps[$0].phase != "rest" },
+                                completed: Set((workout.recordedRunningSteps ?? []).map(\.index)))
+                        }
                     )
 
                 try? await Task.sleep(

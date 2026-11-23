@@ -14,6 +14,7 @@ struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var socialCompanion = SocialWorkoutCompanionStore()
     @State private var showingTreadmillInclineEditor = false
     @State private var treadmillInclineDraft = 0.0
     @State private var coachOutputName: String?
@@ -215,6 +216,34 @@ struct MirroredWorkoutLiveView: View {
             updateRollingPace(with: snap)
         }
         .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
+        .task(id: social.recordingWorkoutSessionID) {
+            guard let sessionID = social.recordingWorkoutSessionID, let userID = social.currentUserID else { return }
+            while !Task.isCancelled {
+                if let snapshot = mirroring.snapshot, snapshot.accountOwnerID == userID,
+                   Date().timeIntervalSince(snapshot.capturedAt) < 20 {
+                    if snapshot.kind == .running || snapshot.kind == .walking {
+                        let progress = snapshot.runningStageSummaries.flatMap { stages in
+                            snapshot.socialCompletedRunningStepIndices.flatMap { done in
+                                SocialWorkoutProgress.counted(planned: stages.filter { $0.phase != "recovery" && $0.phase != "rest" }.map(\.index), completed: Set(done))
+                            }
+                        }
+                        await socialCompanion.publishCardio(sessionID: sessionID, userID: userID,
+                            displayName: appSession.profile.displayName, walking: snapshot.kind == .walking,
+                            title: snapshot.runningStepTitle ?? snapshot.workoutDisplayTitle,
+                            distanceMeters: snapshot.distanceMeters, elapsedSeconds: snapshot.confirmedActiveDuration,
+                            paceSecondsPerKilometer: snapshot.currentPaceSecondsPerKilometer, progress: progress)
+                    } else if snapshot.kind == .strength, strength.activeWorkout == nil,
+                              let done = snapshot.socialCompletedStrengthExerciseCount,
+                              let total = snapshot.strengthExerciseCount, total > 0 {
+                        await socialCompanion.publishProgress(sessionID: sessionID, userID: userID,
+                            displayName: appSession.profile.displayName, kind: WorkoutKind.strength.rawValue,
+                            title: snapshot.strengthExerciseName, progress: SocialWorkoutProgress(completed: min(done,total), total: total),
+                            elapsed: snapshot.confirmedActiveDuration)
+                    }
+                }
+                do { try await Task.sleep(for: .seconds(3)) } catch { break }
+            }
+        }
         .task(
             id: mirroring.snapshot?
                 .capturedAt

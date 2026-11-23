@@ -2301,6 +2301,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepCount: Int? = nil
     /// Small full phase list for read-only iPad workouts.
     var runningStageSummaries: [ATHLTHWatchRunningStageSummary]? = nil
+    var socialCompletedRunningStepIndices: [Int]? = nil
+    var socialCompletedStrengthExerciseCount: Int? = nil
     /// Efforts only (not warm-up/recovery). Optional for older snapshots.
     var runningIntervalOrdinal: Int? = nil
     var runningIntervalTotal: Int? = nil

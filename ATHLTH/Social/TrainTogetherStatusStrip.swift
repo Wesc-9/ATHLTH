@@ -1,185 +1,172 @@
 import SwiftUI
 import Supabase
 
-struct TrainTogetherStatusStrip: View {
-    @EnvironmentObject private var social: SocialStore
-    @State private var showingCompanion = false
+struct SocialWorkoutProgress: Codable, Hashable {
+    let completed: Int
+    let total: Int
+    var fraction: Double { total > 0 ? Double(min(max(completed, 0), total)) / Double(total) : 0 }
 
-    private var sessionID: UUID? {
-        guard let joinedID = social.recordingWorkoutSessionID,
-              let userID = social.currentUserID,
-              social.workoutParticipants.contains(where: {
-                  $0.sessionID == joinedID &&
-                  $0.userID == userID &&
-                  $0.workoutStartedAt != nil
-              })
-        else {
-            return nil
-        }
-        return joinedID
+    static func counted<ID: Hashable>(planned: [ID], completed: Set<ID>) -> Self? {
+        let unique = Set(planned)
+        guard !unique.isEmpty else { return nil }
+        return Self(completed: unique.intersection(completed).count, total: unique.count)
     }
 
-    private var participants:
-        [SocialWorkoutParticipantRecord] {
-        guard let sessionID else {
-            return []
-        }
+    static func strength(_ exercises: [SocialWorkoutLiveExerciseSnapshot]) -> Self? {
+        guard !exercises.isEmpty else { return nil }
+        return Self(completed: exercises.filter { !$0.sets.isEmpty && $0.sets.allSatisfy(\.completed) }.count,
+                    total: exercises.count)
+    }
+}
 
-        return social.workoutParticipants
-            .filter {
-                $0.sessionID == sessionID &&
-                $0.state != .declined
+struct TrainTogetherStatusStrip: View {
+    @EnvironmentObject private var social: SocialStore
+    @StateObject private var companion = SocialWorkoutCompanionStore()
+    @State private var showingCompanion = false
+    @State private var showingChat = false
+    @State private var sharedSourceID: UUID?
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var sessionID: UUID? { social.recordingWorkoutSessionID }
+    private var participants: [SocialWorkoutParticipantRecord] {
+        guard let sessionID else { return [] }
+        return social.workoutParticipants.filter {
+            $0.sessionID == sessionID && ($0.state == .creator || $0.state == .accepted)
+        }.sorted { lhs, rhs in
+            if lhs.userID == social.currentUserID { return rhs.userID != lhs.userID }
+            if rhs.userID == social.currentUserID { return false }
+            return lhs.displayNameSnapshot.localizedCaseInsensitiveCompare(rhs.displayNameSnapshot) == .orderedAscending
+        }
+    }
+    private var partner: SocialWorkoutParticipantRecord? {
+        participants.first { $0.userID != social.currentUserID }
+    }
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+    private func progress(_ person: SocialWorkoutParticipantRecord) -> SocialWorkoutProgress? {
+        guard let state = companion.liveStates.first(where: { $0.userID == person.userID }) else { return nil }
+        return state.payload.progress ?? state.payload.exercises.flatMap(SocialWorkoutProgress.strength)
+    }
+    private func avatar(_ person: SocialWorkoutParticipantRecord, size: CGFloat) -> some View {
+        Group {
+            if let profile = social.profile(for: person.userID), profile.avatarURL != nil {
+                SocialAvatar(profile: profile, size: size)
+            } else {
+                Text(person.displayNameSnapshot.split(separator: " ").prefix(2).compactMap { $0.first }.map(String.init).joined().uppercased())
+                    .font(.system(size: size * 0.34, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: size, height: size)
+                    .background(ATHLTHTrainTogetherDesign.accentSoft, in: Circle())
             }
-            .sorted { lhs, rhs in
-                if lhs.state == .creator {
-                    return true
-                }
-                if rhs.state == .creator {
-                    return false
-                }
-                return lhs.displayNameSnapshot
-                    .localizedCaseInsensitiveCompare(
-                        rhs.displayNameSnapshot
-                    ) == .orderedAscending
-            }
+        }
+        .overlay { Circle().strokeBorder(person.userID == social.currentUserID ? ATHLTHTheme.accentDeep : Color.secondary.opacity(0.5), lineWidth: 1.5) }
+        .accessibilityLabel(person.displayNameSnapshot)
     }
 
     var body: some View {
-        if let sessionID,
-           participants.count > 1 {
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
+        if let sessionID, let partner, participants.count > 1 {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Training together",
-                            norwegian: "Trener sammen"
-                        ),
-                        systemImage: "person.3.fill"
-                    )
-                    .font(
-                        .caption.weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-
+                    Label(tr("Training together", "Trener sammen"), systemImage: "person.2.fill")
+                        .font(.caption.weight(.semibold)).foregroundStyle(ATHLTHTheme.accentDeep)
                     Spacer()
-
-                    Button {
-                        showingCompanion = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(
-                                systemName:
-                                    "bubble.left.and.bubble.right.fill"
-                            )
-                            Text(
-                                "\(participants.count)"
-                            )
-                            Image(
-                                systemName:
-                                    "chevron.right"
-                            )
-                            .font(.caption2)
-                        }
-                        .font(
-                            .caption2
-                                .weight(.bold)
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                ScrollView(
-                    .horizontal,
-                    showsIndicators: false
-                ) {
-                    HStack(spacing: 10) {
-                        ForEach(participants) {
-                            participant in
-                            HStack(spacing: 5) {
-                                Circle()
-                                    .fill(
-                                        statusColor(
-                                            participant
-                                        )
-                                    )
-                                    .frame(
-                                        width: 7,
-                                        height: 7
-                                    )
-
-                                Text(
-                                    participant
-                                        .displayNameSnapshot
-                                )
-                                .font(
-                                    .caption2
-                                        .weight(
-                                            .semibold
-                                        )
-                                )
-                                .lineLimit(1)
-
-                                Text(
-                                    statusText(
-                                        participant
-                                    )
-                                )
-                                .font(.caption2)
-                                .foregroundStyle(
-                                    .secondary
-                                )
+                    Button { showingCompanion = true } label: {
+                        Label(tr("Overview", "Oversikt"), systemImage: "list.bullet.rectangle")
+                            .font(.caption.weight(.medium))
+                    }.buttonStyle(.plain)
+                    Button { showingChat = true } label: {
+                        avatar(partner, size: 34)
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "bubble.left.fill").font(.system(size: 9))
+                                    .foregroundStyle(.white).padding(3)
+                                    .background(ATHLTHTheme.accentDeep, in: Circle())
                             }
-                            .padding(
-                                .horizontal,
-                                9
-                            )
-                            .padding(
-                                .vertical,
-                                6
-                            )
-                            .background(
-                                ATHLTHTrainTogetherDesign.accentSoft.opacity(0.62),
-                                in: Capsule()
-                            )
+                    }.buttonStyle(.plain).accessibilityLabel(tr("Open chat", "Åpne chat"))
+                }
+                if let total = participants.compactMap({ progress($0)?.total }).max(), total > 0 {
+                    GeometryReader { geometry in
+                        let width = max(0, geometry.size.width - 32)
+                        ZStack(alignment: .topLeading) {
+                            Capsule().fill(Color.secondary.opacity(0.19))
+                                .frame(width: width, height: 3).offset(x: 16, y: 12)
+                            ForEach(0...min(total, 40), id: \.self) { i in
+                                Rectangle().fill(Color.secondary.opacity(0.5)).frame(width: 1, height: 8)
+                                    .offset(x: 16 + width * CGFloat(i) / CGFloat(min(total, 40)), y: 10)
+                            }
+                            ForEach(Array(participants.enumerated()), id: \.element.id) { index, person in
+                                if let p = progress(person) {
+                                    Button {
+                                        if person.userID == social.currentUserID { showingCompanion = true }
+                                        else { showingChat = true }
+                                    } label: { avatar(person, size: 28) }
+                                    .buttonStyle(.plain)
+                                    .offset(x: 2 + width * CGFloat(p.fraction), y: CGFloat(index % 2) * 25)
+                                    .accessibilityLabel("\(person.displayNameSnapshot), \(p.completed)/\(p.total)")
+                                }
+                            }
+                        }
+                    }.frame(height: 54)
+                    HStack {
+                        Text(tr("Start", "Start"))
+                        Spacer()
+                        Text(tr("Finish", "Mål"))
+                    }.font(.caption2).foregroundStyle(.secondary)
+                }
+                ForEach(participants) { person in
+                    HStack(spacing: 6) {
+                        Text(person.userID == social.currentUserID ? tr("You", "Du") : person.displayNameSnapshot)
+                            .font(.caption2.weight(.semibold)).lineLimit(1)
+                        Spacer()
+                        if let p = progress(person) {
+                            Text("\(p.completed)/\(p.total) " + tr("completed", "fullført"))
+                                .font(.caption2.monospacedDigit())
+                        } else if let state = companion.liveStates.first(where: { $0.userID == person.userID }),
+                                  let elapsed = state.payload.elapsedSeconds, elapsed.isFinite {
+                            Text("\(Int(max(0, elapsed) / 60)) min" + (state.payload.distanceMeters.map { String(format: " · %.2f km", $0 / 1000) } ?? ""))
+                                .font(.caption2.monospacedDigit())
+                        } else { Text(statusText(person)).font(.caption2) }
+                        if let state = companion.liveStates.first(where: { $0.userID == person.userID }),
+                           Date().timeIntervalSince(state.updatedAt) > 20, person.workoutFinishedAt == nil {
+                            Image(systemName: "clock.badge.exclamationmark").font(.caption2)
+                                .accessibilityLabel(tr("Last known progress", "Sist kjente fremdrift"))
+                        }
+                    }.foregroundStyle(.secondary)
+                }
+            }
+            .padding(11)
+            .athlthTrainTogetherCard(radius: 16, subtle: true)
+            .task(id: sessionID) {
+                while !Task.isCancelled {
+                    if scenePhase == .active {
+                        try? await social.refreshWorkoutLobby(sessionID: sessionID)
+                        await companion.refresh(sessionID: sessionID)
+                        if sharedSourceID == nil,
+                           let source = social.workoutSessions.first(where: { $0.id == sessionID })?.invitePayload?.workout.id {
+                            let draft = TrainTogetherLiveDraftStore()
+                            await draft.refresh(source)
+                            if draft.draft != nil { sharedSourceID = source }
                         }
                     }
+                    do { try await Task.sleep(for: .seconds(3)) } catch { break }
                 }
             }
-            .padding(14)
-            .athlthTrainTogetherCard(radius: 19, subtle: true)
-            .task(id: sessionID) {
-                _ = await social
-                    .confirmCurrentJoinedWorkoutStarted()
-
-                while !Task.isCancelled {
-                    try? await social
-                        .refreshWorkoutLobby(
-                            sessionID: sessionID
-                        )
-                    try? await Task.sleep(
-                        for: .seconds(3)
-                    )
-                }
+            .sheet(isPresented: $showingCompanion) {
+                SocialWorkoutCompanionSheet(sessionID: sessionID, progressOnly: true)
+                    .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
             }
-            .sheet(
-                isPresented:
-                    $showingCompanion
-            ) {
-                SocialWorkoutCompanionSheet(
-                    sessionID: sessionID
-                )
-                .environmentObject(
-                    social
-                )
+            .sheet(isPresented: $showingChat) {
+                if let source = sharedSourceID, let userID = social.currentUserID {
+                    ScrollView {
+                        TrainTogetherRoomChat(sourceID: source, userID: userID,
+                            partnerName: partner.displayNameSnapshot, canSend: true)
+                            .padding(16)
+                    }
+                    .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+                } else {
+                    SocialWorkoutCompanionSheet(sessionID: sessionID, chatOnly: true)
+                        .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+                }
             }
         }
     }
@@ -276,6 +263,7 @@ struct SocialWorkoutLivePayload:
     Hashable
 {
     var currentTitle: String?
+    var progress: SocialWorkoutProgress? = nil
     var exerciseIndex: Int?
     var exerciseCount: Int?
     var currentSetNumber: Int?
@@ -574,6 +562,7 @@ final class SocialWorkoutCompanionStore:
                         currentExercise?
                             .exercise
                             .name,
+                    progress: SocialWorkoutProgress.strength(exercises),
                     exerciseIndex:
                         currentExerciseIndex,
                     exerciseCount:
@@ -618,7 +607,8 @@ final class SocialWorkoutCompanionStore:
         elapsedSeconds:
             TimeInterval,
         paceSecondsPerKilometer:
-            TimeInterval?
+            TimeInterval?,
+        progress: SocialWorkoutProgress? = nil
     ) async {
         await upsert(
             sessionID:
@@ -648,6 +638,7 @@ final class SocialWorkoutCompanionStore:
                                     .running
                                     .title
                         ),
+                    progress: progress,
                     exerciseIndex:
                         nil,
                     exerciseCount:
@@ -666,6 +657,18 @@ final class SocialWorkoutCompanionStore:
                     exercises: nil
                 )
         )
+    }
+
+    func publishProgress(sessionID: UUID, userID: UUID, displayName: String,
+                         kind: String, title: String?, progress: SocialWorkoutProgress?,
+                         elapsed: TimeInterval, distance: Double? = nil,
+                         exercises: [SocialWorkoutLiveExerciseSnapshot]? = nil) async {
+        await upsert(sessionID: sessionID, userID: userID, displayName: displayName,
+                     workoutKind: kind, payload: SocialWorkoutLivePayload(
+                        currentTitle: title, progress: progress, exerciseIndex: nil, exerciseCount: progress?.total,
+                        currentSetNumber: nil, currentSetCount: nil, isResting: nil,
+                        distanceMeters: distance, elapsedSeconds: elapsed, paceSecondsPerKilometer: nil,
+                        exercises: exercises))
     }
 
     func sendText(
@@ -839,6 +842,8 @@ private struct SocialWorkoutCompanionSheet:
     @State private var messageText = ""
 
     let sessionID: UUID
+    var progressOnly = false
+    var chatOnly = false
 
     private var ownParticipant:
         SocialWorkoutParticipantRecord? {
@@ -862,8 +867,8 @@ private struct SocialWorkoutCompanionSheet:
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    liveProgressSection
-                    chatSection
+                    if !chatOnly { liveProgressSection }
+                    if !progressOnly { chatSection }
                 }
                 .padding(16)
                 .padding(.bottom, 24)
@@ -993,7 +998,12 @@ private struct SocialWorkoutCompanionSheet:
                 )
             }
 
-            if state.workoutKind ==
+            if let p = state.payload.progress ?? state.payload.exercises.flatMap(SocialWorkoutProgress.strength) {
+                ProgressView(value: p.fraction).tint(ATHLTHTheme.accentDeep)
+                Text("\(p.completed)/\(p.total) " + ATHLTHLocalization.choose(english: "completed", norwegian: "fullført"))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            if state.payload.exercises != nil || state.workoutKind ==
                 WorkoutKind
                     .strength
                     .rawValue {

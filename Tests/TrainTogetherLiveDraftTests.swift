@@ -121,6 +121,15 @@ final class TrainTogetherLiveDraftTests: XCTestCase {
         XCTAssertNil(ATHLTHSharedWorkoutRoomRoute.resolve(userInfo: foreign))
     }
 
+    func testSharedProgressCountsCompletionNotExerciseOrder() {
+        let progress = SocialWorkoutProgress.counted(planned: ["d", "a", "c", "b"], completed: Set(["b", "d", "unknown"]))
+        XCTAssertEqual(progress?.completed, 2)
+        XCTAssertEqual(progress?.total, 4)
+        XCTAssertEqual(progress?.fraction, 0.5)
+        XCTAssertNil(SocialWorkoutProgress.counted(planned: [String](), completed: Set<String>()))
+        XCTAssertEqual(SocialWorkoutProgress.counted(planned: ["a", "a", "b"], completed: Set(["a"]))?.total, 2)
+    }
+
     func testRemoteSessionCanChooseSynchronizedStart() throws {
         var payload = SocialWorkoutInvitePayload(
             workout: workout(kind: .running),
