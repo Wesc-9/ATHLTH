@@ -799,28 +799,27 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var planLifecycle: some View {
         AnyView(planNavigation)
         .onAppear {
+            // Read before setting the editing marker. SwiftUI can recreate a
+            // sheet host after a quick app switch even while its original
+            // TrainProgramCreationLaunch still says resumesDraftOnAppear=false.
+            // The very same UUID must recover its protected checkpoint, not
+            // restart at the mode selector. A genuinely new UUID cannot read
+            // another plan's checkpoint.
+            let existing = draftStore.load(
+                userID: session.profile.userID, draftID: draftID
+            )
             draftStore.setEditing(true, userID: session.profile.userID, draftID: draftID)
-            guard !didApplySuggestedStartDate
-            else {
-                return
-            }
-
+            guard !didApplySuggestedStartDate else { return }
             didApplySuggestedStartDate = true
 
-            if !resumesDraftOnAppear {
-                // A tap on "Create training plan" must never inherit step 2
-                // (or a draft checkpoint) from an earlier presentation.
-                // Only the explicit "Continue draft" route may restore it.
+            if !resumesDraftOnAppear && existing == nil {
                 step = .mode
                 sourceRoute.removeAll()
                 selectedSource = .scratch
                 isHydratingPlanDraft = false
             }
 
-            if resumesDraftOnAppear,
-               let unfinished = draftStore.load(
-                   userID: session.profile.userID, draftID: draftID
-               ) {
+            if let unfinished = existing {
                 isHydratingPlanDraft = true
                 restorePlanDraft(unfinished)
                 // SwiftUI sheets should be presented after the navigation and
