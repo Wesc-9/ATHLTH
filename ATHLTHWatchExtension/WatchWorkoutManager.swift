@@ -5454,7 +5454,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             // target-zone alert. No inferred zone when not configured.
             context.plannedHeartRateZone =
                 currentStructuredRunningStep?.targetHeartRateZone ??
-                audioCoachConfiguration.smartPrompts?.preferredHeartRateZone
+                targetAlertConfiguration?.heartRateZone
             if usesOutdoorGPS, coachElevation.hasReliableGain {
                 context.elevationGainMeters = coachElevation.gainMeters
                 context.isUphill = coachElevation.uphill
