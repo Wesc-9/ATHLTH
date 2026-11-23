@@ -7640,32 +7640,11 @@ struct ATHLTHTrainView: View {
         )
 
         VStack(alignment: .leading, spacing: 10) {
-            if let delay = delayedPlanStart {
-                HStack(spacing: 8) {
-                    Image(systemName: "clock")
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Scheduled workout start",
-                            norwegian: "Utsatt oppstart"))
-                            .font(.caption.weight(.semibold))
-                        Text(delay.startsAt, style: .time)
-                            .font(.caption2)
-                    }
-                    Spacer(minLength: 4)
-                    Button(ATHLTHLocalization.choose(
-                        english: "Cancel", norwegian: "Avbryt"
-                    )) {
-                        cancelDelayedPlanStart()
-                    }
-                    .font(.caption.weight(.semibold))
-                }
-                .padding(12)
-                .background(
-                    ATHLTHTrainDesign.paleGold.opacity(0.28),
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
-            }
+            delayedTrainStartBanner
 
+            // Erase the dashboard's very large generic view type before
+            // combining it with the Today container's other branches.
+            AnyView(
             ATHLTHTrainTodayPremiumView(
                 workoutCatalog: trainWorkoutCatalog,
                 isActive: isActive,
@@ -7795,6 +7774,7 @@ struct ATHLTHTrainView: View {
             onQuickFreeTraining: { startFreeTrainingQuick() },
             onGhostRace: { showingGhostHub = true }
         )
+            )
         // Reset date-specific check-in and proposed workout state exactly
         // once when the calendar day changes; never reset the live recorder.
         .id(displayedTrainDay)
@@ -7804,6 +7784,39 @@ struct ATHLTHTrainView: View {
         // thread's stack on some devices when switching Home -> Train.
         .athlthStablePresentationBoundary()
         }
+    }
+
+    // Keep the optional delayed-start banner independent of the heavy
+    // Train Today dashboard's view metadata and presentation graph.
+    private var delayedTrainStartBanner: AnyView {
+        AnyView(Group {
+            if let delay = delayedPlanStart {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Scheduled workout start",
+                            norwegian: "Utsatt oppstart"))
+                            .font(.caption.weight(.semibold))
+                        Text(delay.startsAt, style: .time)
+                            .font(.caption2)
+                    }
+                    Spacer(minLength: 4)
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) {
+                        cancelDelayedPlanStart()
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(12)
+                .background(
+                    ATHLTHTrainDesign.paleGold.opacity(0.28),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+
+        })
     }
 
     private func todayHeroMetric(
