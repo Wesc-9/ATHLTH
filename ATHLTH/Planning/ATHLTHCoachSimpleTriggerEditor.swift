@@ -8,6 +8,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     @Binding var eventSelection: ATHLTHCoachEventSelection
     @Binding var phases: [ATHLTHCoachWorkoutPhase]?
     let supportsStructured: Bool
+    var triggerAvailability: ATHLTHCoachTriggerAvailability = .global
     var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @Binding var historicalWorkoutID: UUID?
 
@@ -118,7 +119,25 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             trigger == .elevationGain
     }
 
+    private func familyAvailable(_ item: Family) -> Bool {
+        switch item {
+        case .distance: return triggerAvailability.supports(.distance)
+        case .time, .section, .heartZone, .motivation: return true
+        case .step: return supportsStructured &&
+            triggerAvailability.supports(.stepStart)
+        case .pause: return supportsStructured &&
+            triggerAvailability.supports(.recoveryStart)
+        case .finish: return triggerAvailability.supports(.nearFinishTime) ||
+            triggerAvailability.supports(.nearFinishDistance)
+        case .elevation: return triggerAvailability.supports(.elevationGain)
+        case .pace: return triggerAvailability.supports(.paceSlowerThanTarget)
+        case .history: return !historicalReferences.isEmpty &&
+            triggerAvailability.supports(.slowerThanPreviousWorkout)
+        }
+    }
+
     private func choose(_ choice: Family) {
+        guard familyAvailable(choice) else { return }
         switch choice {
         case .distance: trigger = .distance; interval = 1_000
         case .time: trigger = .time; interval = 60
@@ -141,8 +160,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         title: String? = nil,
         enabled: Bool = true
     ) -> some View {
-        Button {
-            guard enabled else { return }
+        let isAvailable = enabled && triggerAvailability.supports(item)
+        return Button {
+            guard isAvailable else { return }
             trigger = item
         } label: {
             HStack(spacing: 10) {
@@ -160,8 +180,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 in: RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.42)
+        .disabled(!isAvailable)
+        .opacity(isAvailable ? 1 : 0.42)
     }
 
     var body: some View {
@@ -187,15 +207,12 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                             in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
-                    .disabled(
-                        (!supportsStructured && [.step, .pause].contains(item)) ||
-                        (item == .history && historicalReferences.isEmpty)
-                    )
-                    .opacity(
-                        (!supportsStructured && [.step, .pause].contains(item)) ||
-                        (item == .history && historicalReferences.isEmpty)
-                        ? 0.42 : 1
-                    )
+                    .accessibilityHint(familyAvailable(item)
+                        ? tr("Open trigger settings", "Åpne triggerinnstillinger")
+                        : tr("Unavailable: required workout data is missing",
+                             "Ikke tilgjengelig: økten mangler nødvendige data"))
+                    .disabled(!familyAvailable(item))
+                    .opacity(familyAvailable(item) ? 1 : 0.42)
                 }
             }
 
@@ -206,6 +223,14 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             if family == .finish {
                 choice(.nearFinishTime)
                 choice(.nearFinishDistance)
+            }
+            if !triggerAvailability.supports(trigger) {
+                Text(tr(
+                    "This workout does not have the required measured data or programmed target. Choose another trigger.",
+                    "Denne økten mangler nødvendige målinger eller et definert mål. Velg en annen trigger."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             if family == .history {
                 if historicalReferences.isEmpty {
