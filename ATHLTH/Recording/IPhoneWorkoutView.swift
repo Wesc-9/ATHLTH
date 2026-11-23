@@ -1246,11 +1246,12 @@ private struct IPhoneStructuredStepCard: View {
                                         workout.distanceMeters -
                                             (workout.structuredStepStartDistanceMeters ?? 0), 0
                                     )
-                                    if let ghostLead = ATHLTHIntervalGhostPacer.leadMeters(
-                                        step: step,
-                                        elapsedSeconds: effortSeconds,
-                                        distanceMeters: effortMeters
-                                    ) {
+                                    if let ghostLead = recorder.intervalGhostLiveLeadMeters(at: context.date) ??
+                                        ATHLTHIntervalGhostPacer.leadMeters(
+                                            step: step,
+                                            elapsedSeconds: effortSeconds,
+                                            distanceMeters: effortMeters
+                                        ) {
                                         Label(
                                             ATHLTHLocalization.choose(
                                                 english: "Interval Ghost",
