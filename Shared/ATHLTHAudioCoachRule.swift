@@ -64,7 +64,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// remain intact; newly configured event rules share the normal cue ledger.
     enum Trigger: String, Codable, CaseIterable, Identifiable {
         case distance, time
+        // New user-configured events are optional for older saved templates.
+        case randomMotivation, nearFinishTime, nearFinishDistance
+        case elevationGain, uphillDetected
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
+        case zoneBelow, plannedZoneBelow
         // Thresholds are expressed in seconds per kilometre (300 = 5:00).
         case paceFasterOverall, paceFasterLastKilometer
         // The currently planned exercise/treadmill pace target is consulted live.
@@ -78,7 +82,16 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case stepStart, stepEnd, beforeNextStep, beforeMain, beforeCooldown
 
         var id: String { rawValue }
-        var isPeriodic: Bool { self == .time || self == .distance }
+        var isPeriodic: Bool {
+            self == .time || self == .distance || self == .elevationGain
+        }
+        var usesLiveContext: Bool {
+            switch self {
+            case .nearFinishTime, .nearFinishDistance, .elevationGain,
+                 .uphillDetected, .plannedZoneBelow: return true
+            default: return false
+            }
+        }
         var isPaceCondition: Bool {
             switch self {
             case .paceFasterOverall, .paceFasterLastKilometer,
@@ -88,7 +101,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         }
         var isHeartRateCondition: Bool {
             switch self {
-            case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit:
+            case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit,
+                 .zoneBelow, .plannedZoneBelow:
                 return true
             default:
                 return false
@@ -96,30 +110,36 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         }
         var needsStructuredStep: Bool {
             !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
-                self != .personalRecordConfirmed && self != .workoutStart
+                self != .personalRecordConfirmed && self != .workoutStart &&
+                self != .randomMotivation && self != .nearFinishTime &&
+                self != .nearFinishDistance && self != .uphillDetected
         }
         func summary(interval: Int) -> String {
             let value: Int
             switch self {
             case .time: value = min(max(interval, 15), 7_200)
             case .distance: value = min(max(interval, 100), 42_000)
+            case .randomMotivation: value = min(max(interval, 120), 900)
+            case .nearFinishTime: value = min(max(interval, 10), 1_800)
+            case .nearFinishDistance: value = min(max(interval, 25), 5_000)
+            case .elevationGain: value = min(max(interval, 10), 5_000)
             case .heartRateAbove, .heartRateBelow: value = min(max(interval, 40), 220)
             case .paceFasterOverall, .paceFasterLastKilometer: value = min(max(interval, 120), 1_800)
-            case .zoneEnter, .zoneExit: value = min(max(interval, 1), 5)
+            case .zoneEnter, .zoneExit, .zoneBelow: value = min(max(interval, 1), 5)
             case .beforeNextStep, .beforeMain, .beforeCooldown:
                 value = min(max(interval, 5), 60)
             default: return title
             }
             switch self {
-            case .time:
+            case .time, .randomMotivation, .nearFinishTime:
                 return title + " · " + String(value) + " s"
-            case .distance:
+            case .distance, .nearFinishDistance, .elevationGain:
                 return title + " · " + String(value) + " m"
             case .heartRateAbove, .heartRateBelow:
                 return title + " · " + String(value) + " bpm"
             case .paceFasterOverall, .paceFasterLastKilometer:
                 return title + " · " + String(format: "%d:%02d min/km", value / 60, value % 60)
-            case .zoneEnter, .zoneExit:
+            case .zoneEnter, .zoneExit, .zoneBelow:
                 return title + " · S" + String(value)
             case .beforeNextStep, .beforeMain, .beforeCooldown:
                 return title + " · " + String(value) + " s"
@@ -134,6 +154,13 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             switch self {
             case .distance: return tr("Distance", "Distanse")
             case .time: return tr("Time", "Tid")
+            case .randomMotivation: return tr("Random motivation", "Tilfeldig motivasjon")
+            case .nearFinishTime: return tr("Near time goal", "Nær tidsmålet")
+            case .nearFinishDistance: return tr("Near distance goal", "Nær distansemålet")
+            case .elevationGain: return tr("Elevation gained", "Høydemeter")
+            case .uphillDetected: return tr("When climbing", "Når du løper oppover")
+            case .zoneBelow: return tr("Below heart-rate zone", "Under pulssone")
+            case .plannedZoneBelow: return tr("Below workout target zone", "Under øktens målsone")
             case .heartRateAbove: return tr("Heart rate above", "Puls over")
             case .heartRateBelow: return tr("Heart rate below", "Puls under")
             case .paceFasterOverall: return tr("Total pace faster than", "Snittempo raskere enn")
@@ -325,9 +352,13 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         switch trigger {
         case .distance: return min(max(interval, 100), 42_000)
         case .time: return min(max(interval, 15), 7_200)
+        case .randomMotivation: return min(max(interval, 120), 900)
+        case .nearFinishTime: return min(max(interval, 10), 1_800)
+        case .nearFinishDistance: return min(max(interval, 25), 5_000)
+        case .elevationGain: return min(max(interval, 10), 5_000)
         case .heartRateAbove, .heartRateBelow: return min(max(interval, 40), 220)
         case .paceFasterOverall, .paceFasterLastKilometer: return min(max(interval, 120), 1_800)
-        case .zoneEnter, .zoneExit: return min(max(interval, 1), 5)
+        case .zoneEnter, .zoneExit, .zoneBelow: return min(max(interval, 1), 5)
         case .beforeNextStep, .beforeMain, .beforeCooldown:
             return min(max(interval, 5), 60)
         default: return 1
@@ -526,6 +557,28 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 ? "Husk å ta en slurk vann når det passer."
                 : "Remember to take a sip of water when convenient."
         case .motivation:
+            // Context-specific motivation for goals, rather than a generic
+            // encouragement which does not explain what was achieved.
+            if trigger == .nearFinishTime {
+                return norwegian ? "Du er snart ved tidsmålet. Hold flyten!"
+                    : "You're close to your time goal. Keep it going!"
+            }
+            if trigger == .nearFinishDistance {
+                return norwegian ? "Det er kort vei igjen til målet. Fortsett!"
+                    : "The finish is close. Keep going!"
+            }
+            if trigger == .elevationGain {
+                return norwegian ? "Flott klatring! Du har passert et høydemetermål."
+                    : "Great climbing! You've reached an elevation milestone."
+            }
+            if trigger == .uphillDetected {
+                return norwegian ? "Motbakke foran deg. Finn din rytme!"
+                    : "You're climbing. Find your rhythm!"
+            }
+            if trigger == .plannedZoneBelow || trigger == .zoneBelow {
+                return norwegian ? "Pulsen ligger under valgt sone. Juster innsatsen om det passer."
+                    : "Heart rate is below your chosen zone. Adjust if appropriate."
+            }
             return ATHLTHAudioCoachScheduledMotivation.phrase(
                 slot: motivationSlot,
                 style: encouragementStyle ?? .encouragement,
