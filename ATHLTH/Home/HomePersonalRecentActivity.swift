@@ -1433,13 +1433,16 @@ struct HomePersonalRecentActivitySection:
                 .foregroundStyle(
                     ATHLTHTheme.accentDeep
                 )
-                .padding(.horizontal, 14)
-                .frame(minHeight: 44)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
                 .background(
                     ATHLTHTheme.accentSoft,
                     in: Capsule()
                 )
-                .contentShape(Capsule())
+                // Keep the visible capsule compact without shrinking
+                // the accessible touch target.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("athlth-home-recent-see-all")
