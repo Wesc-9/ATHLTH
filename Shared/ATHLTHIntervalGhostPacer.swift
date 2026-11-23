@@ -34,6 +34,41 @@ enum ATHLTHIntervalGhostPacer {
         var leadMeters: Double { runnerMeters - ghostMeters }
     }
 
+    /// Stable segment identifiers allow a workout editor to target a single
+    /// interval without changing other work or recovery segments.
+    struct SegmentOverride {
+        let segmentID: UUID
+        let enabled: Bool
+        let paceSecondsPerKilometer: Double?
+    }
+
+    /// Per-segment overrides take precedence over the global Ghost pace.
+    /// A disabled segment is excluded from both virtual timelines.
+    static func advanceSegment(
+        _ progress: VirtualProgress,
+        segmentID: UUID,
+        kind: SegmentKind,
+        scope: Scope,
+        elapsedSeconds: TimeInterval,
+        actualMeters: Double,
+        defaultPaceSecondsPerKilometer: Double,
+        recovery: RecoveryPolicy,
+        overrides: [SegmentOverride]
+    ) -> VirtualProgress? {
+        let override = overrides.first { $0.segmentID == segmentID }
+        if override?.enabled == false { return progress }
+        return advance(
+            progress,
+            kind: kind,
+            scope: scope,
+            elapsedSeconds: elapsedSeconds,
+            actualMeters: actualMeters,
+            workPaceSecondsPerKilometer:
+                override?.paceSecondsPerKilometer ?? defaultPaceSecondsPerKilometer,
+            recovery: recovery
+        )
+    }
+
     /// Returns nil rather than propagating NaN, negative elapsed time, or
     /// invalid pace into the live Ghost comparison.
     static func advance(
