@@ -9956,15 +9956,16 @@ private struct ATHLTHIntervalGhostSettingsView: View {
                                         let stableID = blocks.first(where: {
                                             $0.editorDragID == block.editorDragID
                                         })?.ghostSegmentID ?? block.editorDragID
+                                        let priorPace = configuration.segments.first {
+                                            $0.id == stableID
+                                        }?.paceSecondsPerKilometer
                                         configuration.segments.removeAll {
                                             $0.id == stableID
                                         }
                                         configuration.segments.append(.init(
                                             id: stableID,
                                             enabled: enabled,
-                                            paceSecondsPerKilometer: configuration.segments.first {
-                                                $0.id == stableID
-                                            }?.paceSecondsPerKilometer
+                                            paceSecondsPerKilometer: priorPace
                                         ))
                                     }
                                 ))
