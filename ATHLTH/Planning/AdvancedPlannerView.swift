@@ -7891,7 +7891,22 @@ struct SessionEditorView: View {
             .onAppear {
                 // Restore the last visible Home card before the general
                 // source-picker policy can reset a cold-launched editor.
-                if restoreOpenNavigationStageIfNeeded() {
+                if directPartnerID != nil && isStandalone &&
+                    existingWorkout == nil && onPreparedWorkout == nil &&
+                    !draftRestored {
+                    // Friend profile -> Train Together must open the shared
+                    // full-screen workout builder directly. Never show the
+                    // obsolete "Plan extra workout" Form first.
+                    draftRestored = true
+                    prepareBlankWorkout(for: .running)
+                    Task { @MainActor in
+                        await Task.yield()
+                        guard !draftFinalized,
+                              selectedScratchWorkoutType == .running,
+                              !showingUnifiedWorkoutComposer else { return }
+                        showingUnifiedWorkoutComposer = true
+                    }
+                } else if restoreOpenNavigationStageIfNeeded() {
                     // The account-scoped route owns this presentation.
                 } else if !draftRestored, isStandalone, onPreparedWorkout == nil,
                    selectedPartnerID == nil,
