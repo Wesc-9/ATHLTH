@@ -97,10 +97,15 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     private func presentationPhase(for block: WorkoutTemplateBlock) -> WorkoutPhaseKind {
-        // Recovery steps remain inside the selected work phase unless the
-        // athlete explicitly added a standalone recovery section.
-        ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
-            for: block, visiblePhases: visiblePhases
+        guard let index = blocks.firstIndex(where: {
+            $0.editorDragID == block.editorDragID
+        }) else {
+            return ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                for: block, visiblePhases: visiblePhases
+            )
+        }
+        return ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            at: index, in: blocks, visiblePhases: visiblePhases
         )
     }
 
@@ -112,7 +117,12 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     private func entries(in phase: WorkoutPhaseKind) -> [WorkoutTemplateBlock] {
-        blocks.filter { presentationPhase(for: $0) == phase }
+        // Reuse source indices; filtering preserves effort/recovery chronology.
+        blocks.enumerated().compactMap { index, step in
+            ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                at: index, in: blocks, visiblePhases: visiblePhases
+            ) == phase ? step : nil
+        }
     }
 
     var body: some View {
