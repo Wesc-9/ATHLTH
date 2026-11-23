@@ -118,6 +118,17 @@ final class ATHLTHWorkoutSelectionOverviewTests: XCTestCase {
         XCTAssertTrue(rows.allSatisfy { $0.sets == 1 })
     }
 
+    func testActiveRecoveryCountsAsPauseButNotPassiveRest() {
+        let active = ATHLTHActiveRecovery.convert(
+            pause("Pause", seconds: 60), active: true
+        )
+        let metrics = ATHLTHWorkoutSelectionOverview.metrics(for: [active])
+        XCTAssertEqual(metrics.pauseCount, 1)
+        XCTAssertEqual(metrics.restSeconds, 0)
+        XCTAssertEqual(metrics.activeSeconds, 60)
+        XCTAssertEqual(metrics.totalSeconds, 60)
+    }
+
     func testMusclesAndEquipmentComeFromRealEmbeddedExerciseMetadata() {
         var item = strength(sets: 2)
         item.exerciseSnapshot = ExerciseSnapshot(
