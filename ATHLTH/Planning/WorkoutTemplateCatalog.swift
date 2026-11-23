@@ -202,6 +202,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// Stable per-source-step key for selectively measured workout sections.
     /// Unlike editorDragID this MUST survive saving and reordering.
     var measurementStepID: UUID? = nil
+    /// Persisted Ghost segment identity, unlike the editor-only drag token.
+    var ghostSegmentID: UUID? = nil
     /// Original intensity target from Zoned (which uses six heart-rate zones).
     /// This displays normalized ATHLTH Z1-Z5 ranges; original source is in JSON.
     var sourceIntensityZoneLabel: String? = nil
@@ -295,6 +297,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.assessmentMethod == rhs.assessmentMethod &&
         lhs.assessmentScope == rhs.assessmentScope &&
         lhs.measurementStepID == rhs.measurementStepID &&
+        lhs.ghostSegmentID == rhs.ghostSegmentID &&
         lhs.sourceIntensityZoneLabel == rhs.sourceIntensityZoneLabel &&
         lhs.targetHeartRatePercentMin == rhs.targetHeartRatePercentMin &&
         lhs.targetHeartRatePercentMax == rhs.targetHeartRatePercentMax &&
@@ -353,6 +356,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(assessmentMethod)
         hasher.combine(assessmentScope)
         hasher.combine(measurementStepID)
+        hasher.combine(ghostSegmentID)
         hasher.combine(sourceIntensityZoneLabel)
         hasher.combine(targetHeartRatePercentMin)
         hasher.combine(targetHeartRatePercentMax)
@@ -419,6 +423,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case assessmentMethod = "assessment_method"
         case assessmentScope = "assessment_scope"
         case measurementStepID = "measurement_step_id"
+        case ghostSegmentID = "ghost_segment_id"
         case sourceIntensityZoneLabel = "source_intensity_zone"
         case targetHeartRatePercentMin = "target_hr_percent_min"
         case targetHeartRatePercentMax = "target_hr_percent_max"
@@ -9913,15 +9918,15 @@ private struct ATHLTHIntervalGhostSettingsView: View {
                                 Toggle(block.title, isOn: Binding(
                                     get: {
                                         configuration.segments.first {
-                                            $0.id == block.editorDragID
+                                            $0.id == (block.ghostSegmentID ?? block.editorDragID)
                                         }?.enabled ?? false
                                     },
                                     set: { enabled in
                                         configuration.segments.removeAll {
-                                            $0.id == block.editorDragID
+                                            $0.id == (block.ghostSegmentID ?? block.editorDragID)
                                         }
                                         configuration.segments.append(.init(
-                                            id: block.editorDragID,
+                                            id: block.ghostSegmentID ?? block.editorDragID,
                                             enabled: enabled,
                                             paceSecondsPerKilometer: nil
                                         ))
