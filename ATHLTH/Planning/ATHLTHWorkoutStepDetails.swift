@@ -53,6 +53,140 @@ enum ATHLTHWorkoutStepTargetSummary {
     }
 }
 
+/// Concise instructions for an individual effort or recovery, based on the
+/// real recipe order and exact exercise group. Never writes explanatory text
+/// into the user's personal notes or changes the recording prescription.
+enum ATHLTHWorkoutStepGuidance {
+    struct Detail {
+        let context: String
+        let instructions: String
+        let zone: String?
+    }
+
+    static func detail(
+        for block: WorkoutTemplateBlock, in recipe: [WorkoutTemplateBlock]
+    ) -> Detail {
+        let source = block.groupID.flatMap { id in
+            let matching = recipe.filter { $0.groupID == id }
+            return matching.count >= 2 ? matching : nil
+        } ?? [block]
+        let works = source.filter {
+            $0.kind == .run && !$0.isRestOrActiveRecovery
+        }
+        let isRecovery = block.isRestOrActiveRecovery
+        let isFourByFour = ATHLTHCompoundExerciseCatalog
+            .fourByFourRecovery(source) != nil
+        let isGroupedRun = works.count > 1
+        let isNorwegian = ATHLTHLocalization.isNorwegian
+        let time = block.durationSeconds.flatMap {
+            $0.isFinite && $0 > 0 ? ATHLTHWorkoutStepCopy.duration($0) : nil
+        }
+        let configuredZone = ATHLTHWorkoutStepTargetSummary.zoneLabel(for: block)
+            .map { isNorwegian
+                ? $0.replacingOccurrences(of: "Z", with: "S") : $0
+            }
+        let zone = configuredZone ?? (
+            isFourByFour && !isRecovery
+                ? (isNorwegian ? "S4–S5" : "Z4–Z5")
+                : nil
+        )
+
+        let ordinal: Int
+        if isRecovery, let index = source.firstIndex(where: {
+            $0.editorDragID == block.editorDragID
+        }) {
+            ordinal = source.prefix(through: index)
+                .filter { $0.kind == .run && !$0.isRestOrActiveRecovery }.count
+        } else {
+            ordinal = (works.firstIndex(where: {
+                $0.editorDragID == block.editorDragID
+            }) ?? 0) + 1
+        }
+
+        let context: String
+        if isGroupedRun {
+            if isRecovery {
+                context = ATHLTHLocalization.choose(
+                    english: "Recovery after effort \(ordinal) of \(works.count)",
+                    norwegian: "Pause etter drag \(ordinal) av \(works.count)"
+                )
+            } else if isFourByFour {
+                context = ATHLTHLocalization.choose(
+                    english: "Effort \(ordinal) of \(works.count) · 4×4 intervals",
+                    norwegian: "Drag \(ordinal) av \(works.count) · 4×4 intervaller"
+                )
+            } else {
+                context = ATHLTHLocalization.choose(
+                    english: "Effort \(ordinal) of \(works.count)",
+                    norwegian: "Drag \(ordinal) av \(works.count)"
+                )
+            }
+        } else if isRecovery {
+            context = block.isActiveRecovery
+                ? ATHLTHLocalization.choose(
+                    english: "Active recovery", norwegian: "Aktiv pause"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Recovery", norwegian: "Pause"
+                )
+        } else {
+            context = block.title
+        }
+
+        let instruction: String
+        if isRecovery {
+            if block.isActiveRecovery {
+                instruction = ATHLTHLocalization.choose(
+                    english: "Keep moving gently with a walk or easy jog" +
+                        (time.map { " for \($0)" } ?? "") +
+                        ". Follow the planned recovery speed and keep the effort low before the next interval.",
+                    norwegian: "Fortsett i rolig bevegelse med gange eller lett jogg" +
+                        (time.map { " i \($0)" } ?? "") +
+                        ". Følg valgt pausefart og hold belastningen lav før neste drag."
+                )
+            } else {
+                instruction = ATHLTHLocalization.choose(
+                    english: "Recover" + (time.map { " for \($0)" } ?? "") +
+                        " before the next step. Use the time to regain control of your breathing.",
+                    norwegian: "Ta pause" + (time.map { " i \($0)" } ?? "") +
+                        " før neste drag. Bruk tiden til å roe ned pusten."
+                )
+            }
+        } else if block.kind == .run {
+            instruction = ATHLTHLocalization.choose(
+                english: (isFourByFour ? "Run at a steady, controlled effort" :
+                    "Complete this running step") +
+                    (time.map { " for \($0)" } ?? "") +
+                    ". Follow your selected pace and heart-rate target. A recovery follows each effort when prescribed.",
+                norwegian: (isFourByFour ? "Løp jevnt og kontrollert" :
+                    "Gjennomfør denne løpedelen") +
+                    (time.map { " i \($0)" } ?? "") +
+                    ". Følg valgt måltempo og pulssone. Ta den planlagte pausen etter draget."
+            )
+        } else if block.kind == .exercise {
+            instruction = ATHLTHLocalization.choose(
+                english: "Perform the exercise with controlled technique and follow the planned sets, repetitions and load.",
+                norwegian: "Utfør øvelsen med kontrollert teknikk og følg planlagte sett, repetisjoner og belastning."
+            )
+        } else {
+            instruction = ATHLTHLocalization.choose(
+                english: "Follow the prescribed duration, intensity and instructions for this step.",
+                norwegian: "Følg planlagt varighet, intensitet og instruksjoner for denne deløkten."
+            )
+        }
+
+        let notes = block.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Detail(
+            context: context,
+            instructions: [instruction, notes].compactMap { value in
+                guard let value, !value.isEmpty else { return nil }
+                return value
+            }.joined(separator: "\n\n"),
+            zone: zone
+        )
+    }
+}
+
 /// A proper step-inspection surface for both the library and saved recipes.
 /// Previously this screen showed only title + combined targetText and left
 /// most of a large iPad sheet blank, concealing executable targets.
