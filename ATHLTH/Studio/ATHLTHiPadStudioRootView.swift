@@ -990,10 +990,16 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func resetDetailNavigation(force: Bool = false) {
-        // An implicit NavigationLink(destination:) can push without changing
-        // the NavigationPath. Pop those routes when crossing destinations,
-        // but never remount Home merely because Home is tapped twice.
+        // Catalog cards use NavigationLink(destination:) and therefore may
+        // leave the explicit NavigationPath empty while a detail is visible.
+        // A deliberate sidebar tap must always replace that entire detail
+        // stack, including a pushed catalog training-plan screen.
         guard force || !detailNavigationPath.isEmpty else { return }
+        // An empty path does not trigger onChange, so a saved deep path could
+        // otherwise be restored on returning from the background after the
+        // user deliberately selected a different sidebar destination.
+        savedDetailPath = nil
+        savedDetailPathAccount = ""
         detailNavigationPath = NavigationPath()
         detailNavigationIdentity = UUID()
     }
@@ -1002,7 +1008,7 @@ struct ATHLTHiPadStudioRootView: View {
         clearWeekInspectorIfNeeded()
         libraryExpanded = true
         focusedPlanningDate = nil
-        resetDetailNavigation(force: libraryPage != page)
+        resetDetailNavigation(force: true)
         sidebarPage = nil
         libraryPage = page
         // Replace the detail page only; do not force the sidebar open.
@@ -1015,7 +1021,7 @@ struct ATHLTHiPadStudioRootView: View {
     private func openSidebarPage(_ destination: ATHLTHSideMenuDestination) {
         clearWeekInspectorIfNeeded()
         focusedPlanningDate = nil
-        resetDetailNavigation(force: sidebarPage != destination)
+        resetDetailNavigation(force: true)
         libraryPage = nil
         sidebarPage = destination
         // The user controls the sidebar independently of opened pages.
@@ -1030,9 +1036,10 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
         clearWeekInspectorIfNeeded()
-        let changingDestination = selection != destination ||
-            libraryPage != nil || sidebarPage != nil
-        resetDetailNavigation(force: changingDestination)
+        // Even a repeated Home or Plan Studio tap must return from an
+        // implicit NavigationLink, not leave the old detail card above it.
+        // Never reset this stack on scene activation: only explicit routing.
+        resetDetailNavigation(force: true)
         libraryPage = nil
         sidebarPage = nil
         if destination == .overview {
