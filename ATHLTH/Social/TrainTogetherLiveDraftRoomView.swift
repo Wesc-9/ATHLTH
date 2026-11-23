@@ -339,7 +339,8 @@ struct TrainTogetherLiveDraftRoomView: View {
     @State private var showingGuestLobby = false
 
     let sourceWorkoutID: UUID
-    let fallbackWorkout: PlannedSession
+    var fallbackWorkout: PlannedSession? = nil
+    var initiallyShowsChat = false
     var onOpenReady: (() -> Void)? = nil
 
     private enum RoomTab: String, CaseIterable { case workout, chat, history, recap }
@@ -464,7 +465,10 @@ struct TrainTogetherLiveDraftRoomView: View {
         .sheet(item: $editor) { selection in
             sharedEditor(selection)
         }
-        .task(id: sourceWorkoutID) { await live.watch(sourceWorkoutID) }
+        .task(id: sourceWorkoutID) {
+            if initiallyShowsChat { selectedTab = .chat }
+            await live.watch(sourceWorkoutID)
+        }
         .task(id: live.draft?.id) {
             guard live.draft != nil else { return }
             while !Task.isCancelled {

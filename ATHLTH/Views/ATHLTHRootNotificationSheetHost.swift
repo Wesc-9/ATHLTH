@@ -97,6 +97,25 @@ struct ATHLTHRootNotificationSheetHost<Content: View>: View {
                     }
             }
         }
+        .sheet(item: Binding<ATHLTHSharedWorkoutRoomRoute?>(
+            get: {
+                guard session.signedIn, let route = pushManager.pendingSharedWorkoutRoom,
+                      route.recipientID == session.profile.userID else { return nil }
+                return route
+            },
+            set: { route in if route == nil { pushManager.clearPendingSharedWorkoutRoom() } }
+        )) { route in
+            NavigationStack {
+                TrainTogetherLiveDraftRoomView(sourceWorkoutID: route.sourceID, initiallyShowsChat: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                                pushManager.clearPendingSharedWorkoutRoom()
+                            }
+                        }
+                    }
+            }
+        }
         .sheet(isPresented: $showingDailyCheckIn) {
             NavigationStack {
                 RecoverySorenessLogView(store: RecoverySorenessStore())

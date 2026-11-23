@@ -102,6 +102,25 @@ final class TrainTogetherLiveDraftTests: XCTestCase {
         XCTAssertEqual(result.durationMinutes, edited.durationMinutes)
     }
 
+    func testRoomPushRequiresRecipientAndExactEntityType() {
+        let source = UUID()
+        let user = UUID()
+        let payload: [AnyHashable: Any] = [
+            "athlth_entity_type": "shared_workout_room",
+            "athlth_kind": "train_together_chat",
+            "athlth_entity_id": source.uuidString,
+            "athlth_recipient_id": user.uuidString
+        ]
+        XCTAssertEqual(ATHLTHSharedWorkoutRoomRoute.resolve(userInfo: payload)?.sourceID, source)
+        XCTAssertEqual(ATHLTHSharedWorkoutRoomRoute.resolve(userInfo: payload)?.recipientID, user)
+        var missing = payload
+        missing.removeValue(forKey: "athlth_recipient_id")
+        XCTAssertNil(ATHLTHSharedWorkoutRoomRoute.resolve(userInfo: missing))
+        var foreign = payload
+        foreign["athlth_entity_type"] = "train_together_post"
+        XCTAssertNil(ATHLTHSharedWorkoutRoomRoute.resolve(userInfo: foreign))
+    }
+
     func testRemoteSessionCanChooseSynchronizedStart() throws {
         var payload = SocialWorkoutInvitePayload(
             workout: workout(kind: .running),

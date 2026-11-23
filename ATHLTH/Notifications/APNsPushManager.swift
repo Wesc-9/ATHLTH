@@ -81,6 +81,20 @@ struct ATHLTHTournamentPushRoute: Identifiable, Equatable {
     }
 }
 
+struct ATHLTHSharedWorkoutRoomRoute: Identifiable, Equatable {
+    let sourceID: UUID
+    let recipientID: UUID
+    var id: UUID { sourceID }
+    static func resolve(userInfo: [AnyHashable: Any]) -> Self? {
+        guard (userInfo["athlth_entity_type"] as? String)?.lowercased() == "shared_workout_room",
+              (userInfo["athlth_kind"] as? String)?.lowercased() == "train_together_chat",
+              let rawID = userInfo["athlth_entity_id"] as? String, let id = UUID(uuidString: rawID),
+              let rawUser = userInfo["athlth_recipient_id"] as? String, let user = UUID(uuidString: rawUser)
+        else { return nil }
+        return Self(sourceID: id, recipientID: user)
+    }
+}
+
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -123,6 +137,7 @@ final class APNsPushManager: ObservableObject {
         ATHLTHTournamentPushRoute?
     @Published private(set) var pendingWorkoutInviteNotification:
         ATHLTHWorkoutInviteNotificationRoute?
+    @Published private(set) var pendingSharedWorkoutRoom: ATHLTHSharedWorkoutRoomRoute?
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
     @Published private(set) var pendingBodyGoalCheckIn:
         ATHLTHBodyGoalNotificationRoute?
@@ -188,6 +203,11 @@ final class APNsPushManager: ObservableObject {
             return
         }
 
+        if let room = ATHLTHSharedWorkoutRoomRoute.resolve(userInfo: userInfo) {
+            pendingSharedWorkoutRoom = room
+            return
+        }
+
         if let invite = ATHLTHWorkoutInviteNotificationRoute.resolve(
             userInfo: userInfo
         ) {
@@ -250,6 +270,8 @@ final class APNsPushManager: ObservableObject {
                     backendEventID
             )
     }
+
+    func clearPendingSharedWorkoutRoom() { pendingSharedWorkoutRoom = nil }
 
     func clearPendingNavigationTarget() {
         pendingNavigationTarget = nil

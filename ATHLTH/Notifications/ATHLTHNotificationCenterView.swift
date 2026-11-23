@@ -2292,6 +2292,7 @@ struct ATHLTHNotificationCenterView: View {
             return status == .actionable
         }
         if item.kind == .dailyCheckIn { return true }
+        if item.socialEntityType == "shared_workout_room", item.socialEntityID != nil { return true }
         if item.socialEntityType?.lowercased() == "arena_series" &&
             item.socialEntityID != nil {
             return true
@@ -2372,6 +2373,8 @@ struct ATHLTHNotificationCenterView: View {
                   let goalID = item.goalID,
                   let goal = goals.goals.first(where: { $0.id == goalID }) {
             ATHLTHBodyGoalCheckInView(goal: goal)
+        } else if item.socialEntityType == "shared_workout_room", let id = item.socialEntityID {
+            TrainTogetherLiveDraftRoomView(sourceWorkoutID: id, initiallyShowsChat: item.title != "Fellesøkt oppdatert" && item.title != "Shared workout updated")
         } else if item.socialEntityType?.lowercased() == "arena_series",
            let seriesID = item.socialEntityID {
             ATHLTHArenaNotificationDestination(seriesID: seriesID)
