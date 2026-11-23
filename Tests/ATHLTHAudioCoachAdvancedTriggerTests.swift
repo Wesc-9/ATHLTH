@@ -110,6 +110,36 @@ final class ATHLTHAudioCoachAdvancedTriggerTests: XCTestCase {
                            context: ctx, slots: &slots).count, 1)
     }
 
+    func testWorkoutTargetOutsideRuleNeedsARealPrescribedZone() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .plannedZoneOutside, metric: .motivation, interval: 1
+        )
+        var slots: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule, heartRate: 110, maxHR: 180,
+                          slots: &slots).isEmpty)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.plannedHeartRateZone = 4
+        let spoken = due(rule, heartRate: 110, maxHR: 180,
+                         context: ctx, slots: &slots)
+        XCTAssertEqual(spoken.count, 1)
+        XCTAssertTrue(spoken[0].contains("utenfor"))
+        XCTAssertTrue(due(rule, heartRate: 110, maxHR: 180,
+                          context: ctx, slots: &slots).isEmpty)
+    }
+
+    func testPaceTargetIsNotInferredWhenWorkoutHasNoTarget() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .paceSlowerThanTarget,
+            metric: .motivation,
+            interval: 1
+        )
+        var slots: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule, slots: &slots).isEmpty)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.targetSlowestPaceSecondsPerKilometer = 250
+        XCTAssertEqual(due(rule, context: ctx, slots: &slots).count, 1)
+    }
+
     func testRandomMotivationHasJitterAndDoesNotRepeatWithinWindow() {
         let rule = ATHLTHAudioCoachRule(
             trigger: .randomMotivation, metric: .motivation, interval: 180
@@ -117,11 +147,11 @@ final class ATHLTHAudioCoachAdvancedTriggerTests: XCTestCase {
         var slots: [UUID: Int] = [:]
         XCTAssertTrue(due(rule, time: 179, slots: &slots).isEmpty)
         var spoken = 0
-        for time in stride(from: 180.0, through: 360.0, by: 5) {
+        for time in stride(from: 180.0, through: 350.0, by: 5) {
             spoken += due(rule, time: time, slots: &slots).count
         }
         XCTAssertEqual(spoken, 1)
-        XCTAssertEqual(due(rule, time: 360, slots: &slots).count, 0)
+        XCTAssertEqual(due(rule, time: 350, slots: &slots).count, 0)
     }
 
     func testNewRuleAndCoachGroupRoundTripToWatch() throws {
