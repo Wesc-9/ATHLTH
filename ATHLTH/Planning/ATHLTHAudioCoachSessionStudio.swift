@@ -6,12 +6,14 @@ struct ATHLTHAudioCoachSessionStudio: View {
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
+    var triggerAvailability: ATHLTHCoachTriggerAvailability? = nil
 
     var body: some View {
         ATHLTHAudioCoachActiveListView(
             draft: $draft,
             showRouteOptions: showRouteOptions,
-            showStructuredOptions: showStructuredOptions
+            showStructuredOptions: showStructuredOptions,
+            triggerAvailability: triggerAvailability
         )
     }
 }
