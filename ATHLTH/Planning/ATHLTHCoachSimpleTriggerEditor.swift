@@ -285,8 +285,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                           trigger == .plannedZoneOutside {
                     choice(.plannedZoneBelow)
                     choice(.plannedZoneOutside)
-                    Text(tr("Coach speaks only when the measured zone drops below the current exercise's prescribed zone.",
-                            "Coach snakker bare når pulssonen faller under øktens angitte målsone."))
+                    Text(tr("Uses the current exercise's prescribed zone. Choose below target or outside target.",
+                            "Bruker målsone fra den aktive øvelsen. Velg under eller utenfor målsone."))
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 } else {
