@@ -152,36 +152,81 @@ enum ATHLTHWorkoutPhasePlacement {
 /// there is no separate Pause category; deleting Hoveddel must remove those
 /// rows too, otherwise they would reappear after the next render or save.
 enum ATHLTHWorkoutPhaseDeletionPolicy {
+    /// Context-free behavior remains valid for a standalone recovery in the
+    /// guided-day planner. The full Studio uses the context-aware overload so
+    /// interval recoveries follow their efforts, including active recoveries.
     static func presentedPhase(
         for block: WorkoutTemplateBlock,
         visiblePhases: Set<WorkoutPhaseKind>
     ) -> WorkoutPhaseKind {
-        // Active recovery is an actual training block with its own phase.
-        // Unlike an ordinary rest step it must never be silently presented
-        // as Hoveddel, otherwise "Aktiv pause" turns into "Pause" when the
-        // guided day is reopened in the full workout editor.
         if block.isActiveRecovery { return .recovery }
         return block.resolvedPhase == .recovery && !visiblePhases.contains(.recovery)
             ? .main : block.resolvedPhase
     }
 
-    /// Preserve the established category ordering, except when an explicit
-    /// active-recovery step occurs before the first main step. Then show its
-    /// Pause section before Hoveddel, matching the guided day timeline.
-    /// Stored execution order never changes.
+    /// Presentation only. A 4×4 is still [work, active recovery, work, ...]
+    /// in its original recording recipe. Never change stored phases or sort
+    /// independently by work/rest type. An independent active pause (for
+    /// example a guided day starting with recovery) remains a Pause section.
+    static func presentedPhase(
+        at index: Int,
+        in blocks: [WorkoutTemplateBlock],
+        visiblePhases: Set<WorkoutPhaseKind>
+    ) -> WorkoutPhaseKind {
+        guard blocks.indices.contains(index) else { return .main }
+        let block = blocks[index]
+        guard block.isRestOrActiveRecovery else {
+            return presentedPhase(for: block, visiblePhases: visiblePhases)
+        }
+
+        if index > 0 {
+            let previous = blocks[index - 1]
+            // Explicit intervals have an immutable shared ID even when
+            // active recovery keeps phase=.recovery and an easy 6 km/h pace.
+            if let id = block.groupID, block.groupKind == .intervals,
+               previous.groupID == id, previous.groupKind == .intervals,
+               previous.kind == .run && !previous.isActiveRecovery {
+                return previous.resolvedPhase
+            }
+
+            // Older ungrouped recipes may still interleave run/recovery/run.
+            // The next effort is necessary: do not swallow a standalone
+            // active recovery placed after a completed workout.
+            if block.groupID == nil, previous.groupID == nil,
+               previous.kind == .run, !previous.isRestOrActiveRecovery,
+               index + 1 < blocks.count {
+                let next = blocks[index + 1]
+                if next.kind == .run, !next.isRestOrActiveRecovery,
+                   next.groupID == nil,
+                   previous.resolvedPhase == next.resolvedPhase,
+                   previous.cardioActivity == next.cardioActivity {
+                    return previous.resolvedPhase
+                }
+            }
+        }
+        return presentedPhase(for: block, visiblePhases: visiblePhases)
+    }
+
+    /// Any explicit section is listed once, but a transient recovery phase
+    /// in a bundled interval must not produce an empty Pause card.
     static func orderedVisiblePhases(
         for blocks: [WorkoutTemplateBlock],
         visiblePhases: Set<WorkoutPhaseKind>
     ) -> [WorkoutPhaseKind] {
-        var phases = WorkoutPhaseKind.allCases.filter { phase in
-            visiblePhases.contains(phase) || blocks.contains {
-                presentedPhase(for: $0, visiblePhases: visiblePhases) == phase
-            }
+        let classified = blocks.indices.map {
+            presentedPhase(at: $0, in: blocks, visiblePhases: visiblePhases)
         }
-        if let recoveryIndex = blocks.firstIndex(where: { $0.isActiveRecovery }),
-           let mainIndex = blocks.firstIndex(where: {
-               presentedPhase(for: $0, visiblePhases: visiblePhases) == .main
-           }), recoveryIndex < mainIndex,
+        var phases = WorkoutPhaseKind.allCases.filter { phase in
+            if classified.contains(phase) { return true }
+            if phase == .recovery &&
+               blocks.contains(where: { $0.isRestOrActiveRecovery }) {
+                return false
+            }
+            return visiblePhases.contains(phase)
+        }
+        if let recoveryIndex = classified.firstIndex(of: .recovery),
+           let mainIndex = classified.firstIndex(of: .main),
+           recoveryIndex < mainIndex,
            let existingRecovery = phases.firstIndex(of: .recovery) {
             phases.remove(at: existingRecovery)
             if let firstMain = phases.firstIndex(of: .main) {
@@ -196,12 +241,14 @@ enum ATHLTHWorkoutPhaseDeletionPolicy {
         from blocks: [WorkoutTemplateBlock],
         visiblePhases: Set<WorkoutPhaseKind>
     ) -> [WorkoutTemplateBlock] {
-        var remaining = blocks.filter {
-            presentedPhase(for: $0, visiblePhases: visiblePhases) != phase
+        var remaining = blocks.enumerated().compactMap { index, block in
+            presentedPhase(
+                at: index, in: blocks, visiblePhases: visiblePhases
+            ) == phase ? nil : block
         }
 
-        // If removing a category leaves a single member of a previous
-        // superset / interval group, it is no longer a valid grouped set.
+        // Deleting Main deletes its interval recoveries as well; it cannot
+        // strand a detached Pause group or a broken explicit interval.
         let groupSizes = Dictionary(
             grouping: remaining.compactMap { item -> (UUID, UUID)? in
                 guard let groupID = item.groupID else { return nil }
@@ -248,10 +295,20 @@ enum ATHLTHWorkoutTimelinePresentation {
 
     static func sections(for blocks: [WorkoutTemplateBlock]) -> [Section] {
         var sections: [Section] = []
-        for block in blocks {
-            let phase = block.kind == .rest
-                ? (sections.last?.phase ?? block.resolvedPhase)
-                : block.resolvedPhase
+        for (index, block) in blocks.enumerated() {
+            // Active recoveries inside an explicit interval share their
+            // effort's visible section, even though they are actual moving
+            // running steps rather than passive .rest blocks.
+            let phase: WorkoutPhaseKind
+            if block.kind == .rest {
+                phase = sections.last?.phase ?? block.resolvedPhase
+            } else if block.isActiveRecovery {
+                phase = ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                    at: index, in: blocks, visiblePhases: []
+                )
+            } else {
+                phase = block.resolvedPhase
+            }
 
             if let last = sections.indices.last, sections[last].phase == phase {
                 sections[last].blocks.append(block)
