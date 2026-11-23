@@ -6187,19 +6187,6 @@ struct WorkoutTemplateBuilderView: View {
         if studioFullscreenEditing {
             return AnyView(
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 12) {
-                        Label(tr("WORKOUT BUILDER", "ØKTBYGGER"),
-                              systemImage: "slider.horizontal.3")
-                            .font(.caption.weight(.semibold))
-                            .tracking(1.0)
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        Spacer(minLength: 8)
-                        ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
-                            .accessibilityIdentifier("athlth-ipad-workout-mode")
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-
                     // Preserve the original adaptive two-column workspace.
                     ViewThatFits(in: .horizontal) {
                         HStack(alignment: .top, spacing: 20) {
@@ -6276,6 +6263,31 @@ struct WorkoutTemplateBuilderView: View {
 
     private var editorWithPresentation: some View {
             editorScrollContent
+            // Mode choice belongs to the shared workout editor rather than
+            // either Basic or Advanced content. Keep it pinned while scrolling
+            // so the user can switch modes at any point without leaving
+            // the current workout or losing its draft.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if isPlannedWorkout && studioFullscreenEditing {
+                    HStack(spacing: 12) {
+                        Label(tr("Build mode", "Byggemodus"),
+                              systemImage: "slider.horizontal.3")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Spacer(minLength: 8)
+                        ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
+                            .accessibilityIdentifier("athlth-ipad-workout-mode")
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 7)
+                    .background(studioBackground)
+                    .overlay(alignment: .bottom) {
+                        ATHLTHPlanDesign.outline.opacity(0.35)
+                            .frame(height: 0.6)
+                            .allowsHitTesting(false)
+                    }
+                }
+            }
             .onChange(of: studioBasicDate) { _, value in
                 // Date/time in the shared details card is authoritative for
                 // both Basic and Advanced, and the scheduled session is
@@ -6965,18 +6977,6 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
 
-            HStack {
-                Spacer()
-                Button {
-                    studioAdvanced = true
-                } label: {
-                    Label(tr("Detailed editing", "Detaljert redigering"),
-                          systemImage: "slider.horizontal.3")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 
