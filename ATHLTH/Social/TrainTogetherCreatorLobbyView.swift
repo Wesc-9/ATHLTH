@@ -722,22 +722,42 @@ struct TrainTogetherCreatorLobbyView: View {
                     session?.invitePayload?.startIndependently == true
                 )
 
-                Button {
-                    confirmingIndependentStart = true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Start alone",
-                            norwegian: "Start alene"
-                        ),
-                        systemImage: "figure.run"
-                    )
+                if session?.invitePayload?.startIndependently == true {
+                    Button {
+                        guard creatorReady, !isStarting else { return }
+                        startAloneAfterConfirmation()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start my workout",
+                                norwegian: "Start min økt"
+                            ),
+                            systemImage: "figure.run"
+                        )
+                        .font(.headline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTrainTogetherDesign.accent)
+                    .disabled(!creatorReady || isStarting || isMarkingReady)
+                } else {
+                    Button {
+                        confirmingIndependentStart = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start alone",
+                                norwegian: "Start alene"
+                            ),
+                            systemImage: "figure.run"
+                        )
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
                     .frame(maxWidth: .infinity, minHeight: 38)
                 }
                 .buttonStyle(.plain)
-                .disabled(isStarting || isMarkingReady || session?.invitePayload == nil)
+                    .disabled(isStarting || isMarkingReady || session?.invitePayload == nil)
+                }
 
                 if let startError {
                     Text(startError)
