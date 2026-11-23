@@ -2680,6 +2680,7 @@ struct TrainTogetherPostCreateView:
     @EnvironmentObject private var messaging: MessagingStore
 
     @State private var selectedInviteeIDs: Set<UUID> = []
+    @State private var showingParticipationSettings = false
     @State private var isPublishing = false
     @State private var publishWarning: String?
     @State private var publishedSuccessfully = false
@@ -3625,8 +3626,31 @@ struct TrainTogetherPostCreateView:
     private var socialWorkoutCard: some View {
         ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 15) {
-                WorkoutSocialModePicker(mode: $participationMode)
-                createDivider
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Invite participants", norwegian: "Inviter deltakere"
+                    ))
+                    .font(.headline)
+                    Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingParticipationSettings.toggle()
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Settings", norwegian: "Innstillinger"
+                            ),
+                            systemImage: showingParticipationSettings
+                                ? "chevron.up" : "chevron.down"
+                        )
+                        .font(.subheadline)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if showingParticipationSettings {
+                    WorkoutSocialModePicker(mode: $participationMode)
+                    createDivider
 
                 Text(ATHLTHLocalization.choose(
                     english: "WHO CAN JOIN?",
@@ -3703,6 +3727,8 @@ struct TrainTogetherPostCreateView:
                     .fixedSize()
                 }
                 .frame(minHeight: 44)
+
+                }
 
                 if joinPolicy != .open {
                     createDivider
