@@ -591,24 +591,23 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 if activity == .strength {
                     emptyWorkoutAction(ATHLTHLocalization.choose(english: "Free strength", norwegian: "Fri styrke"),
                         symbol: "dumbbell", identifier: "athlth-workout-add-free-strength") { onAddFreeStrength(.main) }
-                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Walk / run", norwegian: "Gå / løping"),
-                        symbol: "figure.walk", identifier: "athlth-workout-add-free-cardio") { openAddPage(.freeCardio, phase: .main) }
-                } else {
-                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"),
-                        symbol: "figure.walk", identifier: "athlth-workout-add-free-walk") { onAddWalk(.main) }
-                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
-                        symbol: "figure.run", identifier: "athlth-workout-add-free-run") { onAddRun(.main) }
                 }
+                emptyWorkoutAction(ATHLTHLocalization.choose(english: "Walk / run", norwegian: "Gå / løping"),
+                    symbol: "figure.walk", identifier: "athlth-workout-add-free-cardio") { openAddPage(.freeCardio, phase: .main) }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
                     symbol: activity == .strength ? "dumbbell" : "plus", identifier: "athlth-workout-add-exercise") { onAddExercise(.main) }
+                if activity != .strength {
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
+                        symbol: "map", identifier: "athlth-workout-add-route") { onSelectRoute(.main) }
+                }
             }
             HStack(spacing: 7) {
                 if activity == .strength {
                     emptyWorkoutAction(ATHLTHLocalization.choose(english: "Strength mode", norwegian: "Styrkemodus"),
                         symbol: "square.stack.3d.up", identifier: "athlth-workout-add-strength-mode") { openAddPage(.strengthMode, phase: .main) }
                 } else {
-                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"),
-                        symbol: "map", identifier: "athlth-workout-add-route") { onSelectRoute(.main) }
+                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running mode", norwegian: "Løpemodus"),
+                        symbol: "timer", identifier: "athlth-workout-add-running-mode") { openAddPage(.runningMode, phase: .main) }
                 }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Workout", norwegian: "Treningsøkt"),
                     symbol: "books.vertical", identifier: "athlth-workout-choose-from-library") { onAddWorkout(.main) }
@@ -616,10 +615,6 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     symbol: "pause", identifier: "athlth-workout-add-rest") { openAddPage(.recovery, phase: .main) }
             }
             HStack(spacing: 7) {
-                if activity != .strength {
-                    emptyWorkoutAction(ATHLTHLocalization.choose(english: "Running mode", norwegian: "Løpemodus"),
-                        symbol: "timer", identifier: "athlth-workout-add-running-mode") { openAddPage(.runningMode, phase: .main) }
-                }
                 emptyWorkoutAction(ATHLTHLocalization.choose(english: "Add other", norwegian: "Legg til annet"),
                     symbol: "square.grid.2x2", identifier: "athlth-workout-add-other") { onAddOther(.main) }
             }
@@ -1464,11 +1459,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         if usesActivityActions {
             if activity == .strength {
                 addSheetRow(ATHLTHLocalization.choose(english: "Free strength", norwegian: "Fri styrkeøkt"), "dumbbell", action: .freeStrength(phase))
-                addPageRow(ATHLTHLocalization.choose(english: "Walk / run", norwegian: "Gå / løping"), "figure.walk", page: .freeCardio)
-            } else {
-                addSheetRow(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Gå (frigå)"), "figure.walk", action: .walk(phase))
-                addSheetRow(ATHLTHLocalization.choose(english: "Free running", norwegian: "Løping (friløp)"), "figure.run", action: .run(phase))
             }
+            addPageRow(ATHLTHLocalization.choose(english: "Walk / run", norwegian: "Gå / løping"), "figure.walk", page: .freeCardio)
             addSheetRow(ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"), activity == .strength ? "dumbbell" : "figure.run", action: .exercise(phase))
             if activity != .strength {
                 addSheetRow(ATHLTHLocalization.choose(english: "Route", norwegian: "Rute"), "map", action: .route(phase))
