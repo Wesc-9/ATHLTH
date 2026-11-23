@@ -2817,7 +2817,7 @@ struct TrainingPlanCatalogDetailView: View {
 
     @State private var createEditableCopy = false
     @State private var showingPersonalizePlan = false
-    @State private var showAllWeeks = false
+    @State private var showAllWeeks = true
     // Weeks and sessions start collapsed. Generate detailed steps only
     // when requested to keep long plans responsive.
     @State private var expandedWeeks: Set<Int> = []
