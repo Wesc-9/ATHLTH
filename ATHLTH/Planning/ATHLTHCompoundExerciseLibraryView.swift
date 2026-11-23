@@ -233,6 +233,25 @@ struct ATHLTHCompoundExerciseDetailView: View {
         )
     }
 
+    /// Show the exercise's intended effort zones, never the easy recovery
+    /// as its primary intensity. Legacy 4×4 recipes get protocol guidance.
+    private var exerciseZoneText: String? {
+        let efforts = exercise.blocks.filter {
+            $0.kind == .run && !$0.isRestOrActiveRecovery
+        }
+        let range = ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(
+            for: efforts.isEmpty ? exercise.blocks : efforts
+        )
+        let prefix = ATHLTHLocalization.isNorwegian ? "S" : "Z"
+        if let range {
+            return range.lowerBound == range.upperBound
+                ? "\(prefix)\(range.lowerBound)"
+                : "\(prefix)\(range.lowerBound)–\(prefix)\(range.upperBound)"
+        }
+        return exercise.familyID == "athlth:running:interval:4x4"
+            ? "\(prefix)4–\(prefix)5" : nil
+    }
+
     private var fourByFourResults: [ATHLTHFourByFourRecords.Result] {
         guard exercise.familyID == "athlth:running:interval:4x4",
               let recovery = ATHLTHCompoundExerciseCatalog.fourByFourRecovery(
@@ -247,43 +266,71 @@ struct ATHLTHCompoundExerciseDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(exercise.category.title.uppercased())
-                        .font(.caption.weight(.bold))
-                        .tracking(1.4)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    Text(exercise.title)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                    Text(exercise.detail)
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                // Reuse the same premium workout identity card as the
+                // planned-session editor instead of an unframed text header.
+                ATHLTHWorkoutDetailsCard(
+                    activityTitle: exercise.title,
+                    symbol: exercise.isRunning ? "figure.run" : "dumbbell",
+                    showsTimingLabel: false
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            Label(exercise.category.title,
+                                  systemImage: "square.stack.3d.up")
+                            if let exerciseZoneText {
+                                Label(exerciseZoneText, systemImage: "heart")
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        Text(exercise.detail)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                .accessibilityIdentifier("athlth-compound-exercise-hero")
 
-                VStack(alignment: .leading, spacing: 13) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Main section", norwegian: "Hoveddel"
-                    ))
-                    .font(.headline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "list.number")
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Main section", norwegian: "Hoveddel"
+                        ))
+                        .font(.headline.weight(.semibold))
+                    }
                     ForEach(Array(exercise.blocks.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .top, spacing: 10) {
-                            Text("\(index + 1)")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                .frame(width: 25)
+                        HStack(spacing: 11) {
+                            Image(systemName: step.isRestOrActiveRecovery
+                                  ? "pause.fill" : step.kind.systemImage)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                .frame(width: 38, height: 38)
+                                .background(ATHLTHPlanDesign.surface,
+                                            in: RoundedRectangle(cornerRadius: 11))
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(step.title)
-                                    .font(.subheadline.weight(.medium))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
                                 Text(stepSummary(step))
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
-                            Spacer(minLength: 0)
+                            Spacer(minLength: 4)
+                            Text("\(index + 1)")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(ATHLTHPlanDesign.selectedSurface.opacity(0.45),
+                                    in: RoundedRectangle(cornerRadius: 13))
                     }
                 }
-                .padding(16)
-                .athlthPlanCard(radius: 19)
+                .padding(15)
+                .athlthPlanCard(radius: 20)
 
                 if exercise.familyID == "athlth:running:interval:4x4" {
                     VStack(alignment: .leading, spacing: 10) {
@@ -423,6 +470,12 @@ struct ATHLTHCompoundExerciseDetailView: View {
         }
         if let zone = step.targetHeartRateZone {
             parts.append("Z\(zone)")
+        } else if let source = step.sourceIntensityZoneLabel,
+                  !source.isEmpty {
+            parts.append(source)
+        } else if exercise.familyID == "athlth:running:interval:4x4",
+                  step.kind == .run, !step.isRestOrActiveRecovery {
+            parts.append(ATHLTHLocalization.isNorwegian ? "S4–S5" : "Z4–Z5")
         }
         return parts.joined(separator: " · ")
     }
