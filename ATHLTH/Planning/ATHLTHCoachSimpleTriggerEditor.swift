@@ -14,6 +14,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
 
     private enum Family: String, CaseIterable, Identifiable {
         case distance, time, section, step, pause, heartZone
+        case motivation, finish, elevation, pace
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -22,7 +23,11 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .section: return ATHLTHLocalization.choose(english: "Section", norwegian: "Del")
             case .step: return ATHLTHLocalization.choose(english: "Workout step", norwegian: "Deløkt")
             case .pause: return ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause")
-            case .heartZone: return ATHLTHLocalization.choose(english: "Heart-rate zone", norwegian: "Pulssone")
+            case .heartZone: return ATHLTHLocalization.choose(english: "Heart rate", norwegian: "Puls")
+            case .motivation: return ATHLTHLocalization.choose(english: "Motivation", norwegian: "Motivasjon")
+            case .finish: return ATHLTHLocalization.choose(english: "Near goal", norwegian: "Nær mål")
+            case .elevation: return ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter")
+            case .pace: return ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo")
             }
         }
         var icon: String {
@@ -33,6 +38,10 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .step: "figure.run"
             case .pause: "pause.circle"
             case .heartZone: "heart"
+            case .motivation: "sparkles"
+            case .finish: "flag.checkered"
+            case .elevation: "mountain.2"
+            case .pace: "speedometer"
             }
         }
     }
@@ -45,7 +54,13 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         switch trigger {
         case .distance: .distance
         case .time: .time
-        case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow: .heartZone
+        case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow,
+             .zoneBelow, .plannedZoneBelow: .heartZone
+        case .randomMotivation: .motivation
+        case .nearFinishTime, .nearFinishDistance: .finish
+        case .elevationGain, .uphillDetected: .elevation
+        case .paceFasterThanTarget, .paceSlowerThanTarget,
+             .paceFasterOverall, .paceFasterLastKilometer: .pace
         case .workoutStart, .warmupStart, .warmupEnd, .mainStart, .mainEnd,
              .cooldownStart, .cooldownEnd, .beforeMain, .beforeCooldown: .section
         case .recoveryStart, .recoveryEnd, .activeRecoveryStart,
@@ -71,17 +86,30 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     private var amount: Binding<Double> {
         Binding(
             get: {
-                Double(interval) / (trigger == .distance
+                Double(interval) / (usesDistanceUnit
                     ? distanceMultiplier : timeMultiplier)
             },
             set: { newValue in
                 guard newValue.isFinite else { return }
-                let unit = trigger == .distance ? distanceMultiplier : timeMultiplier
-                let limits = trigger == .distance ? 100...42_000 : 15...7_200
+                let unit = usesDistanceUnit ? distanceMultiplier : timeMultiplier
+                let limits: ClosedRange<Int>
+                switch trigger {
+                case .nearFinishDistance: limits = 25...5_000
+                case .elevationGain: limits = 10...5_000
+                case .nearFinishTime: limits = 10...1_800
+                case .randomMotivation: limits = 120...900
+                case .distance: limits = 100...42_000
+                default: limits = 15...7_200
+                }
                 interval = min(max(Int((newValue * unit).rounded()), limits.lowerBound),
                                limits.upperBound)
             }
         )
+    }
+
+    private var usesDistanceUnit: Bool {
+        trigger == .distance || trigger == .nearFinishDistance ||
+            trigger == .elevationGain
     }
 
     private func choose(_ choice: Family) {
@@ -92,6 +120,10 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .step: trigger = .stepStart; interval = 1
         case .pause: trigger = .recoveryStart; interval = 1
         case .heartZone: trigger = .zoneEnter; interval = 3
+        case .motivation: trigger = .randomMotivation; interval = 240
+        case .finish: trigger = .nearFinishTime; interval = 60
+        case .elevation: trigger = .elevationGain; interval = 50
+        case .pace: trigger = .paceSlowerThanTarget; interval = 1
         }
         eventSelection = .every
         phases = nil
@@ -147,9 +179,15 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 }
             }
 
-            if trigger == .distance || trigger == .time {
+            if trigger == .distance || trigger == .time ||
+                trigger == .randomMotivation || trigger == .nearFinishTime ||
+                trigger == .nearFinishDistance || trigger == .elevationGain {
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(tr("EVERY", "HVER"))
+                    Text((trigger == .nearFinishTime || trigger == .nearFinishDistance)
+                        ? tr("WHEN REMAINING", "NÅR DET GJENSTÅR")
+                        : trigger == .randomMotivation
+                            ? tr("AVERAGE INTERVAL", "GJENNOMSNITTLIG INTERVALL")
+                            : tr("EVERY", "HVER"))
                         .font(.caption2.weight(.bold))
                         .tracking(1.2)
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -162,8 +200,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                             .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
                             .accessibilityIdentifier("athlth-coach-trigger-value")
                         Picker(tr("Unit", "Enhet"), selection:
-                               trigger == .distance ? $distanceUnit : $timeUnit) {
-                            if trigger == .distance {
+                               usesDistanceUnit ? $distanceUnit : $timeUnit) {
+                            if usesDistanceUnit {
                                 Text("m").tag(0)
                                 Text("km").tag(1)
                                 Text("mil").tag(2)
@@ -176,9 +214,18 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                         .pickerStyle(.menu)
                         .frame(minWidth: 110)
                     }
-                    Text(trigger == .distance
-                        ? tr("Range: 100 m–42 km", "Område: 100 m–42 km")
-                        : tr("Range: 15 seconds–2 hours", "Område: 15 sekunder–2 timer"))
+                    Text(trigger == .randomMotivation
+                        ? tr("Randomized within each interval. Coach prioritizes safety cues.",
+                             "Tilfeldig tidspunkt innenfor intervallet. Viktige varsler prioriteres.")
+                        : trigger == .nearFinishTime || trigger == .nearFinishDistance
+                            ? tr("Only when the workout has a reliable goal.",
+                                 "Kun når økten har et kjent og pålitelig mål.")
+                            : trigger == .elevationGain
+                                ? tr("Measured outdoor ascent only; GPS noise is ignored.",
+                                     "Kun målt stigning utendørs. GPS-støy filtreres.")
+                                : trigger == .distance
+                                    ? tr("Range: 100 m–42 km", "Område: 100 m–42 km")
+                                    : tr("Range: 15 seconds–2 hours", "Område: 15 sekunder–2 timer"))
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
@@ -201,22 +248,65 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 choice(.recoveryEnd)
                 eventPicker([.every, .first, .last])
             } else if family == .heartZone {
-                choice(.zoneEnter)
-                choice(.zoneExit)
-                Text(tr("HEART-RATE ZONE", "PULSSONE"))
+                Text(tr("CHOOSE HEART-RATE TYPE", "VELG PULSTYPE"))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Picker(tr("Zone", "Sone"), selection: $interval) {
-                    ForEach(1...5, id: \.self) { zone in
-                        Text("S\(zone)").tag(zone)
-                    }
+                Picker(tr("Type", "Type"), selection: heartType) {
+                    Text(tr("BPM", "Puls")).tag(0)
+                    Text(tr("Zone", "Pulssone")).tag(1)
+                    Text(tr("Workout target", "Øktens målsone")).tag(2)
                 }
                 .pickerStyle(.segmented)
+                if trigger == .heartRateAbove || trigger == .heartRateBelow {
+                    choice(.heartRateAbove)
+                    choice(.heartRateBelow)
+                    TextField(tr("Heart rate BPM", "Puls i slag/min"),
+                              value: $interval, format: .number)
+                        .keyboardType(.numberPad)
+                        .padding(12)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    Text(tr("40–220 BPM", "40–220 slag/min"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } else if trigger == .plannedZoneBelow {
+                    Text(tr("Coach speaks only when the measured zone drops below the current exercise's prescribed zone.",
+                            "Coach snakker bare når pulssonen faller under øktens angitte målsone."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } else {
+                    choice(.zoneEnter)
+                    choice(.zoneExit)
+                    choice(.zoneBelow)
+                    Picker(tr("Zone", "Sone"), selection: $interval) {
+                        ForEach(1...5, id: \.self) { zone in
+                            Text("S\(zone)").tag(zone)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            } else if family == .finish {
+                choice(.nearFinishTime)
+                choice(.nearFinishDistance)
+            } else if family == .elevation {
+                choice(.elevationGain)
+                choice(.uphillDetected)
+                Text(tr("Uphill detection uses reliable outdoor GPS altitude and ignores uncertain terrain.",
+                        "Motbakkeregistrering krever pålitelige høydemålinger utendørs."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else if family == .pace {
+                choice(.paceFasterThanTarget)
+                choice(.paceSlowerThanTarget)
+                Text(tr("Only fires when the active exercise has an authored pace target.",
+                        "Varsler bare når den aktive øvelsen har angitt måltempo."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             if supportsStructured &&
                 (family == .distance || family == .time || family == .heartZone ||
-                 family == .step || family == .pause) {
+                 family == .step || family == .pause || family == .motivation ||
+                 family == .finish || family == .elevation || family == .pace) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(tr("APPLIES TO", "GJELDER FOR"))
                         .font(.caption2.weight(.bold))
@@ -270,6 +360,25 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var heartType: Binding<Int> {
+        Binding(
+            get: {
+                switch trigger {
+                case .heartRateAbove, .heartRateBelow: return 0
+                case .plannedZoneBelow: return 2
+                default: return 1
+                }
+            },
+            set: { selected in
+                switch selected {
+                case 0: trigger = .heartRateAbove; interval = 150
+                case 2: trigger = .plannedZoneBelow; interval = 1
+                default: trigger = .zoneEnter; interval = 3
+                }
+            }
+        )
     }
 
     private var phaseBinding: Binding<String> {
