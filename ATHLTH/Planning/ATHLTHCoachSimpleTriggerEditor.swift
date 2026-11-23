@@ -55,7 +55,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .distance: .distance
         case .time: .time
         case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow,
-             .zoneBelow, .plannedZoneBelow: .heartZone
+             .zoneBelow, .plannedZoneBelow, .plannedZoneOutside: .heartZone
         case .randomMotivation: .motivation
         case .nearFinishTime, .nearFinishDistance: .finish
         case .elevationGain, .uphillDetected: .elevation
@@ -281,7 +281,10 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                     Text(tr("40–220 BPM", "40–220 slag/min"))
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                } else if trigger == .plannedZoneBelow {
+                } else if trigger == .plannedZoneBelow ||
+                          trigger == .plannedZoneOutside {
+                    choice(.plannedZoneBelow)
+                    choice(.plannedZoneOutside)
                     Text(tr("Coach speaks only when the measured zone drops below the current exercise's prescribed zone.",
                             "Coach snakker bare når pulssonen faller under øktens angitte målsone."))
                         .font(.caption)
@@ -370,7 +373,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             get: {
                 switch trigger {
                 case .heartRateAbove, .heartRateBelow: return 0
-                case .plannedZoneBelow: return 2
+                case .plannedZoneBelow, .plannedZoneOutside: return 2
                 default: return 1
                 }
             },
