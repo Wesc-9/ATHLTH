@@ -30,14 +30,32 @@ struct ATHLTHCoachEditorTarget: Identifiable {
     }
 }
 
+/// A scene-local editing checkpoint. Saving a Coach group remains explicit;
+/// this snapshot only preserves the unfinished wizard if UIKit temporarily
+/// reconstructs its sheet while the user switches apps.
+struct ATHLTHCoachComposerCheckpoint: Equatable {
+    let targetID: UUID
+    let stage: String
+    let groupName: String
+    let trigger: ATHLTHAudioCoachRule.Trigger
+    let interval: Int
+    let eventSelection: ATHLTHCoachEventSelection
+    let allowedPhases: [ATHLTHCoachWorkoutPhase]?
+    let metrics: [ATHLTHAudioCoachRule.Metric]
+    let motivationPhrase: String
+    let motivationStyle: ATHLTHCoachEncouragementStyle
+}
+
 struct ATHLTHCoachRuleComposer: View {
     @Binding private var draft: AudioCoachDraft
     let target: ATHLTHCoachEditorTarget
     let supportsStructured: Bool
     let showsRoutes: Bool
     let onClose: () -> Void
+    var restoreCheckpoint: ATHLTHCoachComposerCheckpoint? = nil
+    var onCheckpoint: ((ATHLTHCoachComposerCheckpoint) -> Void)? = nil
 
-    private enum Stage {
+    private enum Stage: String {
         case name, trigger, commands
     }
 
@@ -50,6 +68,16 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var metrics: [ATHLTHAudioCoachRule.Metric]
     @State private var motivationPhrase: String
     @State private var motivationStyle: ATHLTHCoachEncouragementStyle
+
+    private var currentCheckpoint: ATHLTHCoachComposerCheckpoint {
+        ATHLTHCoachComposerCheckpoint(
+            targetID: target.id, stage: stage.rawValue,
+            groupName: groupName, trigger: trigger, interval: interval,
+            eventSelection: eventSelection, allowedPhases: allowedPhases,
+            metrics: metrics, motivationPhrase: motivationPhrase,
+            motivationStyle: motivationStyle
+        )
+    }
 
     private let bronze = ATHLTHPlanDesign.accentInk
     private let ink = ATHLTHPlanDesign.ink
@@ -64,13 +92,19 @@ struct ATHLTHCoachRuleComposer: View {
         target: ATHLTHCoachEditorTarget,
         supportsStructured: Bool,
         showsRoutes: Bool,
-        onClose: @escaping () -> Void
+        onClose: @escaping () -> Void,
+        restoreCheckpoint: ATHLTHCoachComposerCheckpoint? = nil,
+        onCheckpoint: ((ATHLTHCoachComposerCheckpoint) -> Void)? = nil
     ) {
         _draft = draft
         self.target = target
         self.supportsStructured = supportsStructured
         self.showsRoutes = showsRoutes
         self.onClose = onClose
+        self.restoreCheckpoint = restoreCheckpoint
+        self.onCheckpoint = onCheckpoint
+        let checkpoint = restoreCheckpoint?.targetID == target.id
+            ? restoreCheckpoint : nil
         let value = draft.wrappedValue
         let group = value.coachGroups.first { $0.id == target.groupID }
         let original = target.ruleID.flatMap { id in
@@ -88,24 +122,32 @@ struct ATHLTHCoachRuleComposer: View {
         }
 
         _stage = State(initialValue:
-            target.startAtTrigger ? .trigger :
+            checkpoint.flatMap { Stage(rawValue: $0.stage) } ??
+            (target.startAtTrigger ? .trigger :
                 (target.groupID != nil || target.ruleID != nil) ? .commands :
-                (target.isGroup ? .name : .trigger))
-        _groupName = State(initialValue: group?.name ?? "")
-        _trigger = State(initialValue: group?.trigger ?? original?.trigger ??
+                (target.isGroup ? .name : .trigger)))
+        _groupName = State(initialValue:
+            checkpoint?.groupName ?? group?.name ?? "")
+        _trigger = State(initialValue: checkpoint?.trigger ??
+            group?.trigger ?? original?.trigger ??
             Self.legacyTrigger(target.legacyOption))
-        _interval = State(initialValue: group?.interval ?? original?.interval ??
+        _interval = State(initialValue: checkpoint?.interval ??
+            group?.interval ?? original?.interval ??
             Self.legacyInterval(target.legacyOption, draft: value))
         _eventSelection = State(initialValue:
-            group?.eventSelection ?? original?.eventSelection ?? .every)
+            checkpoint?.eventSelection ?? group?.eventSelection ??
+            original?.eventSelection ?? .every)
         _allowedPhases = State(initialValue:
-            group?.phases ?? original?.allowedPhases)
-        _metrics = State(initialValue: target.isGroup ? uniqueMetrics :
+            checkpoint?.allowedPhases ?? group?.phases ?? original?.allowedPhases)
+        _metrics = State(initialValue: checkpoint?.metrics ??
+            (target.isGroup ? uniqueMetrics :
             Array((uniqueMetrics.isEmpty
                 ? target.legacyOption.map { [Self.legacyMetric($0)] } ?? []
-                : uniqueMetrics).prefix(1)))
-        _motivationPhrase = State(initialValue: original?.customPhrase ?? "")
+                : uniqueMetrics).prefix(1))))
+        _motivationPhrase = State(initialValue:
+            checkpoint?.motivationPhrase ?? original?.customPhrase ?? "")
         _motivationStyle = State(initialValue:
+            checkpoint?.motivationStyle ??
             original?.encouragementStyle ?? .encouragement)
     }
 
@@ -288,6 +330,12 @@ struct ATHLTHCoachRuleComposer: View {
             }
         }
         .presentationDetents([.large])
+        .onAppear {
+            onCheckpoint?(currentCheckpoint)
+        }
+        .onChange(of: currentCheckpoint) { _, checkpoint in
+            onCheckpoint?(checkpoint)
+        }
         .accessibilityIdentifier("athlth-coach-rule-composer")
     }
 
