@@ -62,6 +62,7 @@ on:
       - release/v2.2.8
       - release/v2.2.9
       - release/v2.3.0
+      - release/v3.0.0
     paths:
       - .github/testflight-trigger
 
@@ -83,7 +84,7 @@ jobs:
       # Historical release branches preserve their existing upload contract.
       # v2.2.5/v2.2.6 cannot enter signing/archive until ALL test gates pass.
       - name: Verify full 2.2.x release gate on the exact commit
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -173,7 +174,7 @@ jobs:
           else:
               print("::error::Build job list exceeds verification limit.")
               sys.exit(1)
-          for name in (["build"] if os.environ["GITHUB_REF_NAME"] in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0") else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
+          for name in (["build"] if os.environ["GITHUB_REF_NAME"] in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0") else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
               matches = [job for job in jobs if job["name"] == name]
               if len(matches) != 1 or matches[0]["conclusion"] != "success":
                   print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
@@ -188,7 +189,7 @@ jobs:
           else:
               print("::error::Build artifact list exceeds verification limit.")
               sys.exit(1)
-          for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] not in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0") else ()):
+          for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] not in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0") else ()):
               name = f"athlth-ipad-smoke-screenshots-{size}"
               matched = [
                   artifact for artifact in artifacts
@@ -232,7 +233,7 @@ jobs:
       # The branch can advance while waiting for a macOS runner. Do not
       # sign or upload an obsolete commit after the release gate passed.
       - name: Recheck release branch before signing
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
