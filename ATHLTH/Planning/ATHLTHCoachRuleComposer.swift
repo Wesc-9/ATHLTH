@@ -44,9 +44,11 @@ struct ATHLTHCoachComposerCheckpoint: Equatable {
     let metrics: [ATHLTHAudioCoachRule.Metric]
     let motivationPhrase: String
     let motivationStyle: ATHLTHCoachEncouragementStyle
+    let historicalWorkoutID: UUID?
 }
 
 struct ATHLTHCoachRuleComposer: View {
+    @EnvironmentObject private var session: AppSessionStore
     @Binding private var draft: AudioCoachDraft
     let target: ATHLTHCoachEditorTarget
     let supportsStructured: Bool
@@ -68,6 +70,8 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var metrics: [ATHLTHAudioCoachRule.Metric]
     @State private var motivationPhrase: String
     @State private var motivationStyle: ATHLTHCoachEncouragementStyle
+    @State private var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
+    @State private var historicalWorkoutID: UUID?
 
     private var currentCheckpoint: ATHLTHCoachComposerCheckpoint {
         ATHLTHCoachComposerCheckpoint(
@@ -75,7 +79,8 @@ struct ATHLTHCoachRuleComposer: View {
             groupName: groupName, trigger: trigger, interval: interval,
             eventSelection: eventSelection, allowedPhases: allowedPhases,
             metrics: metrics, motivationPhrase: motivationPhrase,
-            motivationStyle: motivationStyle
+            motivationStyle: motivationStyle,
+            historicalWorkoutID: historicalWorkoutID
         )
     }
 
@@ -149,6 +154,8 @@ struct ATHLTHCoachRuleComposer: View {
         _motivationStyle = State(initialValue:
             checkpoint?.motivationStyle ??
             original?.encouragementStyle ?? .encouragement)
+        _historicalWorkoutID = State(initialValue:
+            checkpoint?.historicalWorkoutID ?? original?.historicalWorkoutID)
     }
 
     private var isEditing: Bool {
@@ -207,8 +214,16 @@ struct ATHLTHCoachRuleComposer: View {
         default: return .elapsedTime
         }
     }
+    private var selectedHistory: ATHLTHCoachHistoricalRunReference? {
+        historicalReferences.first { $0.id == historicalWorkoutID }
+    }
+
+    private var canAdvanceTrigger: Bool {
+        trigger != .slowerThanPreviousWorkout || selectedHistory != nil
+    }
+
     private var canSave: Bool {
-        !metrics.isEmpty && (!target.isGroup ||
+        canAdvanceTrigger && !metrics.isEmpty && (!target.isGroup ||
             !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
             (isEditing || draft.customRules.count < 20)
     }
@@ -263,7 +278,9 @@ struct ATHLTHCoachRuleComposer: View {
                             interval: $interval,
                             eventSelection: $eventSelection,
                             phases: $allowedPhases,
-                            supportsStructured: supportsStructured
+                            supportsStructured: supportsStructured,
+                            historicalReferences: historicalReferences,
+                            historicalWorkoutID: $historicalWorkoutID
                         )
                     case .commands:
                         commandStep
@@ -282,11 +299,17 @@ struct ATHLTHCoachRuleComposer: View {
                             .background(bronze, in: RoundedRectangle(cornerRadius: 17))
                         }
                         .buttonStyle(.plain)
-                        .disabled(stage == .name &&
-                            groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .opacity(stage == .name &&
-                            groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? 0.45 : 1)
+                        .disabled(
+                            (stage == .name &&
+                                groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ||
+                            (stage == .trigger && !canAdvanceTrigger)
+                        )
+                        .opacity(
+                            (stage == .name &&
+                                groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ||
+                            (stage == .trigger && !canAdvanceTrigger)
+                            ? 0.45 : 1
+                        )
                     } else {
                         Button(action: save) {
                             Text(target.isGroup
@@ -330,6 +353,11 @@ struct ATHLTHCoachRuleComposer: View {
             }
         }
         .presentationDetents([.large])
+        .task(id: session.profile.userID) {
+            historicalReferences = ATHLTHCoachHistoricalRunEvidence.available(
+                userID: session.profile.userID
+            )
+        }
         .onAppear {
             onCheckpoint?(currentCheckpoint)
         }
@@ -498,6 +526,7 @@ struct ATHLTHCoachRuleComposer: View {
                 stage = .trigger
             }
         case .trigger:
+            guard canAdvanceTrigger else { return }
             // New triggers should work on first save without searching a
             // 20-item command list for the obvious matching readout.
             if metrics.isEmpty {
@@ -509,7 +538,8 @@ struct ATHLTHCoachRuleComposer: View {
                     metrics = [.heartRateZone]
                 case .randomMotivation, .nearFinishTime, .nearFinishDistance,
                      .elevationGain, .uphillDetected,
-                     .paceFasterThanTarget, .paceSlowerThanTarget:
+                     .paceFasterThanTarget, .paceSlowerThanTarget,
+                     .slowerThanPreviousWorkout:
                     metrics = [.motivation]
                 default: break
                 }
@@ -541,6 +571,13 @@ struct ATHLTHCoachRuleComposer: View {
             eventSelection: eventSelection
         )
         if let previous { rule.id = previous.id }
+        if trigger == .slowerThanPreviousWorkout,
+           let reference = selectedHistory {
+            rule.historicalWorkoutID = reference.id
+            rule.historicalWorkoutFirstKilometerSeconds =
+                reference.firstKilometerSeconds
+            rule.historicalWorkoutTitle = reference.title
+        }
         if metrics.contains(.motivation) {
             rule.encouragementStyle = motivationStyle
         }
