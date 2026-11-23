@@ -217,7 +217,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
 
         return Button {
             if !selected {
-                pendingDate = day.date
+                requestDayChange(to: day.date)
             }
         } label: {
             VStack(alignment: .leading, spacing: 5) {
@@ -453,7 +453,25 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         let proposed = ATHLTHStudioHomeWeek.shiftedWeek(
             from: selectedDate, offset: offset
         )
-        pendingDate = proposed
+        requestDayChange(to: proposed)
+    }
+
+    /// Do not warn about an unsaved workout before one has been started.
+    /// Date/time and Basic/Advanced preferences on the entry screen are
+    /// not an authored workout. Both the day rail and week arrows use this
+    /// single path so neither can raise a false draft confirmation.
+    private func requestDayChange(to proposed: Date) {
+        let nextDate = Calendar.current.startOfDay(for: proposed)
+        guard !Calendar.current.isDate(nextDate, inSameDayAs: selectedDate) else {
+            return
+        }
+        if selectedActivity == nil {
+            switchToDay(nextDate)
+        } else {
+            // The user entered the shared workout builder. Keep its local,
+            // date-scoped draft and ask before replacing that editor.
+            pendingDate = nextDate
+        }
     }
 
     private func switchToDay(_ date: Date) {
