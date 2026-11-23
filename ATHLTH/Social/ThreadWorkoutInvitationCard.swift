@@ -554,6 +554,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
 // The planned workout belongs to its creator, regardless of the response.
 struct PlannedWorkoutLobbyView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
@@ -593,37 +594,40 @@ struct PlannedWorkoutLobbyView: View {
     }
 
     private var invitedAthletes: [InvitedAthlete] {
-        let invitations = messages
-            .filter {
-                $0.sourceObjectID == sourceWorkoutID &&
-                $0.shareVersion == 2 &&
-                $0.senderID == organizerID &&
+        // Build response lookup once. Previously we filtered, sorted and
+        // decoded ALL invitation messages for EACH athlete on every SwiftUI
+        // update. Lobby history can have up to 200 message rows.
+        let relevant = messages.filter {
+            $0.sourceObjectID == sourceWorkoutID &&
                 $0.deletedAt == nil
+        }
+        var decisions: [UUID: PlannedWorkoutInviteDecision] = [:]
+        for response in relevant
+            .filter({ $0.shareVersion == 3 &&
+                $0.recipientID == organizerID })
+            .sorted(by: { $0.createdAt > $1.createdAt }) {
+            guard decisions[response.senderID] == nil,
+                  let detail = response.decodeSnapshot(
+                    PlannedWorkoutInviteResponse.self
+                  ),
+                  detail.sourceWorkoutID == sourceWorkoutID else {
+                continue
             }
-            .sorted { $0.createdAt > $1.createdAt }
+            decisions[response.senderID] = detail.decision
+        }
 
+        let invitations = relevant
+            .filter { $0.shareVersion == 2 &&
+                $0.senderID == organizerID }
+            .sorted { $0.createdAt > $1.createdAt }
         var seen = Set<UUID>()
         return invitations.compactMap { invitation in
             guard seen.insert(invitation.recipientID).inserted else {
                 return nil
             }
-            let latestResponse = messages
-                .filter {
-                    $0.sourceObjectID == sourceWorkoutID &&
-                    $0.shareVersion == 3 &&
-                    $0.senderID == invitation.recipientID &&
-                    $0.recipientID == organizerID &&
-                    $0.deletedAt == nil
-                }
-                .sorted { $0.createdAt > $1.createdAt }
-                .compactMap {
-                    $0.decodeSnapshot(PlannedWorkoutInviteResponse.self)
-                }
-                .first { $0.sourceWorkoutID == sourceWorkoutID }
-
             return InvitedAthlete(
                 id: invitation.recipientID,
-                decision: latestResponse?.decision
+                decision: decisions[invitation.recipientID]
             )
         }
     }
@@ -750,32 +754,39 @@ struct PlannedWorkoutLobbyView: View {
         .task(id: sourceWorkoutID) {
             await sharedDraft.refresh(sourceWorkoutID)
             await refresh()
-            if workout.invitedPartnerID != nil &&
-               inviteeForReadyLobby == nil {
-                await social.refresh()
-            }
-            // A calendar sheet can open before Community loads its profiles.
-            // Resolve names once when a relevant participant is missing.
+            // Resolve only mutual partner profiles. Full Community refresh
+            // fan-outs across feed, inbox, challenges and workout sessions.
             if (organizerID != session.profile.userID &&
                 social.profile(for: organizerID) == nil) ||
                 invitedAthletes.contains(where: {
                     $0.id != session.profile.userID &&
                     social.profile(for: $0.id) == nil
                 }) {
-                await social.refresh()
+                await social.refreshHomeFriends()
             }
             while !Task.isCancelled {
                 do {
-                    try await Task.sleep(for: .seconds(25))
+                    try await Task.sleep(for: .seconds(40))
                 } catch {
                     break
                 }
-                await refresh()
-                await sharedDraft.refresh(sourceWorkoutID, quiet: true)
+                guard !Task.isCancelled else { break }
+                if scenePhase == .active {
+                    await refresh()
+                    await sharedDraft.refresh(sourceWorkoutID, quiet: true)
+                }
             }
         }
         .task(id: sourceWorkoutID) {
             await sharedDraft.watch(sourceWorkoutID)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task {
+                    await refresh()
+                    await sharedDraft.refresh(sourceWorkoutID, quiet: true)
+                }
+            }
         }
     }
 
@@ -1484,10 +1495,12 @@ struct PlannedWorkoutLobbyView: View {
             hasLoaded = true
         }
         do {
-            messages = try await service.loadPlannedWorkoutInvitationMessages(
+            let latest = try await service.loadPlannedWorkoutInvitationMessages(
                 sourceWorkoutID: sourceWorkoutID
             )
-            loadError = nil
+            // Do not invalidate the lobby when the status has not changed.
+            if messages != latest { messages = latest }
+            if loadError != nil { loadError = nil }
         } catch {
             loadError = ATHLTHLocalization.choose(
                 english: "Unable to refresh status. Try again.",
