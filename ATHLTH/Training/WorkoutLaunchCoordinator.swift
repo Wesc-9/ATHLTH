@@ -332,9 +332,9 @@ struct PlannedWorkoutWatchBuilder {
                 targetHeartRatePercentMax: block.targetHeartRatePercentMax,
                 targetTreadmillInclinePercent:
                     block.isIndoor == true ? block.treadmillInclinePercent : nil,
+                ghostFollowsRecovery: phase == "recovery" && block.kind != .rest,
                 coachBrief: phase == "work" ? block.notes : nil,
-                recoveryStyle: phase == "recovery" ? (block.kind == .rest ? .passive : .activeJog) : nil,
-                ghostFollowsRecovery: phase == "recovery" && block.kind != .rest
+                recoveryStyle: phase == "recovery" ? (block.kind == .rest ? .passive : .activeJog) : nil
             )
         }
     }
