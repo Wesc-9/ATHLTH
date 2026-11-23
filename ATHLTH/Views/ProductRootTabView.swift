@@ -6625,6 +6625,18 @@ struct ATHLTHTrainView: View {
                     scheduleTrainDailyRecommendationRefresh()
                 }
             }
+            .task(id: isActive) {
+                guard isActive, !trainDashboardReady else { return }
+                // Mount the heavy Train dashboard only after native tab selection
+                // has completed its initial SwiftUI layout transaction.
+                do {
+                    try await Task.sleep(for: .milliseconds(350))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, isActive else { return }
+                trainDashboardReady = true
+            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
                 // Retain the prepared catalog and plan state across quick
