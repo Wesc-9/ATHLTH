@@ -29,7 +29,7 @@ assert not re.search(
 # timeline is empty. The snapshot must still preserve all authored blocks
 # and must not mutate the original timeline just for the invitation.
 assert re.search(
-    r"let\s+snapshotBlocks\s*:\s*\[WorkoutTemplateBlock\]"
+    r"(?:let|var)\s+snapshotBlocks\s*:\s*\[WorkoutTemplateBlock\]"
     r"\s*=\s*isPlannedWorkout[\s\S]*?blocks\.isEmpty"
     r"[\s\S]*?ATHLTHBasicFreeRunPolicy\.makeOpenRunningBlock\(\)"
     r"[\s\S]*?:\s*blocks",
