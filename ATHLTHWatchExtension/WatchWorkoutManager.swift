@@ -3428,32 +3428,51 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             plan.isWarmUp
     }
 
-    /// Live virtual pacer reads the same active step clock and distance as
-    /// the structured workout engine; no parallel timer or HealthKit session.
+    /// Rebuild Ghost from recorded steps and the current active step. This
+    /// keeps the comparison continuous across intervals without a second
+    /// timer or accumulating the same HealthKit sample twice.
     var intervalGhostLiveLeadMeters: Double? {
         guard let workout = structuredRunningWorkout,
               let configuration = workout.intervalGhostConfiguration,
               configuration.isEnabled, configuration.isValid,
-              !awaitingMainStart,
               workout.steps.indices.contains(structuredStepIndex)
         else { return nil }
-        let step = workout.steps[structuredStepIndex]
-        let kind: ATHLTHIntervalGhostPacer.SegmentKind
-        switch step.phase {
-        case "warmup": kind = .warmup
-        case "cooldown": kind = .cooldown
-        case "recovery":
-            kind = step.ghostFollowsRecovery == true
-                ? .activeRecovery : .passiveRecovery
-        default: kind = .work
+        var progress = ATHLTHIntervalGhostPacer.VirtualProgress()
+        for recorded in recordedStructuredRunSteps.sorted(by: { $0.index < $1.index }) {
+            guard workout.steps.indices.contains(recorded.index) else { continue }
+            let step = workout.steps[recorded.index]
+            guard let next = configuration.progress(
+                from: progress, segmentID: step.id,
+                kind: intervalGhostKind(for: step),
+                elapsedSeconds: recorded.activeSeconds,
+                actualMeters: recorded.distanceMeters
+            ) else { return nil }
+            progress = next
         }
-        let segmentID = step.id
-        guard let progress = configuration.progress(
-            from: .init(), segmentID: segmentID, kind: kind,
-            elapsedSeconds: currentStructuredStepElapsedTime,
-            actualMeters: currentStructuredStepDistanceMeters
-        ) else { return nil }
+        if !awaitingMainStart && !structuredWorkoutComplete {
+            let step = workout.steps[structuredStepIndex]
+            guard let next = configuration.progress(
+                from: progress, segmentID: step.id,
+                kind: intervalGhostKind(for: step),
+                elapsedSeconds: currentStructuredStepElapsedTime,
+                actualMeters: currentStructuredStepDistanceMeters
+            ) else { return nil }
+            progress = next
+        }
         return progress.leadMeters
+    }
+
+    private func intervalGhostKind(
+        for step: WatchRunningWorkoutStep
+    ) -> ATHLTHIntervalGhostPacer.SegmentKind {
+        switch step.phase {
+        case "warmup": return .warmup
+        case "cooldown": return .cooldown
+        case "recovery":
+            return step.ghostFollowsRecovery == true
+                ? .activeRecovery : .passiveRecovery
+        default: return .work
+        }
     }
 
     var currentStructuredRunningStep: WatchRunningWorkoutStep? {
