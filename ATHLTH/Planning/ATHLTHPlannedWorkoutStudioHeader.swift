@@ -140,13 +140,26 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     }
 
     private var zoneText: String {
-        guard let range = ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(
-            for: blocks
-        ) else { return "–" }
+        // An interval's intended effort should not be hidden by its easy
+        // recoveries. Across several exercises, combine the effort zones.
+        let efforts = blocks.filter {
+            $0.kind == .run && !$0.isRestOrActiveRecovery
+        }
+        let range = ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(
+            for: efforts.isEmpty ? blocks : efforts
+        )
         let letter = ATHLTHLocalization.isNorwegian ? "S" : "Z"
-        return range.lowerBound == range.upperBound
-            ? "\(letter)\(range.lowerBound)"
-            : "\(letter)\(range.lowerBound)–\(letter)\(range.upperBound)"
+        if let range {
+            return range.lowerBound == range.upperBound
+                ? "\(letter)\(range.lowerBound)"
+                : "\(letter)\(range.lowerBound)–\(letter)\(range.upperBound)"
+        }
+        // Older 4×4 library recipes may have duration but no zone metadata.
+        // This is estimated protocol guidance, never measured heart rate.
+        if ATHLTHCompoundExerciseCatalog.fourByFourRecovery(blocks) != nil {
+            return "\(letter)4–\(letter)5"
+        }
+        return "–"
     }
 
     private var inclineText: String {
