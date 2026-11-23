@@ -89,6 +89,45 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
 
     private let client = SupabaseEnvironment.client
 
+    // Postgres Changes, polling and the editor can request the same row at
+    // once. Coalesce those requests rather than decoding full workout JSON
+    // repeatedly and publishing identical state into the entire lobby.
+    private var refreshInFlight = false
+    private var pendingRefreshSourceID: UUID?
+    private var latestRequestedSourceID: UUID?
+    private var cachedWorkoutID: UUID?
+    private var cachedWorkoutRevision: Int?
+    private var cachedWorkout: PlannedSession?
+
+    /// Decode one snapshot per source/revision, not on every SwiftUI body
+    /// evaluation or every access by a row in the shared workout view.
+    var workout: PlannedSession? {
+        guard let current = draft else { return nil }
+        if cachedWorkoutID == current.sourceWorkoutID &&
+           cachedWorkoutRevision == current.revision {
+            return cachedWorkout
+        }
+        let decoded = current.workout
+        cachedWorkoutID = current.sourceWorkoutID
+        cachedWorkoutRevision = current.revision
+        cachedWorkout = decoded
+        return decoded
+    }
+
+    /// Never regress to an earlier revision (or earlier approvals of that
+    /// same revision) if two network requests finish out of order.
+    private func apply(_ incoming: TrainTogetherLiveDraft?) {
+        if let current = draft, let incoming {
+            if incoming.revision < current.revision { return }
+            if incoming.revision == current.revision,
+               (current.ownerApproved && !incoming.ownerApproved ||
+                current.partnerApproved && !incoming.partnerApproved) {
+                return
+            }
+        }
+        if draft != incoming { draft = incoming }
+    }
+
     static func privateSnapshot(_ workout: PlannedSession) -> PlannedSession {
         var copy = workout
         copy.gearIDs = []
@@ -124,8 +163,25 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
     }
 
     func refresh(_ sourceID: UUID, quiet: Bool = false) async {
-        if !quiet { isLoading = true }
-        defer { isLoading = false }
+        latestRequestedSourceID = sourceID
+        if refreshInFlight {
+            pendingRefreshSourceID = sourceID
+            return
+        }
+
+        refreshInFlight = true
+        if !quiet && draft == nil { isLoading = true }
+        defer {
+            isLoading = false
+            refreshInFlight = false
+            if let pending = pendingRefreshSourceID {
+                pendingRefreshSourceID = nil
+                Task { @MainActor [weak self] in
+                    await self?.refresh(pending, quiet: true)
+                }
+            }
+        }
+
         do {
             let rows: [TrainTogetherLiveDraft] = try await client
                 .from("social_workout_draft_lobbies")
@@ -134,9 +190,15 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
                 .limit(1)
                 .execute()
                 .value
-            draft = rows.first
-            errorMessage = nil
+            guard !Task.isCancelled,
+                  latestRequestedSourceID == sourceID else { return }
+            apply(rows.first)
+            if errorMessage != nil { errorMessage = nil }
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled,
+                  latestRequestedSourceID == sourceID else { return }
             if !quiet { errorMessage = error.localizedDescription }
         }
     }
@@ -157,15 +219,18 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
         isWorking = true
         defer { isWorking = false }
         do {
-            try await client.rpc(
+            let updated: TrainTogetherLiveDraft = try await client.rpc(
                 "update_social_workout_draft",
                 params: TrainTogetherUpdateDraftParameters(
                     sourceID: current.sourceWorkoutID,
                     expectedRevision: originalRevision,
                     snapshot: try Self.encode(proposed)
                 )
-            ).execute()
-            await refresh(current.sourceWorkoutID)
+            ).execute().value
+            // The RPC returns the authoritative new revision. No follow-up
+            // SELECT is needed just to reflect the athlete's own edit.
+            apply(updated)
+            if errorMessage != nil { errorMessage = nil }
         } catch {
             errorMessage = error.localizedDescription
             await refresh(current.sourceWorkoutID, quiet: true)
@@ -177,14 +242,15 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
         isWorking = true
         defer { isWorking = false }
         do {
-            try await client.rpc(
+            let updated: TrainTogetherLiveDraft = try await client.rpc(
                 "approve_social_workout_draft",
                 params: TrainTogetherApproveDraftParameters(
                     sourceID: current.sourceWorkoutID,
                     expectedRevision: current.revision
                 )
-            ).execute()
-            await refresh(current.sourceWorkoutID)
+            ).execute().value
+            apply(updated)
+            if errorMessage != nil { errorMessage = nil }
         } catch {
             errorMessage = error.localizedDescription
             await refresh(current.sourceWorkoutID, quiet: true)
@@ -194,7 +260,9 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
     /// Postgres Changes is authorized by row-level security. No invitation,
     /// exercise or permission data is sent through a public channel.
     func watch(_ sourceID: UUID) async {
-        await refresh(sourceID)
+        if draft?.sourceWorkoutID != sourceID {
+            await refresh(sourceID)
+        }
         let channel = await client.channel(
             "train-together-draft-\(sourceID.uuidString.lowercased())"
         )
@@ -215,6 +283,7 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
 /// The same workout editor is used for running, walking, strength and every
 /// other supported workout kind. No separate strength-only collaboration path.
 struct TrainTogetherLiveDraftRoomView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @StateObject private var live = TrainTogetherLiveDraftStore()
@@ -234,7 +303,7 @@ struct TrainTogetherLiveDraftRoomView: View {
     }
 
     private var editableSourceWorkout: PlannedSession {
-        var source = live.draft?.workout ?? fallbackWorkout
+        var source = live.workout ?? fallbackWorkout
         // SessionEditorView's existing proposal guard reads this flag.
         // The owner may always add exercises, including in view-only invites;
         // the server-side edit_mode still prevents guest edits.
@@ -466,7 +535,7 @@ struct TrainTogetherLiveDraftRoomView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditor) {
             SessionEditorView(
-                standaloneDate: live.draft?.workout?.scheduledStart
+                standaloneDate: live.workout?.scheduledStart
                     ?? fallbackWorkout.scheduledStart ?? Date(),
                 initialSourceWorkout: editableSourceWorkout,
                 preserveSourceID: true,
@@ -475,7 +544,7 @@ struct TrainTogetherLiveDraftRoomView: View {
                     // Never change the invitation permission merely because
                     // the owner opened the universal exercise editor.
                     revision.allowInviteeExercises =
-                        live.draft?.workout?.allowInviteeExercises
+                        live.workout?.allowInviteeExercises
                     Task {
                         await live.save(revision, basedOn: editingRevision)
                     }
@@ -486,16 +555,29 @@ struct TrainTogetherLiveDraftRoomView: View {
             await live.watch(sourceWorkoutID)
         }
         .task(id: sourceWorkoutID) {
-            // Reconnect/poll fallback for suspended Realtime transports.
+            // Realtime receives edits immediately. Polling is a resilience
+            // fallback for lost subscriptions, not a 6-second background
+            // download of the full workout snapshot.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(6))
-                if Task.isCancelled { break }
-                await live.refresh(sourceWorkoutID, quiet: true)
+                do {
+                    try await Task.sleep(for: .seconds(30))
+                } catch {
+                    break
+                }
+                guard !Task.isCancelled else { break }
+                if scenePhase == .active {
+                    await live.refresh(sourceWorkoutID, quiet: true)
+                }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await live.refresh(sourceWorkoutID, quiet: true) }
             }
         }
         .onChange(of: live.draft?.revision) { _, _ in
             guard isOwner,
-                  var updated = live.draft?.workout,
+                  var updated = live.workout,
                   let local = session.standalonePlannedSessions.first(where: {
                       $0.id == updated.id
                   }) else { return }
