@@ -62,6 +62,23 @@ struct WatchRunIntervalFocusPage: View {
                                 .tint(WatchTheme.liveAction)
                         }
                     }
+                    if !workout.awaitingMainStart,
+                       let lead = ATHLTHIntervalGhostPacer.leadMeters(
+                           step: step,
+                           elapsedSeconds: workout.currentStructuredStepElapsedTime,
+                           distanceMeters: workout.currentStructuredStepDistanceMeters
+                       ) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "figure.run")
+                            Text(lead >= 0
+                                ? "\(Int(lead.rounded())) m foran Ghost"
+                                : "\(Int(abs(lead).rounded())) m bak Ghost")
+                                .monospacedDigit()
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(WatchTheme.accentDeep)
+                        .accessibilityIdentifier("athlth-watch-interval-ghost-lead")
+                    }
                     HStack(spacing: 9) {
                         if let target = targetPace(step) {
                             VStack(alignment: .leading, spacing: 2) {
