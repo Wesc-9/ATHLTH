@@ -472,6 +472,32 @@ final class ATHLTHIntervalGhostPacerPolicyTests: XCTestCase {
         XCTAssertEqual(next.leadMeters, 0, accuracy: 0.01)
     }
 
+    func testIndividualIntervalsCanBeExcludedOrHaveOwnPace() throws {
+        let ignoredID = UUID()
+        let fastID = UUID()
+        let overrides: [ATHLTHIntervalGhostPacer.SegmentOverride] = [
+            .init(segmentID: ignoredID, enabled: false, paceSecondsPerKilometer: nil),
+            .init(segmentID: fastID, enabled: true, paceSecondsPerKilometer: 240)
+        ]
+        let start = ATHLTHIntervalGhostPacer.VirtualProgress()
+        let excluded = try XCTUnwrap(ATHLTHIntervalGhostPacer.advanceSegment(
+            start, segmentID: ignoredID, kind: .work, scope: .mainOnly,
+            elapsedSeconds: 300, actualMeters: 1_000,
+            defaultPaceSecondsPerKilometer: 300,
+            recovery: .freeze, overrides: overrides
+        ))
+        XCTAssertEqual(excluded.ghostMeters, 0)
+        XCTAssertEqual(excluded.runnerMeters, 0)
+        let fast = try XCTUnwrap(ATHLTHIntervalGhostPacer.advanceSegment(
+            excluded, segmentID: fastID, kind: .work, scope: .mainOnly,
+            elapsedSeconds: 240, actualMeters: 950,
+            defaultPaceSecondsPerKilometer: 300,
+            recovery: .freeze, overrides: overrides
+        ))
+        XCTAssertEqual(fast.ghostMeters, 1_000, accuracy: 0.01)
+        XCTAssertEqual(fast.leadMeters, -50, accuracy: 0.01)
+    }
+
     func testMainOnlyIgnoresWarmupAndInvalidPace() throws {
         let start = ATHLTHIntervalGhostPacer.VirtualProgress()
         let next = try XCTUnwrap(ATHLTHIntervalGhostPacer.advance(
