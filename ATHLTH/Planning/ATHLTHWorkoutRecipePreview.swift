@@ -476,6 +476,72 @@ enum ATHLTHSimpleWorkoutOutline {
     }
 }
 
+/// Compact Basic-only grouping for a complete 4×4 protocol. Work and
+/// recoveries retain their exact source positions and individualized targets.
+/// Unlike the generic outline, an athlete's different pace on one effort must
+/// not turn a single exercise into several Basic cards.
+enum ATHLTHBasicRunningExerciseOutline {
+    static func items(
+        for blocks: [WorkoutTemplateBlock]
+    ) -> [ATHLTHSimpleWorkoutOutline.Item] {
+        let original = ATHLTHSimpleWorkoutOutline.stages(for: blocks)
+            .flatMap(\.items)
+        let byStart = Dictionary(uniqueKeysWithValues: original.map { ($0.id, $0) })
+        var result: [ATHLTHSimpleWorkoutOutline.Item] = []
+        var cursor = 0
+        while cursor < blocks.count {
+            var grouped = false
+            for count in [8, 7] where cursor + count <= blocks.count {
+                let candidate = Array(blocks[cursor..<(cursor + count)])
+                guard candidate.enumerated().allSatisfy({ offset, block in
+                    offset.isMultiple(of: 2)
+                        ? (block.kind == .run && !block.isRestOrActiveRecovery)
+                        : block.isRestOrActiveRecovery
+                }), ATHLTHCompoundExerciseCatalog.fourByFourRecovery(
+                    candidate
+                ) != nil else { continue }
+
+                let workMinutes = Int(((candidate.first?.durationSeconds ?? 0) / 60).rounded())
+                let restMinutes = Int(((candidate.dropFirst().first?.durationSeconds ?? 0) / 60).rounded())
+                let title = ATHLTHLocalization.choose(
+                    english: "4 × 4 intervals", norwegian: "4 × 4 intervaller"
+                )
+                let detail = ATHLTHLocalization.choose(
+                    english: "4 efforts · \(workMinutes) min work · \(restMinutes) min recovery",
+                    norwegian: "4 drag · \(workMinutes) min arbeid · \(restMinutes) min pause"
+                )
+                result.append(.init(
+                    id: cursor, title: title, detail: detail,
+                    symbol: "figure.run", repetitions: 4,
+                    representedSteps: count
+                ))
+                cursor += count
+                grouped = true
+                break
+            }
+            if grouped { continue }
+            if let normal = byStart[cursor] {
+                result.append(normal)
+                cursor += max(1, normal.representedSteps)
+            } else {
+                // Defensive fallback for unusual mixed legacy recipes;
+                // never silently hide an executable workout block.
+                let block = blocks[cursor]
+                result.append(.init(
+                    id: cursor, title: block.title,
+                    detail: block.durationSeconds.map {
+                        ATHLTHWorkoutStepCopy.duration($0)
+                    } ?? "",
+                    symbol: block.kind.systemImage, repetitions: 1,
+                    representedSteps: 1
+                ))
+                cursor += 1
+            }
+        }
+        return result
+    }
+}
+
 /// Read-only workout presentation shared by running, strength and hybrid
 /// recipes. It uses the same light plan tokens and phase-oriented timeline as
 /// WorkoutTemplateBuilderView, without exposing editing controls by accident.
