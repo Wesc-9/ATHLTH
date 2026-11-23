@@ -5886,7 +5886,11 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                if selectedSection == .progress {
+                if !isActive {
+                    // Retain the NavigationStack and presentation state while
+                    // avoiding all three expensive Train root trees offscreen.
+                    Color.clear
+                } else if selectedSection == .progress {
                     ATHLTHTrainProgressReferenceView(
                         onReturnToToday: { selectedSection = .today },
                         onOpenPlan: { selectedSection = .plan },
@@ -5903,15 +5907,9 @@ struct ATHLTHTrainView: View {
                         .athlthStablePresentationBoundary()
                         .transition(.opacity)
                 } else {
-                    if isActive {
-                        trainRootScroll(for: .today)
-                            .athlthStablePresentationBoundary()
-                            .transition(.opacity)
-                    } else {
-                        // Retain the NavigationStack and its state, but do not
-                        // evaluate the expensive Today dashboard offscreen.
-                        Color.clear
-                    }
+                    trainRootScroll(for: .today)
+                        .athlthStablePresentationBoundary()
+                        .transition(.opacity)
                 }
             }
             // A short crossfade replaces the jerky animated height changes
