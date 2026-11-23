@@ -541,12 +541,15 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 .execute()
                 .value
             let cutoff = Date().addingTimeInterval(-180)
-            trainingNowUserIDs = Set(rows.compactMap { row in
+            let updated = Set(rows.compactMap { row in
                 guard row.state == "training",
                       let updatedAt = row.updatedAt,
                       updatedAt >= cutoff else { return nil }
                 return row.userID
             })
+            if trainingNowUserIDs != updated {
+                trainingNowUserIDs = updated
+            }
             lastTrainingNowRefreshAt = Date()
         } catch is CancellationError {
             return
@@ -626,7 +629,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     .value
 
             let cutoff = Date().addingTimeInterval(-210)
-            onlineUserIDs = Set(
+            let updated = Set(
                 rows
                     .filter {
                         $0.isOnline &&
@@ -634,6 +637,9 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     }
                     .map(\.userID)
             )
+            if onlineUserIDs != updated {
+                onlineUserIDs = updated
+            }
             lastOnlineRefreshAt = Date()
         } catch is CancellationError {
             return
@@ -677,8 +683,10 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     .execute()
                     .value
 
-            visibleLiveSessions =
-                rows.filter(\.isActive)
+            let active = rows.filter(\.isActive)
+            if visibleLiveSessions != active {
+                visibleLiveSessions = active
+            }
             lastVisibleSessionsRefreshAt = Date()
 
             if selectedLiveGhostSessionID == nil,
@@ -2023,10 +2031,14 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                         liveGhostMaximumUsableAge
                 }
 
-            liveLocations = usable
-            appendFreshTrailSamples(
-                usable.filter(\.isFresh)
-            )
+            if liveLocations != usable {
+                liveLocations = usable
+                appendFreshTrailSamples(
+                    usable.filter(\.isFresh)
+                )
+            }
+            // Connection freshness still changes with wall-clock time even
+            // when GPS locations are identical. Always refresh the status.
             updateLiveGhostConnectionState()
         } catch is CancellationError {
             return
