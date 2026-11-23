@@ -668,14 +668,14 @@ struct PlannedWorkoutLobbyView: View {
     private var canLaunchWorkout: Bool {
         // Planning covers all WorkoutKind cases; the recording callback
         // remains responsible for rejecting unsupported capture devices.
-        onStartWorkout != nil
+        onStartWorkout != nil && !hasCancelledInvitation && !sharedDraft.isWithdrawn(sourceWorkoutID)
     }
 
     private var canEnterReadyLobby: Bool {
         // Existing invitations (before the live-draft migration) keep their
         // old behavior. New invitations require both approvals of one revision.
         hasLoaded && loadError == nil &&
-            !hasCancelledInvitation &&
+            !hasCancelledInvitation && !sharedDraft.isWithdrawn(sourceWorkoutID) &&
             (sharedDraft.draft?.bothApproved ?? true)
     }
 
@@ -729,9 +729,11 @@ struct PlannedWorkoutLobbyView: View {
                     sharedPlanningCard
                 }
                 participantsCard
-                startOptionsCard
-                if isOrganizer {
-                    organizerActions
+                if hasCancelledInvitation || sharedDraft.isWithdrawn(sourceWorkoutID) {
+                    Label(ATHLTHLocalization.choose(english: "Invitation withdrawn", norwegian: "Invitasjonen er trukket tilbake"), systemImage: "xmark.circle")
+                } else {
+                    startOptionsCard
+                    if isOrganizer { organizerActions }
                 }
                 Text(ATHLTHLocalization.choose(
                     english: "Your workout is in your calendar whether friends accept, decline or do not respond. You can train on your own.",

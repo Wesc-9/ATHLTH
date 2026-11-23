@@ -14,13 +14,14 @@ struct TrainTogetherLiveDraft: Decodable, Identifiable, Equatable {
     let revision: Int
     let ownerApprovedRevision: Int?
     let partnerApprovedRevision: Int?
+    var cancelledAt: Date? = nil
 
     var id: UUID { sourceWorkoutID }
     var isCollaborative: Bool { editMode == "collaborative" }
     var isPhysical: Bool { participationMode == "physical" }
     var ownerApproved: Bool { ownerApprovedRevision == revision }
     var partnerApproved: Bool { partnerApprovedRevision == revision }
-    var bothApproved: Bool { ownerApproved && partnerApproved }
+    var bothApproved: Bool { cancelledAt == nil && ownerApproved && partnerApproved }
 
     var workout: PlannedSession? {
         guard let data = workoutSnapshot.data(using: .utf8) else { return nil }
@@ -37,6 +38,7 @@ struct TrainTogetherLiveDraft: Decodable, Identifiable, Equatable {
         case revision
         case ownerApprovedRevision = "owner_approved_revision"
         case partnerApprovedRevision = "partner_approved_revision"
+        case cancelledAt = "cancelled_at"
     }
 }
 
@@ -86,6 +88,9 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var isWorking = false
     @Published var errorMessage: String?
+    @Published private(set) var withdrawnSourceIDs: Set<UUID> = []
+
+    func isWithdrawn(_ sourceID: UUID) -> Bool { withdrawnSourceIDs.contains(sourceID) }
 
     private let client = SupabaseEnvironment.client
 
@@ -117,6 +122,15 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
     /// Never regress to an earlier revision (or earlier approvals of that
     /// same revision) if two network requests finish out of order.
     private func apply(_ incoming: TrainTogetherLiveDraft?) {
+        if let incoming {
+            if incoming.cancelledAt != nil {
+                withdrawnSourceIDs.insert(incoming.sourceWorkoutID)
+                if draft?.sourceWorkoutID == incoming.sourceWorkoutID { draft = nil }
+                errorMessage = ATHLTHLocalization.choose(english: "The invitation was withdrawn.", norwegian: "Invitasjonen er trukket tilbake.")
+                return
+            }
+            guard !isWithdrawn(incoming.sourceWorkoutID) else { return }
+        }
         if let current = draft, let incoming {
             if incoming.revision < current.revision { return }
             if incoming.revision == current.revision,
@@ -193,6 +207,7 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
             guard !Task.isCancelled,
                   latestRequestedSourceID == sourceID else { return }
             apply(rows.first)
+            guard !isWithdrawn(sourceID) else { return }
             if errorMessage != nil { errorMessage = nil }
         } catch is CancellationError {
             return
@@ -230,6 +245,7 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
             // The RPC returns the authoritative new revision. No follow-up
             // SELECT is needed just to reflect the athlete's own edit.
             apply(updated)
+            guard !isWithdrawn(updated.sourceWorkoutID) else { return }
             if errorMessage != nil { errorMessage = nil }
         } catch {
             errorMessage = error.localizedDescription
@@ -250,6 +266,7 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
                 )
             ).execute().value
             apply(updated)
+            guard !isWithdrawn(updated.sourceWorkoutID) else { return }
             if errorMessage != nil { errorMessage = nil }
         } catch {
             errorMessage = error.localizedDescription

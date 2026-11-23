@@ -735,12 +735,8 @@ final class MessagingStore: ObservableObject {
               }) else {
             throw failure("The shared workout has already started.", "Fellesøkten er allerede startet.")
         }
-        for lobby in matchingLobbies {
-            await social.cancelActiveWorkout(sessionID: lobby.id)
-            guard !social.workoutSessions.contains(where: { $0.id == lobby.id }) else {
-                throw failure("Could not close the ready lobby.", "Kunne ikke lukke klar-lobbyen.")
-            }
-        }
+        // The database cancels the lobby and draft atomically with the message.
+
         let change = WorkoutInviteLifecycleUpdate(
             sourceWorkoutID: sourceID, organizerID: organizerID,
             kind: .cancelled, updatedWorkout: nil, occurredAt: Date()
