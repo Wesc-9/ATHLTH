@@ -1604,6 +1604,9 @@ enum ATHLTHAudioCoachSportPolicy {
     ) -> [ATHLTHAudioCoachRule] {
         rules.filter { rule in
             guard rule.trigger != .distance,
+                  rule.trigger != .nearFinishDistance,
+                  rule.trigger != .elevationGain,
+                  rule.trigger != .uphillDetected,
                   !rule.trigger.isPaceCondition,
                   rule.trigger != .personalRecordConfirmed else {
                 return false
@@ -1612,7 +1615,9 @@ enum ATHLTHAudioCoachSportPolicy {
                 switch metric {
                 case .remainingExercises, .nextExercise,
                      .previousExerciseSummary, .previousMainSectionSummary,
-                     .stepName, .elapsedTime:
+                     .stepName, .elapsedTime, .motivation,
+                     .heartRate, .heartRateZone, .hydrationReminder,
+                     .clockTime, .date, .workoutRemainingTime:
                     return true
                 default: return false
                 }
@@ -1635,7 +1640,12 @@ enum ATHLTHAudioCoachSportPolicy {
             if rule.trigger.needsStructuredStep ||
                 rule.trigger.isPaceCondition ||
                 rule.trigger == .personalRecordConfirmed { return false }
-            if rule.trigger == .distance && !distanceAvailable {
+            if (rule.trigger == .distance ||
+                rule.trigger == .nearFinishDistance) && !distanceAvailable {
+                return false
+            }
+            if rule.trigger == .elevationGain ||
+               rule.trigger == .uphillDetected {
                 return false
             }
             return rule.selectedMetrics.allSatisfy { metric in
