@@ -322,3 +322,5 @@ ATHLTH 2.2.8 build 137 — explicitly authorized 2026-11-23 TestFlight release f
 ATHLTH 2.2.8 build 137 — gated retry 2026-11-23 after fixing Swift 6 Audio Coach EnvironmentKey immutable closure default and explicit Set<UUID> inference in social presence. Require all five successful exact-commit checks before upload; keep build 137, never bypass checks.
 
 ATHLTH 2.2.8 build 137 gated TestFlight retry 2026-11-23: resolve Swift 6 main-actor isolated pure fourByFourRecovery call from Basic 4x4 outline and step guidance. Require all five same-commit CI checks and successful iPhone/Watch/Widget signing; no bypass or stale upload.
+
+ATHLTH 2.2.8 build 137 — gated TestFlight retry 2026-11-23 after fixing XCTest compile errors: PublicTrailRecord elevation argument ordering and missing iPad Studio sidebar visibility toggle policy. Require all five successful CI workflows on this exact commit; preserve Apple signing and do not bypass gates.
