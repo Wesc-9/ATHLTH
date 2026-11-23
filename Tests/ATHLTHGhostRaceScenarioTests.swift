@@ -502,6 +502,44 @@ final class ATHLTHIntervalGhostPacerPolicyTests: XCTestCase {
         XCTAssertEqual(selectedProgress.leadMeters, -50, accuracy: 0.01)
     }
 
+    func testRepeatedWatchSampleDoesNotAdvanceGhostTwice() throws {
+        var configuration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
+        configuration.isEnabled = true
+        let id = UUID()
+        let initial = ATHLTHIntervalGhostPacer.LiveSample(
+            elapsedSeconds: 0, distanceMeters: 0
+        )
+        let current = ATHLTHIntervalGhostPacer.LiveSample(
+            elapsedSeconds: 300, distanceMeters: 1_050
+        )
+        let first = try XCTUnwrap(ATHLTHIntervalGhostPacer.advanceLiveSample(
+            configuration: configuration,
+            progress: .init(),
+            previous: initial, current: current,
+            segmentID: id, kind: .work
+        ))
+        let duplicate = try XCTUnwrap(ATHLTHIntervalGhostPacer.advanceLiveSample(
+            configuration: configuration,
+            progress: first,
+            previous: current, current: current,
+            segmentID: id, kind: .work
+        ))
+        XCTAssertEqual(duplicate.ghostMeters, 1_000, accuracy: 0.01)
+        XCTAssertEqual(duplicate.leadMeters, 50, accuracy: 0.01)
+    }
+
+    func testWatchSampleRejectsBackwardClockOrDistance() {
+        var configuration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
+        configuration.isEnabled = true
+        XCTAssertNil(ATHLTHIntervalGhostPacer.advanceLiveSample(
+            configuration: configuration,
+            progress: .init(),
+            previous: .init(elapsedSeconds: 300, distanceMeters: 1_000),
+            current: .init(elapsedSeconds: 299, distanceMeters: 1_050),
+            segmentID: UUID(), kind: .work
+        ))
+    }
+
     func testWorkoutConfigurationRejectsInvalidRecoveryPace() {
         var configuration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
         configuration.isEnabled = true
