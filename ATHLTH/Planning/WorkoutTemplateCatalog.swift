@@ -4678,6 +4678,7 @@ private enum ATHLTHWorkoutExtraDestination: String, Identifiable {
     case planWithFriend
     case spotify
     case heartRateAndPace
+    case basicExercise
     case audioCoach
     case ghostRace
     case navigation
@@ -4771,6 +4772,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingStudioStepSongPicker = false
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
     @State private var selectedBasicTargetBlockIDs: Set<UUID>?
+    @State private var selectedBasicExerciseTitle = ""
     @State private var audioCoachDraft: AudioCoachDraft
     @State private var routeGuardianDraft: RouteGuardianDraft
     @State private var ghostDraft: GhostQuickStartDraft
@@ -6443,6 +6445,18 @@ struct WorkoutTemplateBuilderView: View {
                         blocks: $blocks, advanced: studioAdvanced,
                         includedBlockIDs: selectedBasicTargetBlockIDs
                     )
+                case .basicExercise:
+                    ATHLTHBasicWorkoutExerciseDetailSheet(
+                        blocks: $blocks,
+                        includedBlockIDs: selectedBasicTargetBlockIDs ?? Set(
+                            blocks.prefix(
+                                ATHLTHBasicRunningExerciseOutline.items(
+                                    for: blocks
+                                ).first?.representedSteps ?? 1
+                            ).map(\.editorDragID)
+                        ),
+                        exerciseTitle: selectedBasicExerciseTitle
+                    )
                 case .audioCoach:
                     NavigationStack {
                         ScrollView {
@@ -7016,7 +7030,8 @@ struct WorkoutTemplateBuilderView: View {
                             selectedBasicTargetBlockIDs = Set(
                                 portion.map(\.editorDragID)
                             )
-                            selectedWorkoutExtra = .heartRateAndPace
+                            selectedBasicExerciseTitle = displayName
+                            selectedWorkoutExtra = .basicExercise
                         } else if let first = portion.first {
                             openStudioStepEditor(blockID: first.editorDragID)
                         }
