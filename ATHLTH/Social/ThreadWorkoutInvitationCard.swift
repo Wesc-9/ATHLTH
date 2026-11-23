@@ -847,7 +847,14 @@ struct PlannedWorkoutLobbyView: View {
                 NavigationLink {
                     TrainTogetherLiveDraftRoomView(
                         sourceWorkoutID: sourceWorkoutID,
-                        fallbackWorkout: sharedDraft.draft?.workout ?? workout
+                        fallbackWorkout: sharedDraft.draft?.workout ?? workout,
+                        onOpenReady: isOrganizer && canLaunchWorkout ? {
+                            if matchingReadyLobbyID != nil {
+                                social.presentCoordinatedLobby()
+                            } else if let friend = inviteeForReadyLobby {
+                                Task { await openReadyLobby(with: friend) }
+                            }
+                        } : nil
                     )
                 } label: {
                     Label(
@@ -1188,6 +1195,9 @@ struct PlannedWorkoutLobbyView: View {
         approvedWorkout.spotifyPlaylist = persistedWorkout.spotifyPlaylist
         approvedWorkout.spotifyAutoplayOnStart =
             persistedWorkout.spotifyAutoplayOnStart
+        // The shared snapshot excludes interval music too. Do not reinsert it
+        // into the server-approved payload used by the coordinated start gate.
+        approvedWorkout.spotifyIntervalTrack = nil
 
         // Invitation scheduling must not start a recorder. Starting the
         // ready lobby creates a distinct real-time participation session.

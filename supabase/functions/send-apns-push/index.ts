@@ -348,8 +348,16 @@ function localizedAlert(
       break;
 
     case "train_together_chat":
-      title = "Ny melding i treningsøkt";
-      body = body.replace("New message in ", "Ny melding i ");
+      if (event.title === "Shared workout updated") {
+        title = "Fellesøkt oppdatert";
+        body = "Se siste versjon av fellesøkten.";
+      } else if (event.title === "New shared workout message") {
+        title = "Ny melding i fellesøkten";
+        body = "Åpne fellesøkten for å lese meldingen.";
+      } else {
+        title = "Ny melding i treningsøkt";
+        body = body.replace("New message in ", "Ny melding i ");
+      }
       break;
 
     case "train_together_recap":

@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 import SwiftUI
 import Supabase
 
@@ -332,11 +333,16 @@ struct TrainTogetherLiveDraftRoomView: View {
     @StateObject private var live = TrainTogetherLiveDraftStore()
     @State private var editor: EditorSelection?
     @State private var selectedTab: RoomTab = .workout
+    @State private var presence: [RoomPresence] = []
+    @State private var history: [RoomRevision] = []
+    @State private var roomDataError: String?
+    @State private var showingGuestLobby = false
 
     let sourceWorkoutID: UUID
     let fallbackWorkout: PlannedSession
+    var onOpenReady: (() -> Void)? = nil
 
-    private enum RoomTab: String, CaseIterable { case workout, chat }
+    private enum RoomTab: String, CaseIterable { case workout, chat, history, recap }
     private struct EditorSelection: Identifiable {
         let workout: PlannedSession
         let revision: Int
@@ -366,7 +372,37 @@ struct TrainTogetherLiveDraftRoomView: View {
         guard let draft = live.draft, draft.cancelledAt == nil,
               !live.isWithdrawn(sourceWorkoutID),
               draft.ownerID == session.profile.userID || draft.partnerID == session.profile.userID else { return false }
+        guard matchingSession?.coordinatedStartAt == nil,
+              matchingSession?.resolvedWorkoutPhase != .completed else { return false }
         return isOwner || draft.isCollaborative
+    }
+
+    private var matchingSession: SocialWorkoutSessionRecord? {
+        social.workoutSessions.filter {
+            $0.invitePayload?.workout.id == sourceWorkoutID &&
+                $0.creatorID == live.draft?.ownerID && $0.resolvedWorkoutPhase != .cancelled
+        }.max { $0.createdAt < $1.createdAt }
+    }
+    private var matchingInvite: SocialWorkoutInviteDisplay? {
+        social.workoutInvites.first {
+            $0.session.id == matchingSession?.id && $0.participant.userID == session.profile.userID
+        }
+    }
+    private func tabTitle(_ tab: RoomTab) -> String {
+        switch tab {
+        case .workout: return tr("Workout", "Økten")
+        case .chat: return tr("Chat", "Chat")
+        case .history: return tr("History", "Historikk")
+        case .recap: return tr("Results", "Resultater")
+        }
+    }
+    private func tabIcon(_ tab: RoomTab) -> String {
+        switch tab {
+        case .workout: return "list.bullet.rectangle"
+        case .chat: return "bubble.left.and.bubble.right"
+        case .history: return "clock.arrow.circlepath"
+        case .recap: return "chart.bar"
+        }
     }
 
     var body: some View {
@@ -374,10 +410,16 @@ struct TrainTogetherLiveDraftRoomView: View {
             VStack(alignment: .leading, spacing: 15) {
                 if let draft = live.draft, let workout = live.workout {
                     details(workout, draft: draft)
+                    presenceStrip(draft)
                     tabBar
                     if selectedTab == .workout {
                         workoutContent(workout, draft: draft)
                         approvalCard(draft)
+                        if draft.isPhysical { meetingCard(workout) }
+                    } else if selectedTab == .history {
+                        historyCard
+                    } else if selectedTab == .recap {
+                        recapCard(draft)
                     } else {
                         TrainTogetherRoomChat(
                             sourceID: sourceWorkoutID, userID: session.profile.userID,
@@ -394,6 +436,9 @@ struct TrainTogetherLiveDraftRoomView: View {
                               systemImage: "info.circle")
                             .font(.subheadline.weight(.medium))
                     }
+                }
+                if let roomDataError {
+                    Text(roomDataError).font(.caption).foregroundStyle(.secondary)
                 }
                 if let error = live.errorMessage {
                     Label(error, systemImage: "exclamationmark.triangle")
@@ -420,6 +465,27 @@ struct TrainTogetherLiveDraftRoomView: View {
             sharedEditor(selection)
         }
         .task(id: sourceWorkoutID) { await live.watch(sourceWorkoutID) }
+        .task(id: live.draft?.id) {
+            guard live.draft != nil else { return }
+            while !Task.isCancelled {
+                if scenePhase == .active {
+                    await updateRoomPresence(editor == nil ? "viewing" : "editing")
+                    await refreshRoomData()
+                }
+                do { try await Task.sleep(for: .seconds(12)) } catch { break }
+            }
+        }
+        .onChange(of: editor?.id) { _, value in
+            Task { await updateRoomPresence(value == nil ? "viewing" : "editing") }
+        }
+        .onDisappear {
+            Task { await updateRoomPresence("away") }
+        }
+        .sheet(isPresented: $showingGuestLobby) {
+            if let invite = matchingInvite {
+                WorkoutInviteLaunchSheet(invite: invite)
+            }
+        }
         .task(id: sourceWorkoutID) {
             await social.refresh()
             while !Task.isCancelled {
@@ -428,7 +494,15 @@ struct TrainTogetherLiveDraftRoomView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await live.refresh(sourceWorkoutID, quiet: true) } }
+            if phase == .active {
+                Task {
+                    await live.refresh(sourceWorkoutID, quiet: true)
+                    await updateRoomPresence(editor == nil ? "viewing" : "editing")
+                    await refreshRoomData()
+                }
+            } else {
+                Task { await updateRoomPresence("away") }
+            }
         }
         .onChange(of: live.draft?.revision) { _, _ in
             guard isOwner, var updated = live.workout,
@@ -463,6 +537,163 @@ struct TrainTogetherLiveDraftRoomView: View {
         }
     }
 
+    private func presenceStrip(_ draft: TrainTogetherLiveDraft) -> some View {
+        let record = presence.first { $0.userID == otherID(draft) }
+        let status = record.flatMap { $0.updatedAt.timeIntervalSinceNow >= -40 ? $0.status : nil }
+        return HStack(spacing: 8) {
+            Image(systemName: status == "editing" ? "pencil.circle.fill" : status == "viewing" ? "person.crop.circle.badge.checkmark" : "person.crop.circle")
+                .foregroundStyle(accent)
+            Text(name(otherID(draft))).font(.caption.weight(.semibold))
+            Spacer()
+            Text(status == "editing" ? tr("Editing workout", "Redigerer økten")
+                 : status == "viewing" ? tr("In the room", "I rommet")
+                 : tr("Not active in room", "Ikke aktiv i rommet"))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(11)
+        .athlthTrainTogetherCard(radius: 12, subtle: true)
+    }
+
+    private var historyCard: some View {
+        ATHLTHTrainTogetherSurface {
+            Label(tr("Change history", "Endringshistorikk"), systemImage: "clock.arrow.circlepath").font(.headline)
+            if history.isEmpty {
+                Text(tr("No recorded edits yet.", "Ingen registrerte endringer ennå."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(history) { change in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(name(change.actorID)).font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text("v\(change.revision)").font(.caption.monospacedDigit()).foregroundStyle(accent)
+                    }
+                    Text(change.changedFields.map(fieldTitle).joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text(change.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                Divider()
+            }
+        }
+    }
+
+    private func fieldTitle(_ field: String) -> String {
+        switch field {
+        case "title": return tr("Name", "Øktnavn")
+        case "workoutBlocks", "exercises", "runningWorkout", "runningWorkouts": return tr("Workout contents", "Øktinnhold")
+        case "durationMinutes": return tr("Duration", "Varighet")
+        case "scheduledStart": return tr("Start time", "Starttid")
+        case "meetingPoint": return tr("Meeting point", "Møtested")
+        case "audioCoachConfiguration": return "Audio Coach"
+        case "routeID", "routeAlertConfiguration": return tr("Route", "Rute")
+        default: return tr("Workout settings", "Øktinnstillinger")
+        }
+    }
+
+    private func meetingCard(_ workout: PlannedSession) -> some View {
+        ATHLTHTrainTogetherSurface {
+            Label(tr("Meeting point", "Møtested"), systemImage: "mappin.and.ellipse").font(.headline)
+            if let meeting = workout.meetingPoint {
+                let coordinate = CLLocationCoordinate2D(latitude: meeting.latitude, longitude: meeting.longitude)
+                Text(meeting.name).font(.subheadline.weight(.semibold))
+                if !meeting.address.isEmpty { Text(meeting.address).font(.caption).foregroundStyle(.secondary) }
+                if CLLocationCoordinate2DIsValid(coordinate) {
+                    Map(initialPosition: .region(MKCoordinateRegion(center: coordinate,
+                            span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)))) {
+                        Marker(meeting.name, coordinate: coordinate)
+                    }
+                    .frame(height: 150).clipShape(RoundedRectangle(cornerRadius: 13))
+                    if let url = URL(string: "https://maps.apple.com/?ll=\(meeting.latitude),\(meeting.longitude)") {
+                        Link(destination: url) {
+                            Label(tr("Directions in Maps", "Veibeskrivelse i Kart"), systemImage: "arrow.triangle.turn.up.right.diamond")
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(accent)
+                        }
+                    }
+                }
+            } else {
+                Text(tr("No meeting point specified.", "Ingen møtested er valgt.")).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func recapCard(_ draft: TrainTogetherLiveDraft) -> some View {
+        let people = social.workoutParticipants.filter {
+            $0.sessionID == matchingSession?.id && [$0.userID].contains(where: { $0 == draft.ownerID || $0 == draft.partnerID })
+        }
+        return ATHLTHTrainTogetherSurface {
+            Label(tr("Shared workout recap", "Felles treningssammendrag"), systemImage: "chart.bar").font(.headline)
+            Text(tr("Only recorded start and finish times are shown.", "Viser kun faktisk registrert start og slutt."))
+                .font(.caption).foregroundStyle(.secondary)
+            ForEach([draft.ownerID, draft.partnerID], id: \.self) { id in
+                let participant = people.first { $0.userID == id }
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Text(name(id)).font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text(participant?.workoutFinishedAt != nil ? tr("Completed", "Fullført")
+                             : participant?.workoutStartedAt != nil ? tr("Training", "Trener")
+                             : tr("Not recorded", "Ikke registrert"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let start = participant?.workoutStartedAt, let end = participant?.workoutFinishedAt, end >= start {
+                        Text("\(Int(end.timeIntervalSince(start) / 60)) min · " + start.formatted(date: .omitted, time: .shortened) + "–" + end.formatted(date: .omitted, time: .shortened))
+                            .font(.subheadline.monospacedDigit()).foregroundStyle(accent)
+                    }
+                }
+                Divider()
+            }
+        }
+    }
+
+    private struct RoomPresence: Decodable {
+        let userID: UUID
+        let status: String
+        let updatedAt: Date
+        enum CodingKeys: String, CodingKey { case status; case userID = "user_id"; case updatedAt = "updated_at" }
+    }
+    private struct RoomRevision: Decodable, Identifiable {
+        let revision: Int
+        let actorID: UUID
+        let changedFields: [String]
+        let createdAt: Date
+        var id: Int { revision }
+        enum CodingKeys: String, CodingKey {
+            case revision; case actorID = "actor_id"; case changedFields = "changed_fields"; case createdAt = "created_at"
+        }
+    }
+    private struct PresenceParameters: Encodable {
+        let p_source: UUID
+        let p_status: String
+    }
+
+    @MainActor private func updateRoomPresence(_ status: String) async {
+        guard live.draft != nil, !live.isWithdrawn(sourceWorkoutID) else { return }
+        do {
+            try await SupabaseEnvironment.client.rpc("set_workout_room_presence",
+                params: PresenceParameters(p_source: sourceWorkoutID, p_status: status)).execute()
+        } catch { if !Task.isCancelled { roomDataError = tr("Room status unavailable.", "Romstatus er ikke tilgjengelig.") } }
+    }
+
+    @MainActor private func refreshRoomData() async {
+        do {
+            let client = SupabaseEnvironment.client
+            let updatedPresence: [RoomPresence] = try await client.from("social_workout_room_presence").select()
+                .eq("source_workout_id", value: sourceWorkoutID).execute().value
+            let updatedHistory: [RoomRevision] = try await client.from("social_workout_room_history").select()
+                .eq("source_workout_id", value: sourceWorkoutID).order("revision", ascending: false).limit(100).execute().value
+            guard !Task.isCancelled else { return }
+            presence = updatedPresence
+            history = updatedHistory
+            roomDataError = nil
+            if let sessionID = matchingSession?.id {
+                try await social.refreshWorkoutLobby(sessionID: sessionID)
+            } else {
+                await social.refresh()
+            }
+        } catch { if !Task.isCancelled { roomDataError = tr("Could not update room information.", "Kunne ikke oppdatere rominformasjonen.") } }
+    }
+
     private func infoPill(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
             .font(.caption.weight(.medium))
@@ -475,9 +706,10 @@ struct TrainTogetherLiveDraftRoomView: View {
         HStack(spacing: 4) {
             ForEach(RoomTab.allCases, id: \.self) { tab in
                 Button { selectedTab = tab } label: {
-                    Label(tab == .workout ? tr("Workout", "Økten") : tr("Chat", "Chat"),
-                          systemImage: tab == .workout ? "list.bullet.rectangle" : "bubble.left.and.bubble.right")
-                        .font(.subheadline.weight(.semibold))
+                    VStack(spacing: 4) {
+                        Image(systemName: tabIcon(tab)).font(.subheadline)
+                        Text(tabTitle(tab)).font(.caption2.weight(.semibold)).lineLimit(1)
+                    }
                         .foregroundStyle(selectedTab == tab ? ink : ATHLTHTrainTogetherDesign.secondary)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(selectedTab == tab ? ATHLTHTrainTogetherDesign.surface : .clear,
@@ -542,6 +774,28 @@ struct TrainTogetherLiveDraftRoomView: View {
                          "Begge har godkjent. Klar-lobbyen kan åpnes."),
                       systemImage: "checkmark.seal.fill")
                     .font(.subheadline.weight(.medium)).foregroundStyle(accent)
+                if isOwner, let onOpenReady {
+                    Button(action: onOpenReady) {
+                        Label(tr("Open Ready lobby", "Åpne Klar-lobby"), systemImage: "person.2.fill")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent).tint(accent)
+                    .disabled(live.isWorking || matchingSession?.resolvedWorkoutPhase == .completed)
+                } else if !isOwner, matchingInvite != nil {
+                    Button { showingGuestLobby = true } label: {
+                        Label(tr("Join Ready lobby", "Gå til Klar-lobby"), systemImage: "person.2.fill")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent).tint(accent)
+                } else if isOwner, social.coordinatedLobbySessionID == matchingSession?.id,
+                          social.coordinatedLobbySessionID != nil {
+                    Button { social.presentCoordinatedLobby() } label: {
+                        Label(tr("Return to Ready lobby", "Tilbake til Klar-lobby"), systemImage: "person.2.fill")
+                    }
+                } else {
+                    Text(isOwner ? tr("Open Ready from the planned workout in Calendar.", "Åpne Klar fra den planlagte økten i kalenderen.") : tr("Waiting for the host to open Ready.", "Venter på at arrangøren åpner Klar."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             } else {
                 Button { Task { await live.approve() } } label: {
                     Label(mineApproved ? tr("Waiting for ", "Venter på ") + name(otherID(draft))

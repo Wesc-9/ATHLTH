@@ -597,7 +597,7 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
             return "Train Together-økt avlyst"
 
         case "train_together_chat":
-            return "Ny øktmelding"
+            return title == "Shared workout updated" ? "Fellesøkt oppdatert" : "Ny øktmelding"
 
         case "train_together_recap":
             return "Felles oppsummering er klar"
@@ -794,6 +794,8 @@ struct SocialInboxEvent: Identifiable, Codable, Hashable {
                 )
 
         case "train_together_chat":
+            if title == "Shared workout updated" { return "Se siste versjon av fellesøkten." }
+            if title == "New shared workout message" { return "Ny melding i fellesøkten." }
             return message.replacingOccurrences(
                 of: "New message in ",
                 with: "Ny melding i "
