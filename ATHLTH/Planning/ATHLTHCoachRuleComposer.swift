@@ -53,6 +53,7 @@ struct ATHLTHCoachRuleComposer: View {
     let target: ATHLTHCoachEditorTarget
     let supportsStructured: Bool
     let showsRoutes: Bool
+    let triggerAvailability: ATHLTHCoachTriggerAvailability
     let onClose: () -> Void
     var restoreCheckpoint: ATHLTHCoachComposerCheckpoint? = nil
     var onCheckpoint: ((ATHLTHCoachComposerCheckpoint) -> Void)? = nil
@@ -97,6 +98,7 @@ struct ATHLTHCoachRuleComposer: View {
         target: ATHLTHCoachEditorTarget,
         supportsStructured: Bool,
         showsRoutes: Bool,
+        triggerAvailability: ATHLTHCoachTriggerAvailability = .global,
         onClose: @escaping () -> Void,
         restoreCheckpoint: ATHLTHCoachComposerCheckpoint? = nil,
         onCheckpoint: ((ATHLTHCoachComposerCheckpoint) -> Void)? = nil
@@ -105,6 +107,7 @@ struct ATHLTHCoachRuleComposer: View {
         self.target = target
         self.supportsStructured = supportsStructured
         self.showsRoutes = showsRoutes
+        self.triggerAvailability = triggerAvailability
         self.onClose = onClose
         self.restoreCheckpoint = restoreCheckpoint
         self.onCheckpoint = onCheckpoint
@@ -219,7 +222,8 @@ struct ATHLTHCoachRuleComposer: View {
     }
 
     private var canAdvanceTrigger: Bool {
-        trigger != .slowerThanPreviousWorkout || selectedHistory != nil
+        triggerAvailability.supports(trigger) &&
+            (trigger != .slowerThanPreviousWorkout || selectedHistory != nil)
     }
 
     private var canSave: Bool {
@@ -279,6 +283,7 @@ struct ATHLTHCoachRuleComposer: View {
                             eventSelection: $eventSelection,
                             phases: $allowedPhases,
                             supportsStructured: supportsStructured,
+                            triggerAvailability: triggerAvailability,
                             historicalReferences: historicalReferences,
                             historicalWorkoutID: $historicalWorkoutID
                         )
