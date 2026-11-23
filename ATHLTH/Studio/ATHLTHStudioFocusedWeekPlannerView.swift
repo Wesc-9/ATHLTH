@@ -1,5 +1,28 @@
 import SwiftUI
 
+/// Decision shared by the seven-day rail and the previous/next-week buttons.
+/// Entry-screen preferences are not a workout draft; entering the workout
+/// builder marks the point at which a date-scoped draft needs protecting.
+enum ATHLTHStudioDayChangePolicy {
+    enum Decision: Equatable {
+        case unchanged
+        case switchImmediately
+        case confirmDraft
+    }
+
+    static func decision(
+        current: Date,
+        proposed: Date,
+        hasStartedWorkout: Bool,
+        calendar: Calendar = .current
+    ) -> Decision {
+        guard !calendar.isDate(current, inSameDayAs: proposed) else {
+            return .unchanged
+        }
+        return hasStartedWorkout ? .confirmDraft : .switchImmediately
+    }
+}
+
 /// Focused iPad day planning: week navigation and one reusable iPhone
 /// workout builder on the same screen. No modal, parallel workout engine,
 /// or implicit completion of saved Health workouts.
@@ -462,12 +485,16 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     /// single path so neither can raise a false draft confirmation.
     private func requestDayChange(to proposed: Date) {
         let nextDate = Calendar.current.startOfDay(for: proposed)
-        guard !Calendar.current.isDate(nextDate, inSameDayAs: selectedDate) else {
+        switch ATHLTHStudioDayChangePolicy.decision(
+            current: selectedDate,
+            proposed: nextDate,
+            hasStartedWorkout: selectedActivity != nil
+        ) {
+        case .unchanged:
             return
-        }
-        if selectedActivity == nil {
+        case .switchImmediately:
             switchToDay(nextDate)
-        } else {
+        case .confirmDraft:
             // The user entered the shared workout builder. Keep its local,
             // date-scoped draft and ask before replacing that editor.
             pendingDate = nextDate
