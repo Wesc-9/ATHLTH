@@ -54,11 +54,17 @@ struct ATHLTHWorkoutContentsPreview: View {
             } else {
                 ForEach(visible.indices, id: \.self) { index in
                     let block = visible[index]
-                    HStack(alignment: .top, spacing: 9) {
+                    HStack(alignment: .top, spacing: block.isRestOrActiveRecovery ? 7 : 9) {
                         Image(systemName: block.isRestOrActiveRecovery
                               ? "pause.fill" : block.kind.systemImage)
-                            .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 22, height: 22)
+                            .font(.system(
+                                size: block.isRestOrActiveRecovery ? 11 : 13,
+                                weight: .semibold
+                            ))
+                            .frame(
+                                width: block.isRestOrActiveRecovery ? 19 : 22,
+                                height: block.isRestOrActiveRecovery ? 19 : 22
+                            )
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                             .background(ATHLTHTheme.accentSoft, in: Circle())
 
@@ -68,12 +74,17 @@ struct ATHLTHWorkoutContentsPreview: View {
                                     english: "Pause", norwegian: "Pause"
                                   )
                                 : block.title)
-                                .font(.subheadline.weight(.medium))
+                                .font(.system(
+                                    size: block.isRestOrActiveRecovery ? 12 : 14,
+                                    weight: .medium
+                                ))
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .fixedSize(horizontal: false, vertical: true)
 
                             Text(compactSubtitle(block))
-                                .font(.caption2)
+                                .font(.system(
+                                    size: block.isRestOrActiveRecovery ? 10 : 11
+                                ))
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -136,7 +147,7 @@ struct ATHLTHWorkoutContentsPreview: View {
                         if row.id != rows.last?.id {
                             Divider()
                                 .overlay(ATHLTHPlanDesign.outline.opacity(0.35))
-                                .padding(.vertical, 10)
+                                .padding(.vertical, row.isPause ? 5 : 8)
                         }
                     }
                 }
@@ -158,7 +169,9 @@ struct ATHLTHWorkoutContentsPreview: View {
 
     @ViewBuilder
     private func expandedRow(_ row: ATHLTHWorkoutSelectionOverview.Row) -> some View {
-        if row.isExercise && row.sets > 1 {
+        if row.isPause {
+            pauseRow(row)
+        } else if row.isExercise && row.sets > 1 {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 9) {
                     ForEach(row.steps.indices, id: \.self) { index in
@@ -196,6 +209,39 @@ struct ATHLTHWorkoutContentsPreview: View {
         } else {
             rowHeader(row)
         }
+    }
+
+    /// Rest and active recovery carry less visual weight than exercises.
+    /// This only affects presentation, not time targets or execution.
+    private func pauseRow(
+        _ row: ATHLTHWorkoutSelectionOverview.Row
+    ) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: row.first.isActiveRecovery
+                  ? "figure.walk" : "pause.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 23, height: 23)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface.opacity(0.65),
+                    in: Circle()
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(row.subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 3)
+        .padding(.leading, 7)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("athlth-workout-preview-compact-pause")
     }
 
     private func rowStepDetail(_ step: WorkoutTemplateBlock) -> String {
