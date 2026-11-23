@@ -6607,21 +6607,58 @@ struct WorkoutTemplateBuilderView: View {
                 NavigationStack {
                     ScrollView {
                         if let index = selection.index(in: blocks) {
+                            let guidance = ATHLTHWorkoutStepGuidance.detail(
+                                for: blocks[index], in: blocks
+                            )
                             VStack(alignment: .leading, spacing: 15) {
                                 ATHLTHWorkoutDetailsCard(
                                     activityTitle: title.isEmpty
                                         ? tr("Workout", "Treningsøkt") : title,
-                                    symbol: blocks[index].kind.systemImage,
+                                    symbol: blocks[index].isActiveRecovery
+                                        ? "figure.walk" : blocks[index].kind.systemImage,
                                     showsTimingLabel: false
                                 ) {
-                                    Label(
-                                        ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]),
-                                        systemImage: blocks[index].isRestOrActiveRecovery
-                                            ? "pause.circle" : "list.number"
-                                    )
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(studioInk)
-                                    .lineLimit(2)
+                                    VStack(alignment: .leading, spacing: 9) {
+                                        Label(
+                                            ATHLTHWorkoutNameSuggestion.displayStepTitle(
+                                                blocks[index]
+                                            ),
+                                            systemImage: blocks[index].isRestOrActiveRecovery
+                                                ? "pause.circle" : "list.number"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(studioInk)
+
+                                        Text(guidance.context)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .accessibilityIdentifier(
+                                                "athlth-step-interval-position"
+                                            )
+                                        Text(guidance.instructions)
+                                            .font(.subheadline)
+                                            .foregroundStyle(
+                                                ATHLTHPlanDesign.secondaryInk
+                                            )
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .accessibilityIdentifier(
+                                                "athlth-step-exercise-instructions"
+                                            )
+                                        if let zone = guidance.zone {
+                                            Label(
+                                                tr("Heart-rate target: ",
+                                                   "Pulssone: ") + zone,
+                                                systemImage: "heart"
+                                            )
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                            .accessibilityIdentifier(
+                                                "athlth-step-heart-rate-zone"
+                                            )
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 blockDetails(index)
                                 Button {
