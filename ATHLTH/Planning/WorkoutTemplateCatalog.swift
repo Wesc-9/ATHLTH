@@ -635,6 +635,8 @@ extension Array where Element == WorkoutTemplateBlock {
             )
             item.assessmentScope = source.assessmentScope
             item.measurementStepID = source.measurementStepID
+            item.ghostSegmentID = source.ghostSegmentID
+            item.intervalGhostConfiguration = source.intervalGhostConfiguration
             item.exerciseID = source.exerciseID
             item.exerciseSnapshot = source.exerciseSnapshot
             item.wellnessKind = source.wellnessKind
