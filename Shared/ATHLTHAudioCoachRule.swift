@@ -57,6 +57,45 @@ enum ATHLTHCoachMetricCategory: String, CaseIterable, Identifiable {
     }
 }
 
+/// Workout-specific Coach rules share the same single recorder and speech
+/// queue. A missing or unsupported sport does not count as a cue occurrence.
+enum ATHLTHCoachActivityFilter: String, Codable, CaseIterable, Identifiable {
+    case all, running, walking, strength, intervals, cycling, swimming, functional
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+        case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .walking: return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gå")
+        case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .intervals: return ATHLTHLocalization.choose(english: "Intervals", norwegian: "Intervall")
+        case .cycling: return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+        case .swimming: return ATHLTHLocalization.choose(english: "Swimming", norwegian: "Svømming")
+        case .functional: return ATHLTHLocalization.choose(english: "Functional", norwegian: "Funksjonell")
+        }
+    }
+
+    func matches(sport: String?, context: ATHLTHCoachReadoutContext) -> Bool {
+        guard self != .all else { return true }
+        guard let sport else { return false }
+        let normalized = sport.lowercased().filter { $0.isLetter }
+        switch self {
+        case .all: return true
+        case .running: return ["running", "treadmill"].contains(normalized)
+        case .walking: return ["walking", "hiking"].contains(normalized)
+        case .strength: return normalized == "strength"
+        case .intervals:
+            return ["running", "walking", "treadmill", "hiking", "strength"]
+                .contains(normalized) &&
+                (context.isEffort || context.groupStartIndex != nil)
+        case .cycling: return normalized == "cycling"
+        case .swimming: return normalized == "swimming"
+        case .functional: return ["functional", "hiit", "custom"].contains(normalized)
+        }
+    }
+}
+
 /// Independent periodic Audio Coach rules. Stored as part of the iPhone
 /// settings and copied unchanged to a Watch workout's configuration.
 struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
@@ -313,6 +352,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// announced if the workout has no reliable remaining-duration estimate.
     var beforeEndSeconds: Int? = nil
     var customPhrase: String? = nil
+    /// Nil on legacy profiles means all supported workout types.
+    var activityFilter: ATHLTHCoachActivityFilter? = nil
     /// A user-selected, recorded workout with a VERIFIED 1-km split.
     /// Nil means the historical comparison is unavailable and must not
     /// announce. Older saved rules decode without these optional fields.
@@ -752,6 +793,7 @@ enum ATHLTHAudioCoachRuleDelivery {
         norwegian: Bool,
         maximumHeartRateBPM: Double? = nil,
         context: ATHLTHCoachReadoutContext = .init(),
+        sport: String? = nil,
         lastSlots: inout [UUID: Int]
     ) -> [String] {
         dueAnnouncements(
@@ -763,6 +805,7 @@ enum ATHLTHAudioCoachRuleDelivery {
             norwegian: norwegian,
             maximumHeartRateBPM: maximumHeartRateBPM,
             context: context,
+            sport: sport,
             lastSlots: &lastSlots
         ).map(\.text)
     }
@@ -776,11 +819,17 @@ enum ATHLTHAudioCoachRuleDelivery {
         norwegian: Bool,
         maximumHeartRateBPM: Double? = nil,
         context: ATHLTHCoachReadoutContext = .init(),
+        sport: String? = nil,
         lastSlots: inout [UUID: Int]
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
         var messages: [ATHLTHAudioCoachDueAnnouncement] = []
         var spokenByScope: [ATHLTHAudioCoachRule.Scope: Set<ATHLTHAudioCoachRule.Metric>] = [:]
         for rule in rules.prefix(20) {
+            // Evaluate eligibility before advancing the rule journal. A
+            // running-only rule must not be silently consumed in strength.
+            guard (rule.activityFilter ?? .all).matches(
+                sport: sport, context: context
+            ) else { continue }
             let scope = rule.scope ?? .workout
             let distance: Double
             let elapsed: Double
@@ -1181,6 +1230,7 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
     /// Nil means all workout phases (legacy behavior). Empty also means all.
     var phases: [ATHLTHCoachWorkoutPhase]? = nil
     var eventSelection: ATHLTHCoachEventSelection? = nil
+    var activityFilter: ATHLTHCoachActivityFilter? = nil
 
     var isEnabled: Bool { enabled ?? true }
 }
@@ -1247,6 +1297,8 @@ extension WatchAudioCoachConfiguration {
             if let group = groups.first(where: { $0.ruleIDs.contains(authored.id) }) {
                 effective.allowedPhases = group.phases
                 effective.eventSelection = group.eventSelection
+                effective.activityFilter = group.activityFilter ??
+                    authored.activityFilter
             }
             return effective
         }
