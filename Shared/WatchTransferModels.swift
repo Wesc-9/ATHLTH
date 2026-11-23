@@ -1192,6 +1192,8 @@ struct WatchRunningWorkoutStep: Identifiable, Codable, Hashable {
     /// reduced speed without imposing a work-pace target.
     var ghostFollowsRecovery: Bool? = nil
     var ghostRecoverySlowdownPercent: Int? = nil
+    /// Stable source block for Ghost overrides; step.id remains unique per round.
+    var ghostSourceSegmentID: UUID? = nil
     var coachBrief: String? = nil
     var intervalMotivation: ATHLTHIntervalMotivationSettings? = nil
     var recoveryStyle: ATHLTHRunningRecoveryStyle? = nil
