@@ -66,6 +66,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case distance, time
         // New user-configured events are optional for older saved templates.
         case randomMotivation, nearFinishTime, nearFinishDistance
+        case slowerThanPreviousWorkout
         case elevationGain, uphillDetected
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
         case zoneBelow, plannedZoneBelow, plannedZoneOutside
@@ -88,7 +89,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var usesLiveContext: Bool {
             switch self {
             case .nearFinishTime, .nearFinishDistance, .elevationGain,
-                 .uphillDetected, .plannedZoneBelow, .plannedZoneOutside: return true
+                 .uphillDetected, .plannedZoneBelow, .plannedZoneOutside,
+                 .slowerThanPreviousWorkout: return true
             default: return false
             }
         }
@@ -112,7 +114,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
                 self != .personalRecordConfirmed && self != .workoutStart &&
                 self != .randomMotivation && self != .nearFinishTime &&
-                self != .nearFinishDistance && self != .uphillDetected
+                self != .nearFinishDistance && self != .uphillDetected &&
+                self != .slowerThanPreviousWorkout
         }
         func summary(interval: Int) -> String {
             let value: Int
@@ -155,6 +158,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .distance: return tr("Distance", "Distanse")
             case .time: return tr("Time", "Tid")
             case .randomMotivation: return tr("Random motivation", "Tilfeldig motivasjon")
+            case .slowerThanPreviousWorkout: return tr(
+                "Slower than a previous run after 1 km",
+                "Saktere enn en tidligere økt etter 1 km"
+            )
             case .nearFinishTime: return tr("Near time goal", "Nær tidsmålet")
             case .nearFinishDistance: return tr("Near distance goal", "Nær distansemålet")
             case .elevationGain: return tr("Elevation gained", "Høydemeter")
@@ -306,6 +313,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// announced if the workout has no reliable remaining-duration estimate.
     var beforeEndSeconds: Int? = nil
     var customPhrase: String? = nil
+    /// A user-selected, recorded workout with a VERIFIED 1-km split.
+    /// Nil means the historical comparison is unavailable and must not
+    /// announce. Older saved rules decode without these optional fields.
+    var historicalWorkoutID: UUID? = nil
+    var historicalWorkoutFirstKilometerSeconds: Double? = nil
+    var historicalWorkoutTitle: String? = nil
 
     var isEnabled: Bool { enabled ?? true }
 
@@ -558,6 +571,15 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 ? "Husk å ta en slurk vann når det passer."
                 : "Remember to take a sip of water when convenient."
         case .motivation:
+            if trigger == .slowerThanPreviousWorkout,
+               let reference = historicalWorkoutFirstKilometerSeconds,
+               let actual = context.overallPaceSecondsPerKilometer,
+               reference.isFinite, actual.isFinite {
+                let slower = max(0, Int((actual - reference).rounded()))
+                return norwegian
+                    ? "Etter første kilometer er du omtrent \(slower) sekunder saktere enn forrige økt. Finn din rytme!"
+                    : "After the first kilometre you're about \(slower) seconds slower than your previous run. Find your rhythm!"
+            }
             // Context-specific motivation for goals, rather than a generic
             // encouragement which does not explain what was achieved.
             if trigger == .nearFinishTime {
@@ -703,7 +725,9 @@ enum ATHLTHAudioCoachRuleDelivery {
         for rule in rules where (rule.scope ?? .workout) == .workout {
             // One-shot finish cues use remaining time, not elapsed-time slots.
             // A nonzero elapsed slot would otherwise suppress the first cue.
-            result[rule.id] = rule.trigger == .workoutStart && elapsedSeconds > 3
+            result[rule.id] = rule.trigger == .slowerThanPreviousWorkout &&
+                distanceMeters >= 1_000 ? 1 :
+                rule.trigger == .workoutStart && elapsedSeconds > 3
                 ? 1
                 : rule.trigger == .randomMotivation
                     ? randomMotivationSlot(for: rule, elapsedSeconds: elapsedSeconds)
@@ -816,6 +840,20 @@ enum ATHLTHAudioCoachRuleDelivery {
                 milestone = randomMotivationSlot(
                     for: rule, elapsedSeconds: elapsed
                 )
+            } else if rule.trigger == .slowerThanPreviousWorkout {
+                // Consume the first-kilometre checkpoint even if the athlete
+                // is faster. A later slowdown is not an "after 1 km" split.
+                guard distanceMeters >= 1_000,
+                      let baseline = rule.historicalWorkoutFirstKilometerSeconds,
+                      baseline.isFinite, (120...1_800).contains(baseline),
+                      let measured = context.overallPaceSecondsPerKilometer,
+                      measured.isFinite, (120...1_800).contains(measured),
+                      lastSlots[rule.id] == nil ||
+                          lastSlots[rule.id] == 0 else { continue }
+                lastSlots[rule.id] = 1
+                alreadyConsumed = true
+                guard measured > baseline + 10 else { continue }
+                milestone = 1
             } else if rule.trigger == .nearFinishTime {
                 guard let remaining = context.workoutRemainingSeconds,
                       remaining.isFinite, remaining >= 0 else { continue }
@@ -1619,6 +1657,7 @@ enum ATHLTHAudioCoachSportPolicy {
         rules.filter { rule in
             guard rule.trigger != .distance,
                   rule.trigger != .nearFinishDistance,
+                  rule.trigger != .slowerThanPreviousWorkout,
                   rule.trigger != .elevationGain,
                   rule.trigger != .uphillDetected,
                   !rule.trigger.isPaceCondition,
@@ -1653,6 +1692,7 @@ enum ATHLTHAudioCoachSportPolicy {
         return rules.filter { rule in
             if rule.trigger.needsStructuredStep ||
                 rule.trigger.isPaceCondition ||
+                rule.trigger == .slowerThanPreviousWorkout ||
                 rule.trigger == .personalRecordConfirmed { return false }
             if (rule.trigger == .distance ||
                 rule.trigger == .nearFinishDistance) && !distanceAvailable {
