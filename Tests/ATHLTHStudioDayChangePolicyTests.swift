@@ -56,6 +56,16 @@ final class ATHLTHStudioDayChangePolicyTests: XCTestCase {
         }
     }
 
+    func testSaveButtonNamesSelectedWeekdayAndDate() {
+        let tuesday = calendar.date(byAdding: .day, value: 1, to: monday)!
+        XCTAssertEqual(ATHLTHStudioDayChangePolicy.addWorkoutTitle(
+            for: monday, norwegian: true, calendar: calendar), "Legg til økt mandag 23. november")
+        XCTAssertEqual(ATHLTHStudioDayChangePolicy.addWorkoutTitle(
+            for: tuesday, norwegian: true, calendar: calendar), "Legg til økt tirsdag 24. november")
+        XCTAssertEqual(ATHLTHStudioDayChangePolicy.addWorkoutTitle(
+            for: tuesday, norwegian: false, calendar: calendar), "Add workout on Tuesday 24 November")
+    }
+
     func testClockSelectionNeverMovesTheSelectedTrainingDay() {
         let selected = calendar.date(byAdding: .day, value: 1, to: monday)!
         let differentDay = calendar.date(bySettingHour: 7, minute: 35, second: 42, of: monday)!

@@ -9272,7 +9272,7 @@ struct WorkoutTemplateBuilderView: View {
 
     private var saveBar: some View {
         VStack(spacing: 8) {
-            if !blocks.isEmpty {
+            if focusedPlannerDay == nil && !blocks.isEmpty {
                 Button {
                     showingWorkoutReview = true
                 } label: {

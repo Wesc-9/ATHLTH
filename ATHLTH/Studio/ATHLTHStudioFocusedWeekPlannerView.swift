@@ -18,6 +18,16 @@ enum ATHLTHStudioDayChangePolicy {
                              of: day) ?? calendar.startOfDay(for: day)
     }
 
+    static func addWorkoutTitle(for day: Date, norwegian: Bool, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: norwegian ? "nb_NO" : "en_GB")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate("EEEE d MMMM")
+        let formattedDay = formatter.string(from: day)
+        return norwegian ? "Legg til økt " + formattedDay : "Add workout on " + formattedDay
+    }
+
     static func decision(
         current: Date,
         proposed: Date,
@@ -451,9 +461,8 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                         onValidateSave: { _ in
                             validateDay()
                         },
-                        saveButtonTitle: ATHLTHLocalization.choose(
-                            english: "Save planned workout",
-                            norwegian: "Lagre planlagt økt"
+                        saveButtonTitle: ATHLTHStudioDayChangePolicy.addWorkoutTitle(
+                            for: selectedDate, norwegian: ATHLTHLocalization.isNorwegian
                         ),
                         onCloseInline: { finishEditorClose() },
                         externalCloseRequest: externalCloseRequest,
