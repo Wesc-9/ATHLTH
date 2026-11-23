@@ -120,6 +120,40 @@ enum ATHLTHIntervalGhostPacer {
         }
     }
 
+    /// Live samples can arrive as cumulative totals, including after a pause
+    /// or Watch reconnect. Convert to non-negative deltas exactly once,
+    /// preventing a repeated sample from advancing Ghost twice.
+    struct LiveSample: Equatable {
+        var elapsedSeconds: TimeInterval
+        var distanceMeters: Double
+    }
+
+    static func advanceLiveSample(
+        configuration: WorkoutConfiguration,
+        progress: VirtualProgress,
+        previous: LiveSample,
+        current: LiveSample,
+        segmentID: UUID,
+        kind: SegmentKind
+    ) -> VirtualProgress? {
+        guard previous.elapsedSeconds.isFinite,
+              current.elapsedSeconds.isFinite,
+              previous.distanceMeters.isFinite,
+              current.distanceMeters.isFinite,
+              previous.elapsedSeconds >= 0,
+              previous.distanceMeters >= 0,
+              current.elapsedSeconds >= previous.elapsedSeconds,
+              current.distanceMeters >= previous.distanceMeters
+        else { return nil }
+        return configuration.progress(
+            from: progress,
+            segmentID: segmentID,
+            kind: kind,
+            elapsedSeconds: current.elapsedSeconds - previous.elapsedSeconds,
+            actualMeters: current.distanceMeters - previous.distanceMeters
+        )
+    }
+
     /// Stable segment identifiers allow a workout editor to target a single
     /// interval without changing other work or recovery segments.
     struct SegmentOverride {
