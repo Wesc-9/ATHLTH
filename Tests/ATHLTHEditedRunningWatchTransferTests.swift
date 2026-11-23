@@ -45,7 +45,7 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
             from: .init(), segmentID: restored.steps[0].id,
             kind: .work, elapsedSeconds: 275, actualMeters: 1_100
         )
-        XCTAssertEqual(progress?.leadMeters, 100, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(progress).leadMeters, 100, accuracy: 0.001)
     }
 
     func testThirtyThirtyPreservesAllFortyWatchStepsAndLastActiveRecovery() throws {
