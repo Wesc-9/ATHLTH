@@ -53,6 +53,27 @@ jobs:
           if not found:
               print("::error::No dSYM matching crash UUID " + target + " was found.")
               sys.exit(1)
+          # Crashed main-thread ATHLTH frames from incident BD1175F9.
+          # Reported binary image base is decimal 4378312704 (0x104F7C000).
+          # These are image offsets, not absolute process addresses.
+          image_base = 4378312704
+          offsets = [47068120, 47059624, 47058232, 46929396, 46899020, 47211776]
+          addresses = [hex(image_base + offset) for offset in offsets]
+          for binary, _ in found:
+              command = ["xcrun", "atos", "-arch", "arm64", "-o", binary,
+                         "-l", hex(image_base), *addresses]
+              result = subprocess.run(command, text=True, capture_output=True)
+              print("SYMBOLICATION_IMAGE_BASE=" + hex(image_base))
+              print("SYMBOLICATION_ADDRESSES=" + " ".join(addresses))
+              print("SYMBOLICATION_RESULT:\\n" + result.stdout)
+              if result.returncode != 0:
+                  print("::error::atos failed: " + result.stderr)
+                  sys.exit(result.returncode)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+                  out.write("### Crashed main-thread ATHLTH frames\\n\\n")
+                  out.write("Image base: \`" + hex(image_base) + "\`\\n\\n")
+                  for offset, symbol in zip(offsets, result.stdout.splitlines()):
+                      out.write("- Offset \`" + str(offset) + "\`: \`" + symbol + "\`\\n")
           for binary, uuid in found:
               print("MATCHING_DSYM=" + binary)
               print(uuid)
