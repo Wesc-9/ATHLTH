@@ -99,9 +99,12 @@ final class ChallengeStore: ObservableObject {
         // Batch merges into one @Published assignment. The previous loop
         // triggered a separate full Challenge screen redraw for every update.
         var updated = challenges
-        var indices = Dictionary(uniqueKeysWithValues:
-            updated.enumerated().map { ($0.element.id, $0.offset) }
-        )
+        // Legacy local data may contain duplicate IDs. Build the index
+        // defensively; Dictionary(uniqueKeysWithValues:) would trap.
+        var indices: [UUID: Int] = [:]
+        for (offset, item) in updated.enumerated() {
+            indices[item.id] = offset
+        }
         var changed = false
         for remoteChallenge in remote {
             if let index = indices[remoteChallenge.id] {
