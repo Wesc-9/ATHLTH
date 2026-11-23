@@ -2665,7 +2665,7 @@ struct TrainingPlanLibraryView: View {
                     entry: entry, onPlanCreated: onPlanCreated
                 )
             } label: {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     Image(categoryArtwork(entry))
                         .resizable()
                         .scaledToFill()
@@ -2678,13 +2678,32 @@ struct TrainingPlanLibraryView: View {
                         .foregroundStyle(ink)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    Text(tr("\(entry.durationWeeks) weeks", "\(entry.durationWeeks) uker"))
-                        .font(.caption)
-                        .foregroundStyle(muted)
+                    Text(
+                        tr("\(entry.durationWeeks) weeks · \(entry.sessionsPerWeek) sessions/week",
+                           "\(entry.durationWeeks) uker · \(entry.sessionsPerWeek) økter/uke")
+                    )
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.77)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: entry.trainingTypeIcon)
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(entry.trainingTypeTitle)
+                            .lineLimit(1)
+                        Text("·")
+                            .foregroundStyle(muted)
+                        Text(localizedLevel(entry.level))
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(bronze)
+                    .minimumScaleFactor(0.75)
                     Spacer(minLength: 0)
                 }
                 .padding(11)
-                .frame(maxWidth: .infinity, minHeight: 195, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: 198, alignment: .topLeading)
                 .background(.white, in: RoundedRectangle(cornerRadius: 19))
             }
             .buttonStyle(.plain)
