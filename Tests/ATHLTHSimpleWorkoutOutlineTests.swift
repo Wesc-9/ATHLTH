@@ -440,4 +440,47 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         XCTAssertEqual(remaining.first?.title, "Cool down")
     }
 
+    func testBasicFourByFourCardRetainsActiveRecoveriesForDrillDown() {
+        let group = UUID()
+        var timeline: [WorkoutTemplateBlock] = []
+        for ordinal in 1...4 {
+            var work = block(
+                "Intervall \(ordinal)", phase: .main,
+                index: timeline.count + 1, duration: 240, pace: 240
+            )
+            work.groupID = group
+            work.groupKind = .intervals
+            work.groupRounds = 1
+            timeline.append(work)
+            if ordinal < 4 {
+                var rest = block(
+                    "Aktiv pause \(ordinal)", phase: .recovery,
+                    index: timeline.count + 1, duration: 120, pace: 600
+                )
+                rest.groupID = group
+                rest.groupKind = .intervals
+                rest.groupRounds = 1
+                rest.activityTag = "active_recovery"
+                rest.cardioActivity = .running
+                rest.targetHeartRateZone = 1
+                timeline.append(rest)
+            }
+        }
+        let before = timeline
+        let items = ATHLTHBasicRunningExerciseOutline.items(for: timeline)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items.first?.representedSteps, 7)
+        XCTAssertEqual(items.first?.repetitions, 4)
+        XCTAssertEqual(timeline, before)
+        XCTAssertEqual(timeline.filter(\.isActiveRecovery).count, 3)
+        let selection = Set(
+            timeline.dropFirst(items[0].id)
+                .prefix(items[0].representedSteps).map(\.editorDragID)
+        )
+        XCTAssertEqual(selection.count, 7)
+        XCTAssertEqual(timeline.filter {
+            selection.contains($0.editorDragID)
+        }.count, 7)
+    }
+
 }
