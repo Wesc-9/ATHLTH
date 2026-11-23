@@ -472,6 +472,44 @@ final class ATHLTHIntervalGhostPacerPolicyTests: XCTestCase {
         XCTAssertEqual(next.leadMeters, 0, accuracy: 0.01)
     }
 
+    func testWorkoutConfigurationRoundTripsAndSelectsOnlyChosenDrag() throws {
+        let selected = UUID()
+        let skipped = UUID()
+        var configuration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
+        configuration.isEnabled = true
+        configuration.coverage = .selectedSegments
+        configuration.segments = [
+            .init(id: selected, enabled: true, paceSecondsPerKilometer: 240),
+            .init(id: skipped, enabled: false, paceSecondsPerKilometer: nil)
+        ]
+        let decoded = try JSONDecoder().decode(
+            ATHLTHIntervalGhostPacer.WorkoutConfiguration.self,
+            from: JSONEncoder().encode(configuration)
+        )
+        XCTAssertEqual(decoded, configuration)
+        XCTAssertTrue(decoded.isValid)
+        let start = ATHLTHIntervalGhostPacer.VirtualProgress()
+        let skippedProgress = try XCTUnwrap(decoded.progress(
+            from: start, segmentID: skipped, kind: .work,
+            elapsedSeconds: 240, actualMeters: 950
+        ))
+        XCTAssertEqual(skippedProgress.ghostMeters, 0)
+        let selectedProgress = try XCTUnwrap(decoded.progress(
+            from: skippedProgress, segmentID: selected, kind: .work,
+            elapsedSeconds: 240, actualMeters: 950
+        ))
+        XCTAssertEqual(selectedProgress.ghostMeters, 1_000, accuracy: 0.01)
+        XCTAssertEqual(selectedProgress.leadMeters, -50, accuracy: 0.01)
+    }
+
+    func testWorkoutConfigurationRejectsInvalidRecoveryPace() {
+        var configuration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
+        configuration.isEnabled = true
+        configuration.pauseBehavior = .customPace
+        configuration.recoveryPaceSecondsPerKilometer = .nan
+        XCTAssertFalse(configuration.isValid)
+    }
+
     func testIndividualIntervalsCanBeExcludedOrHaveOwnPace() throws {
         let ignoredID = UUID()
         let fastID = UUID()
