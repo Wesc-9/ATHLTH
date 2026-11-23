@@ -2817,7 +2817,7 @@ struct TrainingPlanCatalogDetailView: View {
 
     @State private var createEditableCopy = false
     @State private var showingPersonalizePlan = false
-    @State private var showAllWeeks = true
+    @State private var showAllWeeks = false
     // Weeks and sessions start collapsed. Generate detailed steps only
     // when requested to keep long plans responsive.
     @State private var expandedWeeks: Set<Int> = []
@@ -2897,160 +2897,32 @@ struct TrainingPlanCatalogDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .top, spacing: 13) {
-                        Image(systemName: entry.trainingTypeIcon)
-                            .font(.system(size: 23, weight: .semibold))
-                            .foregroundStyle(detailAccent)
-                            .frame(width: 54, height: 54)
-                            .background(
-                                detailAccent.opacity(0.10),
-                                in: RoundedRectangle(
-                                    cornerRadius: 17,
-                                    style: .continuous
-                                )
-                            )
-
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(entry.trainingTypeTitle.uppercased())
-                                .font(.caption2.weight(.bold))
-                                .tracking(2.1)
-                                .foregroundStyle(detailAccent)
-
-                            Text(entry.title)
-                                .font(
-                                    .system(
-                                        size: 28,
-                                        weight: .semibold,
-                                        design: .rounded
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                        }
-
-                        Spacer(minLength: 0)
-                    }
-
-                    Text(entry.summary)
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if entry.tags.contains("no equipment") {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "No equipment needed · bodyweight only",
-                                norwegian: "Ingen utstyr nødvendig · kun kroppsvekt"
-                            ),
-                            systemImage: "checkmark.circle"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                    }
-
-                    HStack(spacing: 7) {
-                        Label(
-                            entry.level,
-                            systemImage: "speedometer"
-                        )
-                        Label(
-                            entry.goal,
-                            systemImage: "scope"
-                        )
-                    }
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText.opacity(0.68)
-                    )
-                    .lineLimit(1)
-                }
-                .padding(18)
-                .athlthPlanCard()
-
-                HStack(spacing: 10) {
-                    detailMetric(
-                        "\(entry.durationWeeks)",
-                        label: ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
-                        icon: "calendar"
-                    )
-                    detailMetric(
-                        "\(entry.sessionsPerWeek)",
-                        label: ATHLTHLocalization.choose(english: "sessions / week", norwegian: "økter / uke"),
-                        icon: "repeat"
-                    )
-                    detailMetric(
-                        "\(entry.durationWeeks * entry.sessionsPerWeek)",
-                        label: ATHLTHLocalization.choose(english: "total sessions", norwegian: "økter totalt"),
-                        icon: "figure.run"
-                    )
-                }
-
-                ATHLTHPlanGhostCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Training focus", norwegian: "Treningsfokus"
-                            ),
-                            systemImage: "scope"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                        Text(entry.goal)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        let muscleFocus = displayedMuscleFocus
-                        if !muscleFocus.isEmpty {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Muscle groups", norwegian: "Muskelgrupper"
-                            ))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            Text(muscleFocus.joined(separator: " · "))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        HStack(spacing: 8) {
-                            ForEach(Array(entry.workoutKinds.enumerated()), id: \.offset) { _, kind in
-                                Image(systemName: kind.systemImage)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                    .frame(width: 34, height: 34)
-                                    .background(ATHLTHPlanDesign.selectedSurface,
-                                                in: RoundedRectangle(cornerRadius: 10))
-                            }
-                        }
-                        Text(ATHLTHLocalization.choose(
-                            english: "Explore each week and expand a session to see its exercises, targets and rest.",
-                            norwegian: "Åpne en uke og deretter en økt for å se øvelser, mål og pauser."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                }
+                premiumPlanOverview
 
                 if let guidance = entry.readinessGuidance {
-                    ATHLTHPlanGhostCard {
-                        VStack(alignment: .leading, spacing: 9) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Before starting",
-                                    norwegian: "Før du starter"
-                                ),
-                                systemImage: "info.circle"
-                            )
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(detailAccent)
+                            .frame(width: 35, height: 35)
+                            .background(detailAccent.opacity(0.08), in: Circle())
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Before you begin",
+                                norwegian: "Før du starter"
+                            ))
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
                             Text(guidance)
                                 .font(.subheadline)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ATHLTHPlanDesign.selectedSurface.opacity(0.55),
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
 
                 planPreview
@@ -3219,19 +3091,7 @@ struct TrainingPlanCatalogDetailView: View {
                         .font(.title3.weight(.semibold))
                 }
 
-                Spacer()
-
-                Text(
-                    "v\(entry.catalogVersion)"
-                )
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(detailAccent)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(
-                    detailAccent.opacity(0.09),
-                    in: Capsule()
-                )
+                Spacer(minLength: 0)
             }
 
             LazyVStack(alignment: .leading, spacing: 10) {
@@ -3304,7 +3164,10 @@ struct TrainingPlanCatalogDetailView: View {
     private func previewWeekCard(_ week: Int) -> some View {
         let zonedWeek = ATHLTHZonedPlanLibrary.plan(for: entry.slug)?
             .weeks.first(where: { $0.weekNumber == week })
-        return VStack(alignment: .leading, spacing: 12) {
+        let sessionsCount = zonedWeek.map {
+            ATHLTHZonedPlanLibrary.orderedRequiredSessions(in: $0).count
+        } ?? entry.sessionsPerWeek
+        return VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.easeInOut(duration: 0.18)) {
                     if !expandedWeeks.insert(week).inserted {
@@ -3312,60 +3175,86 @@ struct TrainingPlanCatalogDetailView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ATHLTHLocalization.format(
-                            english: "Week %d", norwegian: "Uke %d", week
-                        ))
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                        HStack(spacing: 6) {
+                HStack(spacing: 14) {
+                    Text(String(format: "%02d", week))
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(detailAccent)
+                        .frame(width: 49, height: 49)
+                        .background(detailAccent.opacity(0.085),
+                                    in: RoundedRectangle(cornerRadius: 14))
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 7) {
                             Text(ATHLTHLocalization.format(
-                                english: "%d planned sessions",
-                                norwegian: "%d planlagte økter",
-                                entry.sessionsPerWeek
+                                english: "Week %d", norwegian: "Uke %d", week
                             ))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer(minLength: 4)
+                            Image(systemName: expandedWeeks.contains(week)
+                                  ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(detailAccent)
+                                .frame(width: 29, height: 29)
+                                .background(ATHLTHPlanDesign.selectedSurface,
+                                            in: Circle())
+                        }
+
+                        HStack(spacing: 8) {
+                            Label(ATHLTHLocalization.format(
+                                english: "%d sessions", norwegian: "%d økter",
+                                sessionsCount
+                            ), systemImage: "calendar")
                             if let km = zonedWeek?.targetKm {
                                 Text("·")
                                 Text("\(km.formatted()) km")
                             }
                             if let load = zonedWeek?.weeklyLoadScore {
                                 Text("·")
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english: "Load", norwegian: "Belastning"
-                                    ) + " " + load.formatted()
-                                )
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Load", norwegian: "Belastning"
+                                ) + " " + load.formatted())
                             }
                         }
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+
+                        if let zonedWeek {
+                            weekPhaseLabel(zonedWeek.isRecoveryWeek
+                                ? ATHLTHLocalization.choose(english: "RECOVERY", norwegian: "RESTITUSJON")
+                                : zonedWeek.phase.uppercased())
+                        } else if entry.usesCompetitionTaper &&
+                                  week >= max(entry.durationWeeks - 1, 1) {
+                            weekPhaseLabel(ATHLTHLocalization.choose(
+                                english: "TAPER", norwegian: "NEDTRAPPING"
+                            ))
+                        } else if week.isMultiple(of: 4) && week < entry.durationWeeks {
+                            weekPhaseLabel(ATHLTHLocalization.choose(
+                                english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
+                            ))
+                        }
                     }
-                    Spacer()
-                    if let zonedWeek {
-                    weekPhaseLabel(zonedWeek.isRecoveryWeek
-                        ? ATHLTHLocalization.choose(english: "RECOVERY", norwegian: "RESTITUSJON")
-                        : zonedWeek.phase.uppercased())
-                } else if week.isMultiple(of: 4) && week < entry.durationWeeks {
-                    weekPhaseLabel(ATHLTHLocalization.choose(
-                        english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
-                    ))
-                    } else if entry.usesCompetitionTaper &&
-                              week >= max(entry.durationWeeks - 1, 1) {
-                        weekPhaseLabel(ATHLTHLocalization.choose(
-                            english: "TAPER", norwegian: "NEDTRAPPING"
-                        ))
-                    }
-                    Image(systemName: expandedWeeks.contains(week)
-                        ? "chevron.up" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-plan-week-\(week)")
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Show or hide this week's workouts",
+                norwegian: "Vis eller skjul ukens treningsøkter"
+            ))
 
             if expandedWeeks.contains(week) {
+                Rectangle()
+                    .fill(ATHLTHPlanDesign.warmDivider)
+                    .frame(height: 1)
+                    .padding(.horizontal, 16)
+                VStack(alignment: .leading, spacing: 12) {
             if let zonedWeek,
                let zonedPlan = ATHLTHZonedPlanLibrary.plan(for: entry.slug) {
                 LazyVGrid(
@@ -3443,10 +3332,23 @@ struct TrainingPlanCatalogDetailView: View {
                     previewWeekSessionRow(blueprint, week: week, index: index)
                 }
             }
+                }
+                .padding(.horizontal, 15)
+                .padding(.bottom, 16)
             }
         }
-        .padding(14)
-        .athlthPlanCard()
+        .background(.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    expandedWeeks.contains(week)
+                        ? detailAccent.opacity(0.28)
+                        : ATHLTHPlanDesign.warmDivider.opacity(0.75),
+                    lineWidth: 0.8
+                )
+                .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.028), radius: 12, y: 4)
     }
 
     private func weekPhaseLabel(_ title: String) -> some View {
@@ -3697,30 +3599,152 @@ struct TrainingPlanCatalogDetailView: View {
         )
     }
 
-    private func detailMetric(
-        _ value: String,
-        label: String,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Image(systemName: icon)
-                .foregroundStyle(ATHLTHTheme.accent)
-            Text(value)
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    /// One plan identity, not three full-width KPI cards followed by a
+    /// second header repeating the same goal and workout type.
+    private var premiumPlanOverview: some View {
+        VStack(alignment: .leading, spacing: 17) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: entry.trainingTypeIcon)
+                    .font(.system(size: 23, weight: .medium))
+                    .foregroundStyle(detailAccent)
+                    .frame(width: 56, height: 56)
+                    .background(detailAccent.opacity(0.09),
+                                in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(entry.trainingTypeTitle.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.8)
+                        .foregroundStyle(detailAccent)
+                    Text(entry.title)
+                        .font(.system(size: 27, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Text(entry.summary)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    premiumPlanChip(entry.goal, icon: "scope")
+                    premiumPlanChip(planLevelTitle, icon: "speedometer")
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    premiumPlanChip(entry.goal, icon: "scope")
+                    premiumPlanChip(planLevelTitle, icon: "speedometer")
+                }
+            }
+
+            Rectangle()
+                .fill(ATHLTHPlanDesign.warmDivider)
+                .frame(height: 1)
+
+            HStack(alignment: .center, spacing: 0) {
+                premiumPlanMetric(
+                    String(entry.durationWeeks),
+                    label: ATHLTHLocalization.choose(english: "Weeks", norwegian: "Uker")
+                )
+                premiumMetricSeparator
+                premiumPlanMetric(
+                    String(entry.sessionsPerWeek),
+                    label: ATHLTHLocalization.choose(english: "Sessions / week", norwegian: "Økter / uke")
+                )
+                premiumMetricSeparator
+                premiumPlanMetric(
+                    String(entry.durationWeeks * entry.sessionsPerWeek),
+                    label: ATHLTHLocalization.choose(english: "Total sessions", norwegian: "Økter totalt")
+                )
+            }
+
+            if !displayedMuscleFocus.isEmpty {
+                Rectangle()
+                    .fill(ATHLTHPlanDesign.warmDivider)
+                    .frame(height: 1)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "MUSCLE GROUPS IN THE PLAN",
+                        norwegian: "MUSKELGRUPPER I PLANEN"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(detailAccent)
+                    Text(displayedMuscleFocus.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
-        .padding(13)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ATHLTHPlanDesign.warmSurface,
-                    in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+        .background {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [.white, Color(red: 0.988, green: 0.977, blue: 0.955)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
         }
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .strokeBorder(detailAccent.opacity(0.17), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 15, y: 6)
+        .accessibilityIdentifier("athlth-premium-plan-overview")
+    }
+
+    private var planLevelTitle: String {
+        switch entry.level.lowercased() {
+        case "beginner", "novice":
+            return ATHLTHLocalization.choose(english: "Beginner", norwegian: "Nybegynner")
+        case "intermediate":
+            return ATHLTHLocalization.choose(english: "Intermediate", norwegian: "Middels")
+        case "advanced":
+            return ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")
+        case "expert":
+            return ATHLTHLocalization.choose(english: "Expert", norwegian: "Erfaren")
+        default:
+            return entry.level
+        }
+    }
+
+    private func premiumPlanChip(_ text: String, icon: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .lineLimit(1)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(ATHLTHPlanDesign.selectedSurface.opacity(0.7),
+                        in: Capsule())
+    }
+
+    private func premiumPlanMetric(_ value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+    }
+
+    private var premiumMetricSeparator: some View {
+        Rectangle()
+            .fill(ATHLTHPlanDesign.warmDivider)
+            .frame(width: 1, height: 43)
     }
 
     private var detailAccent: Color {
