@@ -6501,7 +6501,7 @@ struct WorkoutTemplateBuilderView: View {
                                 if initialActivity == .running {
                                     ATHLTHIntervalGhostSettingsView(
                                         configuration: $intervalGhostConfiguration,
-                                        blocks: blocks
+                                        blocks: $blocks
                                     )
                                 }
                             }
@@ -9850,7 +9850,7 @@ struct SavedWorkoutPickerView: View {
 /// preferences and keeps the simple on/off + pace flow above advanced options.
 private struct ATHLTHIntervalGhostSettingsView: View {
     @Binding var configuration: ATHLTHIntervalGhostPacer.WorkoutConfiguration
-    let blocks: [WorkoutTemplateBlock]
+    @Binding var blocks: [WorkoutTemplateBlock]
     @State private var showAdvanced = false
 
     private var paceText: Binding<String> {
@@ -9922,11 +9922,19 @@ private struct ATHLTHIntervalGhostSettingsView: View {
                                         }?.enabled ?? false
                                     },
                                     set: { enabled in
+                                        if let index = blocks.firstIndex(where: {
+                                            $0.editorDragID == block.editorDragID
+                                        }), blocks[index].ghostSegmentID == nil {
+                                            blocks[index].ghostSegmentID = UUID()
+                                        }
+                                        let stableID = blocks.first(where: {
+                                            $0.editorDragID == block.editorDragID
+                                        })?.ghostSegmentID ?? block.editorDragID
                                         configuration.segments.removeAll {
-                                            $0.id == (block.ghostSegmentID ?? block.editorDragID)
+                                            $0.id == stableID
                                         }
                                         configuration.segments.append(.init(
-                                            id: block.ghostSegmentID ?? block.editorDragID,
+                                            id: stableID,
                                             enabled: enabled,
                                             paceSecondsPerKilometer: nil
                                         ))
