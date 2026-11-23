@@ -68,7 +68,10 @@ enum ATHLTHWorkoutSelectionOverview {
         }
 
         var estimatedSeconds: TimeInterval? {
-            ATHLTHWorkoutDurationEstimator.previewSeconds(
+            // AMRAP and EMOM have ONE shared group clock. Showing that
+            // entire clock beside every station would inflate row estimates.
+            if first.executionGroupKind?.usesGroupClock == true { return nil }
+            return ATHLTHWorkoutDurationEstimator.previewSeconds(
                 for: steps,
                 defaultActivity: first.cardioActivity == .walking
                     ? .walking : .running
@@ -115,12 +118,15 @@ enum ATHLTHWorkoutSelectionOverview {
                          locale: Locale(identifier: "nb_NO")).lowercased()
         })
         let rests = executed.filter(\.isRestOrActiveRecovery)
-        let knownRest = rests.allSatisfy {
+        // Active recovery is a counted pause/segment but remains physical
+        // exercise; only passive rest is subtracted from active minutes.
+        let passiveRest = rests.filter { $0.kind == .rest }
+        let knownRest = passiveRest.allSatisfy {
             guard let time = $0.durationSeconds else { return false }
             return time.isFinite && time >= 0
         }
         let restSeconds: TimeInterval? = knownRest
-            ? rests.reduce(0) { $0 + ($1.durationSeconds ?? 0) } : nil
+            ? passiveRest.reduce(0) { $0 + ($1.durationSeconds ?? 0) } : nil
         let totalSeconds = ATHLTHWorkoutDurationEstimator.previewSeconds(
             for: blocks, defaultActivity: defaultActivity
         )
