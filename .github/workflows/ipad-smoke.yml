@@ -67,6 +67,7 @@ on:
       - scripts/optimize_hero_assets.sh
       - .github/workflows/ipad-smoke.yml
       - .github/ipad-trigger
+      - .github/launch-trigger
       - .github/testflight-trigger
 
 concurrency:
