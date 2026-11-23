@@ -6989,7 +6989,13 @@ struct SessionEditorView: View {
 
     @ViewBuilder
     private var editorBaseForm: some View {
-        if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
+        // The obsolete "Plan extra workout" Form must never be presented
+        // from a friend's Train Together entry, including the first frame
+        // before the full-screen unified builder is attached.
+        if directPartnerID != nil && isStandalone && existingWorkout == nil {
+            ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
+                .toolbar(.hidden, for: .navigationBar)
+        } else if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
             isStandalone: isStandalone,
             hasScratchSource: selectedScratchWorkoutType != nil ||
                 (editorMode == .advanced && canOpenImportedAdvancedWorkout) ||
