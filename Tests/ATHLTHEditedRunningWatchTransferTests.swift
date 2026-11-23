@@ -18,6 +18,36 @@ final class ATHLTHEditedRunningWatchTransferTests: XCTestCase {
         return workout
     }
 
+    func testIntervalGhostSettingsSurviveWatchTransferSerialization() throws {
+        let blocks = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        var transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: planned(blocks), routeAlerts: .standard
+        )
+        var ghost = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
+        ghost.isEnabled = true
+        ghost.defaultPaceSecondsPerKilometer = 300
+        ghost.pauseBehavior = .followActualDistance
+        ghost.coverage = .selectedSegments
+        ghost.segments = [.init(
+            id: transfer.steps[0].id,
+            enabled: true,
+            paceSecondsPerKilometer: 275
+        )]
+        transfer.intervalGhostConfiguration = ghost
+        let restored = try JSONDecoder().decode(
+            WatchRunningWorkoutTransfer.self,
+            from: JSONEncoder().encode(transfer)
+        )
+        XCTAssertEqual(restored.intervalGhostConfiguration, ghost)
+        XCTAssertEqual(restored.intervalGhostConfiguration?.segments.first?.id,
+                       restored.steps[0].id)
+        let progress = restored.intervalGhostConfiguration?.progress(
+            from: .init(), segmentID: restored.steps[0].id,
+            kind: .work, elapsedSeconds: 275, actualMeters: 1_100
+        )
+        XCTAssertEqual(progress?.leadMeters, 100, accuracy: 0.001)
+    }
+
     func testThirtyThirtyPreservesAllFortyWatchStepsAndLastActiveRecovery() throws {
         let blocks = ATHLTHRunningExercisePreset.thirtyThirty.blocks(in: .main)
         let workout = planned(blocks, title: "30/30")
