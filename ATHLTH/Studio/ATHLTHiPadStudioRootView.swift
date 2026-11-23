@@ -566,7 +566,7 @@ struct ATHLTHiPadStudioRootView: View {
                                 english: "Tap or swipe left on this handle to open Inbox",
                                 norwegian: "Trykk eller sveip mot venstre på håndtaket for å åpne Innboks"
                             ))
-                            .padding(.top, 14)
+                            .padding(.top, 2)
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 15)
                                     .onEnded { value in
