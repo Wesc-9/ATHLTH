@@ -535,16 +535,6 @@ struct ATHLTHiPadStudioRootView: View {
                 studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
-                    // This belongs to the navigation bar, not an overlay on
-                    // Studio content. Overlaying the planner obscures its
-                    // next-week control and blocks taps in the top-right.
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            if !showingInspector {
-                                inboxNavigationHandle
-                            }
-                        }
-                    }
                     // Overview owns its compact title/metrics inside the
                     // content. Avoid the duplicate large "Overview" title
                     // that previously consumed substantial iPad space.
@@ -564,6 +554,17 @@ struct ATHLTHiPadStudioRootView: View {
                         for: .navigationBar
                     )
 
+            }
+            // Mount above the entire navigation stack, not inside the
+            // destination view. Nested workout NavigationStacks own their
+            // own titles/toolbars, but this single handle remains reachable
+            // over the top chrome instead of overlapping date/week arrows.
+            .overlay(alignment: .topTrailing) {
+                if !showingInspector {
+                    inboxNavigationHandle
+                        .padding(.top, 6)
+                        .padding(.trailing, 4)
+                }
             }
             .id(detailNavigationIdentity)
         }
