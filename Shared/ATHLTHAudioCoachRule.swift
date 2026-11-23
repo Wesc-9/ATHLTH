@@ -700,12 +700,16 @@ enum ATHLTHAudioCoachRuleDelivery {
             // A nonzero elapsed slot would otherwise suppress the first cue.
             result[rule.id] = rule.trigger == .workoutStart && elapsedSeconds > 3
                 ? 1
-                : rule.trigger.isPeriodic && rule.beforeEndSeconds == nil
-                    ? slot(
-                        for: rule,
-                        distanceMeters: distanceMeters,
-                        elapsedSeconds: elapsedSeconds
-                    ) : 0
+                : rule.trigger == .randomMotivation
+                    ? randomMotivationSlot(for: rule, elapsedSeconds: elapsedSeconds)
+                    : rule.trigger == .elevationGain
+                        ? 0  // Elevation is a separate measured sensor, not distance.
+                        : rule.trigger.isPeriodic && rule.beforeEndSeconds == nil
+                            ? slot(
+                                for: rule,
+                                distanceMeters: distanceMeters,
+                                elapsedSeconds: elapsedSeconds
+                            ) : 0
         }
         return result
     }
@@ -1442,6 +1446,8 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         // assigned invented metres.
         let remaining = steps[index...]
         if remaining.allSatisfy({ candidate in
+            if candidate.phase == "recovery" &&
+               candidate.distanceMeters == nil { return true }
             guard let value = candidate.distanceMeters else { return false }
             return value.isFinite && value >= 0
         }) {
