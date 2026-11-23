@@ -5970,10 +5970,10 @@ struct ATHLTHTrainView: View {
                     .navigationBarTitleDisplayMode(.inline)
             }
             .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingTrainAllPlans) {
+            .sheet(isPresented: $showingTrainAllPlans.keepingPresentedWhenInactive(scenePhase)) {
                 AllTrainingPlansView()
             }
-            .sheet(isPresented: $showingAllWorkoutCategories, onDismiss: {
+            .sheet(isPresented: $showingAllWorkoutCategories.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 guard let action = pendingWorkoutCategoryAction else { return }
                 pendingWorkoutCategoryAction = nil
                 handleWorkoutCategoryAction(action)
@@ -5985,7 +5985,7 @@ struct ATHLTHTrainView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
-            .sheet(item: $selectedTrainCompetitionActivity) { activity in
+            .sheet(item: $selectedTrainCompetitionActivity.keepingPresentedItemWhenInactive(scenePhase)) { activity in
                 switch activity {
                 case .running:
                     ATHLTHCompetitionCreationView(
@@ -6004,7 +6004,7 @@ struct ATHLTHTrainView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingTrainRunningWorkoutLibrary, onDismiss: {
+            .sheet(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 if let selected = trainRunningWorkoutSelection {
                     trainRunningWorkoutSelection = nil
                     pendingPlannedEnduranceWorkout = nil
@@ -6026,7 +6026,7 @@ struct ATHLTHTrainView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showingTrainIntervalComposer, onDismiss: {
+            .sheet(isPresented: $showingTrainIntervalComposer.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 // The interval editor closes before the running quick-start
                 // sheet is presented. Preserve the newly built interval steps.
                 guard let template = savedTrainIntervalTemplate else { return }
@@ -6039,7 +6039,7 @@ struct ATHLTHTrainView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
-            .athlthStudioEditor(item: $trainProgramCreationLaunch, useFullScreen: studioFullscreenEditing, onDismiss: {
+            .athlthStudioEditor(item: $trainProgramCreationLaunch.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
                 // Only an actual dismissed presentation warrants a recovery.
                 // A normal background/foreground transition never enters here.
                 if let planID = newlyCreatedPlanToOpen {
@@ -6075,23 +6075,23 @@ struct ATHLTHTrainView: View {
                 // Keep this identity alive during an ordinary app switch.
                 .id(launch.id)
             }
-            .sheet(isPresented: $showingTrainPlanProgress) {
+            .sheet(isPresented: $showingTrainPlanProgress.keepingPresentedWhenInactive(scenePhase)) {
                 if let plan = session.activePlan {
                     TrainingPlanProgressDetailView(planID: plan.id)
                 }
             }
-            .sheet(item: $selectedSuggestedWorkout) { entry in
+            .sheet(item: $selectedSuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { entry in
                 NavigationStack {
                     WorkoutTemplateDetailView(entry: entry)
                 }
             }
-            .sheet(item: $selectedTrainDailyRecommendationInfo) { info in
+            .sheet(item: $selectedTrainDailyRecommendationInfo.keepingPresentedItemWhenInactive(scenePhase)) { info in
                 HomeDailyRecommendationInfoSheet(info: info)
                     .presentationDetents([.fraction(0.82), .large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
             }
-            .sheet(item: $selectedTrainStandaloneWorkout) { workout in
+            .sheet(item: $selectedTrainStandaloneWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
                 HomeDailyRecommendedWorkoutSheet(
                     workout: workout,
                     isPlanWorkout: false,
@@ -6118,7 +6118,7 @@ struct ATHLTHTrainView: View {
                 .presentationDetents([.fraction(0.82), .large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(item: $selectedTrainDailySuggestedWorkout) { workout in
+            .sheet(item: $selectedTrainDailySuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
                 HomeDailyRecommendedWorkoutSheet(
                     workout: workout,
                     isPlanWorkout: false,
@@ -6141,7 +6141,7 @@ struct ATHLTHTrainView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
-            .athlthStudioEditor(item: $selectedPlanWorkout, useFullScreen: studioFullscreenEditing) { selection in
+            .athlthStudioEditor(item: $selectedPlanWorkout.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { selection in
                 PlannedWorkoutDetailView(
                     planID: selection.planID,
                     workout: selection.workout,
@@ -6149,7 +6149,7 @@ struct ATHLTHTrainView: View {
                 )
                 .environmentObject(session)
             }
-            .sheet(item: $selectedStrengthSession, onDismiss: {
+            .sheet(item: $selectedStrengthSession.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
                 guard ATHLTHScratchComposerPresentationPolicy
                     .startsLiveAfterSetupDismiss(
                         queued: pendingTrainStrengthLiveAfterDismiss,
@@ -6203,7 +6203,7 @@ struct ATHLTHTrainView: View {
                 }
             }
             .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingRunQuickStart, onDismiss: {
+            .sheet(isPresented: $showingRunQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 pendingPlannedEnduranceWorkout = nil
             }) {
                 RunQuickStartSheet(
@@ -6274,7 +6274,7 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingWalkQuickStart, onDismiss: {
+            .sheet(isPresented: $showingWalkQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 pendingPlannedEnduranceWorkout = nil
             }) {
                 WalkQuickStartSheet(
@@ -6333,7 +6333,7 @@ struct ATHLTHTrainView: View {
                 }
             }
             .sheet(
-                isPresented: $showingStrengthQuickStart,
+                isPresented: $showingStrengthQuickStart.keepingPresentedWhenInactive(scenePhase),
                 onDismiss: {
                     quickStrengthStartWithExercises = false
                     guard ATHLTHScratchComposerPresentationPolicy
@@ -6397,7 +6397,7 @@ struct ATHLTHTrainView: View {
                     }
                 }
             }
-            .sheet(item: $pendingRunningTemplate, onDismiss: {
+            .sheet(item: $pendingRunningTemplate.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
                 pendingPlannedEnduranceWorkout = nil
             }) { workout in
                 RunQuickStartSheet(
@@ -6466,7 +6466,7 @@ struct ATHLTHTrainView: View {
                 }
             }
             .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingCustomQuickStart, onDismiss: {
+            .sheet(isPresented: $showingCustomQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
                 // Never compete with the setup sheet's dismissal animation.
                 if let launch = pendingCustomIPhoneQuick {
                     pendingCustomIPhoneQuick = nil
