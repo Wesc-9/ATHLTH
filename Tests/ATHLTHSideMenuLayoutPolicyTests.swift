@@ -7,34 +7,55 @@ final class ATHLTHSideMenuLayoutPolicyTests: XCTestCase {
     func testTypicalIPhoneWidthsLeaveVisibleHomeSpace() {
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 375),
-            215.625,
+            225,
             accuracy: 0.01
         )
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 393),
-            225.975,
+            235.8,
             accuracy: 0.01
         )
         XCTAssertEqual(
             ATHLTHSideMenuLayoutPolicy.width(for: 440),
-            253,
+            264,
             accuracy: 0.01
         )
     }
 
-    func testDrawerIsFifteenPercentWiderThanBefore() {
+    func testDrawerMatchesRefinedSixtyPercentLayout() {
         for width: CGFloat in [280, 320, 375, 393, 440] {
             let drawerWidth = ATHLTHSideMenuLayoutPolicy.width(for: width)
-            XCTAssertEqual(drawerWidth, width * 0.5 * 1.15, accuracy: 0.01)
+            XCTAssertEqual(drawerWidth, width * 0.60, accuracy: 0.01)
+            XCTAssertLessThanOrEqual(drawerWidth, 280)
         }
+        XCTAssertEqual(
+            ATHLTHSideMenuLayoutPolicy.width(for: 900), 280, accuracy: 0.01
+        )
+        XCTAssertEqual(ATHLTHSideMenuLayoutPolicy.width(for: 0), 0)
     }
 
     func testSmallScreensKeepSpaceForDismissTap() {
         for width: CGFloat in [280, 320, 375, 393, 440] {
             let drawerWidth = ATHLTHSideMenuLayoutPolicy.width(for: width)
-            XCTAssertGreaterThanOrEqual(width - drawerWidth, width * 0.425 - 0.01)
+            XCTAssertGreaterThanOrEqual(width - drawerWidth, width * 0.40 - 0.01)
             XCTAssertGreaterThanOrEqual(width - drawerWidth, 110)
         }
+    }
+
+    func testAccessibilityTypographyGetsExtraWidthAndDismissSpace() {
+        for width: CGFloat in [280, 320, 375, 393, 440] {
+            let regular = ATHLTHSideMenuLayoutPolicy.width(for: width)
+            let accessible = ATHLTHSideMenuLayoutPolicy.width(
+                for: width, accessibilitySize: true
+            )
+            XCTAssertGreaterThan(accessible, regular)
+            XCTAssertLessThanOrEqual(accessible, width * 0.78 + 0.01)
+            XCTAssertGreaterThanOrEqual(width - accessible, 60)
+        }
+        XCTAssertEqual(
+            ATHLTHSideMenuLayoutPolicy.width(for: 900, accessibilitySize: true),
+            350, accuracy: 0.01
+        )
     }
 
     func testExpandedSearchStaysInsideDrawerAndKeepsDismissEdge() {
