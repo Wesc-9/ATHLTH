@@ -77,9 +77,20 @@ final class ChallengeStore: ObservableObject {
                     challenge
             }
 
-        challenges =
-            Array(normalized.values)
-
+        // Incoming rows can arrive in an arbitrary database order. Stable
+        // ordering and equality avoid publishing a whole new Challenges
+        // screen or re-encoding local storage when nothing has changed.
+        let updated = normalized.values.sorted {
+            $0.id.uuidString < $1.id.uuidString
+        }
+        let existing = challenges.sorted {
+            $0.id.uuidString < $1.id.uuidString
+        }
+        guard updated != existing else {
+            refreshStatuses()
+            return
+        }
+        challenges = updated
         refreshStatuses()
         persist()
     }
@@ -783,55 +794,60 @@ final class ChallengeStore: ObservableObject {
 
     func refreshStatuses(now: Date = Date()) {
         var changed = false
+        // Mutating @Published updated[index] in a loop emits one UI
+        // invalidation per challenge. Recalculate off the published
+        // collection and publish once only if a status actually changes.
+        var updated = challenges
 
-        for index in challenges.indices {
+        for index in updated.indices {
             // Check this before the completed guard: older clients may have
             // persisted a false completed result before an invite was accepted.
-            if challenges[index].expiredWithoutOpponent(at: now) {
-                if challenges[index].status != .cancelled {
-                    challenges[index].status = .cancelled
+            if updated[index].expiredWithoutOpponent(at: now) {
+                if updated[index].status != .cancelled {
+                    updated[index].status = .cancelled
                     changed = true
                 }
                 continue
             }
 
-            if challenges[index].status == .cancelled ||
-                challenges[index].status == .completed ||
-                challenges[index].status == .draft {
+            if updated[index].status == .cancelled ||
+                updated[index].status == .completed ||
+                updated[index].status == .draft {
                 continue
             }
 
-            if let endsAt = challenges[index].rules.endsAt,
+            if let endsAt = updated[index].rules.endsAt,
                now >= endsAt {
-                challenges[index].status = .completed
+                updated[index].status = .completed
                 changed = true
                 continue
             }
 
-            if let scoringStart = challenges[index].scoringStartDate,
+            if let scoringStart = updated[index].scoringStartDate,
                now >= scoringStart {
-                if challenges[index].rules.lockRulesAtStart &&
-                    challenges[index].rulesLockedAt == nil {
-                    challenges[index].rulesLockedAt = scoringStart
+                if updated[index].rules.lockRulesAtStart &&
+                    updated[index].rulesLockedAt == nil {
+                    updated[index].rulesLockedAt = scoringStart
                     changed = true
                 }
 
-                if challenges[index].status != .active {
-                    challenges[index].status = .active
+                if updated[index].status != .active {
+                    updated[index].status = .active
                     changed = true
                 }
             } else {
                 let nextStatus: ATHLTHChallengeStatus =
-                    challenges[index].scoringStartDate != nil ? .upcoming : .invited
+                    updated[index].scoringStartDate != nil ? .upcoming : .invited
 
-                if challenges[index].status != nextStatus {
-                    challenges[index].status = nextStatus
+                if updated[index].status != nextStatus {
+                    updated[index].status = nextStatus
                     changed = true
                 }
             }
         }
 
         if changed {
+            challenges = updated
             persist()
         }
     }
