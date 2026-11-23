@@ -3442,7 +3442,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             guard workout.steps.indices.contains(recorded.index) else { continue }
             let step = workout.steps[recorded.index]
             guard let next = configuration.progress(
-                from: progress, segmentID: step.id,
+                from: progress, segmentID: step.ghostSourceSegmentID ?? step.id,
                 kind: intervalGhostKind(for: step),
                 elapsedSeconds: recorded.activeSeconds,
                 actualMeters: recorded.distanceMeters
@@ -3452,7 +3452,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if !awaitingMainStart && !structuredWorkoutComplete {
             let step = workout.steps[structuredStepIndex]
             guard let next = configuration.progress(
-                from: progress, segmentID: step.id,
+                from: progress, segmentID: step.ghostSourceSegmentID ?? step.id,
                 kind: intervalGhostKind(for: step),
                 elapsedSeconds: currentStructuredStepElapsedTime,
                 actualMeters: currentStructuredStepDistanceMeters
