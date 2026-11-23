@@ -45,6 +45,14 @@ enum ATHLTHStudioWeekRailLayout {
             2 * verticalInset - headerHeight - sectionSpacing - 6 * daySpacing
         return min(99, max(44, remaining / 7))
     }
+
+    static func weekNumber(for date: Date, timeZone: TimeZone = .current) -> Int {
+        // Always agree with Monday-first weekRange, including around New Year
+        // for athletes whose device region is not set to Norway.
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = timeZone
+        return calendar.component(.weekOfYear, from: date)
+    }
 }
 
 /// Focused iPad day planning: week navigation and one reusable iPhone
@@ -199,19 +207,18 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
 
     private var weekNavigationHeader: some View {
         HStack(spacing: 3) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(ATHLTHLocalization.choose(
-                    english: "WEEK", norwegian: "UKE"
+                    english: "Week \(ATHLTHStudioWeekRailLayout.weekNumber(for: selectedDate))",
+                    norwegian: "Uke \(ATHLTHStudioWeekRailLayout.weekNumber(for: selectedDate))"
                 ))
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.3)
-                .foregroundStyle(ATHLTHStudioStyle.gold)
-                Text(
-                    "\(Calendar.current.component(.weekOfYear, from: selectedDate))"
-                )
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(ATHLTHStudioStyle.ink)
+                Text(weekDateRangeLabel)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 1)
             Button { changeWeek(-1) } label: {
@@ -237,6 +244,12 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         .foregroundStyle(ATHLTHStudioStyle.gold)
         .frame(height: ATHLTHStudioWeekRailLayout.headerHeight)
         .accessibilityIdentifier("athlth-ipad-week-rail-navigation")
+    }
+
+    private var weekDateRangeLabel: String {
+        let range = ATHLTHStudioHomeWeek.weekRange(containing: selectedDate)
+        return range.start.formatted(.dateTime.day()) + "–" +
+            range.end.formatted(.dateTime.day().month(.abbreviated))
     }
 
     private var dayRail: some View {
