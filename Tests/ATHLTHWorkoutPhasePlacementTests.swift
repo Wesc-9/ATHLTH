@@ -301,4 +301,69 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
             for: ordinaryRest, visiblePhases: [.main]
         ), .main)
     }
+    func testFourByFourActiveRecoveryStaysBetweenEffortsAfterPaceEditing() {
+        let group = UUID()
+        var source: [WorkoutTemplateBlock] = []
+        for round in 1...4 {
+            var work = block("Intervall \(round)", phase: .main, group: group)
+            work.kind = .run
+            work.groupKind = .intervals
+            work.groupRounds = 1
+            work.durationSeconds = 240
+            work.targetPaceSecondsPerKilometer = 240 // 15 km/h
+            source.append(work)
+            if round < 4 {
+                var rest = block("Aktiv pause \(round)", phase: .recovery, group: group)
+                rest.kind = .run
+                rest.groupKind = .intervals
+                rest.groupRounds = 1
+                rest.activityTag = "active_recovery"
+                rest.cardioActivity = .running
+                rest.durationSeconds = 120
+                rest.targetPaceSecondsPerKilometer = 600 // 6 km/h
+                rest.targetHeartRateZone = 1
+                source.append(rest)
+            }
+        }
+
+        let original = source
+        let visible: Set<WorkoutPhaseKind> = [.main, .recovery]
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.orderedVisiblePhases(
+            for: source, visiblePhases: visible
+        ), [.main], "Active interval pauses are not a separate Pause category")
+        XCTAssertEqual(source.indices.map {
+            ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                at: $0, in: source, visiblePhases: visible
+            )
+        }, Array(repeating: .main, count: 7))
+        XCTAssertEqual(ATHLTHWorkoutTimelinePresentation.sections(
+            for: source
+        ).map(\.phase), [.main])
+        XCTAssertEqual(ATHLTHWorkoutTimelinePresentation.sections(
+            for: source
+        )[0].blocks.map(\.title), [
+            "Intervall 1", "Aktiv pause 1", "Intervall 2",
+            "Aktiv pause 2", "Intervall 3", "Aktiv pause 3", "Intervall 4"
+        ])
+        XCTAssertNotNil(ATHLTHIntervalRecipeEditing.summary(for: group, in: source))
+        XCTAssertEqual(source, original, "Rendering cannot change workout phases or pacing")
+        let deleted = ATHLTHWorkoutPhaseDeletionPolicy.removing(
+            .main, from: source, visiblePhases: visible
+        )
+        XCTAssertTrue(deleted.isEmpty, "Deleting Main also removes its paired recoveries")
+    }
+
+    func testStandaloneActiveRecoveryIsNotCapturedByNeighboringUnrelatedSteps() {
+        var active = block("Standalone active recovery", phase: .recovery)
+        active.activityTag = "active_recovery"
+        active.cardioActivity = .running
+        let steps = [active, block("Run", phase: .main)]
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            at: 0, in: steps, visiblePhases: [.main]
+        ), .recovery)
+        XCTAssertEqual(ATHLTHWorkoutPhaseDeletionPolicy.orderedVisiblePhases(
+            for: steps, visiblePhases: [.main]
+        ), [.recovery, .main])
+    }
+
 }
