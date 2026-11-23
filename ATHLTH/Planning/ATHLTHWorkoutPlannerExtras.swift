@@ -14,4 +14,6 @@ struct ATHLTHWorkoutPlannerExtras: Codable, Hashable {
     var routeAlertConfiguration: WatchRouteAlertConfiguration? = nil
     var ghostTargetDurationSeconds: TimeInterval? = nil
     var ghostUpdates: WatchGhostRaceAudioConfiguration? = nil
+    /// Optional workout-specific interval Ghost settings, shared with plans.
+    var intervalGhostConfiguration: ATHLTHIntervalGhostPacer.WorkoutConfiguration? = nil
 }
