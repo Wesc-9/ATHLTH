@@ -541,7 +541,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 .execute()
                 .value
             let cutoff = Date().addingTimeInterval(-180)
-            let updated = Set(rows.compactMap { row in
+            let updated: Set<UUID> = Set(rows.compactMap { row -> UUID? in
                 guard row.state == "training",
                       let updatedAt = row.updatedAt,
                       updatedAt >= cutoff else { return nil }
