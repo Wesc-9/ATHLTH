@@ -346,3 +346,201 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
         }
     }
 }
+
+
+/// Tapping the single exercise in Basic must open its full prescribed
+/// sequence. The source workout remains unchanged; the separate target editor
+/// only modifies explicitly selected blocks, not unrelated exercises.
+struct ATHLTHBasicWorkoutExerciseDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var blocks: [WorkoutTemplateBlock]
+    let includedBlockIDs: Set<UUID>
+    let exerciseTitle: String
+
+    @State private var showingTargets = false
+
+    private let ink = ATHLTHPlanDesign.ink
+    private let muted = ATHLTHPlanDesign.secondaryInk
+    private let bronze = ATHLTHTrainDesign.bronze
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    private var exerciseBlocks: [WorkoutTemplateBlock] {
+        blocks.filter { includedBlockIDs.contains($0.editorDragID) }
+    }
+
+    private var isFourByFour: Bool {
+        ATHLTHCompoundExerciseCatalog.fourByFourRecovery(exerciseBlocks) != nil
+    }
+
+    private var headerTitle: String {
+        if isFourByFour { return tr("4 × 4 intervals", "4 × 4 intervaller") }
+        return exerciseTitle.isEmpty
+            ? (exerciseBlocks.first?.title ?? tr("Exercise", "Øvelse"))
+            : exerciseTitle
+    }
+
+    private var plannedZone: String? {
+        let effort = exerciseBlocks.filter { !$0.isRestOrActiveRecovery }
+        if let range = ATHLTHPlannedWorkoutMetrics.plannedHeartRateZoneRange(
+            for: effort
+        ) {
+            let prefix = ATHLTHLocalization.isNorwegian ? "S" : "Z"
+            return range.lowerBound == range.upperBound
+                ? "\(prefix)\(range.lowerBound)"
+                : "\(prefix)\(range.lowerBound)–\(prefix)\(range.upperBound)"
+        }
+        return isFourByFour
+            ? (ATHLTHLocalization.isNorwegian ? "S4–S5" : "Z4–Z5")
+            : nil
+    }
+
+    private var plannedSeconds: TimeInterval? {
+        ATHLTHWorkoutDurationEstimator.previewSeconds(for: exerciseBlocks)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    ATHLTHWorkoutDetailsCard(
+                        activityTitle: headerTitle,
+                        symbol: exerciseBlocks.contains {
+                            $0.kind == .run &&
+                            $0.treadmillInclinePercent != nil
+                        } ? "figure.run.treadmill" : "figure.run",
+                        showsTimingLabel: false
+                    ) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 12) {
+                                if let plannedSeconds {
+                                    Label(
+                                        ATHLTHWorkoutDurationEstimator
+                                            .conciseDuration(plannedSeconds),
+                                        systemImage: "clock"
+                                    )
+                                }
+                                if let plannedZone {
+                                    Label(plannedZone, systemImage: "heart")
+                                }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(bronze)
+
+                            Text(isFourByFour
+                                ? tr(
+                                    "Four 4-minute efforts, with active recovery between efforts. Follow your own pace and heart-rate targets; each recovery stays directly after its effort.",
+                                    "Fire drag på fire minutter, med aktiv pause mellom dragene. Følg dine egne tempo- og pulsmål. Hver pause ligger rett etter tilhørende drag."
+                                  )
+                                : tr(
+                                    "Review each step and its planned targets before the workout.",
+                                    "Se alle deløktene og de planlagte målene før treningsøkten."
+                                  ))
+                                .font(.subheadline)
+                                .foregroundStyle(muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(tr("Exercise contents", "Øvelsens innhold"),
+                              systemImage: "list.number")
+                            .font(.headline)
+                            .foregroundStyle(ink)
+                        ForEach(exerciseBlocks, id: \.editorDragID) { block in
+                            exerciseStepRow(block)
+                        }
+                    }
+                    .padding(15)
+                    .athlthPlanCard(radius: 20)
+                    .accessibilityIdentifier("athlth-basic-exercise-timeline")
+                }
+                .padding(16)
+            }
+            .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            .navigationTitle(tr("Exercise details", "Øvelsesdetaljer"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Done", "Ferdig")) { dismiss() }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    showingTargets = true
+                } label: {
+                    Label(tr("Edit pace and heart-rate targets",
+                             "Juster tempo og pulssone"),
+                          systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(bronze)
+                .disabled(exerciseBlocks.isEmpty)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
+            }
+        }
+        .sheet(isPresented: $showingTargets) {
+            ATHLTHWorkoutTargetsQuickSheet(
+                blocks: $blocks,
+                advanced: false,
+                includedBlockIDs: includedBlockIDs
+            )
+        }
+        .presentationDetents([.large])
+        .accessibilityIdentifier("athlth-basic-exercise-details")
+    }
+
+    private func exerciseStepRow(_ block: WorkoutTemplateBlock) -> some View {
+        let guidance = ATHLTHWorkoutStepGuidance.detail(
+            for: block, in: exerciseBlocks
+        )
+        return HStack(alignment: .top, spacing: 11) {
+            Image(systemName: block.isActiveRecovery
+                  ? "figure.walk" : block.isRestOrActiveRecovery
+                    ? "pause.fill" : "figure.run")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(bronze)
+                .frame(width: 39, height: 39)
+                .background(ATHLTHPlanDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(guidance.context)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                Text(guidance.instructions)
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 12) {
+                    if let duration = block.durationSeconds,
+                       duration.isFinite, duration > 0 {
+                        Label(ATHLTHWorkoutStepCopy.duration(duration),
+                              systemImage: "timer")
+                    }
+                    if let pace = block.targetPaceSecondsPerKilometer,
+                       pace.isFinite, pace > 0 {
+                        let rounded = Int(pace.rounded())
+                        Label(String(format: "%d:%02d min/km",
+                                     rounded / 60, rounded % 60),
+                              systemImage: "speedometer")
+                    }
+                    if let zone = guidance.zone {
+                        Label(zone, systemImage: "heart")
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(bronze)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(ATHLTHPlanDesign.selectedSurface.opacity(0.53),
+                    in: RoundedRectangle(cornerRadius: 14))
+    }
+}
