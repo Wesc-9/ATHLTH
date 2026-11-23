@@ -91,27 +91,34 @@ final class ChallengeStore: ObservableObject {
             return
         }
         challenges = updated
-        refreshStatuses()
+        refreshStatuses(persistIfChanged: false)
         persist()
     }
 
     func mergeRemoteChallenges(_ remote: [ATHLTHChallenge]) {
+        // Batch merges into one @Published assignment. The previous loop
+        // triggered a separate full Challenge screen redraw for every update.
+        var updated = challenges
+        var indices = Dictionary(uniqueKeysWithValues:
+            updated.enumerated().map { ($0.element.id, $0.offset) }
+        )
         var changed = false
-
         for remoteChallenge in remote {
-            if let index = challenges.firstIndex(where: { $0.id == remoteChallenge.id }) {
-                if challenges[index] != remoteChallenge {
-                    challenges[index] = remoteChallenge
+            if let index = indices[remoteChallenge.id] {
+                if updated[index] != remoteChallenge {
+                    updated[index] = remoteChallenge
                     changed = true
                 }
             } else {
-                challenges.append(remoteChallenge)
+                indices[remoteChallenge.id] = updated.count
+                updated.append(remoteChallenge)
                 changed = true
             }
         }
 
         if changed {
-            refreshStatuses()
+            challenges = updated
+            refreshStatuses(persistIfChanged: false)
             persist()
         }
     }
@@ -792,7 +799,9 @@ final class ChallengeStore: ObservableObject {
             }
     }
 
-    func refreshStatuses(now: Date = Date()) {
+    func refreshStatuses(
+        now: Date = Date(), persistIfChanged: Bool = true
+    ) {
         var changed = false
         // Mutating @Published updated[index] in a loop emits one UI
         // invalidation per challenge. Recalculate off the published
@@ -848,7 +857,7 @@ final class ChallengeStore: ObservableObject {
 
         if changed {
             challenges = updated
-            persist()
+            if persistIfChanged { persist() }
         }
     }
 
