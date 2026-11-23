@@ -2681,6 +2681,7 @@ struct TrainTogetherPostCreateView:
 
     @State private var selectedInviteeIDs: Set<UUID> = []
     @State private var showingParticipationSettings = false
+    @State private var startIndependently = false
     @State private var isPublishing = false
     @State private var publishWarning: String?
     @State private var publishedSuccessfully = false
@@ -3660,6 +3661,40 @@ struct TrainTogetherPostCreateView:
                 if showingParticipationSettings {
                     WorkoutSocialModePicker(mode: $participationMode)
                     createDivider
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "HOW SHOULD THE WORKOUT START?",
+                            norwegian: "HVORDAN SKAL ØKTEN STARTE?"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Start mode", norwegian: "Startmodus"
+                            ),
+                            selection: $startIndependently
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Together", norwegian: "Samtidig"
+                            )).tag(false)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Individually", norwegian: "Hver for seg"
+                            )).tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        Text(startIndependently
+                            ? ATHLTHLocalization.choose(
+                                english: "Each participant starts their own recording on their own device when ready.",
+                                norwegian: "Hver deltaker starter sin egen registrering på sin egen enhet når de er klare."
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Everyone must be ready before the organizer starts the shared countdown.",
+                                norwegian: "Alle må være klare før arrangøren starter felles nedtelling."
+                              ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                    }
+                    createDivider
 
                 Text(ATHLTHLocalization.choose(
                     english: "WHO CAN JOIN?",
@@ -4333,7 +4368,7 @@ struct TrainTogetherPostCreateView:
                     }
             }
 
-        let payload =
+        var payload =
             SocialWorkoutInvitePayload(
                 workout: workout,
                 route: route,
@@ -4351,6 +4386,8 @@ struct TrainTogetherPostCreateView:
                         16
                     )
             )
+
+        payload.startIndependently = startIndependently
 
         let post =
             TrainTogetherPostWrite(
