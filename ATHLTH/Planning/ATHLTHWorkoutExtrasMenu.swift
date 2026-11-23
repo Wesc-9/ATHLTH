@@ -11,6 +11,7 @@ struct ATHLTHWorkoutExtrasMenu: View {
     let onGhostRace: () -> Void
     let onNavigation: () -> Void
     /// Compact bottom-of-Basic menu instead of a competing top-right gear.
+    var showsNavigation = true
     var showsExpandedLabel = false
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -39,9 +40,11 @@ struct ATHLTHWorkoutExtrasMenu: View {
             Button(action: onGhostRace) {
                 Label("Ghost Race", systemImage: "figure.run")
             }
-            Button(action: onNavigation) {
-                Label(tr("Navigation", "Navigasjon"),
-                      systemImage: "location.north.line")
+            if showsNavigation {
+                Button(action: onNavigation) {
+                    Label(tr("Navigation", "Navigasjon"),
+                          systemImage: "location.north.line")
+                }
             }
         } label: {
             if showsExpandedLabel {
