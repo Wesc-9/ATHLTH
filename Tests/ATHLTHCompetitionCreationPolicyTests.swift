@@ -54,6 +54,17 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         )
     }
 
+    func testSharedCompetitionPickerUsesCanonicalTypesWithoutIncorrectSportMapping() {
+        XCTAssertEqual(Set(ATHLTHPlannedWorkoutType.defaultOrder), Set(ATHLTHPlannedWorkoutType.allCases))
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.defaultOrder.count, 6)
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .running), .running)
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .walking), .walking)
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .strength), .strength)
+        XCTAssertNil(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .cycling))
+        XCTAssertNil(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .mobility))
+        XCTAssertNil(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .custom))
+    }
+
     func testCompetitionWorkoutTypeIsAlwaysAvailable() {
         for sport in [
             ATHLTHQuickStartActivity.running, .walking, .strength

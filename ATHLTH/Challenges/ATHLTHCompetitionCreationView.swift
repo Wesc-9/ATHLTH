@@ -62,6 +62,18 @@ enum ATHLTHSprintGoal: String, CaseIterable, Identifiable {
 /// Pure entry policy. A tournament or duel cannot be published with
 /// nonexistent rivals, duplicated participants or invalid measures.
 enum ATHLTHCompetitionCreationPolicy {
+    /// The canonical activity grid never hides unsupported categories.
+    /// Do not silently map cycling, mobility or custom to a different sport.
+    /// These categories stay visible but cannot create unscorable events.
+    static func quickStartActivity(for type: ATHLTHPlannedWorkoutType) -> ATHLTHQuickStartActivity? {
+        switch type {
+        case .running: return .running
+        case .walking: return .walking
+        case .strength: return .strength
+        case .cycling, .mobility, .custom: return nil
+        }
+    }
+
     static func sport(_ activity: ATHLTHQuickStartActivity) -> ATHLTHChallengeSport {
         switch activity {
         case .running: .running

@@ -3,7 +3,7 @@ import SwiftUI
 /// A single grid of images for both entry routes, so the design and
 /// per-account adaptive order cannot drift between planned and scratch.
 enum ATHLTHWorkoutTypePickerPurpose {
-    case useExisting, createFromScratch
+    case useExisting, createFromScratch, competition
 }
 
 struct ATHLTHPlannedWorkoutTypePickerView: View {
@@ -51,14 +51,16 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: compact ? 12 : 20) {
                         VStack(alignment: .leading, spacing: compact ? 5 : 9) {
-                            Text("ATHLTH · PLAN")
+                            Text(purpose == .competition
+                                 ? ATHLTHLocalization.choose(english: "ATHLTH · COMPETITION", norwegian: "ATHLTH · KONKURRANSE")
+                                 : "ATHLTH · PLAN")
                                 .font(.system(size: 11, weight: .bold))
                                 .tracking(3.0)
                                 .foregroundStyle(ATHLTHTheme.accentDeep)
 
                             Text(ATHLTHLocalization.choose(
-                                english: "What would you like to plan?",
-                                norwegian: "Hva vil du planlegge?"
+                                english: purpose == .competition ? "What would you like to compete in?" : "What would you like to plan?",
+                                norwegian: purpose == .competition ? "Hva vil du konkurrere i?" : "Hva vil du planlegge?"
                             ))
                             .font(typeSize.isAccessibilitySize
                                   ? .title2.bold()
@@ -67,12 +69,16 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                             .foregroundStyle(ink)
 
                             Text(ATHLTHLocalization.choose(
-                                english: purpose == .createFromScratch
-                                    ? "Choose an activity and build your own workout in the shared editor."
-                                    : "Choose an activity to find and adapt an existing workout.",
-                                norwegian: purpose == .createFromScratch
-                                    ? "Velg aktivitet og bygg din egen økt i den felles øktbyggeren."
-                                    : "Velg aktivitet for å hente og tilpasse en planlagt økt."
+                                english: purpose == .competition
+                                    ? "Choose an activity for a duel, single event, league or cup."
+                                    : purpose == .createFromScratch
+                                        ? "Choose an activity and build your own workout in the shared editor."
+                                        : "Choose an activity to find and adapt an existing workout.",
+                                norwegian: purpose == .competition
+                                    ? "Velg aktivitet for duell, enkeltkonkurranse, liga eller cup."
+                                    : purpose == .createFromScratch
+                                        ? "Velg aktivitet og bygg din egen økt i den felles øktbyggeren."
+                                        : "Velg aktivitet for å hente og tilpasse en planlagt økt."
                             ))
                             .font(compact ? .footnote : .subheadline)
                             .foregroundStyle(muted)
@@ -88,7 +94,7 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
 
                         // The tip is supplementary. Keep the six workout
                         // choices visible first on the smaller phone sheet.
-                        if !compact {
+                        if !compact && purpose != .competition {
                             HStack(alignment: .center, spacing: 12) {
                                 Image(systemName: "lightbulb")
                                     .font(.title3)
@@ -119,7 +125,8 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
             }
             .background(canvas.ignoresSafeArea())
             .navigationTitle(ATHLTHLocalization.choose(
-                english: "Choose workout type", norwegian: "Velg økttype"
+                english: purpose == .competition ? "Competition" : "Choose workout type",
+                norwegian: purpose == .competition ? "Konkurranse" : "Velg økttype"
             ))
             .navigationBarTitleDisplayMode(.inline)
             // Use the same native cancellation toolbar button as the
@@ -172,11 +179,19 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
     }
 
     private func openWorkoutType(_ type: ATHLTHPlannedWorkoutType) {
-        if purpose == .createFromScratch {
+        if purpose == .competition {
+            guard isAvailable(type) else { return }
+            onCreateNew?(type)
+        } else if purpose == .createFromScratch {
             onCreateNew?(type)
         } else if path.isEmpty {
             path.append(type)
         }
+    }
+
+    private func isAvailable(_ type: ATHLTHPlannedWorkoutType) -> Bool {
+        purpose != .competition ||
+            ATHLTHCompetitionCreationPolicy.quickStartActivity(for: type) != nil
     }
 
     private func activityTile(
@@ -245,6 +260,14 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
 
                         Spacer(minLength: compact ? 2 : 8)
 
+                        if !isAvailable(type) {
+                            Text(ATHLTHLocalization.choose(english: "Coming later", norwegian: "Kommer senere"))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(.white.opacity(0.96), in: Capsule())
+                        } else {
                         Image(systemName: "arrow.right")
                             .font(.system(
                                 size: compact ? 16 : 19, weight: .semibold
@@ -255,6 +278,7 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                                 height: compact ? 34 : 48
                             )
                             .background(.white.opacity(0.96), in: Circle())
+                        }
                     }
                     .padding(compact ? 10 : 15)
                     .frame(
@@ -277,12 +301,17 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
             .contentShape(RoundedRectangle(cornerRadius: compact ? 18 : 22))
         }
         .buttonStyle(.plain)
+        .disabled(!isAvailable(type))
+        .opacity(isAvailable(type) ? 1 : 0.68)
+        .accessibilityIdentifier("athlth-workout-type-\(type.rawValue)")
         .accessibilityLabel("\(type.title). \(type.description)")
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: purpose == .createFromScratch
-                ? "Open workout editor" : "Browse workouts",
-            norwegian: purpose == .createFromScratch
-                ? "Åpner øktbyggeren" : "Åpner øktbiblioteket"
+            english: purpose == .competition
+                ? (isAvailable(type) ? "Open competition setup" : "Competition support is coming later")
+                : purpose == .createFromScratch ? "Open workout editor" : "Browse workouts",
+            norwegian: purpose == .competition
+                ? (isAvailable(type) ? "Åpner konkurranseoppsett" : "Konkurransestøtte kommer senere")
+                : purpose == .createFromScratch ? "Åpner øktbyggeren" : "Åpner øktbiblioteket"
         ))
     }
 
