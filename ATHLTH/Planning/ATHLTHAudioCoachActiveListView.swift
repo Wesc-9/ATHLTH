@@ -1,9 +1,24 @@
 import SwiftUI
 
+/// When an Audio Coach editor is embedded inside a workout sheet, its host
+/// owns persistence and closing that one sheet. The child supplies the Save
+/// action in the toolbar instead of introducing a separate Done button.
+private struct ATHLTHAudioCoachSaveAndCloseKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var athlthAudioCoachSaveAndClose: (() -> Void)? {
+        get { self[ATHLTHAudioCoachSaveAndCloseKey.self] }
+        set { self[ATHLTHAudioCoachSaveAndCloseKey.self] = newValue }
+    }
+}
+
 /// Premium Audio Coach overview with one trigger-first editor for groups
 /// and one-trigger standalone commands. Older nested editing flows removed.
 struct ATHLTHAudioCoachActiveListView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.athlthAudioCoachSaveAndClose) private var saveAndClose
     @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
@@ -162,7 +177,15 @@ struct ATHLTHAudioCoachActiveListView: View {
         .tint(bronze)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if draft.enabled {
+                if let saveAndClose {
+                    // Save the latest bound session state and dismiss only
+                    // this Audio Coach sheet, restoring its presenting screen.
+                    Button(tr("Save", "Lagre"), action: saveAndClose)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(bronze)
+                        .accessibilityIdentifier("athlth-coach-save-top")
+                } else if draft.enabled {
+                    // Standalone profile editor retains Save / Save as new.
                     Button(tr("Save", "Lagre")) { showingSaveChoices = true }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(bronze)
