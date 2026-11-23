@@ -456,7 +456,8 @@ struct ATHLTHCoachRuleComposer: View {
                 switch trigger {
                 case .heartRateAbove, .heartRateBelow:
                     metrics = [.heartRate]
-                case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow:
+                case .zoneEnter, .zoneExit, .zoneBelow,
+                     .plannedZoneBelow, .plannedZoneOutside:
                     metrics = [.heartRateZone]
                 case .randomMotivation, .nearFinishTime, .nearFinishDistance,
                      .elevationGain, .uphillDetected,
