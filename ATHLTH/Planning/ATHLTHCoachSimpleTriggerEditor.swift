@@ -8,13 +8,15 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     @Binding var eventSelection: ATHLTHCoachEventSelection
     @Binding var phases: [ATHLTHCoachWorkoutPhase]?
     let supportsStructured: Bool
+    var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
+    @Binding var historicalWorkoutID: UUID?
 
     @State private var distanceUnit = 0
     @State private var timeUnit = 1
 
     private enum Family: String, CaseIterable, Identifiable {
         case distance, time, section, step, pause, heartZone
-        case motivation, finish, elevation, pace
+        case motivation, finish, elevation, pace, history
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -28,6 +30,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .finish: return ATHLTHLocalization.choose(english: "Near goal", norwegian: "Nær mål")
             case .elevation: return ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter")
             case .pace: return ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo")
+            case .history: return ATHLTHLocalization.choose(english: "Previous workout", norwegian: "Tidligere økt")
             }
         }
         var icon: String {
@@ -42,6 +45,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .finish: "flag.checkered"
             case .elevation: "mountain.2"
             case .pace: "speedometer"
+            case .history: "clock.arrow.circlepath"
             }
         }
     }
@@ -57,7 +61,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow,
              .zoneBelow, .plannedZoneBelow, .plannedZoneOutside: .heartZone
         case .randomMotivation: .motivation
-        case .nearFinishTime, .nearFinishDistance: .finish
+        case .nearFinishTime: .finish
+        case .nearFinishDistance: .distance
+        case .slowerThanPreviousWorkout: .history
         case .elevationGain, .uphillDetected: .elevation
         case .paceFasterThanTarget, .paceSlowerThanTarget,
              .paceFasterOverall, .paceFasterLastKilometer: .pace
@@ -124,19 +130,25 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .finish: trigger = .nearFinishTime; interval = 60
         case .elevation: trigger = .elevationGain; interval = 50
         case .pace: trigger = .paceSlowerThanTarget; interval = 1
+        case .history: trigger = .slowerThanPreviousWorkout; interval = 1
         }
         eventSelection = .every
         phases = nil
     }
 
-    private func choice(_ item: ATHLTHAudioCoachRule.Trigger) -> some View {
+    private func choice(
+        _ item: ATHLTHAudioCoachRule.Trigger,
+        title: String? = nil,
+        enabled: Bool = true
+    ) -> some View {
         Button {
+            guard enabled else { return }
             trigger = item
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: trigger == item ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(item.title)
+                Text(title ?? item.title)
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                 Spacer()
@@ -148,6 +160,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 in: RoundedRectangle(cornerRadius: 13))
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.42)
     }
 
     var body: some View {
@@ -173,15 +187,57 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                             in: RoundedRectangle(cornerRadius: 16))
                     }
                     .buttonStyle(.plain)
-                    .disabled(!supportsStructured && [.step, .pause].contains(item))
-                    .opacity(!supportsStructured && [.step, .pause].contains(item)
-                        ? 0.48 : 1)
+                    .disabled(
+                        (!supportsStructured && [.step, .pause].contains(item)) ||
+                        (item == .history && historicalReferences.isEmpty)
+                    )
+                    .opacity(
+                        (!supportsStructured && [.step, .pause].contains(item)) ||
+                        (item == .history && historicalReferences.isEmpty)
+                        ? 0.42 : 1
+                    )
                 }
             }
 
+            if family == .distance {
+                choice(.distance, title: tr("From start", "Fra start"))
+                choice(.nearFinishDistance, title: tr("To goal", "Til mål"))
+            }
             if family == .finish {
                 choice(.nearFinishTime)
                 choice(.nearFinishDistance)
+            }
+            if family == .history {
+                if historicalReferences.isEmpty {
+                    Text(tr(
+                        "No previous workout with a verified first-kilometre recording. This trigger is unavailable.",
+                        "Ingen tidligere økt med registrert første kilometer. Triggeren er deaktivert."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                } else {
+                    Text(tr("COMPARE WITH", "SAMMENLIGN MED"))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Picker(tr("Workout", "Økt"), selection: $historicalWorkoutID) {
+                        Text(tr("Select earlier workout", "Velg tidligere økt"))
+                            .tag(nil as UUID?)
+                        ForEach(historicalReferences) { workout in
+                            Text(
+                                "\(workout.title) · \(Int(workout.firstKilometerSeconds / 60)):\(String(format: "%02d", Int(workout.firstKilometerSeconds) % 60))/km"
+                            )
+                            .tag(workout.id as UUID?)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(tr(
+                        "After the first kilometre, Coach compares your measured pace with this previously recorded split.",
+                        "Etter første kilometer sammenlignes faktisk tempo med den valgte øktens målte tid."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
             }
             if family == .elevation {
                 choice(.elevationGain)
