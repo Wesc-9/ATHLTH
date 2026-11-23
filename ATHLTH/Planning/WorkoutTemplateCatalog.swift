@@ -4738,6 +4738,20 @@ struct ATHLTHWorkoutStudioStepEditorSelection: Identifiable {
     }
 }
 
+/// Native iPad page sheets default to a paper-sized width. Large exercise
+/// libraries need the *available page*, otherwise the user still sees the
+/// narrow centered popup despite requesting the large height detent.
+private struct ATHLTHWideLibraryPickerSizing: PresentationSizing {
+    let width: CGFloat
+
+    func proposedSize(
+        for root: PresentationSizingRoot,
+        context: PresentationSizingContext
+    ) -> ProposedViewSize {
+        ProposedViewSize(width: width, height: nil)
+    }
+}
+
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -6261,6 +6275,16 @@ struct WorkoutTemplateBuilderView: View {
         )
     }
 
+    private var wideLibraryPickerSizing: ATHLTHWideLibraryPickerSizing {
+        // The active window clamps the proposal in Stage Manager. Use the
+        // device width so a regular-width iPad is nearly edge to edge while
+        // leaving the card's rounded corners and native swipe gesture.
+        let inset: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 32 : 0
+        return ATHLTHWideLibraryPickerSizing(
+            width: max(320, UIScreen.main.bounds.width - inset)
+        )
+    }
+
     private var editorWithPresentation: some View {
             editorScrollContent
             // Mode choice belongs to the shared workout editor rather than
@@ -6444,7 +6468,7 @@ struct WorkoutTemplateBuilderView: View {
                 // Use a wide iPad page sheet instead of the narrow form
                 // popup. Native drag-to-dismiss keeps the underlying
                 // exercise draft, scroll position and selected mode alive.
-                .presentationSizing(.page)
+                .presentationSizing(wideLibraryPickerSizing)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
@@ -6689,7 +6713,7 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     }
                 }
-                .presentationSizing(.page)
+                .presentationSizing(wideLibraryPickerSizing)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
@@ -6716,7 +6740,7 @@ struct WorkoutTemplateBuilderView: View {
                         }
                     }
                 }
-                .presentationSizing(.page)
+                .presentationSizing(wideLibraryPickerSizing)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
