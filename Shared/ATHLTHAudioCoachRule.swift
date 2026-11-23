@@ -771,12 +771,15 @@ enum ATHLTHAudioCoachRuleDelivery {
             let milestone: Int
             var alreadyConsumed = false
 
-            if rule.trigger.isHeartRateCondition || rule.trigger.isPaceCondition {
+            if rule.trigger.isHeartRateCondition || rule.trigger.isPaceCondition ||
+               rule.trigger == .uphillDetected {
                 // Each threshold crossing is one event, with a new delivery
                 // identity on later re-entry. Invalid HR samples do not reset
                 // the condition or cause spurious zone-exit announcements.
                 let state: Bool?
-                if rule.trigger.isPaceCondition {
+                if rule.trigger == .uphillDetected {
+                    state = context.isUphill
+                } else if rule.trigger.isPaceCondition {
                     state = paceCondition(
                         rule, context: context,
                         measuredPace: paceSecondsPerKilometer,
@@ -784,7 +787,8 @@ enum ATHLTHAudioCoachRuleDelivery {
                     )
                 } else {
                     state = heartRateCondition(
-                        rule, bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM
+                        rule, bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM,
+                        context: context
                     )
                 }
                 guard let active = state else { continue }
@@ -798,6 +802,28 @@ enum ATHLTHAudioCoachRuleDelivery {
                     ? (wasActive && !active) : (!wasActive && active)
                 guard shouldAnnounce else { continue }
                 milestone = (updatedState + 1) / 2
+            } else if rule.trigger == .randomMotivation {
+                milestone = randomMotivationSlot(
+                    for: rule, elapsedSeconds: elapsed
+                )
+            } else if rule.trigger == .nearFinishTime {
+                guard let remaining = context.workoutRemainingSeconds,
+                      remaining.isFinite, remaining >= 0 else { continue }
+                milestone = remaining <= Double(rule.validatedInterval) ? 1 : 0
+            } else if rule.trigger == .nearFinishDistance {
+                // Only an explicit route or prescribed distance can make this
+                // statement. Never infer a finish from an open-ended run.
+                guard let remaining = context.workoutRemainingMeters ??
+                        context.routeRemainingMeters,
+                      remaining.isFinite, remaining >= 0 else { continue }
+                milestone = remaining <= Double(rule.validatedInterval) ? 1 : 0
+            } else if rule.trigger == .elevationGain {
+                guard let gain = context.elevationGainMeters,
+                      gain.isFinite, gain >= 0 else { continue }
+                milestone = Int(min(
+                    floor(gain / Double(rule.validatedInterval)),
+                    Double(Int.max / 2)
+                ))
             } else if rule.trigger == .personalRecordConfirmed {
                 guard context.verifiedPersonalRecordEnglish != nil ||
                       context.verifiedPersonalRecordNorwegian != nil else { continue }
@@ -940,7 +966,8 @@ enum ATHLTHAudioCoachRuleDelivery {
     private static func heartRateCondition(
         _ rule: ATHLTHAudioCoachRule,
         bpm: Double?,
-        maximumBPM: Double?
+        maximumBPM: Double?,
+        context: ATHLTHCoachReadoutContext
     ) -> Bool? {
         guard let bpm, bpm.isFinite, (35...250).contains(bpm) else {
             return nil
@@ -948,13 +975,42 @@ enum ATHLTHAudioCoachRuleDelivery {
         switch rule.trigger {
         case .heartRateAbove: return bpm >= Double(rule.validatedInterval)
         case .heartRateBelow: return bpm <= Double(rule.validatedInterval)
-        case .zoneEnter, .zoneExit:
+        case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow:
             guard let zone = ATHLTHHeartRateZones.measuredZone(
                 heartRateBPM: bpm, maximumBPM: maximumBPM
             ) else { return nil }
+            if rule.trigger == .plannedZoneBelow {
+                guard let target = context.plannedHeartRateZone,
+                      (1...5).contains(target) else { return nil }
+                return zone < target
+            }
+            if rule.trigger == .zoneBelow {
+                return zone < rule.validatedInterval
+            }
             return zone == rule.validatedInterval
         default: return nil
         }
+    }
+
+    /// Deterministic per-rule jitter. Each window fires at most once.
+    /// No timer, extra thread, or network call; the existing cue ledger and
+    /// routine-coach priority queue still suppress overlapping speech.
+    private static func randomMotivationSlot(
+        for rule: ATHLTHAudioCoachRule,
+        elapsedSeconds: Double
+    ) -> Int {
+        guard elapsedSeconds.isFinite, elapsedSeconds >= 0 else { return 0 }
+        let seconds = Double(rule.validatedInterval)
+        let window = Int(min(floor(elapsedSeconds / seconds), 10_000_000))
+        guard window >= 1 else { return 0 }
+        // Stable jitter within each window (up to 50% into the window).
+        let seed = rule.id.uuidString.utf8.reduce(UInt64(14_695), {
+            ($0 ^ UInt64($1)) &* 1_099_511_628_211
+        })
+        let hash = (seed ^ UInt64(window) &* 2_654_435_761) &* 2_246_822_519
+        let offset = Double(hash % 501) / 1_000 * seconds
+        return elapsedSeconds >= Double(window) * seconds + offset
+            ? window : window - 1
     }
 
     private static func eventOccurrence(
@@ -1253,6 +1309,15 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var groupRemainingSeconds: Double?
     var workoutRemainingSeconds: Double?
     var routeRemainingMeters: Double?
+    /// Explicit distance remaining for a workout with fully known distance
+    /// steps. Nil for timed/open-ended sessions without a reliable goal.
+    var workoutRemainingMeters: Double? = nil
+    /// Verified cumulative uphill gain, not planned route elevation.
+    var elevationGainMeters: Double? = nil
+    /// Nil when terrain accuracy is insufficient.
+    var isUphill: Bool? = nil
+    /// Active exercise target HR zone, not the user's currently measured zone.
+    var plannedHeartRateZone: Int? = nil
     // Measured values, not prescribed pace. The rolling kilometre is only
     // available after a full kilometre of monotonic recorded distance.
     var overallPaceSecondsPerKilometer: Double? = nil
@@ -1291,6 +1356,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         rules.contains { rule in
             rule.isEnabled && ((rule.allowedPhases?.isEmpty == false) ||
                 rule.trigger.isPaceCondition ||
+                rule.trigger.usesLiveContext ||
                 rule.beforeEndSeconds != nil ||
                 rule.trigger.needsStructuredStep ||
                 (rule.scope ?? .workout) != .workout ||
@@ -1370,6 +1436,21 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         let step = steps[index]
         context.stepName = step.title
         context.stepIndex = index
+        context.plannedHeartRateZone = step.targetHeartRateZone
+        // A distance-based finish is available only when every remaining
+        // executable step has a defined distance. Timed/open steps are not
+        // assigned invented metres.
+        let remaining = steps[index...]
+        if remaining.allSatisfy({ candidate in
+            guard let value = candidate.distanceMeters else { return false }
+            return value.isFinite && value >= 0
+        }) {
+            let future = remaining.dropFirst().reduce(0.0) {
+                $0 + ($1.distanceMeters ?? 0)
+            }
+            context.workoutRemainingMeters =
+                max(0, (step.distanceMeters ?? 0) - max(0, distance)) + future
+        }
         context.stepCount = steps.count
         context.firstRecoveryStepIndex = steps.firstIndex { $0.phase == "recovery" }
         context.lastRecoveryStepIndex = steps.lastIndex { $0.phase == "recovery" }
