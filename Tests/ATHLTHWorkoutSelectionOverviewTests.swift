@@ -89,7 +89,11 @@ final class ATHLTHWorkoutSelectionOverviewTests: XCTestCase {
         let block = pause("Mellom sett", seconds: 90)
         let row = ATHLTHWorkoutSelectionOverview.Row(id: 0, steps: [block])
         XCTAssertEqual(row.title, "Pause")
-        XCTAssertTrue(row.subtitle.contains("Mellom sett"))
+        XCTAssertTrue(row.subtitle.contains(
+            ATHLTHLocalization.choose(
+                english: "Between sets", norwegian: "Mellom sett"
+            )
+        ))
         XCTAssertTrue(row.subtitle.contains("1:30"))
     }
 
