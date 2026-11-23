@@ -12,9 +12,11 @@ struct ThreadWorkoutInvitationCard: View {
     let inviteeName: String
     let onAccept: () -> Void
     let onDecline: () -> Void
+    let onWithdraw: () -> Void
     let onProposeChanges: () -> Void
 
     @State private var showingDetails = false
+    @State private var confirmingWithdrawal = false
 
     private var state: PlannedWorkoutInvitationPresentationState {
         PlannedWorkoutInvitationPresentationState.resolve(
@@ -145,6 +147,17 @@ struct ThreadWorkoutInvitationCard: View {
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTheme.primaryText)
 
+                if isMine && state == .pending {
+                    Button(role: .destructive) {
+                        confirmingWithdrawal = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Withdraw invitation", norwegian: "Trekk tilbake invitasjon"), systemImage: "xmark.circle")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isResponding)
+                }
+
                 if state.canRespond && !isMine {
                     HStack(spacing: 8) {
                         Button(
@@ -184,6 +197,13 @@ struct ThreadWorkoutInvitationCard: View {
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(ATHLTHTheme.accentDeep.opacity(0.10), lineWidth: 0.8)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(english: "Withdraw invitation?", norwegian: "Trekke tilbake invitasjonen?"),
+            isPresented: $confirmingWithdrawal, titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(english: "Withdraw invitation", norwegian: "Trekk tilbake invitasjon"), role: .destructive, action: onWithdraw)
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
         }
         .sheet(isPresented: $showingDetails) {
             ThreadWorkoutInvitationDetailsView(
@@ -403,7 +423,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                         }
                     }
 
-                    if sharedDraft.draft != nil &&
+                    if sharedDraft.draft != nil && state != .cancelled && state != .declined &&
                        (isMine || state == .accepted) {
                         detailSection(ATHLTHLocalization.choose(
                             english: "Shared planning lobby",
