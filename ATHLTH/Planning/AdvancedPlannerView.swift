@@ -7863,7 +7863,15 @@ struct SessionEditorView: View {
                         ),
                     showRouteOptions: runEnvironment == .outdoor &&
                         selectedRoute != nil,
-                    showStructuredOptions: true
+                    showStructuredOptions: true,
+                    triggerAvailability: .running(
+                        steps: selectedRunningWorkouts.flatMap {
+                            watchRunningWorkoutTransfer(from: $0).steps
+                        },
+                        hasRoute: runEnvironment == .outdoor &&
+                            selectedRoute != nil,
+                        isOutdoor: runEnvironment == .outdoor
+                    )
                 )
             }
             .sheet(
@@ -11571,6 +11579,7 @@ private struct PlannedAudioCoachEditorView: View {
     let defaultConfiguration: WatchAudioCoachConfiguration
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
+    let triggerAvailability: ATHLTHCoachTriggerAvailability?
 
     @State private var usesCustomSettings: Bool
     @State private var coachDraft: AudioCoachDraft
@@ -11588,12 +11597,14 @@ private struct PlannedAudioCoachEditorView: View {
         configuration: Binding<WatchAudioCoachConfiguration?>,
         defaultConfiguration: WatchAudioCoachConfiguration,
         showRouteOptions: Bool,
-        showStructuredOptions: Bool
+        showStructuredOptions: Bool,
+        triggerAvailability: ATHLTHCoachTriggerAvailability? = nil
     ) {
         _configuration = configuration
         self.defaultConfiguration = defaultConfiguration
         self.showRouteOptions = showRouteOptions
         self.showStructuredOptions = showStructuredOptions
+        self.triggerAvailability = triggerAvailability
         let customized = configuration.wrappedValue != nil
         _usesCustomSettings = State(initialValue: customized)
         _initiallyUsesCustomSettings = State(initialValue: customized)
@@ -11650,7 +11661,8 @@ private struct PlannedAudioCoachEditorView: View {
                             ATHLTHAudioCoachSessionStudio(
                                 draft: $coachDraft,
                                 showRouteOptions: showRouteOptions,
-                                showStructuredOptions: showStructuredOptions
+                                showStructuredOptions: showStructuredOptions,
+                                triggerAvailability: triggerAvailability
                             )
                         }
                     }
