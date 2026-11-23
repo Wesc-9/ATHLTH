@@ -7,6 +7,11 @@ import SwiftUI
 /// System visibility is persisted per scene; no duplicate hamburger view.
 enum ATHLTHStudioSidebarLayoutPolicy {
     static let fixedWidth: CGFloat = 280
+
+    /// The native toolbar button alternates between the sidebar and detail.
+    static func toggled(_ visibility: NavigationSplitViewVisibility) -> NavigationSplitViewVisibility {
+        visibility == .all ? .detailOnly : .all
+    }
 }
 
 private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
