@@ -6155,8 +6155,7 @@ struct WorkoutTemplateBuilderView: View {
                 trainingPartnerName: collaborationPartnerName,
                 collaborationInviteSent: collaborationInviteSent,
                 collaborationInviteSending: collaborationInviteSending,
-                onInviteToBuild: onInviteToBuild == nil
-                    ? nil : { sendCollaborationInvite() }
+                onInviteToBuild: nil
             )
             // Audio Coach, Spotify and advanced options are grouped
             // underneath the workout instead of above its hero card.
@@ -9787,6 +9786,27 @@ struct WorkoutTemplateBuilderView: View {
             intervalGhostConfiguration: intervalGhostConfiguration.isEnabled &&
                 intervalGhostConfiguration.isValid ? intervalGhostConfiguration : nil
         )
+        if let onInviteToBuild, !collaborationInviteSent {
+            guard !collaborationInviteSending else { return }
+            collaborationInviteSending = true
+            Task { @MainActor in
+                let error = await onInviteToBuild(workout)
+                collaborationInviteSending = false
+                if let error {
+                    actionNotice = error
+                    return
+                }
+                guard onAddStandalone?(workout) == true else {
+                    actionNotice = tr("Cannot finish saving this workout",
+                                      "Kunne ikke fullføre lagringen av økten")
+                    return
+                }
+                draftFinished = true
+                UserDefaults.standard.removeObject(forKey: draftStorageKey)
+                closeWorkoutEditor()
+            }
+            return
+        }
         if let onAddStandalone {
             guard onAddStandalone(workout) else {
                 actionNotice = tr("Cannot add this workout yet",
