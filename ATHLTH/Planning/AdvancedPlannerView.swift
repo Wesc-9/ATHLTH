@@ -7732,7 +7732,15 @@ struct SessionEditorView: View {
                     !draftFinalized {
                     persistOpenNavigationStage(.source)
                 }
-                if editorMode == .advanced {
+                if directPartnerID != nil && selectedScratchWorkoutType != nil {
+                    // Present the selected existing workout in the same
+                    // full-screen builder after the picker has dismissed.
+                    // Do not briefly reveal the obsolete host Form.
+                    Task { @MainActor in
+                        await Task.yield()
+                        showingUnifiedWorkoutComposer = true
+                    }
+                } else if editorMode == .advanced {
                     Task { @MainActor in
                         await Task.yield()
                         openImportedAdvancedWorkoutIfNeeded()
@@ -7743,11 +7751,17 @@ struct SessionEditorView: View {
                     applySavedWorkout(workout)
                     // Preserve the chosen workout name in the new independent
                     // session. The athlete can still rename it in Basics.
-                    selectedScratchWorkoutType = nil
+                    selectedScratchWorkoutType = directPartnerID != nil
+                        ? ATHLTHPlannedWorkoutType.from(workout) : nil
                     discardStoredStandaloneDraft()
                     hasSelectedWorkoutSource = true
                     persistDraft()
-                    persistOpenNavigationStage(.legacyEditor)
+                    if directPartnerID != nil {
+                        partnerScratchReadyForInvite = false
+                        allowInviteeExercises = true
+                    } else {
+                        persistOpenNavigationStage(.legacyEditor)
+                    }
                     showingSavedWorkoutPicker = false
                 }
                 .presentationDetents([.large])
