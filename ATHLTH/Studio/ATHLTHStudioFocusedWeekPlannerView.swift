@@ -23,6 +23,30 @@ enum ATHLTHStudioDayChangePolicy {
     }
 }
 
+/// Vertical cards are always measured against the height of their actual
+/// container, never hard-coded to seven rows taller than the iPad window.
+enum ATHLTHStudioWeekRailLayout {
+    static let headerHeight: CGFloat = 54
+    static let horizontalInset: CGFloat = 9
+    static let verticalInset: CGFloat = 9
+    static let sectionSpacing: CGFloat = 9
+    static let daySpacing: CGFloat = 7
+
+    static func useVerticalRail(width: CGFloat, height: CGFloat) -> Bool {
+        width >= 680 && height >= 600
+    }
+
+    static func width(in availableWidth: CGFloat) -> CGFloat {
+        min(256, max(166, availableWidth * 0.19))
+    }
+
+    static func dayHeight(for availableHeight: CGFloat) -> CGFloat {
+        let remaining = availableHeight -
+            2 * verticalInset - headerHeight - sectionSpacing - 6 * daySpacing
+        return min(99, max(44, remaining / 7))
+    }
+}
+
 /// Focused iPad day planning: week navigation and one reusable iPhone
 /// workout builder on the same screen. No modal, parallel workout engine,
 /// or implicit completion of saved Health workouts.
@@ -73,10 +97,14 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
             VStack(spacing: 0) {
                 topBar
 
-                if geometry.size.width >= 680 {
+                if ATHLTHStudioWeekRailLayout.useVerticalRail(
+                    width: geometry.size.width, height: geometry.size.height
+                ) {
                     HStack(spacing: 0) {
                         dayRail
-                            .frame(width: min(222, max(144, geometry.size.width * 0.17)))
+                            .frame(width: ATHLTHStudioWeekRailLayout.width(
+                                in: geometry.size.width
+                            ))
                         Rectangle()
                             .fill(ATHLTHStudioStyle.outline.opacity(0.7))
                             .frame(width: 1)
@@ -85,10 +113,10 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                     }
                 } else {
                     VStack(spacing: 0) {
-                        // Stage Manager can resize an iPad window to phone
-                        // width. The week remains available without squeezing
-                        // the workout editor into an unusably narrow pane.
-                        compactDayStrip
+                        // In a short or narrow Stage Manager window, all
+                        // seven days wrap into one or two rows. No horizontal
+                        // swipe or clipped Sunday card is required.
+                        compactDayStrip(width: geometry.size.width)
                         editorArea
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -157,35 +185,9 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 .foregroundStyle(ATHLTHStudioStyle.ink)
             }
 
+            // Week controls live immediately above Monday in the rail,
+            // not over the selected-day text or the Inbox edge handle.
             Spacer(minLength: 5)
-            HStack(spacing: 5) {
-                Button {
-                    changeWeek(-1)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .frame(width: 34, height: 34)
-                }
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Previous week", norwegian: "Forrige uke"
-                ))
-
-                Text(ATHLTHStudioHomeWeek.weekRange(
-                    containing: selectedDate
-                ).start.formatted(.dateTime.day().month(.abbreviated)))
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-
-                Button {
-                    changeWeek(1)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .frame(width: 34, height: 34)
-                }
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Next week", norwegian: "Neste uke"
-                ))
-            }
-            .buttonStyle(.borderless)
         }
         .padding(.horizontal, 18)
         .frame(minHeight: 66)
@@ -195,36 +197,97 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         }
     }
 
-    private var dayRail: some View {
-        ScrollView {
-            LazyVStack(spacing: 7) {
-                ForEach(snapshot.days) { day in
-                    dayButton(day, compact: false)
-                }
+    private var weekNavigationHeader: some View {
+        HStack(spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ATHLTHLocalization.choose(
+                    english: "WEEK", norwegian: "UKE"
+                ))
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1.3)
+                .foregroundStyle(ATHLTHStudioStyle.gold)
+                Text(
+                    "\(Calendar.current.component(.weekOfYear, from: selectedDate))"
+                )
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHStudioStyle.ink)
             }
-            .padding(10)
+            Spacer(minLength: 1)
+            Button { changeWeek(-1) } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 34, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Previous week", norwegian: "Forrige uke"
+            ))
+            Button { changeWeek(1) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 34, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Next week", norwegian: "Neste uke"
+            ))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(ATHLTHStudioStyle.gold)
+        .frame(height: ATHLTHStudioWeekRailLayout.headerHeight)
+        .accessibilityIdentifier("athlth-ipad-week-rail-navigation")
+    }
+
+    private var dayRail: some View {
+        GeometryReader { proxy in
+            let tileHeight = ATHLTHStudioWeekRailLayout.dayHeight(
+                for: proxy.size.height
+            )
+            VStack(spacing: ATHLTHStudioWeekRailLayout.sectionSpacing) {
+                weekNavigationHeader
+                VStack(spacing: ATHLTHStudioWeekRailLayout.daySpacing) {
+                    ForEach(snapshot.days) { day in
+                        dayButton(day, compact: false, verticalHeight: tileHeight)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, ATHLTHStudioWeekRailLayout.horizontalInset)
+            .padding(.vertical, ATHLTHStudioWeekRailLayout.verticalInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(ATHLTHStudioStyle.canvas)
         .accessibilityIdentifier("athlth-ipad-vertical-day-rail")
     }
 
-    private var compactDayStrip: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 7) {
+    private func compactDayStrip(width: CGFloat) -> some View {
+        let columnCount = width >= 620 ? 7 : 4
+        return VStack(spacing: 5) {
+            weekNavigationHeader
+                .padding(.horizontal, 12)
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(minimum: 0), spacing: 6),
+                    count: columnCount
+                ),
+                spacing: 6
+            ) {
                 ForEach(snapshot.days) { day in
                     dayButton(day, compact: true)
-                        .frame(width: 114)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 9)
+            .padding(.bottom, 8)
         }
-        .scrollIndicators(.hidden)
+        .background(ATHLTHStudioStyle.canvas)
+        .accessibilityIdentifier("athlth-ipad-compact-week-rail")
     }
 
     private func dayButton(
         _ day: ATHLTHStudioHomeWeek.Day,
-        compact: Bool
+        compact: Bool,
+        verticalHeight: CGFloat? = nil
     ) -> some View {
         let selected = Calendar.current.isDate(
             selectedDate, inSameDayAs: day.date
@@ -274,9 +337,13 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: compact ? 66 : 72,
-                   alignment: .leading)
+            .padding(.horizontal, compact ? 6 : 12)
+            .padding(.vertical, compact ? 9 : 8)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: compact ? 66 : (verticalHeight ?? 78),
+                alignment: .leading
+            )
             .background(
                 selected ? ATHLTHStudioStyle.paper : Color.white,
                 in: RoundedRectangle(cornerRadius: 12)
