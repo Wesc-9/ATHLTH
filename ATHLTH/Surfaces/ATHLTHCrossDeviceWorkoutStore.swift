@@ -79,6 +79,9 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     var controlGrantID: UUID? = nil
     var controlDeviceID: String? = nil
     var supportedControls: [ATHLTHRemoteWorkoutAction]? = nil
+    // Only a small library reference, never a private media URL or file.
+    var gymExerciseGuide: ATHLTHGymExerciseReference? = nil
+    var gymStageDuration: TimeInterval? = nil
 
     var id: UUID { sessionID }
     var symbol: String {
@@ -87,6 +90,33 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
 }
 
  
+/// A guide is tied to a specific exercise, not a similar display name.
+struct ATHLTHGymExerciseReference: Codable, Equatable {
+    let exerciseID: UUID?
+    let slug: String?
+    let title: String
+    let upcoming: Bool
+
+    static func select(blocks: [WorkoutTemplateBlock], index: Int, waiting: Bool = false) -> WorkoutTemplateBlock? {
+        guard blocks.indices.contains(index) else { return nil }
+        let current = blocks[index]
+        if !waiting && current.kind == .exercise && !current.isActiveRecovery { return current }
+        guard waiting || current.kind == .rest || current.isActiveRecovery else { return nil }
+        // Only look forward through recovery; never show a later strength
+        // exercise in place of the next running or other activity.
+        return blocks.dropFirst(index + 1)
+            .first { $0.kind != .rest && !$0.isActiveRecovery }
+            .flatMap { $0.kind == .exercise ? $0 : nil }
+    }
+
+    static func make(blocks: [WorkoutTemplateBlock], index: Int, waiting: Bool = false) -> Self? {
+        guard let block = select(blocks: blocks, index: index, waiting: waiting) else { return nil }
+        return Self(exerciseID: block.exerciseID ?? block.exerciseSnapshot?.libraryExerciseID,
+                    slug: block.exerciseSlug, title: String(block.title.prefix(160)),
+                    upcoming: waiting || blocks[index].id != block.id)
+    }
+}
+
 /// Shared read-only sensor provenance and sport-unit eligibility.
 /// A spectator is NEVER another recording owner.
 enum ATHLTHSpectatorSportMetricPolicy {
@@ -268,6 +298,7 @@ struct ATHLTHLocalStructuredWorkoutStatus {
     var completedCount: Int
     var pausedAt: Date? = nil
     var completedPauseSeconds: TimeInterval = 0
+    var gymExerciseGuide: ATHLTHGymExerciseReference? = nil
 
     /// Derive the iPad spectator's live model exclusively from the original
     /// committed, account-scoped structured checkpoint after app restart.
@@ -307,7 +338,10 @@ struct ATHLTHLocalStructuredWorkoutStatus {
             stepEnteredAt: checkpoint.stepEnteredAt,
             completedCount: checkpoint.completedIDs.count,
             pausedAt: checkpoint.pausedAt,
-            completedPauseSeconds: checkpoint.completedPauseSeconds ?? 0
+            completedPauseSeconds: checkpoint.completedPauseSeconds ?? 0,
+            gymExerciseGuide: ATHLTHGymExerciseReference.make(
+                blocks: checkpoint.executionBlocks, index: checkpoint.currentIndex,
+                waiting: checkpoint.emomWaiting)
         )
     }
 }
@@ -353,7 +387,9 @@ enum ATHLTHStructuredSpectatorSnapshot {
             captureEvidence: "structuredManual",
             runningSteps: structured.steps,
             runningStepIndex: structured.stepIndex,
-            runningStepCount: structured.steps.count
+            runningStepCount: structured.steps.count,
+            gymExerciseGuide: structured.gymExerciseGuide,
+            gymStageDuration: step.durationSeconds
         )
     }
 }
@@ -984,7 +1020,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 spotifyTrackTitle: log.captureDevice == .iPhone &&
                     spotify.isPlaying ? spotify.watchTrackTitle : nil,
                 spotifyArtistName: log.captureDevice == .iPhone &&
-                    spotify.isPlaying ? spotify.watchArtistName : nil
+                    spotify.isPlaying ? spotify.watchArtistName : nil,
+                gymExerciseGuide: strength.currentExercise.map {
+                    ATHLTHGymExerciseReference(exerciseID: $0.exercise.libraryExerciseID,
+                        slug: nil, title: String($0.exercise.displayName.prefix(160)),
+                        upcoming: strength.restEndsAt.map { $0 > now } ?? false)
+                }
             )
         }
         if let run = phone.active {
@@ -1361,6 +1402,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         output.runningStepRemainingSeconds = finite(
             input.runningStepRemainingSeconds
         )
+        output.gymStageDuration = finite(input.gymStageDuration)
+        if let guide = output.gymExerciseGuide {
+            output.gymExerciseGuide = ATHLTHGymExerciseReference(
+                exerciseID: guide.exerciseID, slug: guide.slug.map { String($0.prefix(160)) },
+                title: String(guide.title.prefix(160)), upcoming: guide.upcoming)
+        }
         output.runningStepRemainingMeters = finite(
             input.runningStepRemainingMeters
         )
