@@ -14,6 +14,8 @@ struct ATHLTHQuickRunStartFooter: View {
     let onDelay: (WorkoutCaptureDevice, Int) -> Void
     let onCancelDelay: () -> Void
 
+    private var watchSelection = ATHLTHWatchLaunchSelection()
+    @State private var showingWatchChoice = false
     @State private var customDevice: WorkoutCaptureDevice = .iPhone
     @State private var customMinutes = 2
     @State private var showingCustomDelay = false
@@ -29,7 +31,7 @@ struct ATHLTHQuickRunStartFooter: View {
 
             HStack(spacing: 10) {
                 deviceButton(.iPhone, label: "iPhone", icon: "iphone")
-                deviceButton(.appleWatch, label: "Apple Watch", icon: "applewatch")
+                deviceButton(.appleWatch, label: "Watch", icon: "applewatch")
             }
 
             if let scheduledDate {
@@ -58,6 +60,20 @@ struct ATHLTHQuickRunStartFooter: View {
         .background(.regularMaterial)
         .overlay(alignment: .top) {
             ATHLTHTrainDesign.rule.opacity(0.7).frame(height: 0.7)
+        }
+        .confirmationDialog(ATHLTHLocalization.choose(english: "Choose watch", norwegian: "Velg klokke"),
+                            isPresented: $showingWatchChoice, titleVisibility: .visible) {
+            ATHLTHWatchLaunchChoices(
+                appleAvailable: watchAvailable && canStart && !starting,
+                garminAvailable: false,
+                garminConnected: watchSelection.garminDataConnected,
+                onAppleWatch: onWatchNow, onGarmin: nil
+            )
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only watches ready for live recording can start a workout.",
+                norwegian: "Kun klokker som er klare for live-registrering kan starte en økt."
+            ))
         }
         .sheet(isPresented: $showingCustomDelay) {
             NavigationStack {
@@ -104,10 +120,11 @@ struct ATHLTHQuickRunStartFooter: View {
         label: String, icon: String
     ) -> some View {
         let enabled = canStart && !starting &&
-            (device == .iPhone || watchAvailable)
+            (device == .iPhone || watchAvailable || watchSelection.garminDataConnected)
         return Button {
             if device == .iPhone { onIPhoneNow() }
-            else { onWatchNow() }
+            else if watchSelection.resolve(apple: watchAvailable, garmin: false) == .appleWatch { onWatchNow() }
+            else { showingWatchChoice = true }
         } label: {
             Label(label, systemImage: icon)
                 .font(.subheadline.weight(.semibold))
@@ -122,15 +139,19 @@ struct ATHLTHQuickRunStartFooter: View {
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
         .contextMenu {
-            Button {
-                if device == .iPhone { onIPhoneNow() }
-                else { onWatchNow() }
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Start now", norwegian: "Start nå"
-                ), systemImage: "play.fill")
+            if device == .iPhone {
+                Button(action: onIPhoneNow) {
+                    Label(ATHLTHLocalization.choose(english: "Start now", norwegian: "Start nå"),
+                          systemImage: "play.fill")
+                }
+            } else {
+                ATHLTHWatchLaunchChoices(
+                    appleAvailable: watchAvailable && canStart && !starting,
+                    garminAvailable: false, garminConnected: watchSelection.garminDataConnected,
+                    onAppleWatch: onWatchNow, onGarmin: nil
+                )
             }
-            if device == .appleWatch {
+            if device == .appleWatch && watchAvailable {
                 Button(action: onWatchCountDown) {
                     Label(ATHLTHLocalization.choose(
                         english: "Countdown · 30 seconds",
@@ -143,6 +164,7 @@ struct ATHLTHQuickRunStartFooter: View {
                     ), systemImage: "applewatch")
                 }
             }
+            if device == .iPhone || watchAvailable {
             Menu {
                 ForEach([30, 60, 300, 600], id: \.self) { seconds in
                     Button(seconds == 30
@@ -166,6 +188,7 @@ struct ATHLTHQuickRunStartFooter: View {
                 Label(ATHLTHLocalization.choose(
                     english: "Start later", norwegian: "Start om X tid"
                 ), systemImage: "clock")
+            }
             }
         }
         .accessibilityHint(ATHLTHLocalization.choose(

@@ -3370,10 +3370,30 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
     @EnvironmentObject private var session: AppSessionStore
     #endif
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    private var watchSelection = ATHLTHWatchLaunchSelection()
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(ATHLTHLocalization.choose(english: "DEFAULT WATCH", norwegian: "STANDARDKLOKKE"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(2.4)
+                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                        .padding(.leading, 16)
+                    PremiumSettingsCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ATHLTHPreferredWatchPicker(selection: watchSelection)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Tap Watch to start on your preferred watch. Hold to select a different watch for this workout.",
+                                norwegian: "Trykk på Watch for å starte på standardklokken. Hold inne for å velge en annen klokke for denne økten."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .padding(16)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text("APPLE WATCH")
                         .font(.caption.weight(.semibold))
@@ -3471,7 +3491,10 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                                 Text(
-                                    "iPhone and Apple Watch are chosen for each workout when you press Start. This screen only manages your Watch connection."
+                                    ATHLTHLocalization.choose(
+                                        english: "Choose iPhone or Watch when starting a workout. Connected data sources are not necessarily capable of live recording.",
+                                        norwegian: "Velg iPhone eller Watch når du starter en økt. En tilkoblet datakilde støtter ikke nødvendigvis live-registrering."
+                                    )
                                 )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)

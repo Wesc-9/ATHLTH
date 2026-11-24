@@ -317,6 +317,22 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
     var preferAppleWatch: Bool = false
     var supportingText: String? = nil
     var canStart: Bool = true
+    // A future live-capable Garmin adapter must supply both readiness and a launch action.
+    var garminLiveAvailable: Bool = false
+    var onGarmin: (() -> Void)? = nil
+    @State private var showingWatchChoice = false
+    private var watchSelection = ATHLTHWatchLaunchSelection()
+
+    private var garminCanStart: Bool { garminLiveAvailable && onGarmin != nil }
+    private var anyWatchAvailable: Bool { watchAvailable || garminCanStart }
+    private var watchButtonEnabled: Bool { canStart && (anyWatchAvailable || watchSelection.garminDataConnected) }
+    private func startPreferredWatch() {
+        switch watchSelection.resolve(apple: watchAvailable, garmin: garminCanStart) {
+        case .appleWatch: onAppleWatch()
+        case .garmin: onGarmin?()
+        case nil: showingWatchChoice = true
+        }
+    }
 
     private func label(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -333,17 +349,37 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
                 launchButton(
                     title: "iPhone",
                     icon: "iphone",
-                    primary: !(preferAppleWatch && watchAvailable),
+                    primary: !(preferAppleWatch && anyWatchAvailable),
                     enabled: canStart,
                     action: onIPhone
                 )
                 launchButton(
-                    title: "Apple Watch",
+                    title: "Watch",
                     icon: "applewatch",
-                    primary: preferAppleWatch && watchAvailable,
-                    enabled: watchAvailable && canStart,
-                    action: onAppleWatch
+                    primary: preferAppleWatch && anyWatchAvailable,
+                    enabled: watchButtonEnabled,
+                    action: startPreferredWatch
                 )
+                .contextMenu {
+                    ATHLTHWatchLaunchChoices(
+                        appleAvailable: watchAvailable && canStart,
+                        garminAvailable: garminCanStart && canStart,
+                        garminConnected: watchSelection.garminDataConnected,
+                        onAppleWatch: onAppleWatch, onGarmin: onGarmin
+                    )
+                }
+                .confirmationDialog(label("Choose watch", "Velg klokke"),
+                                    isPresented: $showingWatchChoice, titleVisibility: .visible) {
+                    ATHLTHWatchLaunchChoices(
+                        appleAvailable: watchAvailable && canStart,
+                        garminAvailable: garminCanStart && canStart,
+                        garminConnected: watchSelection.garminDataConnected,
+                        onAppleWatch: onAppleWatch, onGarmin: onGarmin
+                    )
+                } message: {
+                    Text(label("Only watches ready for live recording can start a workout.",
+                               "Kun klokker som er klare for live-registrering kan starte en økt."))
+                }
             }
 
             if !canStart {
@@ -358,11 +394,11 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
-            if !watchAvailable {
+            if !anyWatchAvailable {
                 Label(
                     label(
-                        "Apple Watch is not ready. Check it under Settings > Health & connections > Watch, or start with iPhone.",
-                        "Apple Watch er ikke klar. Kontroller den under Innstillinger > Helse og tilkoblinger > Watch, eller start med iPhone."
+                        "No watch is ready for live recording. Check Settings > Health & connections > Watch, or start with iPhone.",
+                        "Ingen klokke er klar for live-registrering. Kontroller Innstillinger > Helse og tilkoblinger > Watch, eller start med iPhone."
                     ),
                     systemImage: "info.circle"
                 )
