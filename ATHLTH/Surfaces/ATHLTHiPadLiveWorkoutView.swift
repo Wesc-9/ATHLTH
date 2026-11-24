@@ -50,6 +50,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
     let onMinimize: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("athlth_ipad_live_keep_awake") private var keepAwake = false
     @State private var keepAwakeWindowID = UUID()
@@ -106,7 +107,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let wide = geometry.size.width >= 840
+            let wide = geometry.size.width >= 840 && !dynamicTypeSize.isAccessibilitySize
+            let threeColumns = geometry.size.width >= 1160 && !dynamicTypeSize.isAccessibilitySize
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
@@ -117,7 +119,41 @@ struct ATHLTHiPadLiveWorkoutView: View {
 
                     TrainTogetherStatusStrip()
 
-                    if wide {
+                    if threeColumns {
+                        HStack(alignment: .top, spacing: 16) {
+                            VStack(spacing: 16) {
+                                if isStrength {
+                                    ATHLTHiPadLiveStrengthDetailsPanel(snapshot: snapshot)
+                                } else {
+                                    ATHLTHiPadLiveTimelinePanel(snapshot: snapshot)
+                                }
+                                if isStrength { strengthProgress }
+                                else { workoutProgress }
+                            }
+                            .frame(width: min(310, geometry.size.width * 0.24), alignment: .topLeading)
+
+                            VStack(spacing: 16) {
+                                activeStepCard
+                                ATHLTHiPadLiveGhostDuelPanel(snapshot: snapshot)
+                                if isPaceSport || ATHLTHWorkoutSportMode(category: snapshot.kind) == .cycling {
+                                    ATHLTHiPadLiveGPSMap(snapshot: snapshot)
+                                }
+                                ATHLTHiPadLiveRouteProgressPanel(snapshot: snapshot)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                            VStack(spacing: 16) {
+                                elapsedHero
+                                metrics
+                                if snapshot.kind == "running" || snapshot.kind == "walking" {
+                                    runningPulseZones
+                                }
+                                ATHLTHiPadLiveWorkoutExtrasPanel(snapshot: snapshot)
+                                additionalDetails
+                            }
+                            .frame(width: min(370, geometry.size.width * 0.29), alignment: .topLeading)
+                        }
+                    } else if wide {
                         HStack(alignment: .top, spacing: 20) {
                             VStack(spacing: 20) {
                                 elapsedHero
