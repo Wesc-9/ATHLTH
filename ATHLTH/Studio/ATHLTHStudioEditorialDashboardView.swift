@@ -1,6 +1,34 @@
 import SwiftUI
 import Charts
 
+/// Measure the actual cards once at their respective widths and propose the
+/// taller height to both. No GeometryReader preference feedback loop.
+private struct StudioHomeEqualCardRow: Layout {
+    let spacing: CGFloat
+    let rightWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews,
+                      cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let width = proposal.width ?? (subviews[0].sizeThatFits(.unspecified).width + rightWidth + spacing)
+        let left = max(0, width - spacing - rightWidth)
+        let first = subviews[0].sizeThatFits(.init(width: left, height: nil))
+        let second = subviews[1].sizeThatFits(.init(width: rightWidth, height: nil))
+        return CGSize(width: width, height: max(first.height, second.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize,
+                       subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let left = max(0, bounds.width - spacing - rightWidth)
+        subviews[0].place(at: bounds.origin, anchor: .topLeading,
+                          proposal: .init(width: left, height: bounds.height))
+        subviews[1].place(at: CGPoint(x: bounds.minX + left + spacing, y: bounds.minY),
+                          anchor: .topLeading,
+                          proposal: .init(width: rightWidth, height: bounds.height))
+    }
+}
+
 /// Keep seven existing calendar cards fully visible on wide iPads and allow
 /// horizontal scrolling only in compact Stage Manager windows.
 enum ATHLTHStudioWeekTileLayout {
@@ -342,15 +370,16 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             let upcoming = nextWorkouts(from: home.upcoming)
 
                             if split {
-                                HStack(alignment: .top, spacing: 18) {
+                                StudioHomeEqualCardRow(
+                                    spacing: 18,
+                                    rightWidth: min(390, max(270, min(width, 1500) * 0.30))
+                                ) {
                                     nextWorkoutCard(
                                         upcoming,
-                                        availableWidth: max(300, width - 44 - 18 -
-                                            min(390, max(310, width * 0.30)) - 36)
+                                        availableWidth: max(280, min(width, 1500) - 44 - 18 -
+                                            min(390, max(270, min(width, 1500) * 0.30)) - 32)
                                     )
-                                    .frame(maxWidth: .infinity, alignment: .topLeading)
                                     compactReadinessCard
-                                        .frame(width: min(390, max(310, width * 0.30)))
                                 }
                             } else {
                                 nextWorkoutCard(upcoming, availableWidth: max(280, width - 64))
@@ -664,7 +693,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 222, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 222, maxHeight: .infinity, alignment: .topLeading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20)
             .stroke(outline.opacity(0.45), lineWidth: 0.6))
@@ -1521,7 +1550,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             .buttonStyle(.plain)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangle(cornerRadius: 22)
                 .fill(LinearGradient(
