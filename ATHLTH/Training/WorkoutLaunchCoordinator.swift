@@ -778,6 +778,7 @@ enum WorkoutLaunchCoordinator {
     private static func approvedEndurancePlan(
         planID: UUID?,
         workoutID: UUID?,
+        standaloneSessionID: UUID? = nil,
         session: AppSessionStore?,
         expectedKind: WorkoutKind,
         device: WorkoutCaptureDevice
@@ -787,6 +788,18 @@ enum WorkoutLaunchCoordinator {
         ) else {
             throw ATHLTHWorkoutCaptureAdmission.Rejection
                 .requiresDedicatedActivityCapture
+        }
+        if let standaloneSessionID {
+            guard planID == nil, workoutID == nil, let session,
+                  let workout = session.standalonePlannedSessions.first(where: { $0.id == standaloneSessionID }),
+                  workout.cancelledAt == nil, !workout.isExplicitRestDay,
+                  session.recordedTimes(for: workout.id)?.endedAt == nil else {
+                throw ATHLTHWorkoutCaptureAdmission.Rejection.requiresDedicatedActivityCapture
+            }
+            try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                for: workout, expectedKind: expectedKind, device: device
+            )
+            return workout
         }
         guard let planID, let workoutID else { return nil }
         guard let session,
@@ -815,11 +828,13 @@ enum WorkoutLaunchCoordinator {
             WorkoutMirroringStore? = nil,
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil,
+        standaloneSessionID: UUID? = nil,
         relayRequestID: UUID? = nil
     ) async throws {
         let plannedRunningWorkout = try approvedEndurancePlan(
             planID: plannedPlanID,
             workoutID: plannedSessionID,
+            standaloneSessionID: standaloneSessionID,
             session: session,
             expectedKind: .running,
             device: configuration.captureDevice
@@ -894,6 +909,8 @@ enum WorkoutLaunchCoordinator {
                 )
             envelope.plannedPlanID = plannedPlanID
             envelope.plannedSessionID = plannedSessionID
+            envelope.standaloneSessionID = standaloneSessionID
+            if standaloneSessionID != nil { envelope.version = 2 }
 
             try await WorkoutDeviceRelayStore
                 .shared
@@ -1044,7 +1061,7 @@ enum WorkoutLaunchCoordinator {
                     configuration
                         .autoPauseEnabled,
                 plannedPlanID: plannedPlanID,
-                plannedSessionID: plannedSessionID,
+                plannedSessionID: standaloneSessionID ?? plannedSessionID,
                 relayRequestID: relayRequestID,
                 admissionID: launchID
             )
@@ -1335,7 +1352,7 @@ enum WorkoutLaunchCoordinator {
                 updatedAt: Date()
             )
         preparedWatchWorkout.plannedPlanID = plannedPlanID
-        preparedWatchWorkout.plannedSessionID = plannedSessionID
+        preparedWatchWorkout.plannedSessionID = standaloneSessionID ?? plannedSessionID
         watchConnection.sendPreparedWorkout(preparedWatchWorkout)
 
         // For automatic start, launch the Watch workout via HealthKit.
@@ -1383,11 +1400,13 @@ enum WorkoutLaunchCoordinator {
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil,
         session: AppSessionStore? = nil,
+        standaloneSessionID: UUID? = nil,
         relayRequestID: UUID? = nil
     ) async throws {
         let plannedWalkingWorkout = try approvedEndurancePlan(
             planID: plannedPlanID,
             workoutID: plannedSessionID,
+            standaloneSessionID: standaloneSessionID,
             session: session,
             expectedKind: .walking,
             device: configuration.captureDevice
@@ -1434,6 +1453,8 @@ enum WorkoutLaunchCoordinator {
                 )
             envelope.plannedPlanID = plannedPlanID
             envelope.plannedSessionID = plannedSessionID
+            envelope.standaloneSessionID = standaloneSessionID
+            if standaloneSessionID != nil { envelope.version = 2 }
 
             try await WorkoutDeviceRelayStore
                 .shared
@@ -1490,7 +1511,7 @@ enum WorkoutLaunchCoordinator {
                 autoPauseEnabled:
                     configuration.autoPauseEnabled,
                 plannedPlanID: plannedPlanID,
-                plannedSessionID: plannedSessionID,
+                plannedSessionID: standaloneSessionID ?? plannedSessionID,
                 relayRequestID: relayRequestID,
                 admissionID: launchID
             )
@@ -1600,7 +1621,7 @@ enum WorkoutLaunchCoordinator {
             updatedAt: Date()
         )
         preparedWalking.plannedPlanID = plannedPlanID
-        preparedWalking.plannedSessionID = plannedSessionID
+        preparedWalking.plannedSessionID = standaloneSessionID ?? plannedSessionID
         watchConnection.sendPreparedWorkout(preparedWalking)
 
         do {
