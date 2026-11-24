@@ -69,14 +69,46 @@ final class ATHLTHRegisteredIPadAvailability: ObservableObject {
 }
 
 
-/// iPad launch picker only needs an account-scoped registration signal.
-/// A registration is not a live connection or proof of Watch pairing.
+/// A recent, phone-observed WatchConnectivity status, without any health data.
+struct ATHLTHWorkoutDeviceHeartbeat: Codable, Equatable {
+    let userID: UUID
+    let deviceID: String
+    let watchPaired: Bool
+    let watchInstalled: Bool
+    let watchReachable: Bool
+    let observedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case deviceID = "device_id"
+        case watchPaired = "watch_paired"
+        case watchInstalled = "watch_installed"
+        case watchReachable = "watch_reachable"
+        case observedAt = "observed_at"
+    }
+
+    func isFresh(at now: Date = .now) -> Bool {
+        (-5...35).contains(now.timeIntervalSince(observedAt))
+    }
+}
+
+/// Registration remains a fallback, not a live connection or Watch pairing.
 @MainActor
 final class ATHLTHRegisteredPhoneAvailability: ObservableObject {
     enum Status: Equatable { case checking, registered, notRegistered, unknown }
     @Published private(set) var status: Status = .checking
+    @Published private(set) var heartbeats: [ATHLTHWorkoutDeviceHeartbeat] = []
     private let client: SupabaseClient
     private var generation = UUID()
+    private var checkedAccount: UUID?
+
+    var phoneOnline: Bool { heartbeats.contains { $0.isFresh() } }
+    var watchAvailable: Bool {
+        heartbeats.contains { $0.isFresh() && $0.watchPaired && $0.watchInstalled }
+    }
+    var watchReachable: Bool {
+        heartbeats.contains { $0.isFresh() && $0.watchPaired && $0.watchInstalled && $0.watchReachable }
+    }
 
     private struct DeviceRegistration: Decodable { let device_id: String }
 
@@ -87,10 +119,35 @@ final class ATHLTHRegisteredPhoneAvailability: ObservableObject {
     func refresh(for userID: UUID) async {
         let request = UUID()
         generation = request
-        status = .checking
+        if checkedAccount != userID {
+            status = .checking
+            heartbeats = []
+            checkedAccount = userID
+        }
         guard client.auth.currentUser?.id == userID else {
+            heartbeats = []
             status = .unknown
             return
+        }
+        do {
+            let live: [ATHLTHWorkoutDeviceHeartbeat] = try await client
+                .from("private_workout_device_availability")
+                .select()
+                .eq("user_id", value: userID)
+                .gte("observed_at", value: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-35)))
+                .limit(20)
+                .execute().value
+            guard generation == request, client.auth.currentUser?.id == userID,
+                  !Task.isCancelled else { return }
+            heartbeats = live.filter { $0.userID == userID && $0.isFresh() }
+            if phoneOnline {
+                status = .registered
+                return
+            }
+        } catch {
+            guard generation == request, client.auth.currentUser?.id == userID,
+                  !Task.isCancelled else { return }
+            heartbeats = []
         }
         let recent = ISO8601DateFormatter().string(
             from: Date().addingTimeInterval(-120 * 86_400)
