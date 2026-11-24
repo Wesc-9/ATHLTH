@@ -604,7 +604,7 @@ struct LibrarySavedWorkoutsHubView: View {
                         detail: tr("Detailed sessions and templates", "Detaljerte økter og maler"),
                         symbol: "dumbbell",
                         tint: ATHLTHTheme.accentDeep,
-                        count: session.savedWorkoutTemplates.count
+                        count: session.personalWorkoutTemplates.count
                     )
                 }
 
@@ -6076,7 +6076,7 @@ struct LibraryFavoritesView: View {
                     entry: workout
                 )
             } else if let id = UUID(uuidString: item.itemID),
-                      session.savedWorkoutTemplates.contains(where: { $0.id == id }) {
+                      session.personalWorkoutTemplates.contains(where: { $0.id == id }) {
                 MyWorkoutTemplatesView()
             } else {
                 WorkoutTemplateLibraryView()
