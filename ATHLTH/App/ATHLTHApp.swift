@@ -973,15 +973,15 @@ struct AppRootView: View {
             Date().addingTimeInterval(20)
 
         let envelope = command.envelope
-        guard ATHLTHDeviceRelayPlanLinkPolicy.allows(
-            kind: envelope.kind,
-            planID: envelope.plannedPlanID,
-            sessionID: envelope.plannedSessionID
+        guard ATHLTHDeviceRelayPlanLinkPolicy.allowsEnvelope(
+            version: envelope.version, kind: envelope.kind,
+            planID: envelope.plannedPlanID, sessionID: envelope.plannedSessionID,
+            standaloneID: envelope.standaloneSessionID
         ) else {
             throw ATHLTHWorkoutCaptureAdmission.Rejection
                 .requiresDedicatedActivityCapture
         }
-        let isLinkedPlan = envelope.plannedSessionID != nil
+        let isLinkedPlan = envelope.plannedSessionID != nil || envelope.standaloneSessionID != nil
         let payload = envelope.workoutPayload
         let captureDevice =
             envelope.target.captureDevice
@@ -1080,6 +1080,7 @@ struct AppRootView: View {
                         workoutMirroring,
                     plannedPlanID: envelope.plannedPlanID,
                     plannedSessionID: envelope.plannedSessionID,
+                    standaloneSessionID: envelope.standaloneSessionID,
                     relayRequestID: envelope.clientRequestID
                 )
 
@@ -1127,6 +1128,7 @@ struct AppRootView: View {
                     plannedPlanID: envelope.plannedPlanID,
                     plannedSessionID: envelope.plannedSessionID,
                     session: appSession,
+                    standaloneSessionID: envelope.standaloneSessionID,
                     relayRequestID: envelope.clientRequestID
                 )
 
