@@ -10,20 +10,24 @@ struct ATHLTHGarminLiveRequest: Equatable {
     let sport: ATHLTHGarminLiveSport
     let expiresAt: Date
     let recipe: ATHLTHGarminEnduranceRecipe?
+    let strengthRecipe: ATHLTHGarminStrengthRecipe?
 
     init(id: UUID = UUID(), sport: ATHLTHGarminLiveSport, now: Date = .now,
-         recipe: ATHLTHGarminEnduranceRecipe? = nil) {
+         recipe: ATHLTHGarminEnduranceRecipe? = nil,
+         strengthRecipe: ATHLTHGarminStrengthRecipe? = nil) {
         self.id = id
         self.sport = sport
         self.expiresAt = now.addingTimeInterval(90)
         self.recipe = recipe
+        self.strengthRecipe = strengthRecipe
     }
 
     var message: [String: Any] {
-        var payload: [String: Any] = ["v": recipe == nil ? 1 : 2,
+        var payload: [String: Any] = ["v": strengthRecipe != nil ? 3 : (recipe == nil ? 1 : 2),
             "kind": "prepare", "id": id.uuidString, "sport": sport.rawValue,
             "expires": Int(expiresAt.timeIntervalSince1970)]
         if let recipe { payload["recipe"] = recipe.message }
+        if let strengthRecipe { payload["recipe"] = strengthRecipe.message }
         return payload
     }
 }
@@ -46,9 +50,11 @@ struct ATHLTHGarminLiveEvent: Equatable {
     let stepID: UUID?
     let recipeComplete: Bool?
     let version: Int
+    let completedSets: Int?
+    let resting: Bool?
 
     init?(message: [String: Any]) {
-        guard let version = message["v"] as? Int, [1, 2].contains(version),
+        guard let version = message["v"] as? Int, [1, 2, 3].contains(version),
               message["kind"] as? String == "event",
               let raw = message["id"] as? String, let id = UUID(uuidString: raw),
               let sequence = message["seq"] as? Int, sequence > 0,
@@ -70,6 +76,8 @@ struct ATHLTHGarminLiveEvent: Equatable {
         stepIndex = (message["stepIndex"] as? Int).flatMap { $0 >= 0 && $0 < 32 ? $0 : nil }
         stepID = (message["stepID"] as? String).flatMap(UUID.init(uuidString:))
         recipeComplete = message["recipeComplete"] as? Bool
+        completedSets = (message["completedSets"] as? Int).flatMap { (0...32).contains($0) ? $0 : nil }
+        resting = message["resting"] as? Bool
     }
 }
 
@@ -99,6 +107,17 @@ struct ATHLTHGarminLiveHandshake {
                   event.stepID == recipe.steps[index].id,
                   index >= (latest?.stepIndex ?? 0),
                   event.recipeComplete != true || index == recipe.steps.count - 1,
+                  latest?.recipeComplete != true || event.recipeComplete == true
+            else { return false }
+        } else if let strength = request.strengthRecipe {
+            guard event.version == 3, let index = event.stepIndex,
+                  strength.steps.indices.contains(index),
+                  event.stepID == strength.steps[index].id,
+                  let count = event.completedSets, let resting = event.resting,
+                  count >= (latest?.completedSets ?? 0),
+                  index >= (latest?.stepIndex ?? 0),
+                  count == index + (resting || event.recipeComplete == true ? 1 : 0),
+                  event.recipeComplete != true || (count == strength.steps.count && !resting),
                   latest?.recipeComplete != true || event.recipeComplete == true
             else { return false }
         } else if event.version != 1 { return false }

@@ -46,6 +46,9 @@ class ATHLTHGarminController {
     var stepDistance = null;
     var recipeComplete = false;
     var waitingForNext = false;
+    var completedSets = 0;
+    var resting = false;
+    var restStart = null;
     var sport = null;
     var expires = 0;
     var session = null;
@@ -81,7 +84,7 @@ class ATHLTHGarminController {
     function received(message) {
         var data = message.data;
         if (!(data instanceof Lang.Dictionary)) { return; }
-        if (data["v"] != 1 && data["v"] != 2) { return; }
+        if (data["v"] != 1 && data["v"] != 2 && data["v"] != 3) { return; }
         var command = data["kind"];
         if (command == "prepare") {
             var id = data["id"];
@@ -97,6 +100,7 @@ class ATHLTHGarminController {
             if (state == "ready") { return; }
             var incomingRecipe = data["recipe"];
             if (data["v"] == 2 && (requestedSport == "strength" || !validRecipe(incomingRecipe))) { return; }
+            if (data["v"] == 3 && (requestedSport != "strength" || !validStrength(incomingRecipe))) { return; }
             if (data["v"] == 1 && incomingRecipe != null) { return; }
             version = data["v"];
             page = 0;
@@ -109,6 +113,9 @@ class ATHLTHGarminController {
             stepDistance = null;
             recipeComplete = false;
             waitingForNext = false;
+            completedSets = 0;
+            resting = false;
+            restStart = null;
             requestID = id;
             sport = requestedSport;
             expires = deadline;
@@ -224,7 +231,19 @@ class ATHLTHGarminController {
             statusText = "Request expired";
             publish();
         }
-        if (state == "recording" && recipe != null && !recipeComplete && !waitingForNext && !finishArmed) {
+        if (state == "recording" && version == 3 && recipe != null && !recipeComplete && !finishArmed) {
+            var strengthInfo = Activity.getActivityInfo();
+            if (strengthInfo != null) {
+                if (resting) {
+                    if (restStart == null && strengthInfo.timerTime != null) { restStart = strengthInfo.timerTime / 1000.0; }
+                    var restLeft = remainingRest(strengthInfo);
+                    if (restLeft != null && restLeft <= 0) { advanceStrength(strengthInfo); }
+                } else {
+                    setStepAnchor(strengthInfo);
+                }
+            }
+        }
+        if (state == "recording" && version == 2 && recipe != null && !recipeComplete && !waitingForNext && !finishArmed) {
             var info = Activity.getActivityInfo();
             if (info != null) {
                 if (stepTime == null || stepDistance == null) { setStepAnchor(info); }
@@ -268,6 +287,68 @@ class ATHLTHGarminController {
         }
         return true;
     }
+    function validStrength(value) {
+        if (!(value instanceof Lang.Dictionary) || !(value["title"] instanceof Lang.String)) { return false; }
+        var steps = value["steps"];
+        if (!(steps instanceof Lang.Array) || steps.size() == 0 || steps.size() > 32) { return false; }
+        for (var i = 0; i < steps.size(); i++) {
+            var step = steps[i];
+            if (!(step instanceof Lang.Dictionary) || !(step["id"] instanceof Lang.String) ||
+                step["id"].length() != 36 || !(step["title"] instanceof Lang.String) ||
+                !(step["rest"] instanceof Lang.Number) || step["rest"] < 0 || step["rest"] > 3600 ||
+                !(step["setNumber"] instanceof Lang.Number) || step["setNumber"] < 1) { return false; }
+            if (step["measure"] == "reps") {
+                if (!(step["reps"] instanceof Lang.Number) || step["reps"] < 1 || step["reps"] > 999) { return false; }
+            } else if (step["measure"] == "time") {
+                if (!(step["target"] instanceof Lang.Number) || step["target"] < 1 || step["target"] > 3600) { return false; }
+            } else { return false; }
+            for (var j = 0; j < i; j++) {
+                if (steps[j]["id"] == step["id"]) { return false; }
+            }
+        }
+        return true;
+    }
+
+    function remainingRest(info) {
+        if (!resting || restStart == null || info == null || info.timerTime == null) { return null; }
+        var left = recipe["steps"][stepIndex]["rest"] - (info.timerTime / 1000.0 - restStart);
+        return left < 0 ? 0 : left;
+    }
+
+    function confirmStrength(info) {
+        if (resting || recipeComplete || info == null || info.timerTime == null) { return false; }
+        var step = recipe["steps"][stepIndex];
+        if (step["measure"] == "time") {
+            var progress = stepProgress(info);
+            if (progress == null || progress < step["target"]) { return false; }
+        }
+        completedSets += 1;
+        if (completedSets == recipe["steps"].size()) {
+            recipeComplete = true;
+            statusText = "Plan done | BACK save";
+        } else if (step["rest"] > 0) {
+            resting = true;
+            restStart = info.timerTime / 1000.0;
+            statusText = "Rest";
+        } else {
+            advanceStrength(info);
+            return true;
+        }
+        publish();
+        return true;
+    }
+
+    function advanceStrength(info) {
+        resting = false;
+        restStart = null;
+        stepIndex += 1;
+        stepTime = null;
+        stepDistance = null;
+        setStepAnchor(info);
+        statusText = "DOWN confirm set";
+        publish();
+    }
+
     function setStepAnchor(info) {
         if (info == null) { return; }
         if (stepTime == null && info.timerTime != null) { stepTime = info.timerTime / 1000.0; }
@@ -288,6 +369,7 @@ class ATHLTHGarminController {
         if (state != "recording" || recipe == null || recipeComplete || finishArmed) { return false; }
         var info = Activity.getActivityInfo();
         if (info == null) { return false; }
+        if (version == 3) { return confirmStrength(info); }
         // Manual next is for open steps and acknowledged timed targets only;
         // do not claim a distance/time target completed early.
         if (recipe["steps"][stepIndex]["measure"] != "open" && !waitingForNext) { return false; }
@@ -322,6 +404,10 @@ class ATHLTHGarminController {
             data["stepIndex"] = stepIndex;
             data["stepID"] = recipe["steps"][stepIndex]["id"];
             data["recipeComplete"] = recipeComplete;
+            if (version == 3) {
+                data["completedSets"] = completedSets;
+                data["resting"] = resting;
+            }
         }
         if (session != null && (state == "recording" || state == "paused")) {
             var info = Activity.getActivityInfo();

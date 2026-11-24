@@ -102,6 +102,13 @@ class ATHLTHGarminView extends Ui.View {
             step = controller.recipe["steps"][controller.stepIndex];
             progress = controller.stepProgress(info);
             if (controller.recipeComplete) { fraction = 1.0; }
+            else if (controller.version == 3 && controller.resting) {
+                var rest = controller.remainingRest(info);
+                if (rest != null && step["rest"] > 0) { fraction = 1.0 - rest / step["rest"]; }
+            }
+            else if (controller.version == 3 && step["measure"] == "reps") {
+                fraction = controller.completedSets / (controller.recipe["steps"].size() * 1.0);
+            }
             else if (progress != null && step["target"] != null && step["target"] > 0) {
                 fraction = progress / step["target"];
             }
@@ -142,9 +149,27 @@ class ATHLTHGarminView extends Ui.View {
                          controller.state == "recording" ? "LIVE" : controller.state;
         if (controller.page == 1) {
             text(dc, 25, stateLabel + "  |  2/2", Gfx.FONT_XTINY, GOLD);
-            text(dc, 40, pulse(bpm), Gfx.FONT_NUMBER_HOT, Gfx.COLOR_WHITE);
+            text(dc, 40, pulse(bpm), Gfx.FONT_LARGE, Gfx.COLOR_WHITE);
             text(dc, 57, distance(metres), Gfx.FONT_MEDIUM, Gfx.COLOR_WHITE);
             text(dc, 69, controller.sport == "strength" ? clock(elapsed) : pace(speed), Gfx.FONT_MEDIUM, Gfx.COLOR_WHITE);
+        } else if (step != null && controller.version == 3) {
+            text(dc, 25, controller.resting ? "REST" : step["title"], Gfx.FONT_SMALL, GOLD);
+            var main = "--";
+            if (controller.recipeComplete) { main = "Done"; }
+            else if (controller.resting) { main = clock(controller.remainingRest(info)); }
+            else if (step["measure"] == "reps") { main = step["reps"].toString() + " reps"; }
+            else if (progress != null) {
+                var left = step["target"] - progress;
+                main = clock(left < 0 ? 0 : left);
+            }
+            text(dc, 43, main, Gfx.FONT_LARGE, Gfx.COLOR_WHITE);
+            text(dc, 57, controller.completedSets.toString() + "/" +
+                controller.recipe["steps"].size().toString() + " sets", Gfx.FONT_SMALL, GOLD);
+            if (!controller.resting && step["weight"] != null) {
+                text(dc, 69, "Target " + step["weight"].format("%.1f") + " kg", Gfx.FONT_SMALL, Gfx.COLOR_WHITE);
+            } else {
+                text(dc, 69, pulse(bpm), Gfx.FONT_SMALL, Gfx.COLOR_WHITE);
+            }
         } else if (step != null) {
             var title = step["title"];
             text(dc, 26, title, Gfx.FONT_SMALL, Gfx.COLOR_WHITE);
@@ -159,7 +184,7 @@ class ATHLTHGarminView extends Ui.View {
                     main = step["measure"] == "time" ? clock(left) : left.format("%.0f") + " m";
                 }
             }
-            text(dc, 43, main, Gfx.FONT_NUMBER_HOT, Gfx.COLOR_WHITE);
+            text(dc, 43, main, Gfx.FONT_LARGE, Gfx.COLOR_WHITE);
             text(dc, 57, stateLabel + "  " + (controller.stepIndex + 1).toString() + "/" +
                 controller.recipe["steps"].size().toString(), Gfx.FONT_XTINY, GOLD);
             text(dc, 69, pulse(bpm) + "   " + pace(speed), Gfx.FONT_SMALL, Gfx.COLOR_WHITE);
@@ -183,6 +208,8 @@ class ATHLTHGarminView extends Ui.View {
 
         if (controller.state == "paused") {
             text(dc, 85, "START resume", Gfx.FONT_XTINY, GOLD);
+        } else if (controller.version == 3 && !controller.recipeComplete && !controller.resting) {
+            text(dc, 85, "DOWN confirm set", Gfx.FONT_XTINY, GOLD);
         } else if (controller.waitingForNext || (step != null && step["measure"] == "open" && !controller.recipeComplete)) {
             text(dc, 85, "DOWN next step", Gfx.FONT_XTINY, GOLD);
         } else {
