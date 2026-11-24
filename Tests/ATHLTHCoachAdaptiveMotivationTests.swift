@@ -4,6 +4,25 @@ import XCTest
 
 @MainActor
 final class ATHLTHCoachAdaptiveMotivationTests: XCTestCase {
+    func testHighPulseSuppressesConflictingPacePush() {
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.coachingMode = .custom
+        settings.pushWhenBelowTargetPace = true
+        settings.targetZoneVoiceAlertsEnabled = true
+        var state = ATHLTHCoachAdaptiveMotivation()
+        func cue(_ t: Double) -> String? {
+            state.nextCue(settings: settings, elapsed: t,
+                measuredPaceSecondsPerKilometer: 420,
+                targetSlowestPaceSecondsPerKilometer: 330,
+                measuredHeartRateBPM: 175, targetHeartRateMinimumBPM: 140,
+                targetHeartRateMaximumBPM: 160,
+                reliableNotClimbing: true, norwegian: true)
+        }
+        XCTAssertNil(cue(100))
+        XCTAssertTrue(cue(120)?.contains("Senk farten") == true)
+        XCTAssertNil(cue(140))
+    }
+
     func testStartPushHasCooldownAndStopsAfterConfiguredWindow() {
         var settings = ATHLTHAudioCoachSmartSettings()
         settings.coachingMode = .custom

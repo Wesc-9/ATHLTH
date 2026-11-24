@@ -39,6 +39,9 @@ enum ATHLTHWorkoutDraftRecoveryPolicy {
         savedAt: Date,
         now: Date = Date()
     ) -> Bool {
+        // Identical generated signatures must not override saved source identity.
+        guard storedSourceID == nil || storedSourceID == currentSourceID,
+              savedAt <= now.addingTimeInterval(60 * 5) else { return false }
         if storedSignature == currentSignature { return true }
 
         // A changed source can be intentional. Only recover a mismatched

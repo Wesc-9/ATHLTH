@@ -76,6 +76,14 @@ final class ATHLTHWorkoutDraftRecoveryPolicyTests: XCTestCase {
         ))
     }
 
+    func testMatchingSignatureCannotRestoreDifferentSource() {
+        XCTAssertFalse(ATHLTHWorkoutDraftRecoveryPolicy.accepts(
+            storedSignature: "same", currentSignature: "same",
+            context: "catalog-copy-running", storedSourceTitle: "Running",
+            currentSourceTitle: "Running", storedSourceID: UUID(),
+            currentSourceID: UUID(), savedAt: now, now: now))
+    }
+
     func testMatchingSignatureKeepsOlderStoredDraft() {
         XCTAssertTrue(ATHLTHWorkoutDraftRecoveryPolicy.accepts(
             storedSignature: "stable-saved-workout",

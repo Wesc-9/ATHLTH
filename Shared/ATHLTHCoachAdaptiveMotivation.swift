@@ -6,6 +6,8 @@ struct ATHLTHCoachAdaptiveMotivation {
     private var lastCueElapsed: TimeInterval = -.infinity
     private var lastStartSlot = -1
     private var lowZoneSince: TimeInterval?
+    private var highZoneSince: TimeInterval?
+    private var lastHighZonePrompt = -Double.infinity
     private var slowTargetSince: TimeInterval?
     private var paceDropSince: TimeInterval?
     private var reliablePaceBaseline: Double?
@@ -27,11 +29,35 @@ struct ATHLTHCoachAdaptiveMotivation {
         targetSlowestPaceSecondsPerKilometer: Double?,
         measuredHeartRateBPM: Double?,
         targetHeartRateMinimumBPM: Double?,
+        targetHeartRateMaximumBPM: Double? = nil,
         reliableNotClimbing: Bool,
         norwegian: Bool
     ) -> String? {
         guard settings.coachingMode == .custom,
               elapsed.isFinite, elapsed >= 0 else { return nil }
+
+        // Never push pace while measured heart rate exceeds a valid target.
+        let aboveTarget: Bool = {
+            guard let bpm = measuredHeartRateBPM, (30...240).contains(bpm),
+                  let maximum = targetHeartRateMaximumBPM,
+                  (40...240).contains(maximum) else { return false }
+            return bpm > maximum
+        }()
+        highZoneSince = aboveTarget ? (highZoneSince ?? elapsed) : nil
+        if aboveTarget {
+            lowZoneSince = nil
+            slowTargetSince = nil
+            paceDropSince = nil
+            guard settings.targetZoneVoiceAlertsEnabled == true,
+                  let since = highZoneSince, elapsed - since >= 18,
+                  elapsed - lastHighZonePrompt >= max(60, settings.resolvedAdaptiveCooldown),
+                  elapsed - lastCueElapsed >= settings.resolvedAdaptiveCooldown else { return nil }
+            lastHighZonePrompt = elapsed
+            lastCueElapsed = elapsed
+            return norwegian
+                ? "Pulsen ligger over målområdet. Senk farten litt og finn tilbake til en kontrollert intensitet."
+                : "Your heart rate is above the target range. Ease the pace and return to a controlled effort."
+        }
 
         let pace: Double? = {
             guard let measuredPaceSecondsPerKilometer,

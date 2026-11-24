@@ -2064,6 +2064,7 @@ struct PerformanceStatsView: View {
 
                     editorialFeaturedRecords
                     editorialSummaryStrip
+                    recentTrainingProfile
                     editorialRunningPRCard
                     editorialStrengthPRCard
 
@@ -2224,6 +2225,68 @@ struct PerformanceStatsView: View {
             .isEmpty
             ? health.workouts
             : performanceWorkoutHistory
+    }
+
+    private var recentTrainingProfile: some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let start = calendar.date(byAdding: .day, value: -27, to: today) ?? today
+        let records = resolvedPerformanceWorkouts.filter {
+            $0.startDate >= start && $0.startDate <= Date() &&
+                $0.duration.isFinite && $0.duration > 0
+        }
+        let unique = Dictionary(grouping: records, by: \.id).values.compactMap { $0.first }
+        let activeDays = Set(unique.map { calendar.startOfDay(for: $0.startDate) }).count
+        let running = unique.filter { $0.activity == .running }.count
+        let strength = unique.filter { $0.activity == .strength }.count
+        let other = max(0, unique.count - running - strength)
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(text("Your training profile", "Din treningsprofil"))
+                .font(.system(size: 22, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(text("Last 28 days · recorded activities", "Siste 28 dager · registrerte aktiviteter"))
+                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+            if unique.isEmpty {
+                Text(text("No recorded sessions in this period yet.", "Ingen registrerte økter i perioden ennå."))
+                    .font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+            } else {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(text("Active days", "Aktive dager")).font(.caption)
+                        Text("\(activeDays)/28").font(.title2.weight(.semibold).monospacedDigit())
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(text("Sessions", "Økter")).font(.caption)
+                        Text(String(unique.count)).font(.title2.weight(.semibold).monospacedDigit())
+                    }
+                }
+                ProgressView(value: Double(activeDays), total: 28)
+                    .tint(ATHLTHTheme.accentDeep)
+                trainingProfileRow(text("Running", "Løping"), count: running, total: unique.count)
+                trainingProfileRow(text("Strength", "Styrke"), count: strength, total: unique.count)
+                trainingProfileRow(text("Other activity", "Annen aktivitet"), count: other, total: unique.count)
+                Text(text("Frequency and mix describe your recorded training, not your physical capacity.",
+                          "Frekvens og fordeling beskriver registrert trening, ikke din fysiske kapasitet."))
+                    .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+        .padding(16)
+        .athlthTrainPaper()
+        .accessibilityIdentifier("athlth-training-profile-28-days")
+    }
+
+    private func trainingProfileRow(_ title: String, count: Int, total: Int) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title).font(.subheadline)
+                Spacer()
+                Text(String(count)).font(.caption.monospacedDigit())
+            }
+            ProgressView(value: Double(count), total: Double(max(1, total)))
+                .tint(ATHLTHTheme.accentDeep)
+        }
+        .foregroundStyle(ATHLTHTheme.primaryText)
     }
 
     private var editorialHero: some View {

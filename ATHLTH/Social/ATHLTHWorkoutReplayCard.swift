@@ -147,6 +147,52 @@ struct ATHLTHWorkoutReplayCard: View {
         "athlth.replay.reviewed.\(workout.id.uuidString)"
     }
 
+    private var nextSessionAdvice: some View {
+        let guidance: String = {
+            if requiresDataReview {
+                return ATHLTHLocalization.choose(
+                    english: "Review recorded duration and distance before planning progression.",
+                    norwegian: "Kontroller registrert tid og distanse før økten brukes til å planlegge progresjon.")
+            }
+            if isStrength {
+                return ATHLTHLocalization.choose(
+                    english: "Use completed sets, repetitions and loads as the next reference. Increase only if technique and recovery allow.",
+                    norwegian: "Bruk fullførte sett, repetisjoner og vekter som referanse neste gang. Øk bare hvis teknikk og restitusjon tillater det.")
+            }
+            let paces = usableSegments.compactMap(\.paceSecondsPerKilometer)
+            if paces.count >= 3, let first = paces.first, let last = paces.last,
+               last > first * 1.10 {
+                return ATHLTHLocalization.choose(
+                    english: "The last measured section was slower than the first. If terrain and intended effort were comparable, try a more even start next time.",
+                    norwegian: "Siste målte del var roligere enn første. Hvis terreng og planlagt intensitet var sammenlignbare, prøv en jevnere åpning neste gang.")
+            }
+            if validOverallPace != nil && paces.count >= 3 {
+                return ATHLTHLocalization.choose(
+                    english: "Keep measured pace as a reference. Compare a similar route or session before increasing the target.",
+                    norwegian: "Behold målt tempo som referanse. Sammenlign med en tilsvarende rute eller økt før du øker målet.")
+            }
+            return ATHLTHLocalization.choose(
+                english: "Not enough comparable evidence to recommend changing intensity. Use perceived effort and recovery when planning the next workout.",
+                norwegian: "Det er ikke nok sammenlignbare data til å anbefale endret intensitet. Bruk egen opplevd innsats og restitusjon når du planlegger neste økt.")
+        }()
+        return VStack(alignment: .leading, spacing: 7) {
+            Label(ATHLTHLocalization.choose(english: "COACH · NEXT SESSION", norwegian: "COACH · NESTE ØKT"), systemImage: "sparkles")
+                .font(.caption2.weight(.semibold)).tracking(0.8)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            Text(guidance).font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(ATHLTHLocalization.choose(english: "Local advice · no plan is changed automatically",
+                                           norwegian: "Lokalt forslag · ingen plan endres automatisk"))
+                .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHTheme.premiumGoldSoft, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.top, 12)
+        .accessibilityIdentifier("athlth-replay-next-session-advice")
+    }
+
     private var replayHeroTitle: String {
         if requiresDataReview {
             return ATHLTHLocalization.choose(
@@ -352,6 +398,7 @@ struct ATHLTHWorkoutReplayCard: View {
             }
 
             if showingMoments {
+                nextSessionAdvice
                 Divider()
                     .padding(.top, 12)
 

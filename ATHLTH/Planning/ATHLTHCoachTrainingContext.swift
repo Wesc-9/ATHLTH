@@ -28,9 +28,17 @@ enum ATHLTHCoachTrainingContext {
     ) -> [String] {
         let since = now.addingTimeInterval(-14 * 86_400)
         var rows: [(Date, String)] = []
-        for run in running where run.completedAt >= since && run.completedAt <= now {
+        var seenRuns = Set<UUID>()
+        var seenHealthRuns = Set<UUID>()
+        for run in running.sorted(by: { $0.completedAt > $1.completedAt })
+            where run.completedAt >= since && run.completedAt <= now {
+            guard !seenRuns.contains(run.id),
+                  run.healthWorkoutUUID.map({ !seenHealthRuns.contains($0) }) ?? true
+            else { continue }
+            seenRuns.insert(run.id)
+            if let healthID = run.healthWorkoutUUID { seenHealthRuns.insert(healthID) }
             let details = run.averageWorkSpeed.flatMap { speed -> String? in
-                guard speed.isFinite, speed > 0 else { return nil }
+                guard speed.isFinite, (1...40).contains(speed) else { return nil }
                 let pace = Int((3_600 / speed).rounded())
                 return String(format: "%d:%02d min/km", pace / 60, pace % 60)
             }
@@ -39,7 +47,10 @@ enum ATHLTHCoachTrainingContext {
                 (details.map { " · work pace \($0)" } ?? " · pace unavailable")
             rows.append((run.completedAt, label))
         }
-        for log in strength where log.isFinished {
+        var seenStrength = Set<UUID>()
+        for log in strength.sorted(by: { ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt) })
+            where log.isFinished && log.totalCompletedSets > 0 {
+            guard seenStrength.insert(log.id).inserted else { continue }
             let date = log.endedAt ?? log.startedAt
             guard date >= since, date <= now else { continue }
             rows.append((date, "Completed strength: " +
@@ -68,8 +79,12 @@ enum ATHLTHCoachTrainingContext {
                         value: max(week.weekNumber - 1, 0) * 7 +
                             max(day.dayIndex - 1, 0),
                         to: start
-                    ), date >= calendar.startOfDay(for: now) else { return [] }
-                    return day.sessions.map { (date, $0) }
+                    ) else { return [] }
+                    return day.sessions.compactMap { session in
+                        let scheduled = session.scheduledStart ?? date
+                        guard scheduled >= calendar.startOfDay(for: now) else { return nil }
+                        return (scheduled, session)
+                    }
                 }
             }
             .sorted { $0.0 < $1.0 }

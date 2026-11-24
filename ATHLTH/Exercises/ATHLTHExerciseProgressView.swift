@@ -50,6 +50,33 @@ struct ATHLTHExerciseProgressView: View {
                               value: "\(progress.totalRepetitions)")
                 }
 
+                if let latest = progress.sessions.last {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label(tr("Last completed", "Sist gjennomført"), systemImage: "clock.arrow.circlepath")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            Spacer(minLength: 4)
+                            Text(latest.date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption).foregroundStyle(dim)
+                        }
+                        HStack(spacing: 8) {
+                            statistic(tr("Sets", "Sett"), value: String(latest.completedSets))
+                            statistic(tr("Reps", "Reps"), value: String(latest.repetitions))
+                            if let weight = latest.highestWeightKilograms {
+                                statistic(tr("Top weight", "Toppvekt"),
+                                          value: String(format: "%.1f kg", weight))
+                            }
+                        }
+                        Text(tr("Use the last recorded result as a reference, not an automatic load increase.",
+                                "Bruk siste registrerte resultat som referanse, ikke som en automatisk vektøkning."))
+                            .font(.caption2).foregroundStyle(dim)
+                    }
+                    .padding(12)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 15))
+                    .accessibilityIdentifier("athlth-exercise-last-completed")
+                }
+
                 // For sit-ups and other bodyweight movements, zero kg is not
                 // a meaningful performance metric. Show weight only when a
                 // positive load was actually logged.
