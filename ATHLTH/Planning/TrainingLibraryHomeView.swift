@@ -2007,11 +2007,6 @@ struct TrainingPlanLibraryView: View {
         }
     }
 
-    private var hasActiveFilters: Bool {
-        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        selectedCategory != "all" || favoritePlansOnly || showFavoritesOnly ||
-        selectedMuscle != nil || sessionsPerWeekFilter != nil
-    }
 
     private var filterCount: Int {
         (showFavoritesOnly ? 1 : 0) +
@@ -2062,22 +2057,6 @@ struct TrainingPlanLibraryView: View {
         }
     }
 
-    /// Editorial picks: one running and one strength option if available.
-    /// These are real catalog entries, never hard-coded demonstration plans.
-    private var featuredEntries: [TrainingPlanCatalogEntry] {
-        var selected: [TrainingPlanCatalogEntry] = []
-        for category in ["running", "strength"] {
-            if let entry = catalog.entries.first(where: { $0.category == category }) {
-                selected.append(entry)
-            }
-        }
-        for entry in catalog.entries where selected.count < 2 {
-            if !selected.contains(where: { $0.id == entry.id }) {
-                selected.append(entry)
-            }
-        }
-        return selected
-    }
 
     private var listedEntries: [TrainingPlanCatalogEntry] {
         // Search and all filters run over the complete catalog first.
@@ -2266,49 +2245,6 @@ struct TrainingPlanLibraryView: View {
         }
     }
 
-    // Deliberately no full-width hero or photo at the top. The content
-    // starts immediately, matching Train's restrained editorial styling.
-    private var libraryHeading: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(favoritePlansOnly
-                 ? tr("FAVORITE PLANS", "FAVORITTPLANER")
-                 : tr("PLAN LIBRARY", "PLANBIBLIOTEK"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2.3)
-                .foregroundStyle(bronze)
-
-            Text(favoritePlansOnly
-                 ? tr("Your favorite plans", "Dine favorittplaner")
-                 : tr("Find your next plan", "Finn din neste plan"))
-                .font(.system(size: 34, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-                .accessibilityAddTraits(.isHeader)
-
-            Text(favoritePlansOnly
-                 ? tr("Plans you've starred, ready when you need them.",
-                      "Planene du har merket med stjerne, samlet på ett sted.")
-                 : tr("Choose a plan and make it yours.",
-                      "Finn en treningsplan som passer målene dine."))
-                .font(.subheadline)
-                .foregroundStyle(muted)
-
-            HStack(spacing: 9) {
-                Label(
-                    tr("\(catalog.entries.count) plans", "\(catalog.entries.count) planer"),
-                    systemImage: "square.stack.3d.up"
-                )
-                Label(
-                    tr("\(favorites.count(for: .plan)) saved",
-                       "\(favorites.count(for: .plan)) lagret"),
-                    systemImage: "star"
-                )
-            }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(ink.opacity(0.78))
-            .padding(.top, 5)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 
     private var inlineSearch: some View {
         HStack(spacing: 12) {
@@ -2402,146 +2338,8 @@ struct TrainingPlanLibraryView: View {
             .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func featuredSection(onSeeAll: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Text(tr("Featured plans", "Utvalgte planer"))
-                    .font(.system(size: 24, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Button(action: onSeeAll) {
-                    HStack(spacing: 5) {
-                        Text(tr("See all", "Se alle"))
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(muted)
-                }
-                .buttonStyle(.plain)
-            }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(featuredEntries) { entry in
-                        featuredPlanItem(entry)
-                    }
-                }
-                .padding(.vertical, 3)
-            }
-        }
-    }
 
-    private func featuredPlanItem(_ entry: TrainingPlanCatalogEntry) -> some View {
-        ZStack(alignment: .topTrailing) {
-            NavigationLink {
-                TrainingPlanCatalogDetailView(
-                    entry: entry,
-                    onPlanCreated: onPlanCreated
-                )
-            } label: {
-                ZStack(alignment: .bottomLeading) {
-                    GeometryReader { geometry in
-                        Image(categoryArtwork(entry))
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width,
-                                   height: geometry.size.height)
-                            .clipped()
-                            .accessibilityHidden(true)
-                    }
-                    LinearGradient(
-                        colors: [.black.opacity(0.06), .black.opacity(0.23),
-                                 .black.opacity(0.84)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(entry.trainingTypeTitle.uppercased())
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.2)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(.white.opacity(0.88), in: Capsule())
-                            .foregroundStyle(ink)
-                        Spacer(minLength: 8)
-                        Text(entry.title)
-                            .font(.system(size: 24, weight: .regular, design: .serif))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                        Text(entry.goal)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.92))
-                            .lineLimit(2)
-                        HStack(spacing: 10) {
-                            Label(
-                                tr("\(entry.durationWeeks) weeks",
-                                   "\(entry.durationWeeks) uker"),
-                                systemImage: "calendar"
-                            )
-                            Label(localizedLevel(entry.level), systemImage: "chart.bar")
-                        }
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white)
-                    }
-                    .padding(15)
-                    .padding(.trailing, 6)
-                }
-                .frame(
-                    width: ATHLTHLibraryResponsiveLayout.featuredCardWidth(
-                        for: libraryViewWidth,
-                        accessibilityText: dynamicTypeSize.isAccessibilitySize
-                    ),
-                    height: ATHLTHLibraryResponsiveLayout.featuredCardHeight(
-                        for: ATHLTHLibraryResponsiveLayout.featuredCardWidth(
-                            for: libraryViewWidth,
-                            accessibilityText: dynamicTypeSize.isAccessibilitySize
-                        ),
-                        accessibilityText: dynamicTypeSize.isAccessibilitySize
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 22))
-                .contentShape(RoundedRectangle(cornerRadius: 22))
-            }
-            .buttonStyle(.plain)
-
-            LibraryFavoriteButton(
-                kind: .plan,
-                itemID: entry.id.uuidString,
-                title: entry.title,
-                subtitle: "\(entry.durationWeeks) weeks · \(entry.level)",
-                icon: "calendar.badge.clock"
-            )
-            .padding(9)
-        }
-    }
-
-    private var resultsHeader: some View {
-        HStack(spacing: 8) {
-            Text(hasActiveFilters
-                 ? tr("Search results", "Søkeresultater")
-                 : tr("All plans", "Alle planer"))
-                .font(.system(size: 24, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-                .accessibilityAddTraits(.isHeader)
-            Text("\(hasActiveFilters ? filteredEntries.count : listedEntries.count)")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(muted)
-            Spacer(minLength: 6)
-            if !favoritePlansOnly {
-                Button { showFavoritesOnly.toggle() } label: {
-                    Image(systemName: showFavoritesOnly ? "star.fill" : "star")
-                        .foregroundStyle(showFavoritesOnly ? bronze : ink)
-                        .frame(width: 38, height: 38)
-                        .background(.white.opacity(0.88), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tr("Favorite plans", "Favorittplaner"))
-                .accessibilityAddTraits(showFavoritesOnly ? [.isSelected] : [])
-                .accessibilityIdentifier("training-plans-favorites-filter")
-            }
-            catalogFiltersMenu
-        }
-    }
 
     private var catalogFiltersMenu: some View {
         Menu {
@@ -3808,16 +3606,6 @@ struct TrainingPlanCatalogDetailView: View {
         ATHLTHPlanDesign.accentInk
     }
 
-    private var detailIcon: String {
-        switch entry.category {
-        case "strength":
-            return "dumbbell.fill"
-        case "hybrid":
-            return "figure.run.square.stack.fill"
-        default:
-            return "figure.run"
-        }
-    }
 }
 
 
@@ -5354,11 +5142,6 @@ struct MyTrainingPlansLibraryView: View {
         .padding(.top, 2)
     }
 
-    private var activePlanCount: Int {
-        session.trainingPlans.filter {
-            session.trainingPlanStatus($0) == .active
-        }.count
-    }
 
     private func statusTitle(
         _ status: TrainingPlanTimingStatus
