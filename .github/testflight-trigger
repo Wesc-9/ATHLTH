@@ -351,3 +351,5 @@ ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry after native Home-to
 ATHLTH 3.0.1 build 141 — user-authorized retry 2026-11-24; isolate iPhone smoke per compatible size, fresh job-owned device and native transition before individual tab previews; preserve all required assertions, 100 transitions and same-commit release gates. No stale upload or bypass.
 
 ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry 2026-11-24: one checksummed exact-commit simulator build shared across isolated device jobs, bounded lifecycle waiting, first-frame/stress handshake and durable host/main-thread diagnostics. All five release gates and 100 transitions remain mandatory; no bypass.
+
+ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry 2026-11-24. Reuse one verified installed-app data container, force fresh preview processes, check PID before/after screenshots, require distinct final native transition and actual Today dashboard evidence after 100 cycles, separate screenshots and distinguish simulator transport/lifecycle/render/process failures. All five exact-commit gates mandatory; no bypass.

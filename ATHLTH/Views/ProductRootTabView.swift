@@ -448,9 +448,26 @@ struct ProductRootTabView: View {
             selectedTab = 0
             try? await Task.sleep(for: .milliseconds(750))
             guard !Task.isCancelled, selectedTab == 0 else { return }
+            if hop == 100 {
+                ATHLTHTrainSmokeTrace.record("native-final-hop-requested")
+            }
             selectedTab = 1
             try? await Task.sleep(for: .milliseconds(750))
             guard !Task.isCancelled, selectedTab == 1 else { return }
+            if hop == 100 {
+                // Require new evidence from the actual native transition and
+                // active Today dashboard, not the first hop's old markers.
+                for _ in 0..<600 {
+                    if Task.isCancelled { return }
+                    if ATHLTHTrainSmokeTrace.hasRecorded("native-final-home-to-train"),
+                       ATHLTHTrainSmokeTrace.hasRecorded("native-final-dashboard-ready") { break }
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                guard !Task.isCancelled, selectedTab == 1,
+                      ATHLTHTrainSmokeTrace.hasRecorded("native-final-home-to-train"),
+                      ATHLTHTrainSmokeTrace.hasRecorded("native-final-dashboard-ready")
+                else { ATHLTHTrainSmokeTrace.record("native-final-dashboard-timeout"); return }
+            }
             ATHLTHTrainSmokeTrace.record("stress-hop-\(hop)")
         }
     }
@@ -513,6 +530,11 @@ struct ProductRootTabView: View {
         .onChange(of: selectedTab) { previous, next in
             if previous == 0 && next == 1 {
                 ATHLTHTrainSmokeTrace.record("native-home-to-train")
+                #if targetEnvironment(simulator)
+                if ATHLTHTrainSmokeTrace.hasRecorded("native-final-hop-requested") {
+                    ATHLTHTrainSmokeTrace.record("native-final-home-to-train")
+                }
+                #endif
             }
             if session.signedIn && !session.previewModeEnabled {
                 persistedSelectedTab = next
@@ -7553,6 +7575,18 @@ struct ATHLTHTrainView: View {
             .onAppear {
                 recordTrainDashboardSmokeReadiness()
             }
+            #if targetEnvironment(simulator)
+            // A retained native tab may become active without reconstruction.
+            // Observe activation on the dashboard itself, not the parent tab.
+            .task(id: isActive) {
+                guard isActive,
+                      ATHLTHTrainSmokeTrace.hasRecorded("native-final-hop-requested")
+                else { return }
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled else { return }
+                recordTrainDashboardSmokeReadiness()
+            }
+            #endif
         )
     }
 
@@ -7568,6 +7602,11 @@ struct ATHLTHTrainView: View {
     private func recordTrainDashboardSmokeReadiness() {
         guard isActive, selectedSection == .today else { return }
         ATHLTHTrainSmokeTrace.record("dashboard-ready")
+        #if targetEnvironment(simulator)
+        if ATHLTHTrainSmokeTrace.hasRecorded("native-final-hop-requested") {
+            ATHLTHTrainSmokeTrace.record("native-final-dashboard-ready")
+        }
+        #endif
     }
 
     // Keep the optional delayed-start banner independent of the heavy
