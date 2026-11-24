@@ -251,10 +251,6 @@ struct StructuredWorkoutSessionView: View {
     @State private var persistenceErrorMessage: String?
     @State private var gymMode = false
     @State private var gymExerciseDetails: WorkoutTemplateBlock?
-    @State private var gymAwakeWindowID = UUID()
-    private var gymScreenAwake: Bool {
-        gymMode && hasStarted && !savedCompletion && scenePhase == .active
-    }
 
     private var checkpointName: String {
         "structuredWorkoutInProgress.v1.\(workout.id.uuidString)"
@@ -392,14 +388,11 @@ struct StructuredWorkoutSessionView: View {
                     }
                 }
             }
-            .onChange(of: gymScreenAwake) { _, enabled in
-                ATHLTHiPadKeepAwakeCoordinator.setEnabled(enabled, for: gymAwakeWindowID)
+            .onChange(of: gymMode) { _, _ in
+                updateScreenAwakeState()
             }
             .onChange(of: currentIndex) { _, _ in
                 gymExerciseDetails = nil
-            }
-            .onDisappear {
-                ATHLTHiPadKeepAwakeCoordinator.setEnabled(false, for: gymAwakeWindowID)
             }
             .navigationTitle(workout.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -712,11 +705,13 @@ struct StructuredWorkoutSessionView: View {
         let block = currentBlock
         let effective = ATHLTHStructuredWorkoutClock.at(now, pause: pausedAt) ?? now
         let remaining: TimeInterval? = block.flatMap { value in
-            let ordinal = blocks.prefix(currentIndex).filter {
-                $0.executionGroupID == value.executionGroupID
-            }.count
-            if let groupTime = timeRemaining(for: value, at: now, ordinal: ordinal) {
-                return groupTime
+            if let groupID = value.executionGroupID {
+                let ordinal = blocks.prefix(currentIndex).filter {
+                    $0.executionGroupID == groupID
+                }.count
+                if let groupTime = timeRemaining(for: value, at: now, ordinal: ordinal) {
+                    return groupTime
+                }
             }
             return value.durationSeconds.map {
                 max(0, $0 - max(0, effective.timeIntervalSince(stepEnteredAt)))
@@ -1713,7 +1708,7 @@ struct StructuredWorkoutSessionView: View {
     @MainActor
     private func updateScreenAwakeState() {
         ATHLTHWorkoutScreenAwake.set(
-            !savedCompletion && pausedAt == nil &&
+            hasStarted && !savedCompletion && (gymMode || pausedAt == nil) &&
                 scenePhase == .active,
             reason:
                 "iphone-structured-workout"
