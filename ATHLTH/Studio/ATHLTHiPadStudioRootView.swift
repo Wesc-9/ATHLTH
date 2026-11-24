@@ -136,6 +136,13 @@ struct ATHLTHiPadStudioRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMessagePanelMotion
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var goalAccountSync: ATHLTHGoalAccountSyncStore
     @SceneStorage("athlth.studio.selectedDestination")
@@ -186,6 +193,19 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var focusedPlanningDate: Date?
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
     @State private var showingTrain = false
+    @State private var studioStartChoice: ATHLTHStudioSchedule.Occurrence?
+    @State private var showingStudioStartChoice = false
+    @State private var studioLocalLaunch: StudioLocalLaunch?
+    @State private var studioLaunchInProgress = false
+    @State private var studioLaunchError: String?
+    @State private var studioLastRelayAt = Date.distantPast
+
+    private struct StudioLocalLaunch: Identifiable {
+        let workout: PlannedSession
+        let planID: UUID?
+        var id: UUID { workout.id }
+    }
+
     @State private var selectedStandaloneWorkout: PlannedSession?
     @State private var showingPlanSync = false
     @State private var showingPresentation = false
@@ -252,6 +272,46 @@ struct ATHLTHiPadStudioRootView: View {
         .tint(gold)
         .fullScreenCover(isPresented: $showingTrain) {
             ATHLTHStudioTrainWorkspaceView(navigationRequest: $trainRequest)
+        }
+        .fullScreenCover(item: $studioLocalLaunch) { launch in
+            StructuredWorkoutSessionView(
+                workout: launch.workout, linkedPlanID: launch.planID
+            )
+            .environmentObject(session)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(english: "Start training", norwegian: "Start trening"),
+            isPresented: $showingStudioStartChoice,
+            titleVisibility: .visible,
+            presenting: studioStartChoice
+        ) { item in
+            if canRelayStudioWorkout(item, device: .iPhone) {
+                Button("iPhone") { relayStudioWorkout(item, device: .iPhone) }
+            }
+            if localStudioRecipe(item.workout) != nil {
+                Button(ATHLTHLocalization.choose(
+                    english: "iPad · manual workout", norwegian: "iPad · manuell økt"
+                )) { startLocalStudioWorkout(item) }
+            }
+            if canRelayStudioWorkout(item, device: .appleWatch) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Apple Watch via iPhone", norwegian: "Apple Watch via iPhone"
+                )) { relayStudioWorkout(item, device: .appleWatch) }
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
+        } message: { item in
+            Text(item.workout.title)
+        }
+        .alert(
+            ATHLTHLocalization.choose(english: "Unable to start workout", norwegian: "Kunne ikke starte økten"),
+            isPresented: Binding(
+                get: { studioLaunchError != nil },
+                set: { if !$0 { studioLaunchError = nil } }
+            )
+        ) {
+            Button("OK") { studioLaunchError = nil }
+        } message: {
+            Text(studioLaunchError ?? "")
         }
         .sheet(isPresented: $showingPlanSync) {
             ATHLTHStudioPlanSyncPanel(sync: studioPlanSync)
@@ -1102,14 +1162,7 @@ struct ATHLTHiPadStudioRootView: View {
                     }
                 },
                 onStartWorkout: { entry in
-                    if let planID = entry.planID {
-                        trainRequest = .startPlannedWorkout(
-                            planID: planID, workoutID: entry.workout.id
-                        )
-                        showingTrain = true
-                    } else {
-                        selectedStandaloneWorkout = entry.workout
-                    }
+                    openStudioWorkoutStart(entry)
                 },
                 onSendToWatch: { entry in
                     guard let planID = entry.planID else { return }
@@ -1201,6 +1254,12 @@ struct ATHLTHiPadStudioRootView: View {
         pendingWeekTrainLaunch = false
         pendingWeekStandaloneWorkout = nil
         selectedStandaloneWorkout = nil
+        studioStartChoice = nil
+        showingStudioStartChoice = false
+        studioLocalLaunch = nil
+        studioLaunchInProgress = false
+        studioLaunchError = nil
+        studioLastRelayAt = .distantPast
         showingTrain = false
         trainRequest = nil
         focusedPlanningDate = nil
@@ -1216,6 +1275,167 @@ struct ATHLTHiPadStudioRootView: View {
         savedCommunityTab = ATHLTHCommunityMainTab.overview.rawValue
         savedHomeDayEpoch = 0
         selectedHomeWeekDate = .now
+    }
+
+    /// Keep this launcher on the original session identity and never start
+    /// two recorders. iPad can execute the existing manual structured player;
+    /// measured phone/Watch sessions are handed off through the existing relay.
+    private func localStudioRecipe(_ workout: PlannedSession) -> PlannedSession? {
+        guard workout.kind != .running, workout.kind != .walking,
+              !workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run || $0.kind == .walk })
+        else { return nil }
+        if workout.isStructuredWorkout { return workout }
+        return ATHLTHUnifiedWorkout.timedNonCardioProjection(from: workout)
+    }
+
+    private func canRelayStudioWorkout(
+        _ item: ATHLTHStudioSchedule.Occurrence, device: WorkoutCaptureDevice
+    ) -> Bool {
+        let workout = item.workout
+        let route = ATHLTHPlannedWorkoutCaptureRoute.resolve(workout, device: device)
+        switch workout.kind {
+        case .strength:
+            return device == .iPhone
+                ? (route == .phoneStrength || route == .phoneStructuredManual || route == .phoneHybridStrength)
+                : (route == .watchStrength || route == .watchHybridStrength)
+        case .running, .walking:
+            // The current endurance relay requires the complete plan link.
+            guard item.planID != nil else { return false }
+            return device == .iPhone ? route == .phoneEndurance : route == .watchEndurance
+        default:
+            return false
+        }
+    }
+
+    private func openStudioWorkoutStart(_ item: ATHLTHStudioSchedule.Occurrence) {
+        guard !studioLaunchInProgress else { return }
+        guard localStudioRecipe(item.workout) != nil ||
+              canRelayStudioWorkout(item, device: .iPhone) ||
+              canRelayStudioWorkout(item, device: .appleWatch) else {
+            // Unsupported activities retain their original detail path.
+            if let planID = item.planID {
+                trainRequest = .workout(planID: planID, workoutID: item.workout.id)
+                showingTrain = true
+            } else {
+                selectedStandaloneWorkout = item.workout
+            }
+            return
+        }
+        studioStartChoice = item
+        showingStudioStartChoice = true
+    }
+
+    private func checkedStudioWorkout(_ item: ATHLTHStudioSchedule.Occurrence) -> PlannedSession? {
+        let workout: PlannedSession?
+        if let planID = item.planID {
+            workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == item.workout.id })
+        } else {
+            workout = session.standalonePlannedSessions.first(where: { $0.id == item.workout.id })
+        }
+        guard let workout, session.signedIn, !workout.isExplicitRestDay,
+              workout.cancelledAt == nil,
+              session.recordedTimes(for: workout.id)?.endedAt == nil,
+              !strengthWorkout.workoutHistory.contains(where: {
+                  $0.isFinished && $0.plannedSessionID == workout.id
+              }),
+              !(item.planID.map { id in
+                  session.isPlanSessionSkipped(planID: id, sessionID: workout.id) ||
+                  session.isPlanSessionCompleted(
+                      planID: id, sessionID: workout.id,
+                      healthWorkouts: health.workouts, strengthHistory: strengthWorkout.workoutHistory
+                  )
+              } ?? false),
+              !ATHLTHUniversalWorkoutAdmission.isOccupied(
+                  phone: phoneWorkout, strength: strengthWorkout,
+                  remoteWatchActive: watchConnection.hasActiveWatchWorkout
+              ),
+              !(ATHLTHCrossDeviceWorkoutStore.shared.remotePresence.map {
+                  $0.expiresAt > Date()
+              } ?? false),
+              !studioLaunchInProgress,
+              Date().timeIntervalSince(studioLastRelayAt) >= 20
+        else {
+            studioLaunchError = ATHLTHLocalization.choose(
+                english: "The workout is unavailable or another workout is already active or starting.",
+                norwegian: "Økten er ikke tilgjengelig, eller en annen økt pågår eller er i ferd med å starte."
+            )
+            return nil
+        }
+        return workout
+    }
+
+    private func startLocalStudioWorkout(_ item: ATHLTHStudioSchedule.Occurrence) {
+        guard let workout = checkedStudioWorkout(item),
+              let recipe = localStudioRecipe(workout) else { return }
+        studioLocalLaunch = StudioLocalLaunch(workout: recipe, planID: item.planID)
+    }
+
+    private func relayStudioWorkout(
+        _ item: ATHLTHStudioSchedule.Occurrence, device: WorkoutCaptureDevice
+    ) {
+        guard let workout = checkedStudioWorkout(item) else { return }
+        studioLaunchInProgress = true
+        let account = session.profile.userID
+        Task { @MainActor in
+            defer { if account == session.profile.userID { studioLaunchInProgress = false } }
+            do {
+                if workout.kind == .strength {
+                    var advanced = StrengthAdvancedConfiguration.savedDefaults()
+                    if let playlist = workout.spotifyPlaylist {
+                        advanced.spotifyPlaylist = playlist
+                        advanced.spotifyAutoplay = workout.spotifyAutoplayOnStart ?? false
+                    }
+                    _ = try await WorkoutLaunchCoordinator.startStrength(
+                        workout: workout, captureDevice: device,
+                        trackingMode: .advanced, selectedFriends: [],
+                        audioCoach: workout.audioCoachConfiguration ?? advanced.audioCoach.watchConfiguration,
+                        advancedConfiguration: advanced, session: session,
+                        settings: settings, social: social, strengthWorkout: strengthWorkout,
+                        watchConnection: watchConnection, spotify: spotify
+                    )
+                } else {
+                    guard let planID = item.planID else {
+                        throw ATHLTHWorkoutCaptureAdmission.Rejection.requiresDedicatedActivityCapture
+                    }
+                    let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
+                    defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
+                    let environment = RunEnvironment.forPlannedSession(workout)
+                    let route = environment == .treadmill ? nil :
+                        PlannedWorkoutWatchBuilder.route(for: workout, routes: session.savedRoutes)
+                    if workout.routeID != nil && route == nil && environment != .treadmill {
+                        throw NSError(domain: "ATHLTH.StudioStart", code: 1,
+                                      userInfo: [NSLocalizedDescriptionKey: ATHLTHLocalization.choose(
+                                        english: "The planned route is missing.", norwegian: "Den planlagte ruten mangler.")])
+                    }
+                    var envelope = WorkoutDeviceRelayEnvelope(
+                        kind: workout.kind == .running ? .run : .walk,
+                        target: WorkoutDeviceRelayTarget(captureDevice: device),
+                        workoutPayload: SocialWorkoutInvitePayload(
+                            workout: workout, route: route, routeAlerts: workout.routeAlertConfiguration
+                        ),
+                        watchAudioCoach: PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+                            for: workout, selectedRoute: route,
+                            defaultConfiguration: settings.audioCoachConfiguration(
+                                enabled: settings.audioCoachEnabledByDefault)
+                        ),
+                        ghostTargetDurationSeconds: workout.ghostTargetDurationSeconds,
+                        ghostUpdates: workout.ghostUpdates,
+                        runEnvironment: environment,
+                        spotifyPlaylist: workout.spotifyPlaylist,
+                        spotifyAutoplay: workout.spotifyAutoplayOnStart ?? false,
+                        gearIDs: workout.gearIDs ?? []
+                    )
+                    envelope.plannedPlanID = planID
+                    envelope.plannedSessionID = workout.id
+                    try await WorkoutDeviceRelayStore.shared.enqueue(envelope)
+                }
+                if account == session.profile.userID { studioLastRelayAt = Date() }
+            } catch {
+                if account == session.profile.userID { studioLaunchError = error.localizedDescription }
+            }
+        }
     }
 
     private func clearWeekInspectorIfNeeded() {
