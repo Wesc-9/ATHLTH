@@ -276,6 +276,14 @@ jobs:
       - name: Embed licensed RepDB catalog and images for offline use
         run: python3 scripts/prepare_repdb_offline.py
 
+      - name: Cache public SwiftPM repository objects
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ATHLTHSourcePackages/repositories
+          key: swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('project.yml', '**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Generate Xcode project
         run: xcodegen generate
       # Keep the full iPhone and Watch build, but boot a compatible
@@ -330,6 +338,7 @@ jobs:
             exit 1
           fi
           xcodebuild -project ATHLTH.xcodeproj -scheme ATHLTH \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -destination "platform=iOS Simulator,id=$DEVICE_ID" \
             -destination-timeout 120 \
             -parallel-testing-enabled NO \

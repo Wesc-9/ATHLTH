@@ -78,7 +78,22 @@ permissions:
   actions: read
 
 jobs:
+  release-checks:
+    if: github.ref != 'refs/heads/release/v3.0.1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify full release gate before legacy signing and archive
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1"]'), github.ref) && github.ref != 'refs/heads/release/v3.0.1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/verify_testflight_release_gate.sh
+
   testflight:
+    needs: release-checks
+    if: ${{ !cancelled() && (needs.release-checks.result == 'success' || (github.ref == 'refs/heads/release/v3.0.1' && needs.release-checks.result == 'skipped')) }}
     runs-on: xcode-27
     timeout-minutes: 240
     env:
@@ -89,13 +104,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Verify full release gate before legacy signing and archive
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1"]'), github.ref) && github.ref != 'refs/heads/release/v3.0.1'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash scripts/verify_testflight_release_gate.sh
 
       # Refuse an obsolete checkout before doing any release work. The full
       # exact-commit gate is checked again before signing and upload.
@@ -230,6 +238,14 @@ jobs:
       - name: Embed licensed RepDB catalog and images for offline use
         run: python3 scripts/prepare_repdb_offline.py
 
+      - name: Cache public SwiftPM repository objects
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ATHLTHSourcePackages/repositories
+          key: swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('project.yml', '**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Generate Xcode project
         run: xcodegen generate
 
@@ -241,6 +257,7 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
@@ -328,6 +345,7 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \

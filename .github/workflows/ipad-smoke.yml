@@ -78,9 +78,44 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
+  resolve-smoke-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    outputs:
+      run-id: ${{ steps.resolve.outputs.run_id }}
+    steps:
+      - name: Locate exact-commit universal simulator artifact
+        id: resolve
+        if: github.ref == 'refs/heads/release/v3.0.1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Wait on a cheap Linux runner, not an occupied macOS runner.
+          # Standalone iPad pushes may not trigger the iPhone workflow.
+          for attempt in $(seq 1 80); do
+            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/launch-smoke.yml/runs?head_sha=$GITHUB_SHA&per_page=100" --jq '[.workflow_runs[] | select(.head_branch == env.GITHUB_REF_NAME and .head_sha == env.GITHUB_SHA and (.event == "push" or .event == "workflow_dispatch"))] | sort_by(.id) | last // empty')
+            if [ -z "$run" ]; then
+              if [ "$attempt" -ge 3 ]; then break; fi
+            else
+              id=$(jq -r '.id' <<< "$run")
+              artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts?per_page=100" --jq '[.artifacts[] | select(.name == "athlth-iphone-simulator-app" and .expired == false and .size_in_bytes > 0)] | length')
+              if [ "$artifact" = 1 ]; then
+                echo "run_id=$id" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              if [ "$(jq -r '.status' <<< "$run")" = completed ]; then break; fi
+            fi
+            sleep 60
+          done
+          echo "::notice::No shareable app available; run independent iPad build."
+
   ipad-smoke:
+    needs: resolve-smoke-app
     runs-on: xcode-27
     # Independent iPad build/launch check; no TestFlight upload.
     timeout-minutes: 60
@@ -99,14 +134,51 @@ jobs:
           brew install xcodegen
           brew install imagemagick
 
+      - name: Download exact-commit shared simulator app
+        if: needs.resolve-smoke-app.outputs.run-id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: athlth-iphone-simulator-app
+          path: ${{ runner.temp }}/athlth-smoke-package
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.resolve-smoke-app.outputs.run-id }}
+
+      - name: Verify universal simulator app
+        if: needs.resolve-smoke-app.outputs.run-id != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/athlth-smoke-package"
+          test "$(cat commit.txt)" = "$GITHUB_SHA"
+          shasum -a 256 -c SHA256SUMS
+          grep -qw "$(uname -m)" architectures.txt
+          mkdir -p "$RUNNER_TEMP/athlth-shared-app"
+          ditto -x -k ATHLTH.zip "$RUNNER_TEMP/athlth-shared-app"
+          APP="$RUNNER_TEMP/athlth-shared-app/ATHLTH.app"
+          test -x "$APP/ATHLTH"
+          python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert {1,2}.issubset(p["UIDeviceFamily"]), "Expected universal iPhone/iPad app"' "$APP/Info.plist"
+          echo "ATHLTH_IPAD_SMOKE_APP=$APP" >> "$GITHUB_ENV"
+
       - name: Optimize hero assets for runtime memory
+        if: needs.resolve-smoke-app.outputs.run-id == ''
         shell: bash
         run: bash scripts/optimize_hero_assets.sh
 
       - name: Embed RepDB offline exercise assets
+        if: needs.resolve-smoke-app.outputs.run-id == ''
         run: python3 scripts/prepare_repdb_offline.py
 
+      - name: Cache public SwiftPM repository objects
+        if: needs.resolve-smoke-app.outputs.run-id == ''
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ATHLTHSourcePackages/repositories
+          key: swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('project.yml', '**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Generate iPad smoke-test project
+        if: needs.resolve-smoke-app.outputs.run-id == ''
         shell: bash
         run: |
           set -euo pipefail
@@ -121,12 +193,14 @@ jobs:
           xcodegen generate --spec project-ipad-smoke.yml
 
       - name: Build simulator app
+        if: needs.resolve-smoke-app.outputs.run-id == ''
         shell: bash
         run: |
           set -euo pipefail
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
