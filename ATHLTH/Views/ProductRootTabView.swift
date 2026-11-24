@@ -615,6 +615,10 @@ struct ProductRootTabView: View {
         .background {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            GarminPersonalAccountBoundary()
+                .frame(width: 0, height: 0)
+            #endif
         }
         .overlay(alignment: .top) {
             VStack(spacing: 8) {
@@ -1299,6 +1303,10 @@ struct ATHLTHHomeView: View {
                             homeReadinessMetricText,
                         isActive: isActive
                     )
+
+                    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+                    AnyView(GarminPersonalLocalCard(surface: .home, isActive: isActive))
+                    #endif
 
                     HomeWeeklyProgressStrip(
                         plan: session.activePlan,

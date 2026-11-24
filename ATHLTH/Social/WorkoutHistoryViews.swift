@@ -186,6 +186,13 @@ struct WorkoutHistoryView: View {
             .pickerStyle(.segmented)
             .padding()
 
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            GarminPersonalHistoryEntry(
+                existing: workouts, startDate: startDate, endDate: endDate
+            )
+            .padding(.horizontal)
+            #endif
+
             if loading && workouts.isEmpty {
                 Spacer()
                 ProgressView(ATHLTHLocalization.choose(english: "Loading workout history…", norwegian: "Laster treningshistorikk…"))

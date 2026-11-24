@@ -1,0 +1,143 @@
+#if ATHLTH_GARMIN_PERSONAL && DEBUG
+import Foundation
+import SwiftUI
+
+/// Account-scoped, device-memory-only Garmin cache. Never inject this into
+/// HealthKitManager, social publishing, workout backups, analytics or Coach.
+@MainActor
+final class GarminPersonalLocalStore: ObservableObject {
+    static let shared = GarminPersonalLocalStore()
+    @Published private(set) var accountID: UUID?
+    @Published private(set) var connected = false
+    @Published private(set) var busy = false
+    @Published private(set) var message: String?
+    @Published private(set) var lastRefresh: Date?
+    @Published private var preview: GarminPersonalPreview?
+    private var generation = UUID()
+    private var job: Task<Void, Never>?
+    private var client: GarminPersonalClient?
+    private var lastAttempt: Date?
+
+    private init() {}
+
+    func activate(account: UUID?) {
+        guard account != accountID else { return }
+        reset()
+        accountID = account
+        if let account {
+            do { connected = try GarminPersonalKeychain.read(account) != nil }
+            catch { message = "Unable to access the local Keychain." }
+        }
+    }
+
+    func isConnected(to account: UUID) -> Bool {
+        accountID == account && connected
+    }
+
+    func snapshot(for account: UUID) -> GarminPersonalPreview? {
+        accountID == account && connected ? preview : nil
+    }
+
+    func connect(_ key: String, account: UUID) {
+        guard accountID == account, !busy else { return }
+        begin(account: account, key: key, replaceKey: true)
+    }
+
+    func refresh(account: UUID, force: Bool = false) {
+        guard accountID == account, !busy, connected else { return }
+        if !force, let lastAttempt, Date().timeIntervalSince(lastAttempt) < 300 { return }
+        do {
+            guard let key = try GarminPersonalKeychain.read(account) else {
+                reset()
+                return
+            }
+            begin(account: account, key: key, replaceKey: false)
+        } catch { message = "Unable to access the local Keychain." }
+    }
+
+    func disconnect(account: UUID) {
+        guard accountID == account else { return }
+        reset()
+        do {
+            try GarminPersonalKeychain.remove(account)
+            message = "Local key and cached Garmin data removed. Revoke the key at Garmin if needed."
+        } catch {
+            // Fail closed even if Keychain deletion failed.
+            message = "Local data cleared, but key removal failed. Retry disconnect or revoke at Garmin."
+        }
+    }
+
+    private func reset() {
+        generation = UUID()
+        job?.cancel()
+        client?.close()
+        job = nil
+        client = nil
+        connected = false
+        busy = false
+        preview = nil
+        lastAttempt = nil
+        lastRefresh = nil
+        message = nil
+    }
+
+    private func begin(account: UUID, key: String, replaceKey: Bool) {
+        generation = UUID()
+        let requestID = generation
+        let api = GarminPersonalClient()
+        client = api
+        busy = true
+        message = nil
+        lastAttempt = Date()
+        job = Task { @MainActor [weak self] in
+            defer { api.close() }
+            do {
+                let result = try await api.preview(key: key)
+                try Task.checkCancellation()
+                guard let self, self.accountID == account, self.generation == requestID else { return }
+                if replaceKey { try GarminPersonalKeychain.save(key, account: account) }
+                self.connected = true
+                self.preview = result
+                self.lastRefresh = Date()
+                self.message = "Garmin data refreshed locally."
+            } catch {
+                guard let self, self.accountID == account, self.generation == requestID,
+                      !Task.isCancelled else { return }
+                switch error {
+                case GarminPersonalClientError.unauthorized:
+                    self.preview = nil
+                    self.lastRefresh = nil
+                    self.message = "Garmin rejected access. Replace or revoke your key."
+                case GarminPersonalClientError.throttled:
+                    self.message = "Garmin rate limit reached. Try again later."
+                default:
+                    self.message = "Garmin refresh failed. Check your connection or key."
+                }
+            }
+            guard let self, self.accountID == account, self.generation == requestID else { return }
+            self.busy = false
+            self.client = nil
+            self.job = nil
+        }
+    }
+}
+
+/// Invalidate on sign-out/account switch; suspend the cached preview and in-flight
+/// work on lock/background. Only the explicitly saved, local key survives.
+@MainActor
+struct GarminPersonalAccountBoundary: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
+    private var account: UUID? {
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+            ? session.profile.userID : nil
+    }
+    var body: some View {
+        Color.clear
+            .onChange(of: account, initial: true) { _, account in
+                GarminPersonalLocalStore.shared.activate(account: account)
+            }
+            .onDisappear { GarminPersonalLocalStore.shared.activate(account: nil) }
+    }
+}
+#endif

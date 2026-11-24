@@ -229,6 +229,9 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            AnyView(GarminPersonalLocalCard(surface: .insights, isActive: isActive))
+            #endif
             ATHLTHInsightsDailyRhythmCard()
             ATHLTHInsightsMuscleCard(summary: muscleSummary)
             ATHLTHInsightsSleepStagesCard()

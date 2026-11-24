@@ -72,6 +72,8 @@ struct GarminPersonalPreview {
     let bodyBatteryHigh: Double?
     let bodyBatteryLow: Double?
     let unavailableSections: Int
+    let measurementDay: Date
+    let historyPossiblyTruncated: Bool
 }
 
 @MainActor
@@ -177,6 +179,7 @@ final class GarminPersonalClient {
         let day = formatter.string(from: today)
         let from = formatter.string(from: Calendar.current.date(byAdding: .day, value: -29, to: today) ?? today)
         var workouts: [String: GarminImportedActivity] = [:]
+        var possiblyTruncated = false
         // Bounded first import. No partial history is represented as complete.
         for offset in stride(from: 0, to: 500, by: 50) {
             try Task.checkCancellation()
@@ -190,6 +193,7 @@ final class GarminPersonalClient {
                 workouts[item.workout.id] = item
             }
             if rows.count < 50 { break }
+            if offset == 450 { possiblyTruncated = true }
         }
         var unavailable = 0
         func optional<T: Decodable>(_ type: T.Type, path: String,
@@ -222,7 +226,9 @@ final class GarminPersonalClient {
             sleepSeconds: sleep?.sleepTimeSeconds, restingHeartRate: heart?.restingHeartRate,
             overnightHRV: hrv?.hrvSummary?.lastNightAvg,
             averageStress: daily?.averageStressLevel, bodyBatteryHigh: daily?.bodyBatteryHighestValue,
-            bodyBatteryLow: daily?.bodyBatteryLowestValue, unavailableSections: unavailable)
+            bodyBatteryLow: daily?.bodyBatteryLowestValue, unavailableSections: unavailable,
+            measurementDay: Calendar.current.startOfDay(for: today),
+            historyPossiblyTruncated: possiblyTruncated)
     }
 }
 #endif
