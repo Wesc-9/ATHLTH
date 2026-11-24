@@ -203,6 +203,10 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var sending = false
     @State private var errorMessage: String?
     @State private var successful = false
+    @State private var didInitialize = false
+    @State private var showingDuelRules = false
+    @State private var showingParticipantChoices = false
+    @State private var groupStartMode: ATHLTHCompetitionStartMode = .manual
 
     private let ink = ATHLTHPlanDesign.ink
     private let bronze = ATHLTHPlanDesign.accentInk
@@ -214,6 +218,25 @@ struct ATHLTHCompetitionCreationView: View {
 
     private var selectedPeople: [SocialProfileCard] {
         social.mutualFollows.filter { chosenIDs.contains($0.userID) }
+    }
+
+    private var readyForRules: Bool {
+        !chosenIDs.contains(session.profile.userID) &&
+        chosenIDs.count >= ATHLTHCompetitionCreationPolicy.minOpponents(format) &&
+        chosenIDs.count <= (format == .duel ? 1 : 20) &&
+        selectedPeople.count == chosenIDs.count &&
+        (format != .duel || (startsAt >= Date().addingTimeInterval(-60) &&
+                             endsAt > startsAt &&
+                             endsAt > Date().addingTimeInterval(600))) &&
+        (format == .duel || groupStartMode != .scheduled ||
+         startsAt >= Date().addingTimeInterval(-60))
+    }
+
+    private var competitionAthletes: [ATHLTHTournamentParticipant] {
+        selectedPeople.map {
+            ATHLTHTournamentParticipant(id: $0.userID,
+                username: $0.username ?? $0.resolvedName)
+        }
     }
 
     private var effectiveStart: Date {
@@ -298,28 +321,16 @@ struct ATHLTHCompetitionCreationView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if advanced {
-                        ATHLTHWorkoutDetailsCard(
-                            activityTitle: initialActivity.title,
-                            symbol: initialActivity.symbol
-                        ) {
-                            Label(
-                                tr("Competition setup", "Konkurranseoppsett"),
-                                systemImage: "trophy"
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(bronze)
-                        }
+                    if showingDuelRules {
+                        competitionRules
                     } else {
-                        ATHLTHQuickStartSimpleDetailsCard(
-                            activity: initialActivity,
-                            summary: tr(
-                                "Choose how to compete",
-                                "Velg hvordan du vil konkurrere"
-                            )
-                        )
-                    }
-
+                        competitionDetails
+                        titleBlock(tr("Competition format", "Konkurranseform"))
+                        VStack(spacing: 9) {
+                            ForEach(ATHLTHCompetitionFormat.allCases) { option in
+                                formatOption(option)
+                            }
+                        }
                     if initialFormat == nil || initialFormat != .duel {
                         Button {
                             showingSavedCompetitionTemplates = true
@@ -344,31 +355,14 @@ struct ATHLTHCompetitionCreationView: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("athlth-competition-load-template")
                     }
-                    titleBlock(tr("Competition format", "Konkurranseform"))
-                    VStack(spacing: 9) {
-                        ForEach(ATHLTHCompetitionFormat.allCases) { option in
-                            formatOption(option)
+                        if initialActivity == .running && format == .duel && !advanced {
+                            sprintSection
                         }
-                    }
-
-                    if initialActivity == .running && format == .duel &&
-                       !advanced {
-                        sprintSection
-                    }
-                    if advanced {
-                        advancedIdentity
-                    } else {
-                        simpleIdentity
-                    }
-
-                    if !advanced {
-                        participantsCard
-                        simpleCompetitionRules
-                    } else if format == .duel {
-                        participantsCard
-                        competitionRules
-                    } else {
-                        leagueOrCupSetup
+                        if !advanced {
+                            simpleCompetitionRules
+                        } else if format == .league {
+                            leagueOrCupSetup
+                        }
                     }
 
                     if let errorMessage {
@@ -393,19 +387,24 @@ struct ATHLTHCompetitionCreationView: View {
             .scrollDismissesKeyboard(.interactively)
             .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(tr("Competition", "Konkurranse"))
+            .navigationTitle(showingDuelRules ? tr("Rules", "Regler") : tr("Competition", "Konkurranse"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel", "Avbryt")) { dismiss() }
+                    Button(showingDuelRules ? tr("Back", "Tilbake") : tr("Cancel", "Avbryt")) {
+                        if showingDuelRules { showingDuelRules = false }
+                        else { dismiss() }
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 0) {
                     Divider().opacity(0.32)
                     Button {
-                        if format == .duel || !advanced {
+                        if showingDuelRules || !advanced {
                             Task { await publish() }
+                        } else if format == .duel {
+                            showingDuelRules = true
                         } else {
                             showingExistingTournamentRules = true
                         }
@@ -414,7 +413,7 @@ struct ATHLTHCompetitionCreationView: View {
                             if sending { ProgressView().tint(.white) }
                             Text(sending
                                 ? tr("Creating…", "Oppretter…")
-                                : format == .duel || !advanced
+                                : showingDuelRules || !advanced
                                   ? tr("Create and invite", "Opprett og inviter")
                                   : tr("Continue to rules", "Fortsett til regler"))
                                 .font(.headline)
@@ -426,11 +425,11 @@ struct ATHLTHCompetitionCreationView: View {
                     }
                     .disabled(
                         sending || successful ||
-                        ((format == .duel || !advanced) && !isValid)
+                        ((showingDuelRules || !advanced) ? !isValid : !readyForRules)
                     )
                     .opacity(
                         !sending && !successful &&
-                        (advanced && format != .duel || isValid) ? 1 : 0.48
+                        ((showingDuelRules || !advanced) ? isValid : readyForRules) ? 1 : 0.48
                     )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
@@ -448,12 +447,7 @@ struct ATHLTHCompetitionCreationView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingSavedCompetitionTemplates,
-               onDismiss: {
-            if restoredCompetitionTemplate != nil {
-                showingExistingTournamentRules = true
-            }
-        }) {
+        .sheet(isPresented: $showingSavedCompetitionTemplates) {
             ATHLTHTournamentTemplatePicker { selected in
                 let fixedSport = ATHLTHCompetitionCreationPolicy
                     .tournamentActivity(initialActivity)
@@ -509,6 +503,8 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .presentationDetents([.large])
         .onAppear {
+            guard !didInitialize else { return }
+            didInitialize = true
             format = initialFormat ?? .duel
             scoring = ATHLTHCompetitionCreationPolicy.defaultScoring(
                 for: initialActivity
@@ -555,16 +551,14 @@ struct ATHLTHCompetitionCreationView: View {
         Button {
             format = option
             if option == .duel && chosenIDs.count > 1 {
-                chosenIDs = Set(chosenIDs.sorted {
-                    $0.uuidString < $1.uuidString
-                }.prefix(1))
+                if let friend = preselectedFriend, chosenIDs.contains(friend.userID) {
+                    chosenIDs = [friend.userID]
+                } else {
+                    chosenIDs = Set(chosenIDs.sorted { $0.uuidString < $1.uuidString }.prefix(1))
+                }
             }
-            if competitionTitle.isEmpty ||
-                competitionTitle.hasPrefix("Duell ·") ||
-                competitionTitle.hasPrefix("Liga ·") ||
-                competitionTitle.hasPrefix("Cup ·") {
-                competitionTitle = "\(option.title) · \(initialActivity.title)"
-            }
+            competitionTitle = "\(option.title) · \(initialActivity.title)"
+            restoredCompetitionTemplate = nil
             errorMessage = nil
         } label: {
             HStack(spacing: 13) {
@@ -687,39 +681,56 @@ struct ATHLTHCompetitionCreationView: View {
         }
     }
 
-    private var simpleIdentity: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            titleBlock(tr("Name", "Navn"))
-            TextField(tr("Name the competition", "Gi konkurransen et navn"),
-                      text: $competitionTitle)
+    private var competitionDetails: some View {
+        ATHLTHWorkoutDetailsCard(
+            activityTitle: initialActivity.title,
+            symbol: initialActivity.symbol,
+            showsTimingLabel: false
+        ) {
+            Label(format.title, systemImage: format.symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(bronze)
+            Divider()
+            if advanced && format == .duel {
+                DatePicker(tr("From", "Fra"), selection: $startsAt,
+                           in: Date().addingTimeInterval(-60)...,
+                           displayedComponents: [.date, .hourAndMinute])
+                    .font(.subheadline)
+                DatePicker(tr("To", "Til"), selection: $endsAt,
+                           in: startsAt.addingTimeInterval(60)...,
+                           displayedComponents: [.date, .hourAndMinute])
+                    .font(.subheadline)
+            } else if advanced {
+                Picker(tr("Start", "Start"), selection: $groupStartMode) {
+                    ForEach(ATHLTHCompetitionStartMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
                 .font(.subheadline)
-                .padding(15)
-                .background(.white, in: RoundedRectangle(cornerRadius: 15))
-                .accessibilityIdentifier("athlth-competition-name")
-        }
-    }
-
-    /// The advanced identity card reuses the same workout-header principle
-    /// as Advanced Quick Train, but its fields belong to the competition.
-    private var advancedIdentity: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            titleBlock(tr("Competition details", "Konkurransedetaljer"))
-            TextField(tr("Name", "Navn"), text: $competitionTitle)
-                .textInputAutocapitalization(.sentences)
-                .padding(14)
-                .background(.white, in: RoundedRectangle(cornerRadius: 14))
-                .accessibilityIdentifier("athlth-competition-name")
-            HStack {
-                Label(initialActivity.title, systemImage: initialActivity.symbol)
-                Spacer()
-                Label(format.title, systemImage: format.symbol)
+                .pickerStyle(.menu)
+                if groupStartMode == .scheduled {
+                    DatePicker(tr("Date and time", "Dato og klokkeslett"),
+                               selection: $startsAt, in: Date().addingTimeInterval(-60)...,
+                               displayedComponents: [.date, .hourAndMinute])
+                        .font(.subheadline)
+                }
+            } else {
+                Toggle(tr("Set start date", "Velg startdato"), isOn: $simpleStartLater)
+                    .font(.subheadline)
+                    .tint(bronze)
+                if simpleStartLater {
+                    DatePicker(tr("Starts", "Starter"), selection: $startsAt,
+                               in: Date().addingTimeInterval(-60)...,
+                               displayedComponents: [.date, .hourAndMinute])
+                        .font(.subheadline)
+                }
             }
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(bronze)
+            Divider()
+            participantsCard
         }
-        .padding(15)
-        .background(ATHLTHPlanDesign.selectedSurface,
-                    in: RoundedRectangle(cornerRadius: 20))
+        .onChange(of: startsAt) { _, value in
+            if endsAt <= value { endsAt = value.addingTimeInterval(7 * 86_400) }
+        }
     }
 
     /// Keep the existing, tested tournament editor for the advanced
@@ -766,92 +777,85 @@ struct ATHLTHCompetitionCreationView: View {
                     )
                 }
             }
-            Label(
-                tr("Reuse the complete advanced rule editor",
-                   "Bruk hele den eksisterende avanserte regelredigeringen"),
-                systemImage: "slider.horizontal.3"
-            )
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(bronze)
-            Text(tr(
-                "Set rules authority, exercise selection, voting, round cadence, deadlines, evidence, practice rounds and invites in the next step.",
-                "Velg regelmyndighet, øvelser, avstemning, runder, frister, godkjenning, oppvarmingsrunder og invitasjoner i neste steg."
-            ))
-            .font(.caption)
-            .foregroundStyle(muted)
-            Text(tr(
-                "Seasons are available for leagues and cups, not duels.",
-                "Liga og cup kan videreføres i nye sesonger. Duell har ikke sesonger."
-            ))
-            .font(.caption)
-            .foregroundStyle(muted)
         }
         .padding(15)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var participantsCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                titleBlock(tr("Participants", "Deltakere"))
+                Text(tr("Participants", "Deltakere"))
+                    .font(.subheadline.weight(.semibold))
                 Spacer()
                 Text("\(chosenIDs.count)/\(format == .duel ? 1 : 20)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(bronze)
             }
-            Text(format == .duel
-                ? tr("Choose one mutual friend.", "Velg én venn dere følger gjensidig.")
-                : tr("Invite mutual friends. Everyone must accept.",
-                     "Inviter venner dere følger gjensidig. Alle må godta."))
-                .font(.caption)
-                .foregroundStyle(muted)
-            if social.mutualFollows.isEmpty {
-                Text(tr("No mutual friends found yet.",
-                        "Ingen gjensidige venner funnet ennå."))
-                    .font(.subheadline)
-                    .foregroundStyle(muted)
-            } else {
+            ForEach(selectedPeople, id: \.userID) { friend in
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle().fill(ATHLTHPlanDesign.selectedSurface).frame(width: 36, height: 36)
+                        Text(String(friend.resolvedName.prefix(1)).uppercased())
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(bronze)
+                    }
+                    Text(friend.resolvedName).font(.subheadline.weight(.medium))
+                    Spacer()
+                    Button {
+                        chosenIDs.remove(friend.userID)
+                    } label: {
+                        Image(systemName: "xmark.circle").foregroundStyle(bronze)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Remove", "Fjern") + " " + friend.resolvedName)
+                }
+            }
+            Button {
+                showingParticipantChoices.toggle()
+            } label: {
+                Label(format == .duel && !chosenIDs.isEmpty
+                      ? tr("Change opponent", "Bytt motstander") : tr("Add friends", "Legg til venner"),
+                      systemImage: showingParticipantChoices ? "chevron.up" : "plus.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            if showingParticipantChoices {
                 ForEach(social.mutualFollows.filter {
-                    $0.userID != session.profile.userID
+                    $0.userID != session.profile.userID && !chosenIDs.contains($0.userID)
                 }, id: \.userID) { friend in
                     Button {
-                        if chosenIDs.contains(friend.userID) {
-                            chosenIDs.remove(friend.userID)
-                        } else if format == .duel {
+                        if format == .duel {
                             chosenIDs = [friend.userID]
+                            showingParticipantChoices = false
                         } else if chosenIDs.count < 20 {
                             chosenIDs.insert(friend.userID)
                         }
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "person.crop.circle")
-                                .foregroundStyle(bronze)
-                            Text(friend.resolvedName)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(ink)
+                        HStack {
+                            Text(friend.resolvedName).font(.subheadline)
                             Spacer()
-                            Image(systemName: chosenIDs.contains(friend.userID)
-                                  ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(bronze)
+                            Image(systemName: "plus.circle").foregroundStyle(bronze)
                         }
-                        .padding(12)
-                        .frame(minHeight: 46)
-                        .background(chosenIDs.contains(friend.userID)
-                            ? ATHLTHPlanDesign.selectedSurface : Color.white,
-                            in: RoundedRectangle(cornerRadius: 13))
+                        .padding(10)
+                        .frame(minHeight: 44)
+                        .background(ATHLTHPlanDesign.canvas, in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                 }
+                if social.mutualFollows.isEmpty {
+                    Text(tr("No mutual friends found yet.", "Ingen gjensidige venner funnet ennå."))
+                        .font(.caption).foregroundStyle(muted)
+                }
             }
-            Text(tr(
-                "Minimum: \(ATHLTHCompetitionCreationPolicy.minOpponents(format)) opponent(s).",
-                "Minst \(ATHLTHCompetitionCreationPolicy.minOpponents(format)) motstander(e)."
-            ))
-            .font(.caption)
-            .foregroundStyle(muted)
+            if chosenIDs.count < ATHLTHCompetitionCreationPolicy.minOpponents(format) {
+                Text(tr("Minimum opponents: ", "Minst antall motstandere: ") +
+                     String(ATHLTHCompetitionCreationPolicy.minOpponents(format)))
+                    .font(.caption).foregroundStyle(muted)
+            }
         }
-        .padding(15)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     /// Basic does not open the Advanced tournament wizard. Three choices:
@@ -892,19 +896,6 @@ struct ATHLTHCompetitionCreationView: View {
             .padding(13)
             .background(ATHLTHPlanDesign.selectedSurface,
                         in: RoundedRectangle(cornerRadius: 15))
-            Toggle(tr("Set start date", "Velg startdato"),
-                   isOn: $simpleStartLater)
-                .font(.subheadline)
-                .tint(bronze)
-            if simpleStartLater {
-                DatePicker(
-                    tr("Starts", "Starter"),
-                    selection: $startsAt,
-                    in: Date()...,
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-                .font(.subheadline)
-            }
             Label("Svarfrist for invitasjoner: 3 dager",
                   systemImage: "clock")
                 .font(.caption)
@@ -966,7 +957,8 @@ struct ATHLTHCompetitionCreationView: View {
                             .foregroundStyle(muted)
                     }
                 }
-                if scoring == .fastestDistance {
+                if scoring == .fastestDistance &&
+                    (!advanced || duelRaceSettings.race.discipline == .workout) {
                     HStack {
                         Text(tr("Distance", "Distanse"))
                         Spacer()
@@ -978,7 +970,8 @@ struct ATHLTHCompetitionCreationView: View {
                         Text("km")
                     }
                     .font(.subheadline)
-                } else if scoring == .farthestInTime {
+                } else if scoring == .farthestInTime &&
+                    (!advanced || duelRaceSettings.race.discipline == .workout) {
                     Stepper(
                         tr("Time: \(Int(durationMinutes)) min",
                            "Tid: \(Int(durationMinutes)) min"),
@@ -1012,14 +1005,6 @@ struct ATHLTHCompetitionCreationView: View {
                 Text("Invitasjonen utløper automatisk hvis den ikke besvares.")
                     .font(.caption)
                     .foregroundStyle(muted)
-                DatePicker(tr("Competition starts", "Konkurransen starter"),
-                           selection: $startsAt, in: Date()...,
-                           displayedComponents: [.date, .hourAndMinute])
-                    .font(.subheadline)
-                DatePicker(tr("Competition ends", "Konkurransen avsluttes"),
-                           selection: $endsAt, in: Date().addingTimeInterval(600)...,
-                           displayedComponents: [.date, .hourAndMinute])
-                    .font(.subheadline)
             } else {
                 Label(
                     tr("One round every \(roundsPerWeek) day(s) · \(reviewHours) hours to submit",
