@@ -2945,7 +2945,37 @@ struct ATHLTHWorkoutLiveActivity: Widget {
 }
 
 
-/// A single custom-drawn face, legible even in the compact Island region.
+/// The original capsule-shaped eyes are the character. There is no
+/// surrounding face, badge, background disc or decorative accessory.
+private struct ATHLTHAliveEye: View {
+    let expression: ATHLTHAliveExpression
+    let leading: Bool
+    var scale: CGFloat = 1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isLuminanceReduced) private var reducedLuminance
+
+    private var eyeHeight: CGFloat {
+        switch expression {
+        case .awake: 9
+        case .hello: 11
+        case .wink: leading ? 2 : 9
+        case .excited: 11
+        }
+    }
+
+    var body: some View {
+        Capsule()
+            .fill(.white)
+            .frame(width: 4 * scale, height: eyeHeight * scale)
+            .frame(width: 4 * scale, height: 11 * scale)
+            .animation(reduceMotion || reducedLuminance ? nil : .easeInOut(duration: 0.35),
+                       value: expression)
+            .accessibilityHidden(true)
+    }
+}
+
+/// A mouth appears only during greetings and happy reactions, and only
+/// on surfaces with enough room to keep the original eyes readable.
 private struct ATHLTHAliveMouth: Shape {
     var happiness: CGFloat
 
@@ -2956,10 +2986,10 @@ private struct ATHLTHAliveMouth: Shape {
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        path.move(to: CGPoint(x: rect.width * 0.23, y: rect.height * 0.30))
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.2))
         path.addQuadCurve(
-            to: CGPoint(x: rect.width * 0.77, y: rect.height * 0.30),
-            control: CGPoint(x: rect.midX, y: rect.height * happiness)
+            to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.2),
+            control: CGPoint(x: rect.midX, y: rect.minY + rect.height * happiness)
         )
         return path
     }
@@ -2967,40 +2997,32 @@ private struct ATHLTHAliveMouth: Shape {
 
 private struct ATHLTHAliveFace: View {
     let expression: ATHLTHAliveExpression
-    let size: CGFloat
+    var scale: CGFloat = 1
+    var allowsMouth = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isLuminanceReduced) private var reducedLuminance
 
-    private var reacting: Bool { expression != .awake }
-    private var accent: Color {
-        reacting ? Color(red: 0.92, green: 0.78, blue: 0.53) : .white
+    private var showsMouth: Bool {
+        allowsMouth && (expression == .hello || expression == .excited)
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .strokeBorder(accent.opacity(reacting ? 0.95 : 0.72), lineWidth: size * 0.065)
-            VStack(spacing: size * 0.025) {
-                HStack(spacing: size * 0.20) {
-                    Capsule()
-                        .fill(accent)
-                        .frame(width: size * 0.105,
-                               height: expression == .wink ? size * 0.055 : size * 0.22)
-                    Capsule()
-                        .fill(accent)
-                        .frame(width: size * 0.105, height: size * 0.22)
-                }
-                .frame(height: size * 0.22)
-                ATHLTHAliveMouth(happiness: expression == .excited ? 1.10 : 0.82)
-                    .stroke(accent, style: StrokeStyle(lineWidth: size * 0.075, lineCap: .round))
-                    .frame(width: size * 0.67, height: size * 0.24)
+        VStack(spacing: 2.5 * scale) {
+            HStack(spacing: 3 * scale) {
+                ATHLTHAliveEye(expression: expression, leading: true, scale: scale)
+                ATHLTHAliveEye(expression: expression, leading: false, scale: scale)
             }
-            .offset(y: size * 0.055)
+            if allowsMouth {
+                ATHLTHAliveMouth(happiness: expression == .excited ? 1.35 : 0.95)
+                    .stroke(.white, style: StrokeStyle(lineWidth: 1.3 * scale, lineCap: .round))
+                    .frame(width: 6.5 * scale, height: 3 * scale)
+                    .opacity(showsMouth ? 1 : 0)
+                    .accessibilityHidden(true)
+            }
         }
-        .frame(width: size, height: size)
-        .scaleEffect(expression == .excited ? 1.06 : 1)
-        .animation(reduceMotion || reducedLuminance ? nil : .easeInOut(duration: 0.40),
+        .animation(reduceMotion || reducedLuminance ? nil : .easeInOut(duration: 0.35),
                    value: expression)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("ATHLTH Alive")
     }
 }
@@ -3008,40 +3030,24 @@ private struct ATHLTHAliveFace: View {
 private struct ATHLTHAliveActivityCard: View {
     let expression: ATHLTHAliveExpression
     @Environment(\.activityFamily) private var family
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var caption: LocalizedStringKey {
-        switch expression {
-        case .awake: "ATHLTH Alive"
-        case .hello: "Hello!"
-        case .wink: "Ready"
-        case .excited: "Welcome back!"
-        }
-    }
 
     var body: some View {
-        HStack(spacing: family == .small ? 10 : 14) {
-            ATHLTHAliveFace(expression: expression, size: family == .small ? 37 : 43)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("ATHLTH")
-                    .font(.caption2.weight(.semibold))
-                    .tracking(1.4)
-                    .foregroundStyle(.white.opacity(0.70))
-                Text(caption)
-                    .font(.caption.weight(.semibold))
-                    .contentTransition(.opacity)
-            }
+        HStack(spacing: 12) {
+            ATHLTHAliveFace(expression: expression, scale: family == .small ? 2 : 2.3)
+            Text("ATHLTH")
+                .font(.caption.weight(.medium))
+                .tracking(1.1)
             Spacer(minLength: 0)
         }
         .foregroundStyle(.white)
         .padding(family == .small ? 8 : 12)
         .activityBackgroundTint(.black)
         .activitySystemActionForegroundColor(.white)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: expression)
     }
 }
 
-/// ActivityKit controls the camera cutout and update animation timing.
+/// Preserve one eye on each side of the physical Dynamic Island cutout.
+/// A full face is possible only in the expanded, minimal and card regions.
 struct ATHLTHAliveLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ATHLTHAliveActivityAttributes.self) { context in
@@ -3049,7 +3055,7 @@ struct ATHLTHAliveLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {
-                    ATHLTHAliveFace(expression: context.state.face, size: 37)
+                    ATHLTHAliveFace(expression: context.state.face, scale: 2.5)
                         .padding(3)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -3058,16 +3064,11 @@ struct ATHLTHAliveLiveActivity: Widget {
                         .foregroundStyle(.white.opacity(0.85))
                 }
             } compactLeading: {
-                ATHLTHAliveFace(expression: context.state.face, size: 19)
-                    .padding(.vertical, 2)
+                ATHLTHAliveEye(expression: context.state.face, leading: true)
             } compactTrailing: {
-                Image(systemName: context.state.face == .awake ? "circle.fill" : "sparkle")
-                    .font(.system(size: context.state.face == .awake ? 5 : 12, weight: .medium))
-                    .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.53))
-                    .contentTransition(.symbolEffect(.replace))
-                    .accessibilityHidden(true)
+                ATHLTHAliveEye(expression: context.state.face, leading: false)
             } minimal: {
-                ATHLTHAliveFace(expression: context.state.face, size: 20)
+                ATHLTHAliveFace(expression: context.state.face, allowsMouth: false)
             }
         }
         .supplementalActivityFamilies([.small])
