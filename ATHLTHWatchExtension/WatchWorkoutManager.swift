@@ -5623,6 +5623,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 (currentStructuredRunningStep?.targetHeartRatePercentMin == nil ||
                  currentStructuredRunningStep?.targetHeartRatePercentMax == nil)
         )
+        let adaptiveReadout = currentStructuredRunningStep.map {
+            ATHLTHRunIntervalReadout.resolve(
+                step: $0, elapsedSeconds: currentStructuredStepElapsedTime,
+                distanceMeters: currentStructuredStepDistanceMeters
+            )
+        }
         if let message = adaptiveCoachState.nextCue(
             settings: settings,
             elapsed: elapsedTime,
@@ -5640,6 +5646,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 ? target?.heartRateMaximumBPM : nil,
             stepIndex: currentStructuredRunningStep == nil ? nil : structuredStepIndex,
             stepPhase: awaitingMainStart ? "warmup" : currentStructuredRunningStep?.phase,
+            stepRemainingSeconds: adaptiveReadout?.unit == .seconds ? adaptiveReadout?.remaining : nil,
             reliableNotClimbing: usesOutdoorGPS &&
                 smartCoachState.isReliablyNotClimbing,
             norwegian: norwegian

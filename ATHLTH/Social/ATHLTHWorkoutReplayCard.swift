@@ -818,7 +818,8 @@ struct ATHLTHWorkoutReplayCard: View {
                     english: "Review the next comparable planned workout. Keep my goal and suggest only a justified change, if any.",
                     norwegian: "Vurder neste sammenlignbare planlagte økt. Behold målet mitt og foreslå kun en begrunnet endring dersom det er nødvendig."),
                 planID: session.activePlan?.id,
-                workoutEvidence: completedWorkoutEvidence
+                workoutEvidence: completedWorkoutEvidence,
+                evidenceOwnerID: session.profile.userID
             )
         }
         .sheet(isPresented: $showingDataReview.keepingPresentedWhenInactive(scenePhase)) {

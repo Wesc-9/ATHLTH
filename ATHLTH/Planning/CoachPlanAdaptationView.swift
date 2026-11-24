@@ -13,16 +13,20 @@ struct CoachPlanAdaptationView: View {
     @State private var appliedRecordID: UUID?
     private let requestedPlanID: UUID?
     private let workoutEvidence: String?
+    private let evidenceOwnerID: UUID?
     @State private var includeWorkoutEvidence = false
 
-    init(initialNotes: String = "", planID: UUID? = nil, workoutEvidence: String? = nil) {
+    init(initialNotes: String = "", planID: UUID? = nil, workoutEvidence: String? = nil,
+         evidenceOwnerID: UUID? = nil) {
         _userNotes = State(initialValue: initialNotes)
         self.requestedPlanID = planID
         self.workoutEvidence = workoutEvidence
+        self.evidenceOwnerID = evidenceOwnerID
     }
 
     private var canIncludeWorkoutEvidence: Bool {
-        session.signedIn && CoachHistoryPermission.isEnabled(userID: session.profile.userID)
+        session.signedIn && evidenceOwnerID == session.profile.userID &&
+            CoachHistoryPermission.isEnabled(userID: session.profile.userID)
     }
 
     private let service = CoachPlanAdaptationService()
@@ -266,7 +270,7 @@ struct CoachPlanAdaptationView: View {
                     )
                 }
 
-            if let workoutEvidence {
+            if let workoutEvidence, evidenceOwnerID == session.profile.userID, session.signedIn {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(ATHLTHLocalization.choose(english: "Completed workout evidence", norwegian: "Resultater fra gjennomført økt"),
                           systemImage: "chart.bar.xaxis")
