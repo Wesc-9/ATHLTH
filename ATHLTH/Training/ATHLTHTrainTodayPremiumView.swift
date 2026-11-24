@@ -550,212 +550,60 @@ struct ATHLTHTrainTodayPremiumView: View {
         _ workout: PlannedSession, plan: TrainingPlan
     ) -> some View {
         let finished = completedIDs.contains(workout.id)
-        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-        let exerciseCount = Set(blocks.filter { $0.kind == .exercise }
-            .map { $0.exerciseSlug ?? $0.title }).count
-        let pauseCount = blocks.expandedForExecution()
-            .filter { $0.kind == .rest }.count
-
+        let healthCompleted = healthCompletedIDs.contains(workout.id)
+        let canStart = !finished && !hasActiveWorkout
         return VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 11) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 14) {
-                        workoutTextAndStart(
-                            workout, finished: finished,
-                            exerciseCount: exerciseCount, pauseCount: pauseCount
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        workoutPortrait(workout)
-                            .frame(width: 100, height: 148)
-                    }
-                    .frame(minWidth: 313)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        workoutPortrait(workout)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 124)
-                        workoutTextAndStart(
-                            workout, finished: finished,
-                            exerciseCount: exerciseCount, pauseCount: pauseCount
-                        )
-                    }
+            ATHLTHTodayCompactCard(
+                eyebrow: tr("TODAY'S WORKOUT", "DAGENS ØKT"),
+                title: workout.title,
+                detail: [workout.kind.title, workout.durationMinutes.map { "\($0) min" }]
+                    .compactMap { $0 }.joined(separator: " · "),
+                symbol: finished ? "checkmark.circle.fill" : workout.kind.systemImage,
+                actionTitle: canStart ? tr("Start workout", "Start økt") : tr("View workout", "Se økten"),
+                action: {
+                    if canStart { onStartWorkout(workout, healthCompleted) }
+                    else { onWorkoutDetails(workout, healthCompleted) }
                 }
-
-                HStack(spacing: 8) {
-                    Button {
-                        onWorkoutDetails(workout, healthCompletedIDs.contains(workout.id))
-                    } label: {
-                        Label(tr("View workout details", "Se øktdetaljer"),
-                              systemImage: "list.bullet")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(champagne)
-                            .frame(minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer(minLength: 0)
-
-                    Menu {
-                        Button {
-                            onWorkoutDetails(workout, healthCompletedIDs.contains(workout.id))
-                        } label: {
-                            Label(tr("Workout details", "Øktdetaljer"),
-                                  systemImage: "list.bullet")
-                        }
-                        Button(action: onOpenPlan) {
-                            Label(tr("Open training plan", "Åpne treningsplan"),
-                                  systemImage: "calendar")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.headline)
-                            .foregroundStyle(ink)
-                            .frame(width: 44, height: 44)
-                            .background(ATHLTHTrainDesign.paleGold.opacity(0.35),
-                                        in: Circle())
-                    }
-                    .accessibilityLabel(tr("Workout options", "Flere valg for økten"))
-                }
-            }
-            .padding(13)
-            .background(
-                Color.white.opacity(0.96),
-                in: RoundedRectangle(cornerRadius: 23, style: .continuous)
             )
-            .overlay {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
-                    .strokeBorder(hairline.opacity(0.5), lineWidth: 0.7)
-                    .allowsHitTesting(false)
-            }
-
-            if workout.dailyAlternativeOriginal != nil {
-                undoAlternativeRow(workout)
-            } else if !finished && !hasActiveWorkout,
-                      let suggestion = ATHLTHDailyWorkoutAlternativeAdvisor
-                        .suggestions(for: workout, signals: selfReportedSignals).first {
-                alternativeRecommendationCard(for: workout, suggestion: suggestion)
-            }
-        }
-    }
-
-    private func workoutPortrait(_ workout: PlannedSession) -> some View {
-        GeometryReader { geometry in
-            Image(workoutImage(for: workout.kind))
-                .resizable()
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .accessibilityHidden(true)
-        }
-    }
-
-    private func workoutTextAndStart(
-        _ workout: PlannedSession,
-        finished: Bool,
-        exerciseCount: Int,
-        pauseCount: Int
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(tr("TODAY'S WORKOUT", "DAGENS ØKT"))
-                .font(.caption2.weight(.semibold))
-                .tracking(1.7)
-                .foregroundStyle(champagne)
-
-            Text(workout.title)
-                .font(.system(.title2, design: .serif).weight(.semibold))
-                .foregroundStyle(ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(3)
-
-            let facts = [
-                workout.durationMinutes.map { "\($0) min" },
-                exerciseCount > 0
-                    ? "\(exerciseCount) " + tr("exercises", "øvelser") : nil,
-                pauseCount > 0
-                    ? "\(pauseCount) " + tr("rests", "pauser") : nil
-            ].compactMap { $0 }
-            Text(facts.isEmpty ? workout.kind.title : facts.joined(separator: " · "))
-                .font(.caption)
-                .foregroundStyle(muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(3)
-
-            Spacer(minLength: 4)
-
-            Button {
-                if finished || hasActiveWorkout {
-                    onWorkoutDetails(workout, healthCompletedIDs.contains(workout.id))
-                } else {
-                    onStartWorkout(workout, healthCompletedIDs.contains(workout.id))
-                }
-            } label: {
-                Label(
-                    finished ? tr("View workout", "Se økten")
-                        : hasActiveWorkout ? tr("Workout details", "Øktdetaljer")
-                        : tr("Start workout", "Start økt"),
-                    systemImage: finished || hasActiveWorkout
-                        ? "arrow.up.right" : "play.fill"
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 51)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.73, green: 0.57, blue: 0.31),
-                            Color(red: 0.57, green: 0.40, blue: 0.22)
-                        ],
-                        startPoint: .leading, endPoint: .trailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(tr(
-                "Tap to open the workout start flow, or hold for more start options.",
-                "Trykk for å åpne oppstarten, eller hold inne for flere startvalg."
-            ))
             .contextMenu {
-                if !finished && !hasActiveWorkout {
-                    Button {
-                        onStartWorkout(workout, healthCompletedIDs.contains(workout.id))
-                    } label: {
-                        Label(tr("Start now", "Start nå"), systemImage: "play.fill")
+                Button(tr("Workout details", "Øktdetaljer")) {
+                    onWorkoutDetails(workout, healthCompleted)
+                }
+                Button(tr("Open training plan", "Åpne treningsplan"), action: onOpenPlan)
+                if canStart {
+                    Button(tr("Start now", "Start nå")) { onStartWorkout(workout, healthCompleted) }
+                    ForEach([30, 60, 300, 600], id: \.self) { seconds in
+                        Button(seconds == 30 ? tr("30 seconds", "30 sekunder")
+                            : tr("\(seconds / 60) minutes", "\(seconds / 60) minutter")) {
+                            onDelayWorkout(workout, TimeInterval(seconds))
+                        }
                     }
-                    Menu {
-                        ForEach([30, 60, 300, 600], id: \.self) { seconds in
-                            Button {
-                                onDelayWorkout(workout, TimeInterval(seconds))
-                            } label: {
-                                Text(seconds < 60 ? tr("30 seconds", "30 sekunder")
-                                    : tr("\(seconds / 60) minutes",
-                                         "\(seconds / 60) minutter"))
-                            }
-                        }
-                        Button {
-                            customDelayMinutes = 2
-                            customDelayWorkout = workout
-                        } label: {
-                            Label(tr("Choose duration…", "Velg tid …"),
-                                  systemImage: "clock")
-                        }
-                    } label: {
-                        Label(tr("Start later", "Start om X tid"), systemImage: "clock")
+                    Button(tr("Choose duration…", "Velg tid …")) {
+                        customDelayMinutes = 2
+                        customDelayWorkout = workout
                     }
                     if [.running, .walking, .strength].contains(workout.kind) {
-                        Button {
+                        Button(tr("Send to Apple Watch", "Send til Apple Watch")) {
                             onSendWorkoutToWatch(workout)
-                        } label: {
-                            Label(tr("Send to Apple Watch", "Send til Apple Watch"),
-                                  systemImage: "applewatch")
                         }
                     }
                 }
             }
+            Button(tr("View workout details", "Se øktdetaljer")) {
+                onWorkoutDetails(workout, healthCompleted)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(champagne)
+            if workout.dailyAlternativeOriginal != nil {
+                ATHLTHTrainDeferredContent { AnyView(undoAlternativeRow(workout)) }
+            } else if canStart,
+                      let suggestion = ATHLTHDailyWorkoutAlternativeAdvisor
+                        .suggestions(for: workout, signals: selfReportedSignals).first {
+                ATHLTHTrainDeferredContent {
+                    AnyView(alternativeRecommendationCard(for: workout, suggestion: suggestion))
+                }
+            }
         }
-        .frame(minHeight: 148, alignment: .topLeading)
     }
 
     /// Keep every scheduled session reachable even while the recorder owns
@@ -2165,5 +2013,48 @@ enum TrainTodayOverviewPolicy {
             return age >= 0 && age <= 48 * 3600
         }
         return fresh ? readiness : nil
+    }
+}
+
+
+/// Small value-only presentation shared by Today status cards.
+struct ATHLTHTodayCompactCard: View {
+    let eyebrow: String
+    let title: String
+    let detail: String
+    let symbol: String
+    let actionTitle: String
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(eyebrow)
+                .font(.caption2.weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 42, height: 42)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.system(.title2, design: .serif))
+                    Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            Button(action: action) {
+                Text(actionTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color(red: 0.57, green: 0.40, blue: 0.22),
+                                in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .athlthTrainPaper(emphasized: true)
     }
 }
