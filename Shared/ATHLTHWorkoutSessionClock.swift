@@ -7,6 +7,17 @@ import Foundation
 /// the UI can always reconstruct the exact same elapsed time after a lock,
 /// process suspension, Watch handoff or account-scoped checkpoint restore.
 enum ATHLTHWorkoutSessionClock {
+    static func finiteInterval(from start: Date, to end: Date) -> TimeInterval? {
+        guard start.timeIntervalSince1970.isFinite,
+              end.timeIntervalSince1970.isFinite else { return nil }
+        let interval = end.timeIntervalSince(start)
+        return interval.isFinite ? interval : nil
+    }
+
+    private static func activeInterval(from start: Date, to end: Date) -> TimeInterval {
+        max(finiteInterval(from: start, to: end) ?? 0, 0)
+    }
+
     /// Time accumulated before the last resume plus the active interval.
     /// A paused workout has no resumedAt and therefore cannot advance.
     static func elapsed(
@@ -16,9 +27,8 @@ enum ATHLTHWorkoutSessionClock {
     ) -> TimeInterval {
         let stored = activeBeforeResume.isFinite
             ? max(activeBeforeResume, 0) : 0
-        return stored + (resumedAt.map {
-            max(date.timeIntervalSince($0), 0)
-        } ?? 0)
+        let total = stored + (resumedAt.map { activeInterval(from: $0, to: date) } ?? 0)
+        return total.isFinite ? total : stored
     }
 
     /// Date-based work clock, excluding explicit pauses. Rest between
@@ -31,7 +41,7 @@ enum ATHLTHWorkoutSessionClock {
     ) -> TimeInterval {
         let ignored = excludedPauseSeconds.isFinite
             ? max(excludedPauseSeconds, 0) : 0
-        return max((pausedAt ?? date).timeIntervalSince(startedAt) - ignored, 0)
+        return max(activeInterval(from: startedAt, to: pausedAt ?? date) - ignored, 0)
     }
 
     /// Countdown state persists the amount left at pause and its resume date.
@@ -41,8 +51,8 @@ enum ATHLTHWorkoutSessionClock {
         resumedAt: Date?,
         at date: Date
     ) -> TimeInterval {
-        secondsAtPause - (resumedAt.map {
-            max(date.timeIntervalSince($0), 0)
-        } ?? 0)
+        let stored = secondsAtPause.isFinite ? secondsAtPause : 0
+        let remaining = stored - (resumedAt.map { activeInterval(from: $0, to: date) } ?? 0)
+        return remaining.isFinite ? remaining : stored
     }
 }

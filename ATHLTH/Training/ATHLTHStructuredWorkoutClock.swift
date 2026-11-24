@@ -15,13 +15,13 @@ enum ATHLTHStructuredWorkoutClock {
         guard start.timeIntervalSince1970.isFinite,
               pausedSeconds.isFinite, pausedSeconds >= 0,
               let effective = at(now, pause: pause) else { return nil }
-        let wall = effective.timeIntervalSince(start)
-        guard wall >= 0, pausedSeconds <= wall else { return nil }
+        guard let wall = ATHLTHWorkoutSessionClock.finiteInterval(from: start, to: effective),
+              wall >= 0, pausedSeconds <= wall else { return nil }
         return wall - pausedSeconds
     }
 
     static func resumeOffset(from pause: Date, at now: Date) -> TimeInterval? {
         guard at(now, pause: pause) != nil else { return nil }
-        return now.timeIntervalSince(pause)
+        return ATHLTHWorkoutSessionClock.finiteInterval(from: pause, to: now)
     }
 }
