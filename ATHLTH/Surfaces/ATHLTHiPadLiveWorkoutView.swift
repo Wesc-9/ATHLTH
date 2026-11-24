@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import AVKit
 
 /// A foreground iPad can show one workout in several Stage Manager windows.
 /// UIKit's idle-timer flag belongs to the whole app, not to the view. Only
@@ -283,7 +284,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                         .font(.caption.weight(.bold)).tracking(2)
                     Spacer()
                     Button {
-                        gymMode = false
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) { gymMode = false }
                     } label: {
                         Label(tr("Standard view", "Vanlig visning"), systemImage: "rectangle.split.2x1")
                             .frame(minHeight: 48)
@@ -298,7 +299,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
                     .accessibilityLabel(tr("Minimize", "Minimer"))
                 }
                 .foregroundStyle(ATHLTHGymModeDisplay.gold)
-                ATHLTHGymModeDisplay(snapshot: snapshot, local: false)
+                ATHLTHGymModeSplitView(guide: snapshot.gymExerciseGuide ?? legacyGymGuide, localBlock: nil) {
+                    ATHLTHGymModeDisplay(snapshot: snapshot, local: false)
+                }
                 TrainTogetherStatusStrip()
                 if snapshot.spotifyPlaying == true {
                     Label(snapshot.spotifyTrackTitle ?? tr("Music playing", "Musikk spiller"),
@@ -325,6 +328,14 @@ struct ATHLTHiPadLiveWorkoutView: View {
         .background(ATHLTHGymModeDisplay.canvas.ignoresSafeArea())
         .environment(\.colorScheme, .dark)
         .accessibilityIdentifier("athlth-ipad-gym-mode")
+    }
+
+    private var legacyGymGuide: ATHLTHGymExerciseReference? {
+        // Older Watch snapshots may have only a title. Never guess a demo
+        // from the name; show an honest unavailable state until ID arrives.
+        guard isStrength, let title = snapshot.currentStep else { return nil }
+        return ATHLTHGymExerciseReference(exerciseID: nil, slug: nil,
+                                          title: title, upcoming: false)
     }
 
     private func sendRemoteAction(_ action: ATHLTHRemoteWorkoutAction) {
@@ -440,7 +451,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
             }
 
             Button {
-                gymMode = true
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) { gymMode = true }
             } label: {
                 Group {
                     if compact { Image(systemName: "display").accessibilityLabel("Gym Mode") }
@@ -1082,6 +1093,12 @@ enum ATHLTHGymModeClock {
         return max(0, initial - extra)
     }
 
+    static func fraction(remaining: TimeInterval?, duration: TimeInterval?) -> Double? {
+        guard let remaining, let duration, remaining.isFinite, duration.isFinite,
+              duration > 0, remaining >= 0 else { return nil }
+        return min(1, remaining / duration)
+    }
+
     static func countdown(_ snapshot: ATHLTHCrossDeviceWorkoutSnapshot,
                           at now: Date) -> TimeInterval? {
         restRemaining(snapshot, at: now) ?? ATHLTHiPadLiveMetrics.remaining(snapshot, at: now)
@@ -1093,6 +1110,7 @@ struct ATHLTHGymModeDisplay: View {
     let local: Bool
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     static let canvas = Color(red: 0.07, green: 0.075, blue: 0.085)
     static let gold = Color(red: 0.84, green: 0.72, blue: 0.49)
     private let panel = Color(red: 0.13, green: 0.14, blue: 0.16)
@@ -1112,6 +1130,8 @@ struct ATHLTHGymModeDisplay: View {
                         .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
+                        .contentTransition(.opacity)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: snapshot.currentStep)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: snapshot.symbol)
@@ -1137,16 +1157,37 @@ struct ATHLTHGymModeDisplay: View {
                          tr("WORKOUT TIME", "ØKTTID"))
                         .font(.headline.weight(.semibold)).tracking(1.5)
                         .foregroundStyle(delayed ? .orange : Self.gold)
-                    Text(ATHLTHiPadLiveMetrics.duration(remaining ??
-                         ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
-                        .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 66 : 140,
-                                      weight: .bold, design: .rounded))
-                        .monospacedDigit().foregroundStyle(.white)
-                        .lineLimit(1).minimumScaleFactor(0.32)
-                        .accessibilityLabel((remaining == nil ? tr("Workout time", "Økttid") :
-                            tr("Time remaining", "Tid igjen")) + " " +
-                            ATHLTHiPadLiveMetrics.duration(remaining ??
-                                ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                    ZStack {
+                        if let fraction = ATHLTHGymModeClock.fraction(
+                            remaining: remaining, duration: snapshot.gymStageDuration
+                        ), ATHLTHGymModeClock.restRemaining(snapshot, at: now) == nil {
+                            Circle().stroke(Self.gold.opacity(0.12), lineWidth: 8)
+                            Circle().trim(from: 0, to: fraction)
+                                .stroke(AngularGradient(colors: [Self.gold.opacity(0.48), Self.gold, .white],
+                                                        center: .center),
+                                        style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                                .animation(reduceMotion || delayed || snapshot.paused == true ? nil :
+                                    .linear(duration: 0.45), value: fraction)
+                        }
+                        Text(ATHLTHiPadLiveMetrics.duration(remaining ??
+                             ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                            .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 55 : 100,
+                                          weight: .bold, design: .rounded))
+                            .monospacedDigit().foregroundStyle(.white)
+                            .lineLimit(1).minimumScaleFactor(0.35)
+                            .padding(24)
+                            .contentTransition(.numericText(countsDown: remaining != nil))
+                            .animation(reduceMotion || delayed ? nil : .easeOut(duration: 0.18),
+                                       value: ATHLTHiPadLiveMetrics.duration(remaining ??
+                                           ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                            .accessibilityLabel((remaining == nil ? tr("Workout time", "Økttid") :
+                                tr("Time remaining", "Tid igjen")) + " " +
+                                ATHLTHiPadLiveMetrics.duration(remaining ??
+                                    ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                    }
+                    .frame(maxWidth: 270)
+                    .frame(height: 220)
                     if remaining != nil {
                         Text(tr("Total", "Totalt") + " · " +
                              ATHLTHiPadLiveMetrics.duration(ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
@@ -1213,5 +1254,267 @@ struct ATHLTHGymModeDisplay: View {
         .padding(16)
         .background(panel, in: RoundedRectangle(cornerRadius: 18))
         .accessibilityElement(children: .combine)
+    }
+}
+
+
+/// A width-aware two-column layout without a GeometryReader inside ScrollView.
+/// In a compact Stage Manager window, preserve all content in reading order.
+private struct ATHLTHGymSplitLayout: Layout {
+    let compact: Bool
+    let gap: CGFloat = 18
+
+    private func widths(_ proposed: CGFloat) -> (CGFloat, CGFloat) {
+        let left = max(0, (proposed - gap) * 0.42)
+        return (left, max(0, proposed - gap - left))
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let width = proposal.width ?? 1000
+        if compact || width < 760 {
+            let sizes = subviews.map { $0.sizeThatFits(.init(width: width, height: nil)) }
+            return CGSize(width: width, height: sizes[0].height + gap + sizes[1].height)
+        }
+        let (left, right) = widths(width)
+        let a = subviews[0].sizeThatFits(.init(width: left, height: nil))
+        let b = subviews[1].sizeThatFits(.init(width: right, height: nil))
+        return CGSize(width: width, height: max(a.height, b.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        if compact || bounds.width < 760 {
+            let height = subviews[0].sizeThatFits(.init(width: bounds.width, height: nil)).height
+            subviews[0].place(at: bounds.origin, anchor: .topLeading, proposal: .init(width: bounds.width, height: nil))
+            subviews[1].place(at: CGPoint(x: bounds.minX, y: bounds.minY + height + gap),
+                              anchor: .topLeading, proposal: .init(width: bounds.width, height: nil))
+        } else {
+            let (left, right) = widths(bounds.width)
+            subviews[0].place(at: bounds.origin, anchor: .topLeading, proposal: .init(width: left, height: nil))
+            subviews[1].place(at: CGPoint(x: bounds.minX + left + gap, y: bounds.minY),
+                              anchor: .topLeading, proposal: .init(width: right, height: nil))
+        }
+    }
+}
+
+struct ATHLTHGymModeSplitView<WorkoutContent: View>: View {
+    let guide: ATHLTHGymExerciseReference?
+    let localBlock: WorkoutTemplateBlock?
+    @ViewBuilder let workoutContent: () -> WorkoutContent
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if ATHLTHDeviceRole.isIPad, let guide {
+            ATHLTHGymSplitLayout(compact: dynamicTypeSize.isAccessibilitySize) {
+                ATHLTHGymExercisePanel(reference: guide, localBlock: localBlock)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                workoutContent().frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: guide)
+            .accessibilityIdentifier("athlth-gym-split")
+        } else {
+            workoutContent()
+        }
+    }
+}
+
+private struct ATHLTHGymExercisePanel: View {
+    let reference: ATHLTHGymExerciseReference
+    let localBlock: WorkoutTemplateBlock?
+    @EnvironmentObject private var library: ExerciseLibraryStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let gold = ATHLTHGymModeDisplay.gold
+
+    private var entry: ExerciseLibraryEntry? {
+        if let localBlock {
+            return ATHLTHExerciseReferenceResolver.resolve(localBlock, in: library.allExercises)
+        }
+        if let id = reference.exerciseID {
+            return library.allExercises.first { $0.id == id }
+        }
+        if let slug = reference.slug {
+            let matches = library.allExercises.filter { $0.sourceIdentifier == slug }
+            return matches.count == 1 ? matches.first : nil
+        }
+        return nil
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        let matched = entry
+        let fallback = localBlock?.exerciseSnapshot
+        let instructions = matched.map { library.localizedExerciseInstructions($0) } ?? fallback?.instructions ?? []
+        let muscles = matched?.exercise.primaryMuscles ?? fallback?.primaryMuscles ?? []
+        let secondary = matched?.exercise.secondaryMuscles ?? fallback?.secondaryMuscles ?? []
+        let equipment = matched?.exercise.equipment ?? fallback?.equipment ?? []
+        let video = matched?.exercise.videoURL ?? fallback?.videoURL
+        let start = matched?.imageStartURL ?? matched?.exercise.imageURL ?? fallback?.imageURL
+        let peak = matched?.imagePeakURL
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(reference.upcoming ? tr("NEXT EXERCISE", "NESTE ØVELSE") : tr("TECHNIQUE", "TEKNIKK"))
+                    .font(.caption.weight(.bold)).tracking(2).foregroundStyle(gold)
+                Spacer()
+                Image(systemName: "figure.strengthtraining.traditional").foregroundStyle(gold)
+            }
+            Text(matched.map { library.localizedExerciseName($0) } ?? reference.title)
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(.opacity)
+            ATHLTHGymExerciseMedia(video: video, start: start, peak: peak)
+                .id([video?.absoluteString, start?.absoluteString, peak?.absoluteString].compactMap { $0 }.joined(separator: "|"))
+                .frame(height: 270)
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(gold.opacity(0.18)) }
+            if !muscles.isEmpty {
+                metadata(tr("Primary muscles", "Hovedmuskler"), muscles.joined(separator: " · "))
+            }
+            if !secondary.isEmpty {
+                metadata(tr("Secondary muscles", "Sekundærmuskler"), secondary.joined(separator: " · "))
+            }
+            if !equipment.isEmpty {
+                metadata(tr("Equipment", "Utstyr"), equipment.joined(separator: " · "))
+            }
+            if !instructions.isEmpty {
+                Text(tr("How to perform", "Slik gjør du øvelsen"))
+                    .font(.headline).foregroundStyle(gold)
+                ForEach(Array(instructions.prefix(4).enumerated()), id: \.offset) { index, instruction in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.caption.weight(.bold)).foregroundStyle(gold)
+                            .frame(width: 26, height: 26)
+                            .background(gold.opacity(0.12), in: Circle())
+                        Text(instruction).font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } else {
+                Text(tr("No verified exercise instructions available on this iPad.",
+                        "Ingen bekreftet øvelsesguide tilgjengelig på denne iPaden."))
+                    .font(.subheadline).foregroundStyle(.white.opacity(0.65))
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(LinearGradient(colors: [Color(red: 0.16, green: 0.15, blue: 0.14),
+                                            Color(red: 0.10, green: 0.11, blue: 0.13)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 26))
+        .overlay { RoundedRectangle(cornerRadius: 26).strokeBorder(gold.opacity(0.16)) }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: reference)
+        .accessibilityIdentifier("athlth-gym-exercise-panel")
+    }
+
+    private func metadata(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption.weight(.semibold)).foregroundStyle(gold)
+            Text(value).font(.subheadline).foregroundStyle(.white.opacity(0.85))
+        }
+    }
+}
+
+private struct ATHLTHGymExerciseMedia: View {
+    let video: URL?
+    let start: URL?
+    let peak: URL?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showPeak = false
+    @State private var videoFailed = false
+
+    private func allowed(_ url: URL?) -> URL? {
+        guard let url else { return nil }
+        return url.isFileURL || url.scheme?.lowercased() == "https" ? url : nil
+    }
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.09, green: 0.10, blue: 0.11)
+            if let video = allowed(video), !videoFailed {
+                ATHLTHGymLoopVideo(url: video, autoplay: !reduceMotion && scenePhase == .active,
+                                   failed: { videoFailed = true })
+            } else if let url = allowed(showPeak ? (peak ?? start) : (start ?? peak)) {
+                Group {
+                    if url.isFileURL {
+                        ATHLTHLocalExerciseThumbnailView(url: url, size: 280,
+                                                        fallbackSymbol: "figure.strengthtraining.traditional")
+                    } else {
+                        AsyncImage(url: url) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFit()
+                            } else { placeholder }
+                        }
+                    }
+                }
+                .id(url)
+                .transition(.opacity)
+            } else { placeholder }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: scenePhase) {
+            guard !reduceMotion, scenePhase == .active,
+                  (allowed(video) == nil || videoFailed),
+                  allowed(start) != nil, allowed(peak) != nil, start != peak else { return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                guard !Task.isCancelled, !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.35)) { showPeak.toggle() }
+            }
+        }
+    }
+
+    private var placeholder: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "figure.strengthtraining.traditional")
+                .font(.system(size: 56, weight: .light)).foregroundStyle(ATHLTHGymModeDisplay.gold)
+            Text(ATHLTHLocalization.choose(english: "No demonstration available", norwegian: "Ingen demonstrasjon tilgjengelig"))
+                .font(.caption).foregroundStyle(.white.opacity(0.65))
+        }
+        .padding()
+    }
+}
+
+private struct ATHLTHGymLoopVideo: View {
+    let url: URL
+    let autoplay: Bool
+    let failed: () -> Void
+    @State private var player = AVQueuePlayer()
+    @State private var looper: AVPlayerLooper?
+
+    var body: some View {
+        VideoPlayer(player: player)
+            .task(id: url) {
+                player.pause()
+                looper = nil
+                player.removeAllItems()
+                player.isMuted = true
+                let item = AVPlayerItem(url: url)
+                looper = AVPlayerLooper(player: player, templateItem: item)
+                if autoplay { player.play() }
+                // VideoPlayer may fail for a file absent on this iPad.
+                // Fall back to verified library images, not a guessed video.
+                while !Task.isCancelled {
+                    if player.currentItem?.status == .failed || looper?.status == .failed {
+                        failed()
+                        return
+                    }
+                    do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                }
+            }
+            .onChange(of: autoplay) { _, active in
+                if active { player.play() } else { player.pause() }
+            }
+            .onDisappear {
+                player.pause()
+                looper = nil
+                player.removeAllItems()
+            }
     }
 }
