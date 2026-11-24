@@ -90,10 +90,12 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func reloadCheckIn() {
         let current = RecoverySorenessStore()
-        reportedEnergy = current.todayEnergy
-        reportedStress = current.todayStress
-        reportedSoreness = current.todayOverallSoreness
-        reportedMuscles = current.todayRatings
+        if reportedEnergy != current.todayEnergy { reportedEnergy = current.todayEnergy }
+        if reportedStress != current.todayStress { reportedStress = current.todayStress }
+        if reportedSoreness != current.todayOverallSoreness {
+            reportedSoreness = current.todayOverallSoreness
+        }
+        if reportedMuscles != current.todayRatings { reportedMuscles = current.todayRatings }
     }
     let onQuickTrain: (WorkoutKind) -> Void
     let onQuickCycling: () -> Void
@@ -289,6 +291,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     /// All actionable alternatives are visible without an intermediary tile,
     /// dropdown or navigation. The two safest choices for each signal are
     /// shown directly beneath the primary workout action.
+    @inline(never)
     private func alternativeRecommendationCard(
         for workout: PlannedSession,
         alternatives: [ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion]
@@ -403,6 +406,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         )
     }
 
+    @inline(never)
     private func workoutCard(
         _ workout: PlannedSession, plan: TrainingPlan
     ) -> some View {
@@ -540,6 +544,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     /// Reuse the existing open-day card footprint. A scheduled session,
     /// explicit rest day, live workout or completed recording takes priority.
     /// No second recommendation card is added elsewhere on Today.
+    @inline(never)
     private func dailyRecommendationCard(
         _ advice: HomeDailyRecommendationPolicy.Advice
     ) -> some View {
@@ -758,6 +763,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     // Shortcuts reuse the existing training library. No new recommendation
     // engine or Quick Train changes are needed for this navigation improvement.
+    @inline(never)
     private func completedTodayCard(_ plan: TrainingPlan) -> some View {
         ATHLTHTodayCompactCard(
             eyebrow: tr("COMPLETED", "FULLFØRT"),
@@ -1271,6 +1277,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         .buttonStyle(.plain)
     }
 
+    @inline(never)
     private func activePlanSection(_ plan: TrainingPlan) -> some View {
         let progress = min(max(completionFraction, 0), 1)
         return Button(action: onOpenPlan) {

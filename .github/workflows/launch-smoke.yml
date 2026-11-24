@@ -448,7 +448,8 @@ jobs:
             HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \
               --athlth-compatibility-preview \
               --athlth-compatibility-tab=0 \
-              --athlth-smoke-home-train-hop 2>&1)
+              --athlth-smoke-home-train-hop \
+              --athlth-smoke-home-train-stress 2>&1)
             HOP_STATUS=$?
             set -e
             echo "$HOP_OUTPUT"
@@ -469,6 +470,29 @@ jobs:
             validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train"
             verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME Home-to-Train" true
             validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train after dashboard mount"
+            # Prove all 100 same-process Home -> Train cycles completed.
+            STRESS_CONTAINER=$(simctl_bounded "locate Train stress evidence" 45 get_app_container "$UDID" com.wesc9.athlth data)
+            STRESS_COMPLETE=false
+            for attempt in $(seq 1 210); do
+              if ! kill -0 "$HOP_PID" 2>/dev/null; then
+                echo "::error::ATHLTH crashed during repeated Train navigation on $DEVICE_NAME."
+                exit 1
+              fi
+              if [ -s "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-stress-hop-100" ]; then
+                STRESS_COMPLETE=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$STRESS_COMPLETE" != true ]; then
+              echo "::error::Train stress test did not complete 100 navigation cycles."
+              exit 1
+            fi
+            for hop in $(seq 1 100); do
+              test -s "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-stress-hop-$hop"
+            done
+            verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME repeated Home-to-Train" true
+            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME after 100 Home-to-Train cycles"
             simctl_bounded "terminate transition app $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
 
             cleanup_device "$UDID"

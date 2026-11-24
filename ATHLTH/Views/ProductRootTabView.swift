@@ -433,15 +433,31 @@ struct ProductRootTabView: View {
             // real native TabView selection transition into Train. Unlike
             // launching directly on tab 1, this reproduces the build-135
             // Home -> Train AttributeGraph stack overflow path.
-            if ProcessInfo.processInfo.arguments.contains(
+            #if targetEnvironment(simulator)
+            if isCompatibilityPreview && ProcessInfo.processInfo.arguments.contains(
                 "--athlth-smoke-home-train-hop"
             ) {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(950))
                     guard !Task.isCancelled else { return }
                     selectedTab = 1
+                    guard ProcessInfo.processInfo.arguments.contains(
+                        "--athlth-smoke-home-train-stress"
+                    ) else { return }
+                    try? await Task.sleep(for: .seconds(2))
+                    for hop in 1...100 {
+                        guard !Task.isCancelled, selectedTab == 1 else { return }
+                        selectedTab = 0
+                        try? await Task.sleep(for: .milliseconds(750))
+                        guard !Task.isCancelled, selectedTab == 0 else { return }
+                        selectedTab = 1
+                        try? await Task.sleep(for: .milliseconds(750))
+                        guard !Task.isCancelled, selectedTab == 1 else { return }
+                        ATHLTHTrainSmokeTrace.record("stress-hop-\(hop)")
+                    }
                 }
             }
+            #endif
         }
         .task {
             updateDailyCheckInReminder()
@@ -7315,11 +7331,13 @@ struct ATHLTHTrainView: View {
     private func makePremiumTodayDashboard() -> AnyView {
         ATHLTHTrainSmokeTrace.record("dashboard-construction-start")
         defer { ATHLTHTrainSmokeTrace.record("dashboard-construction-end") }
+        let today = Date()
         let active = session.activePlan
+        let activePlanID = active?.id
         let sessions = active.map { todaySessions(in: $0) } ?? []
         let planSessionIDs = Set(sessions.map(\.id))
         let standaloneToday = HomeTodayCalendarSchedule.workouts(
-            plan: nil, standalone: session.standalonePlannedSessions, on: Date()
+            plan: nil, standalone: session.standalonePlannedSessions, on: today
         ).filter {
             !$0.isExplicitRestDay && !planSessionIDs.contains($0.id)
         }
@@ -7344,7 +7362,6 @@ struct ATHLTHTrainView: View {
             ).completionFraction
         } ?? 0
 
-        let today = Date()
         let hasRecordedWorkoutToday = TrainTodayOverviewPolicy.hasRecordedWorkout(
             on: today,
             healthStartDates: health.workouts.map(\.startDate),
@@ -7376,8 +7393,7 @@ struct ATHLTHTrainView: View {
             hasActiveWorkout: hasOngoingTrainWorkout,
             activeWorkoutKind: activeTrainWorkoutKind,
             lastCompletedWorkoutKind: lastCompletedTrainKind,
-            activeWorkoutCard: hasOngoingTrainWorkout
-                ? AnyView(activeTrainWorkoutCard) : nil,
+            activeWorkoutCard: makeTodayActiveWorkoutCard(),
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
             dailyRecommendation:
                 ATHLTHTrainTodayDailyAdvicePolicy.isVisible(
@@ -7407,17 +7423,17 @@ struct ATHLTHTrainView: View {
                 showingAllWorkoutCategories = true
             },
             onStartWorkout: { workout, healthCompleted in
-                guard let active else { return }
+                guard let activePlanID else { return }
                 openTodayPrimaryWorkout(
                     workout,
-                    planID: active.id,
+                    planID: activePlanID,
                     isHealthCompleted: healthCompleted
                 )
             },
             onWorkoutDetails: { workout, healthCompleted in
-                guard let active else { return }
+                guard let activePlanID else { return }
                 selectedPlanWorkout = PlannedWorkoutSelection(
-                    planID: active.id,
+                    planID: activePlanID,
                     workout: workout,
                     isHealthCompleted: healthCompleted
                 )
@@ -7426,12 +7442,12 @@ struct ATHLTHTrainView: View {
                 selectedTrainStandaloneWorkout = workout
             },
             onSendWorkoutToWatch: { workout in
-                guard let active else { return }
-                prepareTodayWorkoutForAppleWatch(workout, planID: active.id)
+                guard let activePlanID else { return }
+                prepareTodayWorkoutForAppleWatch(workout, planID: activePlanID)
             },
             onDelayWorkout: { workout, seconds in
-                guard let active else { return }
-                scheduleTodayWorkoutStart(workout, planID: active.id, after: seconds)
+                guard let activePlanID else { return }
+                scheduleTodayWorkoutStart(workout, planID: activePlanID, after: seconds)
             },
             onAcceptAlternative: { planned, suggestion in
                 guard !hasOngoingTrainWorkout,
@@ -7494,6 +7510,14 @@ struct ATHLTHTrainView: View {
                 recordTrainDashboardSmokeReadiness()
             }
         )
+    }
+
+    // Keep the live recorder's view construction out of the dashboard's
+    // already substantial stack frame. It must not be built on inactive days.
+    @inline(never)
+    private func makeTodayActiveWorkoutCard() -> AnyView? {
+        guard hasOngoingTrainWorkout else { return nil }
+        return AnyView(activeTrainWorkoutCard)
     }
 
     // Require the actual dashboard, not just a nonblank loading frame.
@@ -9245,50 +9269,55 @@ struct ATHLTHTrainView: View {
         )
     }
 
+    @inline(never)
     private func completedTodaySessionIDs(
         planID: UUID,
         sessions: [PlannedSession]
     ) -> Set<UUID> {
-        Set(
-            sessions.filter {
-                session.isPlanSessionCompleted(
-                    planID: planID,
-                    sessionID: $0.id,
-                    healthWorkouts: health.workouts,
-                    strengthHistory: strengthWorkout.workoutHistory
-                )
-            }.map(\.id)
-        )
+        // Only retain IDs; do not build an intermediate array of large sessions.
+        let healthWorkouts = health.workouts
+        let strengthHistory = strengthWorkout.workoutHistory
+        var result = Set<UUID>()
+        for workout in sessions {
+            let id = workout.id
+            if session.isPlanSessionCompleted(
+                planID: planID,
+                sessionID: id,
+                healthWorkouts: healthWorkouts,
+                strengthHistory: strengthHistory
+            ) {
+                result.insert(id)
+            }
+        }
+        return result
     }
 
+    @inline(never)
     private func healthCompletedTodaySessionIDs(
         planID: UUID,
         sessions: [PlannedSession],
         completedIDs: Set<UUID>? = nil
     ) -> Set<UUID> {
-        // Reuse the completion set when the caller already has it;
-        // otherwise derive one for single-workout links.
+        // Avoid the nested lazy filter/map iterator and captures in the
+        // stack-sensitive Today dashboard. Completion semantics are unchanged.
         let verifiedCompletedIDs = completedIDs ??
             completedTodaySessionIDs(planID: planID, sessions: sessions)
-        return Set(
-            sessions.lazy.filter {
-                verifiedCompletedIDs.contains($0.id) &&
-                !session.isPlanSessionManuallyCompleted(
-                    planID: planID,
-                    sessionID: $0.id
-                ) &&
-                session.linkedHealthWorkoutID(
-                    planID: planID,
-                    sessionID: $0.id
-                ) != nil &&
-                session.isPlanSessionCompleted(
-                    planID: planID,
-                    sessionID: $0.id,
-                    healthWorkouts: health.workouts,
-                    strengthHistory: []
-                )
-            }.map(\.id)
-        )
+        let healthWorkouts = health.workouts
+        var result = Set<UUID>()
+        for workout in sessions {
+            let id = workout.id
+            guard verifiedCompletedIDs.contains(id),
+                  !session.isPlanSessionManuallyCompleted(
+                      planID: planID, sessionID: id),
+                  session.linkedHealthWorkoutID(
+                      planID: planID, sessionID: id) != nil,
+                  session.isPlanSessionCompleted(
+                      planID: planID, sessionID: id,
+                      healthWorkouts: healthWorkouts, strengthHistory: [])
+            else { continue }
+            result.insert(id)
+        }
+        return result
     }
 
     private func todaySessions(
