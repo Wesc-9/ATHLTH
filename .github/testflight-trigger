@@ -333,3 +333,5 @@ ATHLTH 2.3.0 build 139 user-authorized TestFlight release 2026-11-23; require ex
 ATHLTH 3.0.0 — user-authorized overnight TestFlight upload 2026-11-24. Latest source abed36bd07760fcfdfa233b99f6bcd63245bad1f. Require all five exact-commit CI gates, signed archive, App Store Connect delivery and verified processing. Fix verifiable failures on release/v3.0.0 and retry; never bypass gates or publish stale source.
 
 ATHLTH 3.0.1 build 141 — user-authorized TestFlight upload 2026-11-24; require all five same-commit CI gates, signed iPhone/Watch/Widgets archive and verified App Store Connect delivery. No gate bypass or stale upload. Source before trigger: bcc622ba23b838f7aea359f5c99aa39a9f718064.
+
+ATHLTH 3.0.1 build 141 — authorized TestFlight retry after SwiftUI Studio root type-check timeout; split presentation/lifecycle/navigation modifier stages and explicitly type sidebar visibility persistence. Require all five exact-commit gates, signed archive and App Store Connect confirmation; no bypass.

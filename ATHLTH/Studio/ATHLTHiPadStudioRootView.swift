@@ -270,6 +270,106 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     var body: some View {
+        studioNavigationContent
+        .inspector(isPresented: $showingInspector) {
+            // The message view now owns its back, search and compose controls.
+            // Removing the separate "Inbox panel" bar gives the messages
+            // their full height and prevents duplicate navigation chrome.
+            NavigationStack {
+                MessageInboxDestinationView(
+                    onBack: {
+                        withAnimation(messagePanelAnimation) {
+                            showingInspector = false
+                        }
+                    },
+                    isInspectorPanel: true
+                )
+            }
+            // Ensure a previous account's open thread cannot be reused.
+            .id(session.profile.userID)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(canvas)
+            .inspectorColumnWidth(min: 340, ideal: 420, max: 510)
+        }
+        .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
+            inspectedWeekDate = nil
+            selectedWorkout = nil
+            // Launch a selected workout only after the detail sheet has
+            // fully dismissed, avoiding competing modal presentations.
+            if pendingWeekTrainLaunch {
+                pendingWeekTrainLaunch = false
+                showingTrain = true
+            } else if let standalone = pendingWeekStandaloneWorkout {
+                pendingWeekStandaloneWorkout = nil
+                selectedStandaloneWorkout = standalone
+            }
+        }) {
+            // Week days and recorded workouts remain accessible without
+            // occupying the Inbox-only right panel.
+            NavigationStack {
+                VStack(spacing: 0) {
+                    HStack {
+                        if selectedWorkout != nil && inspectedWeekDate != nil {
+                            Button {
+                                selectedWorkout = nil
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Back to selected day",
+                                        norwegian: "Tilbake til valgt dag"
+                                    ),
+                                    systemImage: "chevron.left"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(ink)
+                        }
+                        Spacer(minLength: 0)
+                        Button {
+                            showingWorkoutDetail = false
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Close", norwegian: "Lukk"
+                                ),
+                                systemImage: "xmark"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ink)
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+
+                    Divider().opacity(0.35)
+
+                    if let selectedWorkout {
+                        ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let inspectedWeekDate {
+                        ATHLTHStudioWeekDayInspectorView(
+                            date: inspectedWeekDate,
+                            onOpenWorkout: { openWeekWorkout($0, start: false) },
+                            onStartWorkout: { openWeekWorkout($0, start: true) },
+                            onSendToWatch: sendWeekWorkoutToWatch,
+                            onInspectRecorded: inspectRecordedFromWeek,
+                            onPlanWorkout: planFromWeekDay
+                        )
+                        .id(Calendar.current.startOfDay(for: inspectedWeekDate))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .background(canvas.ignoresSafeArea())
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    // Separate opaque view stages keep SwiftUI's generic modifier chains
+    // independently type-checked without changing presentation order or state.
+    private var studioPresentationContent: some View {
         studioSplitView
         .navigationSplitViewStyle(.balanced)
         // A single root-level, read-only full-screen spectator handles both
@@ -334,6 +434,10 @@ struct ATHLTHiPadStudioRootView: View {
                 await goalAccountSync.sync(session: session, goals: goalStore)
             }
         }
+    }
+
+    private var studioLifecycleContent: some View {
+        studioPresentationContent
         .onAppear {
             if !didRestoreStudioScene {
                 didRestoreStudioScene = true
@@ -445,11 +549,12 @@ struct ATHLTHiPadStudioRootView: View {
             checkpointDetailPathIfPossible()
         }
         .onChange(of: sidebarVisibility) { _, visibility in
-            // Persist only user-driven native sidebar changes after restore.
-            if didRestoreStudioScene && visibility != .automatic {
-                sidebarUserVisible = visibility != .detailOnly
-            }
+            persistSidebarVisibility(visibility)
         }
+    }
+
+    private var studioNavigationContent: some View {
+        studioLifecycleContent
         .onChange(of: selection) { _, destination in
             // openStudio(_:) already resets navigation and side destinations.
             // Resetting NavigationStack a second time in this observer can
@@ -486,100 +591,13 @@ struct ATHLTHiPadStudioRootView: View {
             }
             // Opening a planning day changes only the detail/inspector.
         }
-        .inspector(isPresented: $showingInspector) {
-            // The message view now owns its back, search and compose controls.
-            // Removing the separate "Inbox panel" bar gives the messages
-            // their full height and prevents duplicate navigation chrome.
-            NavigationStack {
-                MessageInboxDestinationView(
-                    onBack: {
-                        withAnimation(messagePanelAnimation) {
-                            showingInspector = false
-                        }
-                    },
-                    isInspectorPanel: true
-                )
-            }
-            // Ensure a previous account's open thread cannot be reused.
-            .id(session.profile.userID)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(canvas)
-            .inspectorColumnWidth(min: 340, ideal: 420, max: 510)
-        }
-        .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
-            inspectedWeekDate = nil
-            selectedWorkout = nil
-            // Launch a selected workout only after the detail sheet has
-            // fully dismissed, avoiding competing modal presentations.
-            if pendingWeekTrainLaunch {
-                pendingWeekTrainLaunch = false
-                showingTrain = true
-            } else if let standalone = pendingWeekStandaloneWorkout {
-                pendingWeekStandaloneWorkout = nil
-                selectedStandaloneWorkout = standalone
-            }
-        }) {
-            // Week days and recorded workouts remain accessible without
-            // occupying the Inbox-only right panel.
-            NavigationStack {
-                VStack(spacing: 0) {
-                    HStack {
-                        if selectedWorkout != nil && inspectedWeekDate != nil {
-                            Button {
-                                selectedWorkout = nil
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Back to selected day",
-                                        norwegian: "Tilbake til valgt dag"
-                                    ),
-                                    systemImage: "chevron.left"
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(ink)
-                        }
-                        Spacer(minLength: 0)
-                        Button {
-                            showingWorkoutDetail = false
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Close", norwegian: "Lukk"
-                                ),
-                                systemImage: "xmark"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(ink)
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
+    }
 
-                    Divider().opacity(0.35)
-
-                    if let selectedWorkout {
-                        ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if let inspectedWeekDate {
-                        ATHLTHStudioWeekDayInspectorView(
-                            date: inspectedWeekDate,
-                            onOpenWorkout: { openWeekWorkout($0, start: false) },
-                            onStartWorkout: { openWeekWorkout($0, start: true) },
-                            onSendToWatch: sendWeekWorkoutToWatch,
-                            onInspectRecorded: inspectRecordedFromWeek,
-                            onPlanWorkout: planFromWeekDay
-                        )
-                        .id(Calendar.current.startOfDay(for: inspectedWeekDate))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-                .background(canvas.ignoresSafeArea())
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        }
+    private func persistSidebarVisibility(_ visibility: NavigationSplitViewVisibility) {
+        // Persist only user-driven native sidebar changes after restore.
+        guard didRestoreStudioScene else { return }
+        guard visibility != NavigationSplitViewVisibility.automatic else { return }
+        sidebarUserVisible = visibility != NavigationSplitViewVisibility.detailOnly
     }
 
     private var studioSplitView: some View {
