@@ -300,13 +300,13 @@ private struct ATHLTHSceneRootView: View {
             }
             scheduleAutomaticOfflinePreparation()
             ATHLTHAliveController.reconcile(
-                isForeground: scenePhase == .active && appSession.signedIn
+                isForeground: scenePhase != .background && appSession.signedIn && !appSession.previewModeEnabled
             )
         }
         .onChange(of: scenePhase) { _, newPhase in
             scheduleAutomaticOfflinePreparation()
             ATHLTHAliveController.reconcile(
-                isForeground: newPhase == .active && appSession.signedIn
+                isForeground: newPhase != .background && appSession.signedIn && !appSession.previewModeEnabled
             )
             if newPhase == .active && appSession.signedIn {
                 // Both iPhone and iPad must durably checkpoint local edits
@@ -389,7 +389,7 @@ private struct ATHLTHSceneRootView: View {
                 )
             }
             ATHLTHAliveController.reconcile(
-                isForeground: scenePhase == .active && signedIn
+                isForeground: scenePhase != .background && signedIn && !appSession.previewModeEnabled
             )
             if !signedIn {
                 // Competition names and scheduled reminders are private
