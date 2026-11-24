@@ -227,6 +227,14 @@ jobs:
           brew install xcodegen
           brew install imagemagick
 
+      - name: Cache public SwiftPM repository objects
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ATHLTHSourcePackages/repositories
+          key: swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('project.yml', '**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Prepare simulator build
         shell: bash
         run: |
@@ -292,6 +300,7 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$UDID" \
@@ -391,6 +400,14 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
           xcodebuild -version
+      - name: Cache public SwiftPM repository objects
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ATHLTHSourcePackages/repositories
+          key: swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('project.yml', '**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Generate full Watch project
         run: |
           brew install xcodegen
@@ -402,6 +419,7 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -target ATHLTHWatchApp \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -configuration Debug \
             -sdk watchsimulator \
             CODE_SIGNING_ALLOWED=NO \

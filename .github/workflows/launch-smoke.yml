@@ -109,6 +109,14 @@ jobs:
       - name: Embed RepDB offline exercise assets
         run: python3 scripts/prepare_repdb_offline.py
 
+      - name: Cache public SwiftPM repository objects
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ATHLTHSourcePackages/repositories
+          key: swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('project.yml', '**/Package.resolved') }}
+          restore-keys: |
+            swiftpm-repos-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Generate iPhone-only smoke-test project
         shell: bash
         run: |
@@ -137,6 +145,7 @@ jobs:
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
@@ -172,6 +181,7 @@ jobs:
           set -euo pipefail
           APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/ATHLTH.app"
           test -x "$APP/ATHLTH"
+          python3 -c 'import plistlib,sys; p=plistlib.load(open(sys.argv[1],"rb")); assert {1,2}.issubset(p["UIDeviceFamily"]), "Expected universal iPhone/iPad app"' "$APP/Info.plist"
           mkdir -p "$RUNNER_TEMP/athlth-smoke-package"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/athlth-smoke-package/ATHLTH.zip"
           printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/athlth-smoke-package/commit.txt"
@@ -196,7 +206,7 @@ jobs:
     strategy:
       fail-fast: false
       # Separate jobs, with bounded concurrency on the Xcode runner pool.
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         size: [standard, large, compact, mini]
     steps:
