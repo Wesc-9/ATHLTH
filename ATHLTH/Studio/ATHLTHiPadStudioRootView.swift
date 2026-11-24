@@ -1373,22 +1373,31 @@ struct ATHLTHiPadStudioRootView: View {
                         if canRelayStudioWorkout(item, device: .iPhone) {
                             studioDeviceRow(
                                 title: "iPhone",
-                                subtitle: ATHLTHLocalization.choose(english: "Registered · connection verified at start", norwegian: "Registrert · tilkobling sjekkes ved start"),
+                                subtitle: registeredPhone.phoneOnline
+                                    ? ATHLTHLocalization.choose(english: "Recently connected", norwegian: "Nylig tilkoblet")
+                                    : ATHLTHLocalization.choose(english: "Registered · open ATHLTH on iPhone", norwegian: "Registrert · åpne ATHLTH på iPhone"),
                                 symbol: "iphone", enabled: true
                             ) {
                                 pendingStudioStart = .relay(item, .iPhone)
                                 studioStartChoice = nil
                             }
                         }
-                        if canRelayStudioWorkout(item, device: .appleWatch) {
+                        if canRelayStudioWorkout(item, device: .appleWatch), registeredPhone.watchAvailable {
                             studioDeviceRow(
                                 title: "Apple Watch",
-                                subtitle: ATHLTHLocalization.choose(english: "Via iPhone · Watch pairing checked at start", norwegian: "Via iPhone · klokken sjekkes ved start"),
+                                subtitle: registeredPhone.watchReachable
+                                    ? ATHLTHLocalization.choose(english: "Connected · via iPhone", norwegian: "Tilkoblet · via iPhone")
+                                    : ATHLTHLocalization.choose(english: "Paired · open ATHLTH on Watch", norwegian: "Paret · åpne ATHLTH på klokken"),
                                 symbol: "applewatch", enabled: true
                             ) {
                                 pendingStudioStart = .relay(item, .appleWatch)
                                 studioStartChoice = nil
                             }
+                        } else if canRelayStudioWorkout(item, device: .appleWatch), !registeredPhone.phoneOnline {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Open ATHLTH on iPhone to verify Apple Watch availability.",
+                                norwegian: "Åpne ATHLTH på iPhone for å sjekke om Apple Watch er tilgjengelig."))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     } else if registeredPhone.status == .checking {
                         ProgressView(ATHLTHLocalization.choose(english: "Checking registered devices…", norwegian: "Sjekker registrerte enheter…"))
@@ -1419,7 +1428,11 @@ struct ATHLTHiPadStudioRootView: View {
                 }
             }
             .task(id: session.profile.userID) {
-                await registeredPhone.refresh(for: session.profile.userID)
+                let account = session.profile.userID
+                while !Task.isCancelled && session.profile.userID == account {
+                    await registeredPhone.refresh(for: account)
+                    do { try await Task.sleep(for: .seconds(8)) } catch { break }
+                }
             }
         }
         .presentationDetents([.medium, .large])
