@@ -1185,6 +1185,29 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertFalse(second.isExpanded)
     }
 
+    func testGymClockPrioritizesSourceRestAndNeverRunsPastExtrapolationLimit() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        var frame = snapshot(capturedAt: now, stepRemaining: 70)
+        frame.strengthRestEndsAt = now.addingTimeInterval(30)
+        XCTAssertEqual(ATHLTHGymModeClock.countdown(frame, at: now), 30)
+        XCTAssertEqual(ATHLTHGymModeClock.countdown(frame, at: now.addingTimeInterval(4)), 26)
+        XCTAssertEqual(ATHLTHGymModeClock.countdown(frame, at: now.addingTimeInterval(60)), 22)
+        frame.paused = true
+        XCTAssertEqual(ATHLTHGymModeClock.countdown(frame, at: now.addingTimeInterval(4)), 30)
+    }
+
+    func testGymClockFallsBackToRealStepAndDoesNotInventCountdown() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        var frame = snapshot(capturedAt: now, stepRemaining: 3)
+        XCTAssertEqual(ATHLTHGymModeClock.countdown(frame, at: now.addingTimeInterval(8)), 0)
+        frame.strengthRestEndsAt = now.addingTimeInterval(-1)
+        XCTAssertNil(ATHLTHGymModeClock.restRemaining(frame, at: now))
+        frame.runningStepRemainingSeconds = nil
+        XCTAssertNil(ATHLTHGymModeClock.countdown(frame, at: now))
+        frame.strengthRestEndsAt = now.addingTimeInterval(100_000)
+        XCTAssertNil(ATHLTHGymModeClock.countdown(frame, at: now))
+    }
+
     func testRemoteControlRequiresOriginalAccountSessionDeviceGrantAndFreshCommand() {
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         let account = UUID(), session = UUID(), grant = UUID()
