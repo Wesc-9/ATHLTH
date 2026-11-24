@@ -483,6 +483,9 @@ struct ATHLTHCompetitionCreationView: View {
                 singleEventMode: format == .single,
                 initialTitle: competitionTitle,
                 continuation: restoredCompetitionTemplate,
+                fixedInvitees: competitionAthletes,
+                fixedStartMode: groupStartMode,
+                fixedStartDate: groupStartMode == .scheduled ? startsAt : nil,
                 onPublished: { _ in
                     showingExistingTournamentRules = false
                     successful = true
@@ -526,6 +529,10 @@ struct ATHLTHCompetitionCreationView: View {
                 duelRaceSettings.race.discipline = .distance
                 duelRaceSettings.race.targetDistanceMeters =
                     Int(max(100, distanceKM * 1_000))
+                if let route = preselectedRoute, initialActivity == .running {
+                    duelRaceSettings.race.discipline = .workout
+                    chosenRoute = route
+                }
             }
             if competitionTitle.isEmpty {
                 competitionTitle = "\(format.title) · \(initialActivity.title)"

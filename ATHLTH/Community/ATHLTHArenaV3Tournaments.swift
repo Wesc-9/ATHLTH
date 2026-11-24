@@ -32,6 +32,9 @@ struct ATHLTHTournamentCreator: View {
     /// Entry flows choose a single competition format. The detailed rules
     /// screen must not silently switch a group league into a cup.
     let restrictFormat: Bool
+    let fixedInvitees: [ATHLTHTournamentParticipant]?
+    let fixedStartMode: ATHLTHCompetitionStartMode?
+    let fixedStartDate: Date?
     let onSave: (ATHLTHTournamentDraft) -> Void
     let onPublished: ((UUID) -> Void)?
     private let tournamentCloud = ATHLTHTournamentCloudService()
@@ -95,6 +98,9 @@ struct ATHLTHTournamentCreator: View {
         singleEventMode: Bool = false,
         initialTitle: String? = nil,
         continuation: ATHLTHTournamentDraft? = nil,
+        fixedInvitees: [ATHLTHTournamentParticipant]? = nil,
+        fixedStartMode: ATHLTHCompetitionStartMode? = nil,
+        fixedStartDate: Date? = nil,
         onPublished: ((UUID) -> Void)? = nil,
         onSave: @escaping (ATHLTHTournamentDraft) -> Void
     ) {
@@ -103,6 +109,9 @@ struct ATHLTHTournamentCreator: View {
         self.isSingleEvent = continuation?.singleEventMode ?? singleEventMode
         self.fixedActivity = fixedActivity
         self.restrictFormat = fixedActivity != nil || continuation != nil
+        self.fixedInvitees = fixedInvitees
+        self.fixedStartMode = fixedStartMode
+        self.fixedStartDate = fixedStartDate
         self.onSave = onSave
         self.onPublished = onPublished
         _format = State(initialValue:
@@ -129,8 +138,12 @@ struct ATHLTHTournamentCreator: View {
             continuation?.winPoints ?? 3)
         _drawPoints = State(initialValue:
             continuation?.drawPoints ?? 1)
-        _competitionSettings = State(initialValue:
-            continuation?.competitionSettings ?? .init())
+        var initialSettings = continuation?.competitionSettings ?? .init()
+        if let fixedStartMode {
+            initialSettings.startMode = fixedStartMode
+            initialSettings.startsAt = fixedStartDate
+        }
+        _competitionSettings = State(initialValue: initialSettings)
         _allowExtensions = State(initialValue:
             continuation?.allowExtensions ?? true)
         _publicResults = State(initialValue:
@@ -152,12 +165,12 @@ struct ATHLTHTournamentCreator: View {
             continuation?.votesCloseAt ??
                 Date().addingTimeInterval(3 * 86_400))
         _chosenIDs = State(initialValue: Set(
-            continuation?.participants.map(\.id).filter {
+            fixedInvitees?.map(\.id) ?? continuation?.participants.map(\.id).filter {
                 $0 != continuation?.ownerID
             } ?? []
         ))
         var previousNames: [UUID: String] = [:]
-        for athlete in continuation?.participants ?? [] {
+        for athlete in fixedInvitees ?? continuation?.participants ?? [] {
             previousNames[athlete.id] = athlete.username
         }
         _chosenNames = State(initialValue: previousNames)
@@ -215,8 +228,10 @@ struct ATHLTHTournamentCreator: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    titleSection
-                    formatSection
+                    if fixedInvitees == nil {
+                        titleSection
+                        formatSection
+                    }
                     ATHLTHTournamentRuleConfigurationSection(
                         activities: Binding(
                             get: {
@@ -250,7 +265,7 @@ struct ATHLTHTournamentCreator: View {
                             .background(ATHLTHArenaV3Style.panel())
                     }
                     coachEntry
-                    templateEntry
+                    if fixedInvitees == nil { templateEntry }
                     exerciseRulesSection
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
@@ -267,12 +282,15 @@ struct ATHLTHTournamentCreator: View {
                     )
                     ATHLTHTournamentCompetitionRulesSection(
                         settings: $competitionSettings,
-                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities
+                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
+                        showsStartTiming: fixedStartMode == nil
                     )
                     warmupSection
                     if format == .groups { groupsSection }
-                    inviteSection
-                    if activeClubID != nil { seasonSection }
+                    if fixedInvitees == nil {
+                        inviteSection
+                        if activeClubID != nil { seasonSection }
+                    }
                     preview
                     Text("Invitasjoner og regler godkjennes før start. Konkurransen starter manuelt, automatisk når alle er klare eller på valgt tidspunkt, slik du har valgt.")
                         .font(.caption)
@@ -288,11 +306,11 @@ struct ATHLTHTournamentCreator: View {
             }
             .scrollIndicators(.hidden)
             .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
-            .navigationTitle("Ny konkurranse")
+            .navigationTitle(fixedInvitees == nil ? "Ny konkurranse" : "Regler")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Avbryt") { dismiss() }
+                    Button(fixedInvitees == nil ? "Avbryt" : "Tilbake") { dismiss() }
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -340,6 +358,7 @@ struct ATHLTHTournamentCreator: View {
         }
         .environment(\.colorScheme, .light)
         .task {
+            guard fixedInvitees == nil else { return }
             if let fixedClubID { await loadClub(fixedClubID) }
             do {
                 clubs = try await directory.manageableClubs()
@@ -377,15 +396,16 @@ struct ATHLTHTournamentCreator: View {
             ) { proposal in
                 let suggested = proposal.exerciseIDs
                 guard !suggested.isEmpty else { return }
-                title = String(proposal.title.prefix(80))
+                if fixedInvitees == nil { title = String(proposal.title.prefix(80)) }
                 exerciseMode = .owner
                 rulesAuthority = .owner
                 exerciseCount = suggested.count
                 competitionSettings.coachExerciseIDs = suggested
-                competitionSettings.startMode =
-                    ATHLTHCompetitionStartMode(rawValue: proposal.startMode)
-                    ?? .manual
-                competitionSettings.startsAt = nil
+                if fixedStartMode == nil {
+                    competitionSettings.startMode =
+                        ATHLTHCompetitionStartMode(rawValue: proposal.startMode) ?? .manual
+                    competitionSettings.startsAt = nil
+                }
                 competitionSettings.environment =
                     ATHLTHCompetitionEnvironment(rawValue: proposal.environment)
                     ?? .any

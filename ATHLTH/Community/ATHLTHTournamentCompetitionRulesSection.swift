@@ -6,6 +6,7 @@ import SwiftUI
 struct ATHLTHTournamentCompetitionRulesSection: View {
     @Binding var settings: ATHLTHTournamentCompetitionSettings
     var activities: Set<ATHLTHTournamentActivity> = []
+    var showsStartTiming = true
     @State private var showingMeetingPoint = false
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
@@ -17,6 +18,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
 
             VStack(alignment: .leading, spacing: 14) {
+                if showsStartTiming {
                 Text("Hvordan starter konkurransen?")
                     .font(.subheadline.weight(.semibold))
                 Picker("Startmåte", selection: $settings.startMode) {
@@ -41,6 +43,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 Divider()
+                }
                 Text("Når åpner neste øvelse?")
                     .font(.subheadline.weight(.semibold))
                 Picker("Neste øvelse", selection: $settings.unlock) {

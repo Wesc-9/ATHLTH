@@ -10,27 +10,73 @@ struct ATHLTHCompetitionRaceRulesSection: View {
     @State private var showingLapPoint = false
 
     private var runningAllowed: Bool { activities.contains(.running) }
+    private func disciplineTile(_ value: ATHLTHCompetitionDiscipline) -> some View {
+        let selected = settings.race.discipline == value
+        let symbol: String = {
+            switch value {
+            case .sprint: return "bolt"
+            case .workout: return "figure.strengthtraining.traditional"
+            case .distance: return "point.topleft.down.curvedto.point.bottomright.up"
+            case .duration: return "timer"
+            case .laps: return "arrow.clockwise"
+            }
+        }()
+        return Button {
+            settings.race.discipline = value
+        } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Image(systemName: symbol).font(.title3)
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                Text(value.title).font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .background(selected ? ATHLTHPlanDesign.selectedSurface : Color.white,
+                        in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(ATHLTHArenaV3Style.gold.opacity(selected ? 0.65 : 0.12))
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     private var race: Binding<ATHLTHCompetitionRaceRules> {
         $settings.race
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("Konkurranseøvelse")
-                .font(.system(size: 23, design: .serif))
-                .foregroundStyle(ATHLTHArenaV3Style.ink)
-            Text("Velg hva deltakerne faktisk skal gjennomføre. Dette er ikke en ekstra treningsmotor.")
-                .font(.caption)
-                .foregroundStyle(ATHLTHArenaV3Style.secondary)
-
-            Picker("Hva konkurrerer dere i?", selection: race.discipline) {
+            HStack(spacing: 12) {
+                Image(systemName: "trophy")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    .frame(width: 46, height: 46)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("KONKURRANSEØVELSE")
+                        .font(.caption2.weight(.semibold)).tracking(1.5)
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    Text("Hva konkurrerer dere i?")
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                }
+                Spacer(minLength: 0)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 124), spacing: 8)], spacing: 8) {
                 ForEach(ATHLTHCompetitionDiscipline.allCases.filter {
                     $0 != .sprint || runningAllowed
                 }) { value in
-                    Text(value.title).tag(value)
+                    disciplineTile(value)
                 }
             }
-            .pickerStyle(.menu)
 
             if settings.race.discipline == .sprint {
                 Picker("Sprintform", selection: race.sprintMode) {
@@ -52,11 +98,13 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                 if settings.race.discipline == .distance ||
                    settings.race.sprintTarget == .distance {
                     Stepper(
-                        "Mål: \(settings.race.targetDistanceMeters) meter",
+                        "\(settings.race.targetDistanceMeters.formatted()) m",
                         value: race.targetDistanceMeters, in: 100...100_000,
                         step: settings.race.targetDistanceMeters < 1000 ? 50 : 500
                     )
-                    .font(.subheadline)
+                    .font(.headline.monospacedDigit())
+                    .padding(14)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
 
