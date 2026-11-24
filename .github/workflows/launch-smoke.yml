@@ -196,7 +196,7 @@ jobs:
     strategy:
       fail-fast: false
       # Separate jobs, with bounded concurrency on the Xcode runner pool.
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         size: [standard, large, compact, mini]
     steps:
