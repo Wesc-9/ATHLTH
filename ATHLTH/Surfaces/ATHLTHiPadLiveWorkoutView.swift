@@ -118,7 +118,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
             } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    topBar
+                    topBar(compact: geometry.size.width < 880 || dynamicTypeSize.isAccessibilitySize)
 
                     identity
                         .padding(.top, 4)
@@ -300,7 +300,6 @@ struct ATHLTHiPadLiveWorkoutView: View {
                 .foregroundStyle(ATHLTHGymModeDisplay.gold)
                 ATHLTHGymModeDisplay(snapshot: snapshot, local: false)
                 TrainTogetherStatusStrip()
-                remoteControlPanel
                 if snapshot.spotifyPlaying == true {
                     Label(snapshot.spotifyTrackTitle ?? tr("Music playing", "Musikk spiller"),
                           systemImage: "music.note")
@@ -316,8 +315,15 @@ struct ATHLTHiPadLiveWorkoutView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            remoteControlPanel
+                .environment(\.colorScheme, .light)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(ATHLTHGymModeDisplay.canvas)
+        }
         .background(ATHLTHGymModeDisplay.canvas.ignoresSafeArea())
-        .preferredColorScheme(.dark)
+        .environment(\.colorScheme, .dark)
         .accessibilityIdentifier("athlth-ipad-gym-mode")
     }
 
@@ -401,8 +407,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
         .accessibilityIdentifier("athlth-ipad-control-\(action.rawValue)")
     }
 
-    private var topBar: some View {
-        HStack(spacing: 12) {
+    private func topBar(compact: Bool) -> some View {
+        HStack(spacing: compact ? 6 : 12) {
             HStack(spacing: 9) {
                 Circle()
                     .fill(snapshot.paused == true ? Color.orange : bronze)
@@ -436,18 +442,24 @@ struct ATHLTHiPadLiveWorkoutView: View {
             Button {
                 gymMode = true
             } label: {
-                Label("Gym Mode", systemImage: "display")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(minHeight: 44)
+                Group {
+                    if compact { Image(systemName: "display").accessibilityLabel("Gym Mode") }
+                    else { Label("Gym Mode", systemImage: "display") }
+                }
+                .font(.subheadline.weight(.semibold))
+                .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.borderedProminent)
             .tint(bronze)
             .accessibilityIdentifier("athlth-gym-enter")
 
             Toggle(isOn: $keepAwake) {
-                Label(tr("Keep screen awake", "Hold skjermen på"),
-                      systemImage: "sun.max")
-                    .font(.caption)
+                if compact {
+                    Image(systemName: "sun.max").accessibilityLabel(tr("Keep screen awake", "Hold skjermen på"))
+                } else {
+                    Label(tr("Keep screen awake", "Hold skjermen på"), systemImage: "sun.max")
+                        .font(.caption)
+                }
             }
             .toggleStyle(.switch)
             .tint(bronze)
@@ -455,7 +467,14 @@ struct ATHLTHiPadLiveWorkoutView: View {
             .accessibilityIdentifier("athlth-ipad-live-keep-awake")
 
             Button(action: onMinimize) {
-                Label(tr("Minimize", "Minimer"), systemImage: "arrow.down.right.and.arrow.up.left")
+                Group {
+                    if compact {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .accessibilityLabel(tr("Minimize", "Minimer"))
+                    } else {
+                        Label(tr("Minimize", "Minimer"), systemImage: "arrow.down.right.and.arrow.up.left")
+                    }
+                }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ink)
                     .padding(.horizontal, 14)
