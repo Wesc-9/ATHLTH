@@ -8,10 +8,13 @@ import SwiftUI
 struct ATHLTHStudioWorkoutComparisonLabView: View {
     let workouts: [WorkoutSummary]
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var session: AppSessionStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var details: [UUID: WorkoutDetail] = [:]
     @State private var cachedElevationPoints: [ElevationPoint] = []
+    @State private var intervalRecords: [ATHLTHCompletedRunningPerformance] = []
     @State private var loading = false
     @State private var markerProgress = 50.0
 
@@ -27,6 +30,33 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
     }
 
     private var points: [ElevationPoint] { cachedElevationPoints }
+
+    private struct IntervalPoint: Identifiable {
+        let run: Int
+        let index: Int
+        let speed: Double
+        var id: String { "\(run)-\(index)" }
+    }
+
+    /// Compare only recorded efforts with an exact local/HealthKit identity.
+    /// Never substitute planned target speed or match an ambiguous session.
+    private var intervalPoints: [IntervalPoint] {
+        guard intervalRecords.count == 2 else { return [] }
+        let first = intervalRecords[0].workSteps
+        let second = intervalRecords[1].workSteps
+        guard first.count >= 2, first.count == second.count,
+              first.count <= 80,
+              ATHLTHWorkoutSearch.normalized(intervalRecords[0].title) ==
+                ATHLTHWorkoutSearch.normalized(intervalRecords[1].title)
+        else { return [] }
+        return intervalRecords.enumerated().flatMap { run, record in
+            record.workSteps.enumerated().compactMap { index, step in
+                guard let speed = step.actualSpeedKilometersPerHour,
+                      speed.isFinite, speed > 0 else { return nil }
+                return IntervalPoint(run: run, index: index + 1, speed: speed)
+            }
+        }
+    }
 
     private func makeElevationPoints(
         from loaded: [UUID: WorkoutDetail]
@@ -108,6 +138,10 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
                             }
                         }
 
+                        if !intervalPoints.isEmpty {
+                            intervalComparisonCard(wide: geo.size.width >= 800 && !dynamicTypeSize.isAccessibilitySize)
+                        }
+
                         VStack(alignment: .leading, spacing: 13) {
                             Text(tr("Elevation along each recorded GPS route",
                                     "Høyde langs hver registrerte GPS-rute"))
@@ -163,8 +197,8 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
                         .padding(18)
                         .background(.white, in: RoundedRectangle(cornerRadius: 20))
                         Text(tr(
-                            "Heart-rate numbers are whole-workout averages and peaks. Per-second pulse, pace and interval curves are not shown until their actual HealthKit samples can be paired reliably.",
-                            "Pulsverdiene er gjennomsnitt og topper for hele økten. Puls-, tempo- og intervallkurver per sekund vises ikke før de faktiske HealthKit-målingene kan kobles sikkert."
+                            "Heart-rate numbers are whole-workout averages and peaks. Per-second pulse and pace curves are not shown until their actual HealthKit samples can be paired reliably.",
+                            "Pulsverdiene er gjennomsnitt og topper for hele økten. Puls- og tempokurver per sekund vises ikke før de faktiske HealthKit-målingene kan kobles sikkert."
                         ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -182,10 +216,20 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
                     Button(tr("Done", "Ferdig")) { dismiss() }
                 }
             }
-            .task(id: workouts.map(\.id).map(\.uuidString).joined()) {
+            .task(id: session.profile.userID.uuidString + workouts.map(\.id).map(\.uuidString).joined()) {
                 guard workouts.count == 2 else { return }
                 loading = true
                 cachedElevationPoints = []
+                details = [:]
+                intervalRecords = []
+                let history = ATHLTHRunningPerformanceHistory.load(userID: session.profile.userID)
+                let matched = workouts.compactMap { workout -> ATHLTHCompletedRunningPerformance? in
+                    let exact = history.filter { $0.healthWorkoutUUID == workout.id || $0.id == workout.id }
+                    return exact.count == 1 ? exact.first : nil
+                }
+                if matched.count == 2, matched[0].id != matched[1].id {
+                    intervalRecords = matched
+                }
                 defer { loading = false }
                 var loaded: [UUID: WorkoutDetail] = [:]
                 for workout in workouts {
@@ -198,6 +242,41 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
             }
             .accessibilityIdentifier("athlth-ipad-workout-lab")
         }
+    }
+
+    private func intervalComparisonCard(wide: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(tr("Recorded effort speeds", "Registrert fart per drag"))
+                .font(.headline)
+            Chart(intervalPoints) { point in
+                BarMark(
+                    x: .value(tr("Effort", "Drag"), String(point.index)),
+                    y: .value("km/t", point.speed)
+                )
+                .position(by: .value("Session", point.run))
+                .foregroundStyle(point.run == 0 ? ATHLTHStudioStyle.gold : ATHLTHStudioStyle.ink)
+            }
+            .frame(height: wide ? 250 : 180)
+            ForEach(Array(intervalRecords.enumerated()), id: \.element.id) { index, record in
+                HStack {
+                    Circle().fill(index == 0 ? ATHLTHStudioStyle.gold : ATHLTHStudioStyle.ink)
+                        .frame(width: 9, height: 9)
+                    Text(record.completedAt.formatted(date: .abbreviated, time: .shortened))
+                    Spacer()
+                    if let speed = record.averageWorkSpeed {
+                        Text(String(format: "%.1f km/t", speed)).monospacedDigit()
+                    }
+                }
+                .font(.caption)
+            }
+            Text(tr("Efforts are aligned by their recorded order. Missing measured speeds are omitted; treadmill data may be user reported.",
+                    "Dragene sammenlignes etter registrert rekkefølge. Manglende fart vises ikke; tredemølleverdier kan være manuelt registrert."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityIdentifier("athlth-ipad-compare-recorded-intervals")
     }
 
     private func comparisonCard(
