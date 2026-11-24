@@ -685,6 +685,7 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
             // Exercise the real native tab hierarchy for the transition test.
             // The standalone compatibility switch below cannot change tabs.
             ProductRootTabView()
+                .onAppear { ATHLTHTrainSmokeTrace.record("native-preview-root-appeared") }
         } else {
             // Keep isolated cold-start checks for individual tab content.
             switch requestedTab {

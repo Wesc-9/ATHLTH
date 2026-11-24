@@ -226,9 +226,12 @@ jobs:
             local marker="$container/tmp/athlth-train-$pid-dashboard-ready"
             local expected_transition="${4:-false}"
             local transition="$container/tmp/athlth-train-$pid-native-home-to-train"
-            for attempt in $(seq 1 30); do
+            local first_hop="$container/tmp/athlth-train-$pid-native-first-hop-verified"
+            local attempts=30
+            if [ "$expected_transition" = true ]; then attempts=75; fi
+            for attempt in $(seq 1 "$attempts"); do
               if [ -s "$marker" ] && kill -0 "$pid" 2>/dev/null; then
-                if [ "$expected_transition" != true ] || [ -s "$transition" ]; then
+                if [ "$expected_transition" != true ] || { [ -s "$transition" ] && [ -s "$first_hop" ]; }; then
                   echo "Verified real Train Today dashboard mounted: $label (PID $pid)."
                   return 0
                 fi
@@ -237,6 +240,7 @@ jobs:
             done
             echo "Train lifecycle evidence for PID $pid:"
             find "$container/tmp" -maxdepth 1 -name "athlth-train-$pid-*" -print
+            simctl_bounded "collect Train lifecycle logs" 65 spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
             echo "::error::$label did not mount the real Train Today dashboard or perform the required native transition."
             return 1
           }
@@ -445,7 +449,7 @@ jobs:
             # native tabs. A cold-start screenshot of tab 1 cannot detect it.
             echo "Smoke testing Home -> Train tab switch on $DEVICE_NAME"
             set +e
-            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch "$UDID" com.wesc9.athlth \
+            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch --terminate-running-process "$UDID" com.wesc9.athlth \
               --athlth-compatibility-preview \
               --athlth-compatibility-tab=0 \
               --athlth-smoke-home-train-hop \
@@ -458,8 +462,8 @@ jobs:
               exit 1
             fi
             HOP_PID=$(echo "$HOP_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
-            # The app changes selectedTab after 950ms, then gets time to
-            # process layout and AttributeGraph updates before verification.
+            # A fresh native process drives the transition only after Home
+            # actually appears. Evidence is required before accepting a frame.
             sleep 8
             if [ -z "$HOP_PID" ] || ! kill -0 "$HOP_PID" 2>/dev/null; then
               echo "::error::ATHLTH crashed during Home -> Train transition on $DEVICE_NAME."
@@ -467,7 +471,6 @@ jobs:
               exit 1
             fi
             HOP_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-home-train.png"
-            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train"
             verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME Home-to-Train" true
             validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train after dashboard mount"
             # Prove all 100 same-process Home -> Train cycles completed.

@@ -345,3 +345,5 @@ ATHLTH 3.0.1 build 141 — authorized gated retry following Train architecture a
 ATHLTH 3.0.1 build 141 — user-authorized TestFlight upload on current release after Train stability changes (source 0090997c4ad57c1b918ca9e58b66b6956d388c27). Trigger-only commit; do not merge separate Alive experiments or future Nutrition/PT features. All five exact-commit release gates, signed archive and verified App Store Connect delivery remain mandatory; no stale upload or bypass.
 
 ATHLTH 3.0.1 build 141 — user-authorized TestFlight upload 2026-11-24; latest Garmin data integration and shared Watch selection, source e51a2dbd923e424b1253dfdbc80627924fe5ded6. Require all five exact-commit release gates, signing, archive and confirmed App Store Connect delivery. Keep experimental Connect IQ live SDK and offline audio disabled in production. No version bump unless confirmed build collision; no CI bypass or stale upload.
+
+ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry after native Home-to-Train smoke lifecycle repair and fresh simulator app launch, 2026-11-24. Keep five exact-commit gates, real dashboard evidence and 100 cycles required; no bypass.

@@ -341,6 +341,11 @@ struct ProductRootTabView: View {
                 sideMenuUnreadCount: visibleAppBadgeCount,
                 isActive: selectedTab == 0
             )
+                .onAppear {
+                    if selectedTab == 0 {
+                        ATHLTHTrainSmokeTrace.record("native-home-appeared")
+                    }
+                }
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
 
@@ -389,7 +394,58 @@ struct ProductRootTabView: View {
         // before attaching global notifications, overlays and state hooks.
         .athlthStablePresentationBoundary()
         .environmentObject(goalAccountSync)
+        .task {
+            #if targetEnvironment(simulator)
+            await runNativeTrainSmoke()
+            #endif
+        }
     }
+
+    #if targetEnvironment(simulator)
+    @MainActor
+    private func runNativeTrainSmoke() async {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--athlth-compatibility-preview"),
+              args.contains("--athlth-smoke-home-train-hop"),
+              !ATHLTHTrainSmokeTrace.hasRecorded("native-driver-started")
+        else { return }
+        ATHLTHTrainSmokeTrace.record("native-driver-started")
+        // Wait for Home's actual appearance, not a fixed delay from process launch.
+        for _ in 0..<120 {
+            if Task.isCancelled { return }
+            if selectedTab == 0 && ATHLTHTrainSmokeTrace.hasRecorded("native-home-appeared") { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        guard !Task.isCancelled, selectedTab == 0,
+              ATHLTHTrainSmokeTrace.hasRecorded("native-home-appeared")
+        else { ATHLTHTrainSmokeTrace.record("native-home-timeout"); return }
+        // The first transition uses the real native TabView binding.
+        selectedTab = 1
+        for _ in 0..<120 {
+            if Task.isCancelled { return }
+            if ATHLTHTrainSmokeTrace.hasRecorded("native-home-to-train"),
+               ATHLTHTrainSmokeTrace.hasRecorded("dashboard-ready") { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        guard !Task.isCancelled, selectedTab == 1,
+              ATHLTHTrainSmokeTrace.hasRecorded("native-home-to-train"),
+              ATHLTHTrainSmokeTrace.hasRecorded("dashboard-ready")
+        else { ATHLTHTrainSmokeTrace.record("native-train-timeout"); return }
+        ATHLTHTrainSmokeTrace.record("native-first-hop-verified")
+        guard args.contains("--athlth-smoke-home-train-stress") else { return }
+        try? await Task.sleep(for: .seconds(2))
+        for hop in 1...100 {
+            guard !Task.isCancelled, selectedTab == 1 else { return }
+            selectedTab = 0
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled, selectedTab == 0 else { return }
+            selectedTab = 1
+            try? await Task.sleep(for: .milliseconds(750))
+            guard !Task.isCancelled, selectedTab == 1 else { return }
+            ATHLTHTrainSmokeTrace.record("stress-hop-\(hop)")
+        }
+    }
+    #endif
 
     private var tabsWithNotificationSheets: some View {
         ATHLTHRootNotificationSheetHost(
@@ -429,35 +485,6 @@ struct ProductRootTabView: View {
                 selectedTab = persistedSelectedTab
             }
             restoreInterruptedPlanTabIfNeeded()
-            // Simulator-only smoke path: start on Home, then exercise the
-            // real native TabView selection transition into Train. Unlike
-            // launching directly on tab 1, this reproduces the build-135
-            // Home -> Train AttributeGraph stack overflow path.
-            #if targetEnvironment(simulator)
-            if isCompatibilityPreview && ProcessInfo.processInfo.arguments.contains(
-                "--athlth-smoke-home-train-hop"
-            ) {
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(950))
-                    guard !Task.isCancelled else { return }
-                    selectedTab = 1
-                    guard ProcessInfo.processInfo.arguments.contains(
-                        "--athlth-smoke-home-train-stress"
-                    ) else { return }
-                    try? await Task.sleep(for: .seconds(2))
-                    for hop in 1...100 {
-                        guard !Task.isCancelled, selectedTab == 1 else { return }
-                        selectedTab = 0
-                        try? await Task.sleep(for: .milliseconds(750))
-                        guard !Task.isCancelled, selectedTab == 0 else { return }
-                        selectedTab = 1
-                        try? await Task.sleep(for: .milliseconds(750))
-                        guard !Task.isCancelled, selectedTab == 1 else { return }
-                        ATHLTHTrainSmokeTrace.record("stress-hop-\(hop)")
-                    }
-                }
-            }
-            #endif
         }
         .task {
             updateDailyCheckInReminder()
@@ -13412,6 +13439,16 @@ private struct ProfileHexagonBadgeShape:
 /// Non-sensitive, per-process simulator-only evidence. No production
 /// recording, account data or workout state is changed by diagnostics.
 enum ATHLTHTrainSmokeTrace {
+    #if targetEnvironment(simulator)
+    static func hasRecorded(_ stage: String) -> Bool {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let marker = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            .appendingPathComponent("tmp", isDirectory: true)
+            .appendingPathComponent("athlth-train-\(pid)-\(stage)")
+        return FileManager.default.fileExists(atPath: marker.path)
+    }
+    #endif
+
     static func record(_ stage: String) {
         #if targetEnvironment(simulator)
         guard ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview")
