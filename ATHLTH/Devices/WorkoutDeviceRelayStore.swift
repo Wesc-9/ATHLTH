@@ -240,6 +240,7 @@ enum WorkoutDeviceRelayClaimPolicy {
         payloadTarget: String,
         payloadKind: String,
         payloadVersion: Int,
+        standaloneID: UUID? = nil,
         expiresAt: Date,
         claimedDeviceID: String?,
         expectedDeviceID: String,
@@ -252,7 +253,8 @@ enum WorkoutDeviceRelayClaimPolicy {
             kind == payloadKind &&
             expiresAt > now &&
             expiresAt.timeIntervalSince1970.isFinite &&
-            (payloadVersion == 1 || payloadVersion == 2) &&
+            ((payloadVersion == 1 && standaloneID == nil) ||
+                (payloadVersion == 2 && standaloneID != nil && (kind == "run" || kind == "walk"))) &&
             claimedDeviceID == expectedDeviceID &&
             !expectedDeviceID.isEmpty &&
             completedAt == nil && failedAt == nil
@@ -1140,6 +1142,7 @@ final class WorkoutDeviceRelayStore:
                 payloadTarget: record.payload.target.rawValue,
                 payloadKind: record.payload.kind.rawValue,
                 payloadVersion: record.payload.version,
+                standaloneID: record.payload.standaloneSessionID,
                 expiresAt: record.expiresAt,
                 claimedDeviceID: record.claimedByDeviceID,
                 expectedDeviceID: ATHLTHDeviceRole.persistentDeviceID,
