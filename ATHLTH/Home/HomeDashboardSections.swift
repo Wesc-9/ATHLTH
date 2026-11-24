@@ -508,11 +508,7 @@ struct HomeHealthMetricStrip: View {
         #endif
         return NavigationLink {
             #if ATHLTH_GARMIN_PERSONAL && DEBUG
-            if reading != nil, let account = garminAccount {
-                GarminExistingMetricDetailView(kind: kind, accountID: account)
-            } else {
-                HomeHealthMetricDetailView(kind: kind, snapshot: snapshot)
-            }
+            HomeHealthMetricDetailView(kind: kind, snapshot: snapshot)
             #else
             HomeHealthMetricDetailView(kind: kind, snapshot: snapshot)
             #endif
@@ -655,7 +651,7 @@ struct HomeHealthMetricStrip: View {
                 HomeMetricMiniBars(
                     values:
                         reading != nil
-                            ? Array(repeating: nil, count: 7)
+                            ? garminBarValues(kind)
                             : Array(points(for: kind).suffix(7).map(\.value)),
                     tint: kind.tint,
                     zeroIsEmpty:
@@ -694,6 +690,21 @@ struct HomeHealthMetricStrip: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func garminBarValues(_ kind: HomeHealthMetricKind) -> [Double?] {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if let account = garminAccount, let metric = kind.garminLibraryMetric {
+            let series = garminStore.libraryHistory(metric, account: account, days: 7)
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: .now)
+            return (0..<7).reversed().map { offset in
+                guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
+                return series.first { calendar.isDate($0.date, inSameDayAs: date) }?.value
+            }
+        }
+        #endif
+        return Array(repeating: nil, count: 7)
     }
 
     private func points(
@@ -901,6 +912,15 @@ struct HomeHealthMetricDetailView:
     View {
     @EnvironmentObject private var health:
         HealthKitManager
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var garminSession: AppSessionStore
+    @Environment(\.scenePhase) private var garminPhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        garminPhase == .active && garminSession.signedIn && !garminSession.previewModeEnabled
+            ? garminSession.profile.userID : nil
+    }
+    #endif
 
     let kind: HomeHealthMetricKind
     let snapshot:
@@ -961,9 +981,7 @@ struct HomeHealthMetricDetailView:
                                     )
                             )
 
-                        Text(
-                            detailSubtitle
-                        )
+                        Text(garminReading.map { $0.source + " · tilgjengelig historikk" } ?? detailSubtitle)
                         .font(.caption)
                         .foregroundStyle(
                             ATHLTHTheme
@@ -1283,8 +1301,23 @@ struct HomeHealthMetricDetailView:
         return snapshot
     }
 
+    private var garminReading: GarminLibraryReading? {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if let account = garminAccount, let metric = kind.garminLibraryMetric {
+            return garminStore.libraryReading(metric, account: account, apple: metric.currentValue(in: health))
+        }
+        #endif
+        return nil
+    }
+
     private var points:
         [HomeMetricPoint] {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if garminReading != nil, let account = garminAccount, let metric = kind.garminLibraryMetric {
+            return garminStore.libraryHistory(metric, account: account, days: selectedRange.rawValue)
+                .map { HomeMetricPoint(date: $0.date, value: $0.value) }
+        }
+        #endif
         if kind == .steps {
             return HomeStepsTrend.points(
                 from: loadedSteps,
@@ -1372,6 +1405,7 @@ struct HomeHealthMetricDetailView:
 
     private var latestValueText:
         String {
+        if let reading = garminReading { return formattedMetricValue(reading.value) }
         // Match the live Home sleep value, not a possibly older trend cache.
         if kind == .sleep, health.sleep.totalAsleep > 0 {
             return formattedMetricValue(health.sleep.totalAsleep / 3_600)

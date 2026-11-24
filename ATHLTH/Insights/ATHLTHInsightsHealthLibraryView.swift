@@ -16,8 +16,8 @@ struct ATHLTHInsightsHealthLibraryView: View {
                     ))
                     .font(.system(size: 32, weight: .regular, design: .serif))
                     Text(ATHLTHLocalization.choose(
-                        english: "Only measurements recorded in Apple Health. Open a metric for its history.",
-                        norwegian: "Kun registrerte målinger fra Apple Health. Trykk på en måling for historikk."
+                        english: "Recorded health measurements. Open a metric for its history and source.",
+                        norwegian: "Registrerte helsemålinger. Trykk på en måling for historikk og kilde."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHInsightsStyle.muted)
@@ -120,7 +120,26 @@ struct ATHLTHInsightsHealthLibraryView: View {
 struct ATHLTHInsightsHealthAreaView: View {
     let area: ATHLTHInsightHealthArea
     @EnvironmentObject private var health: HealthKitManager
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var garminSession: AppSessionStore
+    @Environment(\.scenePhase) private var garminPhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        garminPhase == .active && garminSession.signedIn && !garminSession.previewModeEnabled
+            ? garminSession.profile.userID : nil
+    }
+    #endif
     @State private var latest: [ATHLTHInsightHealthMetric: Double] = [:]
+
+    private func displayValue(_ metric: ATHLTHInsightHealthMetric) -> String {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if let account = garminAccount, let reading = garminStore.libraryReading(
+            metric, account: account, apple: metric.currentValue(in: health)) {
+            return metric.formatted(reading.value) + " · " + reading.source
+        }
+        #endif
+        return metric.formatted(metric.currentValue(in: health) ?? latest[metric])
+    }
 
     var body: some View {
         ScrollView {
@@ -160,9 +179,7 @@ struct ATHLTHInsightsHealthAreaView: View {
                                 .foregroundStyle(ATHLTHInsightsStyle.ink)
                                 .lineLimit(2)
                             Spacer(minLength: 4)
-                            Text(metric.formatted(
-                                metric.currentValue(in: health) ?? latest[metric]
-                            ))
+                            Text(displayValue(metric))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHInsightsStyle.ink)
                                 .lineLimit(1)
@@ -214,6 +231,15 @@ struct ATHLTHInsightsHealthAreaView: View {
 struct ATHLTHInsightsHealthMetricDetailView: View {
     let metric: ATHLTHInsightHealthMetric
     @EnvironmentObject private var health: HealthKitManager
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var garminSession: AppSessionStore
+    @Environment(\.scenePhase) private var garminPhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        garminPhase == .active && garminSession.signedIn && !garminSession.previewModeEnabled
+            ? garminSession.profile.userID : nil
+    }
+    #endif
     @State private var period = 30
     @State private var values: [ATHLTHInsightHealthDay] = []
     @State private var loading = false
@@ -221,7 +247,26 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
     @State private var recoveryFullHistory: [ATHLTHInsightHealthDay] = []
     @State private var recoveryHistoryLoaded = false
 
+    private var garminReading: GarminLibraryReading? {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if let account = garminAccount {
+            return garminStore.libraryReading(metric, account: account, apple: metric.currentValue(in: health))
+        }
+        #endif
+        return nil
+    }
+
+    private var displayedValues: [ATHLTHInsightHealthDay] {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if garminReading != nil, let account = garminAccount {
+            return garminStore.libraryHistory(metric, account: account, days: period)
+        }
+        #endif
+        return values
+    }
+
     private var latest: Double? {
+        if let reading = garminReading { return reading.value }
         let lastRecorded = metric == .heartRateRecovery
             ? recoveryFullHistory.last?.value
             : values.last?.value
@@ -242,6 +287,9 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                         .font(.system(size: 32, weight: .semibold, design: .rounded))
                         .foregroundStyle(ATHLTHInsightsStyle.ink)
                         .accessibilityLabel(metric.title + ": " + metric.formatted(latest))
+                    if let reading = garminReading {
+                        Text(reading.source).font(.caption).foregroundStyle(ATHLTHInsightsStyle.muted)
+                    }
                     if metric == .heartRateRecovery,
                        let recent = recoveryFullHistory.last {
                         Text(
@@ -285,7 +333,7 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                     if loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 165)
-                    } else if values.isEmpty {
+                    } else if displayedValues.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization.choose(
                                 english: "No readings available",
@@ -306,7 +354,7 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                         )
                         .frame(minHeight: 165)
                     } else {
-                        Chart(values) { item in
+                        Chart(displayedValues) { item in
                             if metric == .heartRateRecovery {
                                 BarMark(
                                     x: .value("Dag", item.date),
@@ -351,8 +399,8 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                                 norwegian: "registrerte verdier per dag"
                             ))
                         Text(ATHLTHLocalization.choose(
-                            english: "\(values.count) days with measurements in this period",
-                            norwegian: "\(values.count) dager med målinger i perioden"
+                            english: "\(displayedValues.count) days with measurements in this period",
+                            norwegian: "\(displayedValues.count) dager med målinger i perioden"
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHInsightsStyle.muted)
@@ -406,8 +454,8 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                 }
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Apple Health · Values may differ by device and recording conditions. A single reading is not a medical diagnosis.",
-                    norwegian: "Apple Health · Målinger varierer med enhet og registreringsforhold. En enkeltmåling er ikke en medisinsk diagnose."
+                    english: "\(garminReading?.source ?? "Apple Health") · Values may differ by device and recording conditions. A single reading is not a medical diagnosis.",
+                    norwegian: "\(garminReading?.source ?? "Apple Helse") · Målinger varierer med enhet og registreringsforhold. En enkeltmåling er ikke en medisinsk diagnose."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHInsightsStyle.muted)
@@ -452,9 +500,38 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
 
 struct ATHLTHInsightsSleepStagesCard: View {
     @EnvironmentObject private var health: HealthKitManager
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var garminSession: AppSessionStore
+    @Environment(\.scenePhase) private var garminPhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        garminPhase == .active && garminSession.signedIn && !garminSession.previewModeEnabled
+            ? garminSession.profile.userID : nil
+    }
+    #endif
+
+    private var garminStages: (Double, Double, Double)? {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if let account = garminAccount,
+           garminStore.libraryReading(.sleepDuration, account: account, apple: health.sleep.totalAsleep / 3600) != nil,
+           let snapshot = garminStore.snapshot(for: account), let stages = snapshot.sleepStages,
+           let light = stages.lightSleepSeconds, let deep = stages.deepSleepSeconds, let rem = stages.remSleepSeconds,
+           [light, deep, rem].allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 86400 }) {
+            return (light, deep, rem)
+        }
+        #endif
+        return nil
+    }
 
     private var stages: [(String, TimeInterval, Color)] {
-        [
+        if let g = garminStages {
+            return [
+                ("Lett · Garmin", g.0, Color(red: 0.75, green: 0.67, blue: 0.53)),
+                ("Dyp", g.1, Color(red: 0.52, green: 0.49, blue: 0.45)),
+                ("REM", g.2, Color(red: 0.79, green: 0.80, blue: 0.78))
+            ]
+        }
+        return [
             (ATHLTHLocalization.choose(english: "Core", norwegian: "Kjerne"),
              health.sleep.core, Color(red: 0.75, green: 0.67, blue: 0.53)),
             (ATHLTHLocalization.choose(english: "Deep", norwegian: "Dyp"),

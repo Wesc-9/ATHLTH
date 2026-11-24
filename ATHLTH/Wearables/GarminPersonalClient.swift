@@ -74,6 +74,12 @@ struct GarminPersonalPreview {
     let unavailableSections: Int
     let measurementDay: Date
     let historyPossiblyTruncated: Bool
+    let sleepStages: GarminPersonalSleep.Day?
+    let stepsHistory: [String: Double]
+    let hrvHistory: [String: Double]
+    let restingHeartHistory: [String: Double]
+    let activeEnergy: Double?
+    let basalEnergy: Double?
 }
 
 @MainActor
@@ -210,7 +216,7 @@ final class GarminPersonalClient {
         }
         let dateQuery = [URLQueryItem(name: "date", value: day)]
         let steps = try await optional([GarminPersonalSteps].self,
-            path: "/usersummary-service/stats/steps/daily/" + day + "/" + day)
+            path: "/usersummary-service/stats/steps/daily/" + from + "/" + day)
         let sleep = try await optional(GarminPersonalSleep.self,
             path: "/sleep-service/sleep/dailySleep", query: dateQuery)
         let heart = try await optional(GarminPersonalHeart.self,
@@ -218,17 +224,35 @@ final class GarminPersonalClient {
         let hrv = try await optional(GarminPersonalHRV.self, path: "/hrv-service/hrv/" + day)
         let summary = try await optional(GarminPersonalDailySummary.self,
             path: "/usersummary-service/v2/dailysummaries",
-            query: [.init(name: "startDate", value: day), .init(name: "endDate", value: day)])
+            query: [.init(name: "startDate", value: from), .init(name: "endDate", value: day)])
+        let hrvHistory = try await optional(GarminPersonalHRVHistory.self,
+            path: "/hrv-service/hrv/daily/" + from + "/" + day)
         let daily = summary?.data.first { $0.calendarDate == day }
+        var stepsByDay: [String: Double] = [:]
+        var hrvByDay: [String: Double] = [:]
+        var restByDay: [String: Double] = [:]
+        for entry in steps ?? [] {
+            if let value = entry.totalSteps, value >= 0 { stepsByDay[entry.calendarDate] = Double(value) }
+        }
+        for entry in hrvHistory?.hrvSummaries ?? [] {
+            if let value = entry.lastNightAvg, value.isFinite, value > 0 { hrvByDay[entry.calendarDate] = value }
+        }
+        for entry in summary?.data ?? [] {
+            if let date = entry.calendarDate, let value = entry.restingHeartRate,
+               value.isFinite, value > 0 { restByDay[date] = value }
+        }
+        let sleepDay = sleep?.day.calendarDate == day ? sleep?.day : nil
         return GarminPersonalPreview(
             workouts: workouts.values.sorted { $0.workout.startedAt > $1.workout.startedAt },
             steps: steps?.first { $0.calendarDate == day }?.totalSteps,
-            sleepSeconds: sleep?.sleepTimeSeconds, restingHeartRate: heart?.restingHeartRate,
-            overnightHRV: hrv?.hrvSummary?.lastNightAvg,
+            sleepSeconds: sleepDay?.sleepTimeSeconds, restingHeartRate: heart?.restingHeartRate ?? restByDay[day],
+            overnightHRV: hrv?.hrvSummary?.lastNightAvg ?? hrvByDay[day],
             averageStress: daily?.averageStressLevel, bodyBatteryHigh: daily?.bodyBatteryHighestValue,
             bodyBatteryLow: daily?.bodyBatteryLowestValue, unavailableSections: unavailable,
             measurementDay: Calendar.current.startOfDay(for: today),
-            historyPossiblyTruncated: possiblyTruncated)
+            historyPossiblyTruncated: possiblyTruncated, sleepStages: sleepDay,
+            stepsHistory: stepsByDay, hrvHistory: hrvByDay, restingHeartHistory: restByDay,
+            activeEnergy: daily?.activeKilocalories, basalEnergy: daily?.bmrKilocalories)
     }
 }
 #endif

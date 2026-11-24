@@ -271,6 +271,9 @@ struct ATHLTHiPadStudioRootView: View {
 
     var body: some View {
         studioNavigationContent
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        .background { GarminPersonalAccountBoundary().frame(width: 0, height: 0) }
+        #endif
         .inspector(isPresented: $showingInspector) {
             // The message view now owns its back, search and compose controls.
             // Removing the separate "Inbox panel" bar gives the messages

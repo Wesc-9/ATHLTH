@@ -164,6 +164,9 @@ private struct ATHLTHStudioHomeProjection {
 struct ATHLTHStudioEditorialDashboardView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    #endif
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -433,6 +436,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .task(id: session.profile.userID) {
             scheduleProjectionRefresh()
         }
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        .task(id: "\(session.profile.userID)|\(scenePhase)|\(garminStore.connected)") {
+            guard scenePhase == .active, session.signedIn, !session.previewModeEnabled else { return }
+            garminStore.refresh(account: session.profile.userID)
+        }
+        #endif
         .onReceive(health.$workouts) { _ in
             scheduleProjectionRefresh()
         }
@@ -1513,22 +1522,20 @@ struct ATHLTHStudioEditorialDashboardView: View {
             HStack(alignment: .top, spacing: 7) {
                 readinessSignal(
                     title: tr("Sleep", "Søvn"),
-                    value: hasHealth && health.sleep.totalAsleep > 0
-                        ? String(format: "%.1f t",
-                                 health.sleep.totalAsleep / 3_600)
-                        : "—"
+                    value: displayReading(.sleepDuration, fallback: hasHealth && health.sleep.totalAsleep > 0
+                        ? String(format: "%.1f t", health.sleep.totalAsleep / 3_600) : "—")
                 )
                 readinessSignal(
                     title: "HRV",
-                    value: hasHealth ? health.heart.hrvMilliseconds.map {
+                    value: displayReading(.hrv, fallback: hasHealth ? health.heart.hrvMilliseconds.map {
                         String(format: "%.0f ms", $0)
-                    } ?? "—" : "—"
+                    } ?? "—" : "—")
                 )
                 readinessSignal(
                     title: tr("Resting HR", "Hvilepuls"),
-                    value: hasHealth ? health.heart.restingHeartRate.map {
+                    value: displayReading(.restingHeartRate, fallback: hasHealth ? health.heart.restingHeartRate.map {
                         String(format: "%.0f bpm", $0)
-                    } ?? "—" : "—"
+                    } ?? "—" : "—")
                 )
             }
 
@@ -1565,6 +1572,17 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 .allowsHitTesting(false)
         }
         .accessibilityIdentifier("athlth-ipad-readiness-compact")
+    }
+
+    private func displayReading(_ metric: ATHLTHInsightHealthMetric, fallback: String) -> String {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if scenePhase == .active, session.signedIn, !session.previewModeEnabled,
+           let reading = garminStore.libraryReading(metric, account: session.profile.userID,
+                                                    apple: metric.currentValue(in: health)) {
+            return metric.formatted(reading.value) + " · " + reading.source
+        }
+        #endif
+        return fallback
     }
 
     private func readinessSignal(title: String, value: String) -> some View {

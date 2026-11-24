@@ -73,45 +73,6 @@ struct GarminPersonalHistoryRows: View {
         if workouts.isEmpty { Text("Ingen Garmin-økter i valgt periode.") }
     }
 }
-@MainActor
-struct GarminExistingMetricDetailView: View {
-    let kind: HomeHealthMetricKind
-    let accountID: UUID
-    @EnvironmentObject private var session: AppSessionStore
-    @Environment(\.scenePhase) private var scenePhase
-    @ObservedObject private var store = GarminPersonalLocalStore.shared
-    private var reading: GarminDisplayReading? {
-        guard scenePhase == .active, session.signedIn, !session.previewModeEnabled,
-              session.profile.userID == accountID, let snapshot = store.snapshot(for: accountID),
-              Calendar.current.isDateInToday(snapshot.measurementDay) else { return nil }
-        switch kind {
-        case .sleep:
-            return WearableDisplaySourcePolicy.garminReading(metric: .sleep, apple: nil, garmin: snapshot.sleepSeconds, preference: .garmin)
-        case .steps:
-            return WearableDisplaySourcePolicy.garminReading(metric: .steps, apple: nil, garmin: snapshot.steps.map(Double.init), preference: .garmin)
-        case .hrv:
-            return WearableDisplaySourcePolicy.garminReading(metric: .hrv, apple: nil, garmin: snapshot.overnightHRV, preference: .garmin)
-        default: return nil
-        }
-    }
-    var body: some View {
-        Form {
-            Section("Siste verdi") {
-                LabeledContent(kind.title, value: reading?.formattedValue ?? "—")
-                LabeledContent("Kilde", value: reading?.sourceLabel ?? "Garmin")
-                Text("Historiske trender fra Garmin er ikke tilgjengelige ennå.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            if kind == .hrv {
-                Text("Garmin natt-HRV vises separat fra Apple Helses HRV-metode. Verdiene blandes ikke i en grunnlinje.")
-                    .font(.caption)
-            }
-        }
-        .navigationTitle(kind.title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 struct GarminExistingWorkoutRow: View {
     let item: GarminImportedActivity
     let possibleDuplicate: Bool

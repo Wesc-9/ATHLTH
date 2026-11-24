@@ -51,10 +51,29 @@ struct GarminPersonalSteps: Decodable {
 }
 
 struct GarminPersonalSleep: Decodable {
-    let sleepTimeSeconds: Double?
-    let deepSleepSeconds: Double?
-    let lightSleepSeconds: Double?
-    let remSleepSeconds: Double?
+    struct Day: Decodable {
+        let calendarDate: String?
+        let sleepTimeSeconds: Double?
+        let deepSleepSeconds: Double?
+        let lightSleepSeconds: Double?
+        let remSleepSeconds: Double?
+        let awakeSleepSeconds: Double?
+    }
+    let day: Day
+    private enum CodingKeys: String, CodingKey { case dailySleepDTO }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decodeIfPresent(Day.self, forKey: .dailySleepDTO) ?? Day(from: decoder)
+    }
+}
+
+struct GarminPersonalHRVHistoryDay: Decodable {
+    let calendarDate: String
+    let lastNightAvg: Double?
+}
+
+struct GarminPersonalHRVHistory: Decodable {
+    let hrvSummaries: [GarminPersonalHRVHistoryDay]
 }
 
 struct GarminPersonalHeart: Decodable {
@@ -72,6 +91,9 @@ struct GarminPersonalDailySummary: Decodable {
         let averageStressLevel: Double?
         let bodyBatteryHighestValue: Double?
         let bodyBatteryLowestValue: Double?
+        let restingHeartRate: Double?
+        let activeKilocalories: Double?
+        let bmrKilocalories: Double?
     }
     let data: [Day]
 }
