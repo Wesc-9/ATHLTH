@@ -1185,6 +1185,50 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertFalse(second.isExpanded)
     }
 
+    func testRemoteControlRequiresOriginalAccountSessionDeviceGrantAndFreshCommand() {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let account = UUID(), session = UUID(), grant = UUID()
+        let command = ATHLTHRemoteWorkoutControlCommand(
+            id: UUID(), userID: account, sessionID: session,
+            targetDeviceID: "phone-a", grantID: grant, action: .pause,
+            expectedStep: nil, expectedRestEnd: nil, requestedAt: now,
+            expiresAt: now.addingTimeInterval(25))
+        let policy = ATHLTHRemoteWorkoutControlPolicy.self
+        XCTAssertTrue(policy.accepts(command, accountID: account, sessionID: session,
+            deviceID: "phone-a", grantID: grant, available: [.pause, .end], at: now))
+        XCTAssertFalse(policy.accepts(command, accountID: UUID(), sessionID: session,
+            deviceID: "phone-a", grantID: grant, available: [.pause], at: now))
+        XCTAssertFalse(policy.accepts(command, accountID: account, sessionID: UUID(),
+            deviceID: "phone-a", grantID: grant, available: [.pause], at: now))
+        XCTAssertFalse(policy.accepts(command, accountID: account, sessionID: session,
+            deviceID: "phone-b", grantID: grant, available: [.pause], at: now))
+        XCTAssertFalse(policy.accepts(command, accountID: account, sessionID: session,
+            deviceID: "phone-a", grantID: UUID(), available: [.pause], at: now))
+        XCTAssertFalse(policy.accepts(command, accountID: account, sessionID: session,
+            deviceID: "phone-a", grantID: grant, available: [.resume], at: now))
+        XCTAssertFalse(policy.accepts(command, accountID: account, sessionID: session,
+            deviceID: "phone-a", grantID: grant, available: [.pause], at: now.addingTimeInterval(26)))
+    }
+
+    func testDeviceHeartbeatExpiresAndRejectsFutureClock() {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let heartbeat = ATHLTHWorkoutDeviceHeartbeat(userID: UUID(), deviceID: "phone-a",
+            watchPaired: true, watchInstalled: true, watchReachable: true, observedAt: now)
+        XCTAssertTrue(heartbeat.isFresh(at: now))
+        XCTAssertTrue(heartbeat.isFresh(at: now.addingTimeInterval(35)))
+        XCTAssertFalse(heartbeat.isFresh(at: now.addingTimeInterval(36)))
+        XCTAssertFalse(heartbeat.isFresh(at: now.addingTimeInterval(-6)))
+    }
+
+    func testLegacyLiveSnapshotHasNoImplicitControlGrant() throws {
+        let original = snapshot()
+        let decoded = try JSONDecoder().decode(ATHLTHCrossDeviceWorkoutSnapshot.self,
+            from: JSONEncoder().encode(original))
+        XCTAssertNil(decoded.controlGrantID)
+        XCTAssertNil(decoded.controlDeviceID)
+        XCTAssertNil(decoded.supportedControls)
+    }
+
     func testIPadLiveSceneResetOnAccountChange() {
         var scene = ATHLTHiPadSceneLivePresentationState()
         let oldID = UUID()
