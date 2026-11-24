@@ -133,43 +133,40 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
     }
 
-    @ViewBuilder
-    private var dailyStatusCard: some View {
-            // The live recording replaces the planned hero, never creates
-            // a competing Start button or a second workout recorder.
-            if hasActiveWorkout, let activeWorkoutCard {
-                activeWorkoutCard
-            } else if let plan {
-                let scheduled = sessions.filter { !$0.isExplicitRestDay }
-                if scheduled.isEmpty && sessions.contains(where: \.isExplicitRestDay) {
-                    restDayCard
+    // Select a single status before constructing any SwiftUI subtree.
+    @inline(never)
+    private func makeDailyStatusCard() -> AnyView {
+        if hasActiveWorkout, let activeWorkoutCard { return activeWorkoutCard }
+        if let plan {
+            let scheduled = sessions.filter { !$0.isExplicitRestDay }
+            if scheduled.isEmpty && sessions.contains(where: \.isExplicitRestDay) {
+                return AnyView(VStack(spacing: 8) {
+                    ATHLTHTrainDeferredContent { AnyView(restDayCard) }
                     if let swapped = sessions.first(where: {
                         $0.isExplicitRestDay && $0.dailyAlternativeOriginal != nil
                     }) {
-                        undoAlternativeRow(swapped)
+                        ATHLTHTrainDeferredContent { AnyView(undoAlternativeRow(swapped)) }
                     }
-                } else if !scheduled.isEmpty &&
-                            scheduled.allSatisfy({ completedIDs.contains($0.id) }) {
-                    completedTodayCard(plan)
-                } else if let workout = primaryWorkout {
-                    workoutCard(workout, plan: plan)
-                } else if !hasRecordedWorkoutToday,
-                          scheduled.isEmpty,
-                          sessions.isEmpty,
-                          let dailyRecommendation {
-                    dailyRecommendationCard(dailyRecommendation)
-                } else {
-                    adaptiveOpenDayCard
-                }
-            } else if !standaloneSessions.isEmpty {
-                // Scheduled standalone sessions are rendered below, not an open-day prompt.
-                EmptyView()
-            } else if !hasRecordedWorkoutToday, let dailyRecommendation {
-                dailyRecommendationCard(dailyRecommendation)
-            } else {
-                adaptiveOpenDayCard
+                })
             }
-
+            if !scheduled.isEmpty && scheduled.allSatisfy({ completedIDs.contains($0.id) }) {
+                return AnyView(completedTodayCard(plan))
+            }
+            if let workout = primaryWorkout {
+                return AnyView(workoutCard(workout, plan: plan))
+            }
+            if !hasRecordedWorkoutToday && sessions.isEmpty,
+               standaloneSessions.isEmpty, let dailyRecommendation {
+                return AnyView(dailyRecommendationCard(dailyRecommendation))
+            }
+            if !standaloneSessions.isEmpty { return AnyView(EmptyView()) }
+        } else {
+            if !standaloneSessions.isEmpty { return AnyView(EmptyView()) }
+            if !hasRecordedWorkoutToday, let dailyRecommendation {
+                return AnyView(dailyRecommendationCard(dailyRecommendation))
+            }
+        }
+        return AnyView(adaptiveOpenDayCard)
     }
 
     @ViewBuilder
@@ -195,7 +192,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 ATHLTHTrainDeferredContent { AnyView(goalAndPlanCards) }
             }
             if diagnosticStage >= 3 {
-                ATHLTHTrainDeferredContent { AnyView(dailyStatusCard) }
+                ATHLTHTrainDeferredContent { makeDailyStatusCard() }
                 ATHLTHTrainDeferredContent { AnyView(remainingTodaySection) }
                 ATHLTHTrainDeferredContent { AnyView(standaloneTodaySection) }
             }
