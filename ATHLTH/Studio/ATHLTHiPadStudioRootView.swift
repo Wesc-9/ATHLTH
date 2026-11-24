@@ -273,6 +273,7 @@ struct ATHLTHiPadStudioRootView: View {
         .fullScreenCover(isPresented: $showingTrain) {
             ATHLTHStudioTrainWorkspaceView(navigationRequest: $trainRequest)
         }
+        .athlthStablePresentationBoundary()
         .fullScreenCover(item: $studioLocalLaunch) { launch in
             StructuredWorkoutSessionView(
                 workout: launch.workout, linkedPlanID: launch.planID
@@ -313,6 +314,7 @@ struct ATHLTHiPadStudioRootView: View {
         } message: {
             Text(studioLaunchError ?? "")
         }
+        .athlthStablePresentationBoundary()
         .sheet(isPresented: $showingPlanSync) {
             ATHLTHStudioPlanSyncPanel(sync: studioPlanSync)
                 .environmentObject(session)
@@ -1282,7 +1284,7 @@ struct ATHLTHiPadStudioRootView: View {
     /// measured phone/Watch sessions are handed off through the existing relay.
     private func localStudioRecipe(_ workout: PlannedSession) -> PlannedSession? {
         guard workout.kind != .running, workout.kind != .walking,
-              !workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run || $0.kind == .walk })
+              !workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run })
         else { return nil }
         if workout.isStructuredWorkout { return workout }
         return ATHLTHUnifiedWorkout.timedNonCardioProjection(from: workout)
