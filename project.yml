@@ -117,6 +117,10 @@ targets:
           APS_ENVIRONMENT: development
         Release:
           APS_ENVIRONMENT: production
+          # Retain optimized production code, but compile the large iOS module
+          # in batches instead of one 78-minute whole-module compiler task.
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: incremental
     preBuildScripts:
       - name: Restore treadmill activity hero
         basedOnDependencyAnalysis: false
