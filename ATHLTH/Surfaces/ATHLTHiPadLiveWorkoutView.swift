@@ -55,6 +55,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
     @AppStorage("athlth_ipad_live_keep_awake") private var keepAwake = false
     @State private var keepAwakeWindowID = UUID()
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
+    @State private var confirmingRemoteEnd = false
 
     private var liveMaximumBPM: Double? {
         snapshot.maximumHeartRateBPM ??
@@ -118,6 +120,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
                         .padding(.top, 4)
 
                     TrainTogetherStatusStrip()
+                    remoteControlPanel
 
                     if threeColumns {
                         HStack(alignment: .top, spacing: 16) {
@@ -220,8 +223,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
 
                     Label(
                         tr(
-                            "Read-only companion. The source device stays responsible for recording.",
-                            "Kun visning. Enheten som registrerer økten, har fortsatt ansvaret for opptaket."
+                            "The original device stays responsible for recording. Remote controls require separate permission.",
+                            "Den opprinnelige enheten har ansvaret for opptaket. Fjernstyring krever egen tillatelse."
                         ),
                         systemImage: "lock.shield"
                     )
@@ -240,6 +243,18 @@ struct ATHLTHiPadLiveWorkoutView: View {
             .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         }
         .accessibilityIdentifier("athlth-ipad-live-workout-fullscreen")
+        .confirmationDialog(
+            tr("End this workout?", "Avslutte denne økten?"),
+            isPresented: $confirmingRemoteEnd, titleVisibility: .visible
+        ) {
+            Button(tr("End workout", "Avslutt økt"), role: .destructive) {
+                sendRemoteAction(.end)
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(tr("The original recording device will finish and save this workout.",
+                    "Den opprinnelige treningsenheten avslutter og lagrer økten."))
+        }
         .onAppear {
             ATHLTHiPadKeepAwakeCoordinator.setEnabled(
                 keepAwake && scenePhase == .active, for: keepAwakeWindowID
@@ -260,6 +275,86 @@ struct ATHLTHiPadLiveWorkoutView: View {
                 false, for: keepAwakeWindowID
             )
         }
+    }
+
+    private func sendRemoteAction(_ action: ATHLTHRemoteWorkoutAction) {
+        Task {
+            await liveSharing.enqueueRemoteControl(action, snapshot: snapshot,
+                                                   accountID: session.profile.userID)
+        }
+    }
+
+    private func controlLabel(_ action: ATHLTHRemoteWorkoutAction) -> (String, String) {
+        switch action {
+        case .pause: return (tr("Pause", "Pause"), "pause.fill")
+        case .resume: return (tr("Resume", "Fortsett"), "play.fill")
+        case .end: return (tr("End workout", "Avslutt økt"), "stop.fill")
+        case .next: return (tr("Next step", "Neste deløkt"), "forward.end.fill")
+        case .skipRest: return (tr("Skip rest", "Hopp over pause"), "forward.fill")
+        }
+    }
+
+    private var remoteControlPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(tr("Workout controls", "Øktstyring"), systemImage: "ipad.and.iphone")
+                    .font(.headline).foregroundStyle(ink)
+                Spacer()
+                if liveSharing.pendingRemoteControlID != nil { ProgressView().tint(bronze) }
+            }
+            if let actions = snapshot.supportedControls, !actions.isEmpty,
+               snapshot.controlGrantID != nil {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(actions, id: \.self) { action in remoteActionButton(action) }
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(actions, id: \.self) { action in remoteActionButton(action) }
+                    }
+                }
+                .disabled(liveSharing.pendingRemoteControlID != nil ||
+                          ATHLTHiPadLiveMetrics.isDelayed(snapshot, at: .now))
+            } else {
+                Text(tr("Ask your iPhone for permission to control this session.",
+                        "Be iPhone om tillatelse til å styre denne økten."))
+                    .font(.subheadline).foregroundStyle(secondary)
+                Button {
+                    Task { await liveSharing.requestAccess(accountID: session.profile.userID) }
+                } label: {
+                    Label(tr("Request control", "Be om styring"), systemImage: "lock.open")
+                }
+                .buttonStyle(.bordered)
+                .tint(bronze)
+                .disabled(liveSharing.outgoingRequestState == .sending ||
+                          liveSharing.outgoingRequestState == .pending)
+                if liveSharing.outgoingRequestState == .pending {
+                    Text(tr("Waiting for approval on iPhone.", "Venter på godkjenning på iPhone."))
+                        .font(.caption).foregroundStyle(secondary)
+                }
+            }
+            if let message = liveSharing.remoteControlMessage {
+                Text(message).font(.caption).foregroundStyle(secondary)
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(surface, in: RoundedRectangle(cornerRadius: 18))
+        .accessibilityIdentifier("athlth-ipad-live-remote-controls")
+    }
+
+    private func remoteActionButton(_ action: ATHLTHRemoteWorkoutAction) -> some View {
+        let label = controlLabel(action)
+        return Button {
+            if action == .end { confirmingRemoteEnd = true }
+            else { sendRemoteAction(action) }
+        } label: {
+            Label(label.0, systemImage: label.1)
+                .font(.subheadline.weight(.semibold))
+                .frame(minHeight: 38)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(action == .end ? .red : bronze)
+        .accessibilityIdentifier("athlth-ipad-control-\(action.rawValue)")
     }
 
     private var topBar: some View {
