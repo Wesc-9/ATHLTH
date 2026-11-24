@@ -349,7 +349,8 @@ struct ProductRootTabView: View {
             // Its heavy dashboard content is gated inside ATHLTHTrainView.
             ATHLTHTrainView(
                 navigationRequest: $trainNavigationRequest,
-                isActive: selectedTab == 1
+                isActive: selectedTab == 1,
+                deferInitialDashboard: true
             )
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
@@ -458,7 +459,10 @@ struct ProductRootTabView: View {
             openPendingWorkoutInviteIfNeeded()
         }
         .onChange(of: selectedTab) { previous, next in
-            if session.signedIn {
+            if previous == 0 && next == 1 {
+                ATHLTHTrainSmokeTrace.record("native-home-to-train")
+            }
+            if session.signedIn && !session.previewModeEnabled {
                 persistedSelectedTab = next
                 persistedTabAccount = session.profile.userID.uuidString
             }
@@ -5522,397 +5526,634 @@ struct ATHLTHTrainView: View {
         navigationRequest:
             Binding<ATHLTHTrainNavigationRequest?> =
             .constant(nil),
-        isActive: Bool = true
+        isActive: Bool = true,
+        deferInitialDashboard: Bool = false
     ) {
         _navigationRequest = navigationRequest
         self.isActive = isActive
+        // A standalone Train workspace is already selected; it does not need
+        // to wait for a native tab animation that will never take place.
+        _trainDashboardReady = State(initialValue: isActive && !deferInitialDashboard)
     }
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                if !isActive {
-                    // Keep navigation and presentation state mounted offscreen.
-                    Color.clear
-                } else if !trainDashboardReady {
-                    // The selected tab must never be invisible while mounting.
-                    VStack(spacing: 20) {
-                        ATHLTHTrainHeaderRow(selection: $selectedSection)
-                        ProgressView()
-                            .tint(ATHLTHTheme.accentDeep)
-                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                english: "Loading training", norwegian: "Laster trening"
-                            ))
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                } else if selectedSection == .progress {
-                    ATHLTHTrainProgressReferenceView(
-                        onReturnToToday: { selectedSection = .today },
-                        onOpenPlan: { selectedSection = .plan },
-                        header: premiumTrainBrandHeader(for: .progress),
-                        scrollPosition: $progressScrollPosition
-                    )
-                    // Keep each root branch behind a separate concrete-type
-                    // boundary. iOS 27.3 beta has crashed resolving the
-                    // deeply nested Train view graph (stack overflow).
+            trainLifecycleContent
+        }
+        .onAppear {
+            ATHLTHTrainSmokeTrace.record("navigation-appeared")
+        }
+        // Only the native tab transition needs the deferred mount.
+        .task(id: isActive) {
+            guard isActive else { return }
+            ATHLTHTrainSmokeTrace.record("activation-started")
+            if !trainDashboardReady {
+                do {
+                    try await Task.sleep(for: .milliseconds(350))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, isActive else { return }
+                trainDashboardReady = true
+            }
+            ATHLTHTrainSmokeTrace.record("activation-ready")
+        }
+    }
+
+    // Keep each presentation family in its own opaque type. This retains
+    // the existing navigation owner while reducing runtime metadata depth.
+    private var trainRootSurface: some View {
+        ZStack(alignment: .top) {
+            if !isActive {
+                // Keep navigation and presentation state mounted offscreen.
+                Color.clear
+            } else if !trainDashboardReady {
+                // The selected tab must never be invisible while mounting.
+                VStack(spacing: 20) {
+                    ATHLTHTrainHeaderRow(selection: $selectedSection)
+                    ProgressView()
+                        .tint(ATHLTHTheme.accentDeep)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Loading training", norwegian: "Laster trening"
+                        ))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            } else if selectedSection == .progress {
+                ATHLTHTrainProgressReferenceView(
+                    onReturnToToday: { selectedSection = .today },
+                    onOpenPlan: { selectedSection = .plan },
+                    header: premiumTrainBrandHeader(for: .progress),
+                    scrollPosition: $progressScrollPosition
+                )
+                // Keep each root branch behind a separate concrete-type
+                // boundary. iOS 27.3 beta has crashed resolving the
+                // deeply nested Train view graph (stack overflow).
+                .athlthStablePresentationBoundary()
+                .transition(.opacity)
+            } else if selectedSection == .plan {
+                trainRootScroll(for: .plan)
                     .athlthStablePresentationBoundary()
                     .transition(.opacity)
-                } else if selectedSection == .plan {
-                    trainRootScroll(for: .plan)
-                        .athlthStablePresentationBoundary()
-                        .transition(.opacity)
-                } else {
-                    trainRootScroll(for: .today)
-                        .athlthStablePresentationBoundary()
-                        .transition(.opacity)
-                }
+            } else {
+                trainRootScroll(for: .today)
+                    .athlthStablePresentationBoundary()
+                    .transition(.opacity)
             }
-            // A short crossfade replaces the jerky animated height changes
-            // between a full-bleed Today hero and compact Plan/Progress pages.
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22),
-                       value: selectedSection)
-            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            // Keep root Train navigation metadata small regardless of which
-            // Today/Plan/Progress section is selected.
-            .athlthStablePresentationBoundary()
-            .navigationDestination(
-                isPresented: $showingLibrary
-            ) {
-                ScrollView {
-                    libraryContent
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
-                        // Leave room for the floating Train tab bar, including
-                        // the last item of the user's personal library.
-                        .padding(.bottom, 118)
-                        .frame(maxWidth: 900)
-                        .frame(maxWidth: .infinity)
-                }
-                .scrollIndicators(.hidden)
-                .background(
-                    ATHLTHPremiumCanvas(
-                        accent: ATHLTHTheme.premiumGold.opacity(0.10)
-                    )
+        }
+        // A short crossfade replaces the jerky animated height changes
+        // between a full-bleed Today hero and compact Plan/Progress pages.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22),
+                   value: selectedSection)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        // Keep root Train navigation metadata small regardless of which
+        // Today/Plan/Progress section is selected.
+        .athlthStablePresentationBoundary()
+    }
+
+    private var trainNavigationDestinations: some View {
+        trainRootSurface
+        .navigationDestination(
+            isPresented: $showingLibrary
+        ) {
+            ScrollView {
+                libraryContent
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    // Leave room for the floating Train tab bar, including
+                    // the last item of the user's personal library.
+                    .padding(.bottom, 118)
+                    .frame(maxWidth: 900)
+                    .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: ATHLTHTheme.premiumGold.opacity(0.10)
                 )
-                .navigationTitle(ATHLTHLocalization.choose(
-                    english: "Library", norwegian: "Bibliotek"
-                ))
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .navigationDestination(item: $personalLibrarySection) { section in
-                ATHLTHPersonalLibraryDestinationView(
-                    section: section,
-                    onStartRunning: { workout in
-                        pendingPlannedEnduranceWorkout = nil
-                        pendingRunningTemplate = workout
-                    },
-                    onOpenPlan: openPlanFromTrainingLibrary
-                )
-                .background(
-                    ATHLTHPremiumCanvas(
-                        accent: ATHLTHTheme.premiumGold.opacity(0.10)
-                    )
-                )
-            }
-            .navigationDestination(
-                isPresented: $showingGhostHub
-            ) {
-                GhostRaceHubView()
-            }
-            .navigationDestination(
-                isPresented: $showingTrainPlanWorkspace
-            ) {
-                ATHLTHTrainPlanWorkspaceView()
-            }
-            .navigationDestination(
-                isPresented: $showingTrainExerciseLibrary
-            ) {
-                ExerciseLibraryView()
-                    .navigationTitle(
-                        ATHLTHLocalization.choose(
-                            english: "Exercises",
-                            norwegian: "Øvelser"
-                        )
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingTrainAllPlans.keepingPresentedWhenInactive(scenePhase)) {
-                AllTrainingPlansView()
-            }
-            .sheet(isPresented: $showingAllWorkoutCategories.keepingPresentedWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                guard let action = pendingWorkoutCategoryAction else { return }
-                pendingWorkoutCategoryAction = nil
-                handleWorkoutCategoryAction(action)
-            }) {
-                ATHLTHTrainAllWorkoutCategoriesSheet { action in
-                    pendingWorkoutCategoryAction = action
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(28)
-            }
-            .sheet(item: $selectedTrainCompetitionActivity.keepingPresentedItemWhenInactive(scenePhase)) { activity in
-                switch activity {
-                case .running:
-                    ATHLTHCompetitionCreationView(
-                        initialActivity: .running,
-                        advanced: settings.resolvedAdvancedSetup(for: .running)
-                    )
-                case .walking:
-                    ATHLTHCompetitionCreationView(
-                        initialActivity: .walking,
-                        advanced: settings.resolvedAdvancedSetup(for: .walking)
-                    )
-                case .strength:
-                    ATHLTHCompetitionCreationView(
-                        initialActivity: .strength,
-                        advanced: settings.resolvedAdvancedSetup(for: .strength)
-                    )
-                }
-            }
-            // Bound the generic presentation chain before adding more destinations.
-            // This prevents one enormous nested modifier type from propagating
-            // through the entire Train root view graph on iOS 27.3.
-            .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                if let selected = trainRunningWorkoutSelection {
-                    trainRunningWorkoutSelection = nil
+            )
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Library", norwegian: "Bibliotek"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .navigationDestination(item: $personalLibrarySection) { section in
+            ATHLTHPersonalLibraryDestinationView(
+                section: section,
+                onStartRunning: { workout in
                     pendingPlannedEnduranceWorkout = nil
-                    pendingRunningTemplate = selected
-                }
-            }) {
-                NavigationStack {
-                    RunningWorkoutLibraryView(
-                        selectionTitle: ATHLTHLocalization.choose(
-                            english: "Choose running workout",
-                            norwegian: "Velg løpeøkt"
-                        ),
-                        onSelect: { workout in
-                            trainRunningWorkoutSelection = workout
-                            showingTrainRunningWorkoutLibrary = false
-                        }
-                    )
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $showingTrainIntervalComposer.keepingPresentedWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                // The interval editor closes before the running quick-start
-                // sheet is presented. Preserve the newly built interval steps.
-                guard let template = savedTrainIntervalTemplate else { return }
-                savedTrainIntervalTemplate = nil
-                pendingRunningTemplate = template
-            }) {
-                ATHLTHTrainIntervalComposerView { template in
-                    savedTrainIntervalTemplate = template
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            }
-            // Bound the generic presentation chain before adding more destinations.
-            // This prevents one enormous nested modifier type from propagating
-            // through the entire Train root view graph on iOS 27.3.
-            .athlthStablePresentationBoundary()
-            .athlthStudioEditor(item: $trainProgramCreationLaunch.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
-                guard scenePhase == .active else { return }
-                // Only an actual dismissed presentation warrants a recovery.
-                // A normal background/foreground transition never enters here.
-                if let planID = newlyCreatedPlanToOpen {
-                    unexpectedPlanDismissalNeedsRecovery = false
-                    highlightedTrainPlanID = planID
-                    selectedTrainPlanWeekIndex = 0
-                    selectedSection = .plan
-                    newlyCreatedPlanToOpen = nil
-                } else if TrainProgramCreationLaunch.interruptedDraft(
-                    userID: session.profile.userID,
-                    store: ATHLTHPlanCreationDraftStore()
-                ) != nil {
-                    // The user neither saved-and-closed nor discarded. iOS
-                    // removed the sheet: keep the checkpoint and recover only
-                    // this presentation when the scene is active.
-                    unexpectedPlanDismissalNeedsRecovery = true
-                    if scenePhase == .active {
-                        restoreUnexpectedPlanDismissalIfNeeded()
-                    }
-                } else {
-                    unexpectedPlanDismissalNeedsRecovery = false
-                }
-            }) { launch in
-                ATHLTHTrainProgramComposerView(
-                    resumesDraftOnAppear: launch.resumesDraft,
-                    draftID: launch.draftID
-                ) { planID in
-                    newlyCreatedPlanToOpen = planID
-                }
-                // Swipe-to-dismiss is not a valid way to lose an unsaved plan.
-                // All intentional exits use Save Draft / Discard instead.
-                .interactiveDismissDisabled()
-                // Keep this identity alive during an ordinary app switch.
-                .id(launch.id)
-            }
-            .sheet(isPresented: $showingTrainPlanProgress.keepingPresentedWhenInactive(scenePhase)) {
-                if let plan = session.activePlan {
-                    TrainingPlanProgressDetailView(planID: plan.id)
-                }
-            }
-            .sheet(item: $selectedSuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { entry in
-                NavigationStack {
-                    WorkoutTemplateDetailView(entry: entry)
-                }
-            }
-            .sheet(item: $selectedTrainDailyRecommendationInfo.keepingPresentedItemWhenInactive(scenePhase)) { info in
-                HomeDailyRecommendationInfoSheet(info: info)
-                    .presentationDetents([.fraction(0.82), .large])
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(28)
-            }
-            // Bound the generic presentation chain before adding more destinations.
-            // This prevents one enormous nested modifier type from propagating
-            // through the entire Train root view graph on iOS 27.3.
-            .athlthStablePresentationBoundary()
-            .sheet(item: $selectedTrainStandaloneWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
-                HomeDailyRecommendedWorkoutSheet(
-                    workout: workout,
-                    isPlanWorkout: false,
-                    canStartWithWatch: watchConnection.isReady &&
-                        ATHLTHPlannedWorkoutCaptureRoute.resolve(
-                            workout, device: .appleWatch
-                        ).canUsePreparedWatchTransfer,
-                    onOpenPlannedWorkout: {
-                        beginTrainStandaloneWorkout(workout, device: .iPhone)
-                    },
-                    onStartOnPhone: {
-                        beginTrainStandaloneWorkout(workout, device: .iPhone)
-                    },
-                    onStartOnWatch: {
-                        beginTrainStandaloneWorkout(workout, device: .appleWatch)
-                    },
-                    onSendToWatch: {
-                        beginTrainStandaloneWorkout(workout, device: .appleWatch)
-                    },
-                    isCalendarWorkout: true,
-                    canStart: !hasOngoingTrainWorkout && !workout.isExplicitRestDay &&
-                        session.recordedTimes(for: workout.id)?.endedAt == nil
+                    pendingRunningTemplate = workout
+                },
+                onOpenPlan: openPlanFromTrainingLibrary
+            )
+            .background(
+                ATHLTHPremiumCanvas(
+                    accent: ATHLTHTheme.premiumGold.opacity(0.10)
                 )
+            )
+        }
+        .navigationDestination(
+            isPresented: $showingGhostHub
+        ) {
+            GhostRaceHubView()
+        }
+        .navigationDestination(
+            isPresented: $showingTrainPlanWorkspace
+        ) {
+            ATHLTHTrainPlanWorkspaceView()
+        }
+        .navigationDestination(
+            isPresented: $showingTrainExerciseLibrary
+        ) {
+            ExerciseLibraryView()
+                .navigationTitle(
+                    ATHLTHLocalization.choose(
+                        english: "Exercises",
+                        norwegian: "Øvelser"
+                    )
+                )
+                .navigationBarTitleDisplayMode(.inline)
+        }
+        .athlthStablePresentationBoundary()
+    }
+
+    private var trainPlanningPresentations: some View {
+        trainNavigationDestinations
+        .sheet(isPresented: $showingTrainAllPlans.keepingPresentedWhenInactive(scenePhase)) {
+            AllTrainingPlansView()
+        }
+        .sheet(isPresented: $showingAllWorkoutCategories.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            guard let action = pendingWorkoutCategoryAction else { return }
+            pendingWorkoutCategoryAction = nil
+            handleWorkoutCategoryAction(action)
+        }) {
+            ATHLTHTrainAllWorkoutCategoriesSheet { action in
+                pendingWorkoutCategoryAction = action
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .sheet(item: $selectedTrainCompetitionActivity.keepingPresentedItemWhenInactive(scenePhase)) { activity in
+            switch activity {
+            case .running:
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .running,
+                    advanced: settings.resolvedAdvancedSetup(for: .running)
+                )
+            case .walking:
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .walking,
+                    advanced: settings.resolvedAdvancedSetup(for: .walking)
+                )
+            case .strength:
+                ATHLTHCompetitionCreationView(
+                    initialActivity: .strength,
+                    advanced: settings.resolvedAdvancedSetup(for: .strength)
+                )
+            }
+        }
+        // Bound the generic presentation chain before adding more destinations.
+        // This prevents one enormous nested modifier type from propagating
+        // through the entire Train root view graph on iOS 27.3.
+        .athlthStablePresentationBoundary()
+        .sheet(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            if let selected = trainRunningWorkoutSelection {
+                trainRunningWorkoutSelection = nil
+                pendingPlannedEnduranceWorkout = nil
+                pendingRunningTemplate = selected
+            }
+        }) {
+            NavigationStack {
+                RunningWorkoutLibraryView(
+                    selectionTitle: ATHLTHLocalization.choose(
+                        english: "Choose running workout",
+                        norwegian: "Velg løpeøkt"
+                    ),
+                    onSelect: { workout in
+                        trainRunningWorkoutSelection = workout
+                        showingTrainRunningWorkoutLibrary = false
+                    }
+                )
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingTrainIntervalComposer.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            // The interval editor closes before the running quick-start
+            // sheet is presented. Preserve the newly built interval steps.
+            guard let template = savedTrainIntervalTemplate else { return }
+            savedTrainIntervalTemplate = nil
+            pendingRunningTemplate = template
+        }) {
+            ATHLTHTrainIntervalComposerView { template in
+                savedTrainIntervalTemplate = template
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        // Bound the generic presentation chain before adding more destinations.
+        // This prevents one enormous nested modifier type from propagating
+        // through the entire Train root view graph on iOS 27.3.
+        .athlthStablePresentationBoundary()
+        .athlthStudioEditor(item: $trainProgramCreationLaunch.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
+            guard scenePhase == .active else { return }
+            // Only an actual dismissed presentation warrants a recovery.
+            // A normal background/foreground transition never enters here.
+            if let planID = newlyCreatedPlanToOpen {
+                unexpectedPlanDismissalNeedsRecovery = false
+                highlightedTrainPlanID = planID
+                selectedTrainPlanWeekIndex = 0
+                selectedSection = .plan
+                newlyCreatedPlanToOpen = nil
+            } else if TrainProgramCreationLaunch.interruptedDraft(
+                userID: session.profile.userID,
+                store: ATHLTHPlanCreationDraftStore()
+            ) != nil {
+                // The user neither saved-and-closed nor discarded. iOS
+                // removed the sheet: keep the checkpoint and recover only
+                // this presentation when the scene is active.
+                unexpectedPlanDismissalNeedsRecovery = true
+                if scenePhase == .active {
+                    restoreUnexpectedPlanDismissalIfNeeded()
+                }
+            } else {
+                unexpectedPlanDismissalNeedsRecovery = false
+            }
+        }) { launch in
+            ATHLTHTrainProgramComposerView(
+                resumesDraftOnAppear: launch.resumesDraft,
+                draftID: launch.draftID
+            ) { planID in
+                newlyCreatedPlanToOpen = planID
+            }
+            // Swipe-to-dismiss is not a valid way to lose an unsaved plan.
+            // All intentional exits use Save Draft / Discard instead.
+            .interactiveDismissDisabled()
+            // Keep this identity alive during an ordinary app switch.
+            .id(launch.id)
+        }
+        .sheet(isPresented: $showingTrainPlanProgress.keepingPresentedWhenInactive(scenePhase)) {
+            if let plan = session.activePlan {
+                TrainingPlanProgressDetailView(planID: plan.id)
+            }
+        }
+        .sheet(item: $selectedSuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { entry in
+            NavigationStack {
+                WorkoutTemplateDetailView(entry: entry)
+            }
+        }
+        .sheet(item: $selectedTrainDailyRecommendationInfo.keepingPresentedItemWhenInactive(scenePhase)) { info in
+            HomeDailyRecommendationInfoSheet(info: info)
                 .presentationDetents([.fraction(0.82), .large])
                 .presentationDragIndicator(.visible)
-            }
-            .sheet(item: $selectedTrainDailySuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
-                HomeDailyRecommendedWorkoutSheet(
-                    workout: workout,
-                    isPlanWorkout: false,
-                    // This preview is reviewed before launch. A Watch
-                    // recording must be configured via its own existing
-                    // device-aware start flow rather than silently starting
-                    // the iPhone structured player.
-                    canStartWithWatch: false,
-                    onOpenPlannedWorkout: {
-                        openConfirmedTrainDailyWorkout(workout)
-                    },
-                    onStartOnPhone: {
-                        openConfirmedTrainDailyWorkout(workout)
-                    },
-                    onStartOnWatch: {
-                        openConfirmedTrainDailyWorkout(workout)
-                    }
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+        }
+        // Bound the generic presentation chain before adding more destinations.
+        // This prevents one enormous nested modifier type from propagating
+        // through the entire Train root view graph on iOS 27.3.
+        .athlthStablePresentationBoundary()
+        .sheet(item: $selectedTrainStandaloneWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
+            HomeDailyRecommendedWorkoutSheet(
+                workout: workout,
+                isPlanWorkout: false,
+                canStartWithWatch: watchConnection.isReady &&
+                    ATHLTHPlannedWorkoutCaptureRoute.resolve(
+                        workout, device: .appleWatch
+                    ).canUsePreparedWatchTransfer,
+                onOpenPlannedWorkout: {
+                    beginTrainStandaloneWorkout(workout, device: .iPhone)
+                },
+                onStartOnPhone: {
+                    beginTrainStandaloneWorkout(workout, device: .iPhone)
+                },
+                onStartOnWatch: {
+                    beginTrainStandaloneWorkout(workout, device: .appleWatch)
+                },
+                onSendToWatch: {
+                    beginTrainStandaloneWorkout(workout, device: .appleWatch)
+                },
+                isCalendarWorkout: true,
+                canStart: !hasOngoingTrainWorkout && !workout.isExplicitRestDay &&
+                    session.recordedTimes(for: workout.id)?.endedAt == nil
+            )
+            .presentationDetents([.fraction(0.82), .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $selectedTrainDailySuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
+            HomeDailyRecommendedWorkoutSheet(
+                workout: workout,
+                isPlanWorkout: false,
+                // This preview is reviewed before launch. A Watch
+                // recording must be configured via its own existing
+                // device-aware start flow rather than silently starting
+                // the iPhone structured player.
+                canStartWithWatch: false,
+                onOpenPlannedWorkout: {
+                    openConfirmedTrainDailyWorkout(workout)
+                },
+                onStartOnPhone: {
+                    openConfirmedTrainDailyWorkout(workout)
+                },
+                onStartOnWatch: {
+                    openConfirmedTrainDailyWorkout(workout)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+        }
+        .athlthStudioEditor(item: $selectedPlanWorkout.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { selection in
+            PlannedWorkoutDetailView(
+                planID: selection.planID,
+                workout: selection.workout,
+                isHealthCompleted: selection.isHealthCompleted
+            )
+            .environmentObject(session)
+        }
+        .sheet(item: $selectedStrengthSession.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            guard ATHLTHScratchComposerPresentationPolicy
+                .startsLiveAfterSetupDismiss(
+                    queued: pendingTrainStrengthLiveAfterDismiss,
+                    setupIsPresented: selectedStrengthSession != nil
+                ) else { return }
+            pendingTrainStrengthLiveAfterDismiss = false
+            showingStrengthWorkout = true
+        }) { workout in
+            WorkoutStartOptionsView(
+                session: workout,
+                trainingDeviceProvider:
+                    watchConnection.isReady ? .appleWatch : .none,
+                watchConnected: watchConnection.isReady,
+                defaultCapture: .automatic,
+                defaultTracking: settings.defaultStrengthTracking
+            ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
+                // Return the launch failure to the sheet that owns the
+                // unsaved exercise/set configuration. Do not show a global
+                // Home alert or dismiss the setup on a locked Watch.
+                do {
+                    let didStart = try await WorkoutLaunchCoordinator.startStrength(
+                        workout: configuredWorkout,
+                        captureDevice: captureDevice,
+                        trackingMode: trackingMode,
+                        selectedFriends: selectedFriends,
+                        participationMode: socialMode,
+                        audioCoach: audioCoach,
+                        advancedConfiguration: advancedConfiguration,
+                        session: session,
+                        settings: settings,
+                        social: social,
+                        strengthWorkout: strengthWorkout,
+                        watchConnection: watchConnection,
+                        spotify: spotifyPlayback
+                    )
+                    if didStart {
+                        pendingTrainStrengthLiveAfterDismiss = true
+                        selectedStrengthSession = nil
+                        return nil
+                    }
+                    // The iPad sends an envelope to the paired iPhone;
+                    // a successful enqueue deliberately returns false.
+                    if ATHLTHDeviceRole.isIPad { return nil }
+                    return social.errorMessage ?? ATHLTHLocalization.choose(
+                        english: "The workout could not start. Check Apple Watch and try again.",
+                        norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
+                    )
+                } catch {
+                    return error.localizedDescription
+                }
             }
-            .athlthStudioEditor(item: $selectedPlanWorkout.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { selection in
-                PlannedWorkoutDetailView(
-                    planID: selection.planID,
-                    workout: selection.workout,
-                    isHealthCompleted: selection.isHealthCompleted
+        }
+        .athlthStablePresentationBoundary()
+    }
+
+    private var trainQuickStartPresentations: some View {
+        trainPlanningPresentations
+        .sheet(isPresented: $showingRunQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            pendingPlannedEnduranceWorkout = nil
+        }) {
+            RunQuickStartSheet(
+                trainingDeviceProvider:
+                    watchConnection.isReady ? .appleWatch : .none,
+                watchConnected: watchConnection.isReady,
+                initialRoute: pendingPlannedEnduranceWorkout?.workout
+                    .routeID.flatMap { id in
+                        session.savedRoutes.first { $0.id == id }
+                    },
+                plannedSession: pendingPlannedEnduranceWorkout?.workout
+            ) { configuration in
+                let planOrigin = matchedPlanOriginForRun(
+                    pendingPlannedEnduranceWorkout, configuration: configuration
                 )
-                .environmentObject(session)
+                // Solo workouts are local-first and must never require a
+                // social backend connection to begin recording.
+                let needsSocialLobby = !configuration.friends.isEmpty
+                let lobbyReady: Bool
+                if needsSocialLobby {
+                    lobbyReady = await social.beginWorkoutWithFriends(
+                    title: configuration.title,
+                    kind: .running,
+                    friends: configuration.friends,
+                    creatorName: session.profile.displayName,
+                    creatorUsername: session.profile.username,
+                    invitePayload: configuration.trainTogetherInvitePayload(
+                        savedRoutes: session.savedRoutes
+                    ),
+                    creatorCaptureDevice: configuration.captureDevice
+                    )
+                } else {
+                    lobbyReady = true
+                }
+                guard lobbyReady else {
+                    return social.errorMessage ?? ATHLTHLocalization.choose(
+                        english: "Workout could not start. Unlock Apple Watch and try again.",
+                        norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                    )
+                }
+                do {
+                    try await WorkoutLaunchCoordinator.startRunQuick(
+                        configuration: configuration,
+                        session: session,
+                        settings: settings,
+                        gear: gear,
+                        phoneWorkout: phoneWorkout,
+                        watchConnection: watchConnection,
+                        spotify: spotifyPlayback,
+                        ghostRace: ghostRace,
+                        workoutMirroring: workoutMirroring,
+                        plannedPlanID: planOrigin?.planID,
+                        plannedSessionID: planOrigin?.workout.id
+                    )
+                    if needsSocialLobby {
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                    }
+                    if configuration.captureDevice == .appleWatch {
+                        watchTransferMessage = configuration.watchStartMode == .onWatch
+                            ? configuration.watchStartMode.confirmationText : nil
+                    }
+                    return nil
+                } catch {
+                    if needsSocialLobby {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                    }
+                    return error.localizedDescription
+                }
             }
-            .sheet(item: $selectedStrengthSession.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+        }
+        .sheet(isPresented: $showingWalkQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            pendingPlannedEnduranceWorkout = nil
+        }) {
+            WalkQuickStartSheet(
+                trainingDeviceProvider:
+                    watchConnection.isReady ? .appleWatch : .none,
+                watchConnected: watchConnection.isReady,
+                plannedSession: pendingPlannedEnduranceWorkout?.workout
+            ) { configuration in
+                let planOrigin = validPendingPlanOrigin(
+                    pendingPlannedEnduranceWorkout, kind: .walking
+                )
+                let needsSocialLobby = !configuration.friends.isEmpty
+                let lobbyReady: Bool
+                if needsSocialLobby {
+                    lobbyReady = await social.beginWorkoutWithFriends(
+                        title: configuration.route?.title ??
+                            ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
+                        kind: .walking,
+                        friends: configuration.friends,
+                        creatorName: session.profile.displayName,
+                        creatorUsername: session.profile.username,
+                        invitePayload: configuration.trainTogetherInvitePayload,
+                        creatorCaptureDevice: configuration.captureDevice
+                    )
+                } else {
+                    lobbyReady = true
+                }
+                guard lobbyReady else {
+                    return social.errorMessage ?? ATHLTHLocalization.choose(
+                        english: "Workout could not start. Unlock Apple Watch and try again.",
+                        norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                    )
+                }
+                do {
+                    try await WorkoutLaunchCoordinator.startWalkQuick(
+                        configuration: configuration,
+                        settings: settings,
+                        gear: gear,
+                        phoneWorkout: phoneWorkout,
+                        watchConnection: watchConnection,
+                        spotify: spotifyPlayback,
+                        workoutMirroring: workoutMirroring,
+                        plannedPlanID: planOrigin?.planID,
+                        plannedSessionID: planOrigin?.workout.id
+                    )
+                    if needsSocialLobby {
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                    }
+                    return nil
+                } catch {
+                    if needsSocialLobby {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                    }
+                    return error.localizedDescription
+                }
+            }
+        }
+        .sheet(
+            isPresented: $showingStrengthQuickStart.keepingPresentedWhenInactive(scenePhase),
+            onDismiss: {
                 guard scenePhase == .active else { return }
+                quickStrengthStartWithExercises = false
                 guard ATHLTHScratchComposerPresentationPolicy
                     .startsLiveAfterSetupDismiss(
                         queued: pendingTrainStrengthLiveAfterDismiss,
-                        setupIsPresented: selectedStrengthSession != nil
+                        setupIsPresented: showingStrengthQuickStart
                     ) else { return }
                 pendingTrainStrengthLiveAfterDismiss = false
                 showingStrengthWorkout = true
-            }) { workout in
-                WorkoutStartOptionsView(
-                    session: workout,
-                    trainingDeviceProvider:
-                        watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady,
-                    defaultCapture: .automatic,
-                    defaultTracking: settings.defaultStrengthTracking
-                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
-                    // Return the launch failure to the sheet that owns the
-                    // unsaved exercise/set configuration. Do not show a global
-                    // Home alert or dismiss the setup on a locked Watch.
-                    do {
-                        let didStart = try await WorkoutLaunchCoordinator.startStrength(
-                            workout: configuredWorkout,
-                            captureDevice: captureDevice,
-                            trackingMode: trackingMode,
-                            selectedFriends: selectedFriends,
-                            participationMode: socialMode,
-                            audioCoach: audioCoach,
-                            advancedConfiguration: advancedConfiguration,
-                            session: session,
-                            settings: settings,
-                            social: social,
-                            strengthWorkout: strengthWorkout,
-                            watchConnection: watchConnection,
-                            spotify: spotifyPlayback
-                        )
-                        if didStart {
-                            pendingTrainStrengthLiveAfterDismiss = true
-                            selectedStrengthSession = nil
-                            return nil
-                        }
-                        // The iPad sends an envelope to the paired iPhone;
-                        // a successful enqueue deliberately returns false.
-                        if ATHLTHDeviceRole.isIPad { return nil }
-                        return social.errorMessage ?? ATHLTHLocalization.choose(
-                            english: "The workout could not start. Check Apple Watch and try again.",
-                            norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
-                        )
-                    } catch {
-                        return error.localizedDescription
+            }
+        ) {
+            WorkoutStartOptionsView(
+                session:
+                    quickStrengthSession,
+                trainingDeviceProvider:
+                    watchConnection.isReady
+                        ? .appleWatch
+                        : .none,
+                watchConnected:
+                    watchConnection.isReady,
+                defaultCapture:
+                    .automatic,
+                defaultTracking:
+                    settings
+                        .defaultStrengthTracking,
+                initialStartType: quickStrengthStartWithExercises ? .exercises : .free
+            ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
+                // Return the launch failure to the sheet that owns the
+                // unsaved exercise/set configuration. Do not show a global
+                // Home alert or dismiss the setup on a locked Watch.
+                do {
+                    let didStart = try await WorkoutLaunchCoordinator.startStrength(
+                        workout: configuredWorkout,
+                        captureDevice: captureDevice,
+                        trackingMode: trackingMode,
+                        selectedFriends: selectedFriends,
+                        participationMode: socialMode,
+                        audioCoach: audioCoach,
+                        advancedConfiguration: advancedConfiguration,
+                        session: session,
+                        settings: settings,
+                        social: social,
+                        strengthWorkout: strengthWorkout,
+                        watchConnection: watchConnection,
+                        spotify: spotifyPlayback
+                    )
+                    if didStart {
+                        pendingTrainStrengthLiveAfterDismiss = true
+                        showingStrengthQuickStart = false
+                        return nil
                     }
+                    // The iPad sends an envelope to the paired iPhone;
+                    // a successful enqueue deliberately returns false.
+                    if ATHLTHDeviceRole.isIPad { return nil }
+                    return social.errorMessage ?? ATHLTHLocalization.choose(
+                        english: "The workout could not start. Check Apple Watch and try again.",
+                        norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
+                    )
+                } catch {
+                    return error.localizedDescription
                 }
             }
-            .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingRunQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                pendingPlannedEnduranceWorkout = nil
-            }) {
-                RunQuickStartSheet(
-                    trainingDeviceProvider:
-                        watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady,
-                    initialRoute: pendingPlannedEnduranceWorkout?.workout
-                        .routeID.flatMap { id in
-                            session.savedRoutes.first { $0.id == id }
-                        },
-                    plannedSession: pendingPlannedEnduranceWorkout?.workout
-                ) { configuration in
-                    let planOrigin = matchedPlanOriginForRun(
-                        pendingPlannedEnduranceWorkout, configuration: configuration
-                    )
-                    // Solo workouts are local-first and must never require a
-                    // social backend connection to begin recording.
-                    let needsSocialLobby = !configuration.friends.isEmpty
-                    let lobbyReady: Bool
-                    if needsSocialLobby {
-                        lobbyReady = await social.beginWorkoutWithFriends(
+        }
+        .sheet(item: $pendingRunningTemplate.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            pendingPlannedEnduranceWorkout = nil
+        }) { workout in
+            RunQuickStartSheet(
+                trainingDeviceProvider:
+                    watchConnection.isReady
+                        ? .appleWatch
+                        : .none,
+                watchConnected:
+                    watchConnection.isReady,
+                initialWorkout: workout,
+                plannedSession: pendingPlannedEnduranceWorkout?.workout
+            ) { configuration in
+                let planOrigin = matchedPlanOriginForRun(
+                    pendingPlannedEnduranceWorkout, configuration: configuration
+                )
+                // Solo workouts are local-first and must never require a
+                // social backend connection to begin recording.
+                let needsSocialLobby = !configuration.friends.isEmpty
+                if needsSocialLobby {
+                    let lobbyReady = await social.beginWorkoutWithFriends(
                         title: configuration.title,
                         kind: .running,
                         friends: configuration.friends,
@@ -5922,528 +6163,326 @@ struct ATHLTHTrainView: View {
                             savedRoutes: session.savedRoutes
                         ),
                         creatorCaptureDevice: configuration.captureDevice
-                        )
-                    } else {
-                        lobbyReady = true
-                    }
+                    )
                     guard lobbyReady else {
                         return social.errorMessage ?? ATHLTHLocalization.choose(
                             english: "Workout could not start. Unlock Apple Watch and try again.",
                             norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
                         )
                     }
-                    do {
-                        try await WorkoutLaunchCoordinator.startRunQuick(
-                            configuration: configuration,
-                            session: session,
-                            settings: settings,
-                            gear: gear,
-                            phoneWorkout: phoneWorkout,
-                            watchConnection: watchConnection,
-                            spotify: spotifyPlayback,
-                            ghostRace: ghostRace,
-                            workoutMirroring: workoutMirroring,
-                            plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id
-                        )
-                        if needsSocialLobby {
-                            _ = await social.confirmCurrentJoinedWorkoutStarted()
-                        }
-                        if configuration.captureDevice == .appleWatch {
-                            watchTransferMessage = configuration.watchStartMode == .onWatch
-                                ? configuration.watchStartMode.confirmationText : nil
-                        }
-                        return nil
-                    } catch {
-                        if needsSocialLobby {
-                            await social.markCurrentJoinedWorkoutLaunchFailed()
-                        }
-                        return error.localizedDescription
+                }
+                do {
+                    try await WorkoutLaunchCoordinator.startRunQuick(
+                        configuration: configuration,
+                        session: session,
+                        settings: settings,
+                        gear: gear,
+                        phoneWorkout: phoneWorkout,
+                        watchConnection: watchConnection,
+                        spotify: spotifyPlayback,
+                        ghostRace: ghostRace,
+                        workoutMirroring: workoutMirroring,
+                        plannedPlanID: planOrigin?.planID,
+                        plannedSessionID: planOrigin?.workout.id
+                    )
+                    if needsSocialLobby {
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
                     }
+                    if configuration.captureDevice == .appleWatch {
+                        watchTransferMessage = configuration.watchStartMode == .onWatch
+                            ? configuration.watchStartMode.confirmationText : nil
+                    }
+                    return nil
+                } catch {
+                    if needsSocialLobby {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                    }
+                    return error.localizedDescription
                 }
             }
-            .sheet(isPresented: $showingWalkQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                pendingPlannedEnduranceWorkout = nil
-            }) {
-                WalkQuickStartSheet(
-                    trainingDeviceProvider:
-                        watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady,
-                    plannedSession: pendingPlannedEnduranceWorkout?.workout
-                ) { configuration in
-                    let planOrigin = validPendingPlanOrigin(
-                        pendingPlannedEnduranceWorkout, kind: .walking
-                    )
-                    let needsSocialLobby = !configuration.friends.isEmpty
-                    let lobbyReady: Bool
-                    if needsSocialLobby {
-                        lobbyReady = await social.beginWorkoutWithFriends(
-                            title: configuration.route?.title ??
-                                ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
-                            kind: .walking,
-                            friends: configuration.friends,
+        }
+        .athlthStablePresentationBoundary()
+    }
+
+    private var trainRecordingPresentations: some View {
+        trainQuickStartPresentations
+        .sheet(isPresented: $showingCustomQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            guard scenePhase == .active else { return }
+            // Never compete with the setup sheet's dismissal animation.
+            if let launch = pendingCustomIPhoneQuick {
+                pendingCustomIPhoneQuick = nil
+                activeCustomIPhoneQuick = launch
+            }
+        }) {
+            CustomQuickStartSheet(
+                trainingDeviceProvider:
+                    watchConnection.isReady ? .appleWatch : .none,
+                watchConnected: watchConnection.isReady,
+                initialActivity: customQuickInitialActivity,
+                simpleFreeTraining: isFreeTrainingQuickStart
+            ) { configuration, destination in
+                let invitedFriends = social.resolvedQuickTrainPartners(
+                    configuration.selectedFriendIDs
+                )
+
+                if invitedFriends.isEmpty {
+                    // Solo keeps the existing dismissal/launch behavior.
+                    switch destination {
+                    case .watch:
+                        startCustomWorkoutOnWatch(configuration)
+                    case .phoneTimer:
+                        pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                            configuration: configuration, mode: .timed
+                        )
+                    case .retrospective:
+                        pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                            configuration: configuration, mode: .retrospective
+                        )
+                    }
+                } else {
+                    // The real invitation lobby must finish before starting
+                    // the timer/Watch. The setup sheet will already have
+                    // dismissed, so the phone cover is opened directly.
+                    Task { @MainActor in
+                        let usesWatch: Bool
+                        switch destination {
+                        case .watch: usesWatch = true
+                        case .phoneTimer, .retrospective: usesWatch = false
+                        }
+                        if usesWatch &&
+                           !watchConnection.isReady {
+                            watchTransferError = ATHLTHLocalization.choose(
+                                english: "Connect Apple Watch before inviting friends.",
+                                norwegian: "Koble til Apple Watch før du inviterer venner."
+                            )
+                            return
+                        }
+                        guard await social.beginWorkoutWithFriends(
+                            title: configuration.title,
+                            kind: .custom,
+                            friends: invitedFriends,
                             creatorName: session.profile.displayName,
                             creatorUsername: session.profile.username,
                             invitePayload: configuration.trainTogetherInvitePayload,
-                            creatorCaptureDevice: configuration.captureDevice
-                        )
-                    } else {
-                        lobbyReady = true
-                    }
-                    guard lobbyReady else {
-                        return social.errorMessage ?? ATHLTHLocalization.choose(
-                            english: "Workout could not start. Unlock Apple Watch and try again.",
-                            norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
-                        )
-                    }
-                    do {
-                        try await WorkoutLaunchCoordinator.startWalkQuick(
-                            configuration: configuration,
-                            settings: settings,
-                            gear: gear,
-                            phoneWorkout: phoneWorkout,
-                            watchConnection: watchConnection,
-                            spotify: spotifyPlayback,
-                            workoutMirroring: workoutMirroring,
-                            plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id
-                        )
-                        if needsSocialLobby {
-                            _ = await social.confirmCurrentJoinedWorkoutStarted()
+                            creatorCaptureDevice: usesWatch
+                                ? .appleWatch : .iPhone
+                        ) else {
+                            if let message = social.errorMessage {
+                                watchTransferError = message
+                            }
+                            return
                         }
-                        return nil
-                    } catch {
-                        if needsSocialLobby {
-                            await social.markCurrentJoinedWorkoutLaunchFailed()
-                        }
-                        return error.localizedDescription
-                    }
-                }
-            }
-            .sheet(
-                isPresented: $showingStrengthQuickStart.keepingPresentedWhenInactive(scenePhase),
-                onDismiss: {
-                    guard scenePhase == .active else { return }
-                    quickStrengthStartWithExercises = false
-                    guard ATHLTHScratchComposerPresentationPolicy
-                        .startsLiveAfterSetupDismiss(
-                            queued: pendingTrainStrengthLiveAfterDismiss,
-                            setupIsPresented: showingStrengthQuickStart
-                        ) else { return }
-                    pendingTrainStrengthLiveAfterDismiss = false
-                    showingStrengthWorkout = true
-                }
-            ) {
-                WorkoutStartOptionsView(
-                    session:
-                        quickStrengthSession,
-                    trainingDeviceProvider:
-                        watchConnection.isReady
-                            ? .appleWatch
-                            : .none,
-                    watchConnected:
-                        watchConnection.isReady,
-                    defaultCapture:
-                        .automatic,
-                    defaultTracking:
-                        settings
-                            .defaultStrengthTracking,
-                    initialStartType: quickStrengthStartWithExercises ? .exercises : .free
-                ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
-                    // Return the launch failure to the sheet that owns the
-                    // unsaved exercise/set configuration. Do not show a global
-                    // Home alert or dismiss the setup on a locked Watch.
-                    do {
-                        let didStart = try await WorkoutLaunchCoordinator.startStrength(
-                            workout: configuredWorkout,
-                            captureDevice: captureDevice,
-                            trackingMode: trackingMode,
-                            selectedFriends: selectedFriends,
-                            participationMode: socialMode,
-                            audioCoach: audioCoach,
-                            advancedConfiguration: advancedConfiguration,
-                            session: session,
-                            settings: settings,
-                            social: social,
-                            strengthWorkout: strengthWorkout,
-                            watchConnection: watchConnection,
-                            spotify: spotifyPlayback
-                        )
-                        if didStart {
-                            pendingTrainStrengthLiveAfterDismiss = true
-                            showingStrengthQuickStart = false
-                            return nil
-                        }
-                        // The iPad sends an envelope to the paired iPhone;
-                        // a successful enqueue deliberately returns false.
-                        if ATHLTHDeviceRole.isIPad { return nil }
-                        return social.errorMessage ?? ATHLTHLocalization.choose(
-                            english: "The workout could not start. Check Apple Watch and try again.",
-                            norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
-                        )
-                    } catch {
-                        return error.localizedDescription
-                    }
-                }
-            }
-            .sheet(item: $pendingRunningTemplate.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                pendingPlannedEnduranceWorkout = nil
-            }) { workout in
-                RunQuickStartSheet(
-                    trainingDeviceProvider:
-                        watchConnection.isReady
-                            ? .appleWatch
-                            : .none,
-                    watchConnected:
-                        watchConnection.isReady,
-                    initialWorkout: workout,
-                    plannedSession: pendingPlannedEnduranceWorkout?.workout
-                ) { configuration in
-                    let planOrigin = matchedPlanOriginForRun(
-                        pendingPlannedEnduranceWorkout, configuration: configuration
-                    )
-                    // Solo workouts are local-first and must never require a
-                    // social backend connection to begin recording.
-                    let needsSocialLobby = !configuration.friends.isEmpty
-                    if needsSocialLobby {
-                        let lobbyReady = await social.beginWorkoutWithFriends(
-                            title: configuration.title,
-                            kind: .running,
-                            friends: configuration.friends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username,
-                            invitePayload: configuration.trainTogetherInvitePayload(
-                                savedRoutes: session.savedRoutes
-                            ),
-                            creatorCaptureDevice: configuration.captureDevice
-                        )
-                        guard lobbyReady else {
-                            return social.errorMessage ?? ATHLTHLocalization.choose(
-                                english: "Workout could not start. Unlock Apple Watch and try again.",
-                                norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
-                            )
-                        }
-                    }
-                    do {
-                        try await WorkoutLaunchCoordinator.startRunQuick(
-                            configuration: configuration,
-                            session: session,
-                            settings: settings,
-                            gear: gear,
-                            phoneWorkout: phoneWorkout,
-                            watchConnection: watchConnection,
-                            spotify: spotifyPlayback,
-                            ghostRace: ghostRace,
-                            workoutMirroring: workoutMirroring,
-                            plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id
-                        )
-                        if needsSocialLobby {
-                            _ = await social.confirmCurrentJoinedWorkoutStarted()
-                        }
-                        if configuration.captureDevice == .appleWatch {
-                            watchTransferMessage = configuration.watchStartMode == .onWatch
-                                ? configuration.watchStartMode.confirmationText : nil
-                        }
-                        return nil
-                    } catch {
-                        if needsSocialLobby {
-                            await social.markCurrentJoinedWorkoutLaunchFailed()
-                        }
-                        return error.localizedDescription
-                    }
-                }
-            }
-            .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingCustomQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
-                guard scenePhase == .active else { return }
-                // Never compete with the setup sheet's dismissal animation.
-                if let launch = pendingCustomIPhoneQuick {
-                    pendingCustomIPhoneQuick = nil
-                    activeCustomIPhoneQuick = launch
-                }
-            }) {
-                CustomQuickStartSheet(
-                    trainingDeviceProvider:
-                        watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isReady,
-                    initialActivity: customQuickInitialActivity,
-                    simpleFreeTraining: isFreeTrainingQuickStart
-                ) { configuration, destination in
-                    let invitedFriends = social.resolvedQuickTrainPartners(
-                        configuration.selectedFriendIDs
-                    )
 
-                    if invitedFriends.isEmpty {
-                        // Solo keeps the existing dismissal/launch behavior.
                         switch destination {
                         case .watch:
                             startCustomWorkoutOnWatch(configuration)
                         case .phoneTimer:
-                            pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
+                            activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
                                 configuration: configuration, mode: .timed
                             )
                         case .retrospective:
-                            pendingCustomIPhoneQuick = CustomIPhoneQuickLaunch(
-                                configuration: configuration, mode: .retrospective
-                            )
-                        }
-                    } else {
-                        // The real invitation lobby must finish before starting
-                        // the timer/Watch. The setup sheet will already have
-                        // dismissed, so the phone cover is opened directly.
-                        Task { @MainActor in
-                            let usesWatch: Bool
-                            switch destination {
-                            case .watch: usesWatch = true
-                            case .phoneTimer, .retrospective: usesWatch = false
-                            }
-                            if usesWatch &&
-                               !watchConnection.isReady {
-                                watchTransferError = ATHLTHLocalization.choose(
-                                    english: "Connect Apple Watch before inviting friends.",
-                                    norwegian: "Koble til Apple Watch før du inviterer venner."
-                                )
-                                return
-                            }
-                            guard await social.beginWorkoutWithFriends(
-                                title: configuration.title,
-                                kind: .custom,
-                                friends: invitedFriends,
-                                creatorName: session.profile.displayName,
-                                creatorUsername: session.profile.username,
-                                invitePayload: configuration.trainTogetherInvitePayload,
-                                creatorCaptureDevice: usesWatch
-                                    ? .appleWatch : .iPhone
-                            ) else {
-                                if let message = social.errorMessage {
-                                    watchTransferError = message
-                                }
-                                return
-                            }
-
-                            switch destination {
-                            case .watch:
-                                startCustomWorkoutOnWatch(configuration)
-                            case .phoneTimer:
-                                activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
-                                    configuration: configuration, mode: .timed
-                                )
-                            case .retrospective:
-                                // Retrospective logging cannot invite anyone.
-                                break
-                            }
+                            // Retrospective logging cannot invite anyone.
+                            break
                         }
                     }
                 }
-            }
-            .fullScreenCover(item: $activeCustomIPhoneQuick) { launch in
-                CustomQuickIPhoneWorkoutView(
-                    configuration: launch.configuration,
-                    mode: launch.mode
-                )
-                .environmentObject(session)
-                .environmentObject(social)
-            }
-            .fullScreenCover(isPresented: $showingStrengthWorkout) {
-                ActiveStrengthWorkoutView()
-                    .environmentObject(strengthWorkout)
-                    .environmentObject(session)
-            }
-            .fullScreenCover(
-                item: $selectedStructuredWorkout
-            ) { workout in
-                StructuredWorkoutSessionView(
-                    workout: workout,
-                    linkedPlanID: structuredSourcePlanID(for: workout.id)
-                )
-                .environmentObject(session)
-            }
-            .athlthStablePresentationBoundary()
-            .onAppear {
-                if restoredTrainSectionAccount != session.profile.userID {
-                    restoreTrainSection(for: session.profile.userID)
-                }
-                restoreInterruptedPlanDestinationIfNeeded()
-                restoreDelayedPlanStartIfNeeded()
-            }
-            .onChange(of: session.profile.userID) { _, userID in
-                // Never reuse another athlete's selected Train subsection or timers.
-                delayedPlanStart = nil
-                restoreTrainSection(for: userID)
-                restoreDelayedPlanStartIfNeeded()
-            }
-            .onChange(of: selectedSection) { _, section in
-                let account = session.profile.userID.uuidString
-                if persistedTrainSectionAccount != account {
-                    persistedTrainSectionAccount = account
-                }
-                let key: String
-                switch section {
-                case .today: key = "today"
-                case .plan: key = "plan"
-                case .progress: key = "progress"
-                }
-                if persistedTrainSection != key {
-                    persistedTrainSection = key
-                }
-                if section == .today {
-                    scheduleTrainDailyRecommendationRefresh()
-                }
-            }
-            .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
-                guard isActive else { return }
-                // Retain the prepared catalog and plan state across quick
-                // Today/Plan/tab transitions. On account switch a new owner
-                // gets a full refresh rather than another owner's cache.
-                // Resolve navigation first so the selected tab can render
-                // before expensive plan reconciliation and catalog refresh.
-                handleNavigationRequest()
-                restoreInterruptedPlanDestinationIfNeeded()
-                restoreDelayedPlanStartIfNeeded()
-                let userID = session.profile.userID
-                // Previously plan graph reconciliation started after 160 ms,
-                // right in the native floating tab-pill animation (~300 ms).
-                // Existing plan data already renders immediately: do the
-                // expensive account reconciliation only after navigation has
-                // settled. Cancelling an abandoned Train tap skips the work.
-                do {
-                    try await Task.sleep(for: .milliseconds(480))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled, isActive,
-                      session.profile.userID == userID else { return }
-                let reconciliationID = ATHLTHPerformance.begin(
-                    "TrainPostTransitionReconcile"
-                )
-                defer {
-                    ATHLTHPerformance.end(
-                        "TrainPostTransitionReconcile", id: reconciliationID
-                    )
-                }
-                if preparedTrainUserID != userID {
-                    session.refreshActivePlanForToday()
-                    session.reconcilePlanLinkedPhoneWorkouts(
-                        phoneWorkout.history, healthWorkouts: health.workouts
-                    )
-                    // Local plan and workout state is ready even if the
-                    // remote exercise catalog is slow or unavailable.
-                    // Never tie Train's prepared state to network success.
-                    preparedTrainUserID = userID
-                    await exerciseLibrary.refresh()
-                } else {
-                    refreshTrainDayIfChanged()
-                    // Catch changes received while Train was off-screen.
-                    session.reconcilePlanLinkedPhoneWorkouts(
-                        phoneWorkout.history, healthWorkouts: health.workouts
-                    )
-                }
-                scheduleTrainDailyRecommendationRefresh()
-            }
-            // HealthKit and phone history can publish in bursts. Coalesce
-            // them rather than reconciling plans repeatedly in one frame.
-            .onReceive(phoneWorkout.$history) { _ in
-                scheduleTrainHistoryReconciliation()
-                scheduleTrainDailyRecommendationRefresh()
-            }
-            .onReceive(health.$workouts) { _ in
-                scheduleTrainHistoryReconciliation()
-                scheduleTrainDailyRecommendationRefresh()
-            }
-            .onReceive(strengthWorkout.$workoutHistory) { _ in
-                scheduleTrainDailyRecommendationRefresh()
-            }
-            .onChange(
-                of: navigationRequest?.id
-            ) { _, _ in
-                handleNavigationRequest()
-            }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active, isActive {
-                    // Returning from a short app switch preserves the ENTIRE
-                    // existing sheet/navigation tree, including child editors.
-                    // Only if iOS actually dismissed a sheet do we recover it.
-                    restoreUnexpectedPlanDismissalIfNeeded()
-                    restoreDelayedPlanStartIfNeeded()
-                    // The first Train activation owns the heavy daily refresh
-                    // in the post-transition task above.
-                    if preparedTrainUserID == session.profile.userID {
-                        refreshTrainDayIfChanged()
-                    }
-                    resolveDelayedPlanStartIfReady()
-                    scheduleTrainDailyRecommendationRefresh()
-                }
-            }
-            .task(id: delayedPlanStart?.id) {
-                guard let launch = delayedPlanStart else { return }
-                let interval = launch.startsAt.timeIntervalSinceNow
-                if interval > 0 {
-                    try? await Task.sleep(for: .seconds(interval))
-                }
-                guard !Task.isCancelled else { return }
-                resolveDelayedPlanStartIfReady()
-            }
-            // iOS signals midnight, timezone and system-clock changes here.
-            // A visible Train scene must not keep yesterday's workout hero.
-            .onReceive(NotificationCenter.default.publisher(
-                for: UIApplication.significantTimeChangeNotification
-            )) { _ in
-                refreshTrainDayIfChanged()
-            }
-            .onChange(of: isActive) { _, active in
-                // A restored root tab becomes active after its child onAppear;
-                // this second entry guarantees the plan editor is presented.
-                if active {
-                    restoreInterruptedPlanDestinationIfNeeded()
-                    return
-                }
-                trainHistoryReconcileTask?.cancel()
-                trainHistoryReconcileTask = nil
-                // Preserve the viewport when leaving Train. Resetting three
-                // ScrollPositions during a tab transition can force layout
-                // work on the main thread and cause a visible hitch.
-            }
-            .alert("ATHLTH", isPresented: Binding(
-                get: {
-                    watchTransferMessage != nil ||
-                    watchTransferError != nil
-                },
-                set: { newValue in
-                    if !newValue {
-                        watchTransferMessage = nil
-                        watchTransferError = nil
-                    }
-                }
-            )) {
-                Button("OK", role: .cancel) {
-                    watchTransferMessage = nil
-                    watchTransferError = nil
-                }
-            } message: {
-                Text(
-                    watchTransferError ??
-                    watchTransferMessage ??
-                    ""
-                )
             }
         }
-        // Own activation on the stable NavigationStack, not its initially
-        // empty destination or deeply nested presentation modifier chain.
-        .task(id: isActive) {
-            guard isActive, !trainDashboardReady else { return }
+        .fullScreenCover(item: $activeCustomIPhoneQuick) { launch in
+            CustomQuickIPhoneWorkoutView(
+                configuration: launch.configuration,
+                mode: launch.mode
+            )
+            .environmentObject(session)
+            .environmentObject(social)
+        }
+        .fullScreenCover(isPresented: $showingStrengthWorkout) {
+            ActiveStrengthWorkoutView()
+                .environmentObject(strengthWorkout)
+                .environmentObject(session)
+        }
+        .fullScreenCover(
+            item: $selectedStructuredWorkout
+        ) { workout in
+            StructuredWorkoutSessionView(
+                workout: workout,
+                linkedPlanID: structuredSourcePlanID(for: workout.id)
+            )
+            .environmentObject(session)
+        }
+        .athlthStablePresentationBoundary()
+    }
+
+    private var trainLifecycleContent: some View {
+        trainRecordingPresentations
+        .onAppear {
+            if restoredTrainSectionAccount != session.profile.userID {
+                restoreTrainSection(for: session.profile.userID)
+            }
+            restoreInterruptedPlanDestinationIfNeeded()
+            restoreDelayedPlanStartIfNeeded()
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            // Never reuse another athlete's selected Train subsection or timers.
+            delayedPlanStart = nil
+            restoreTrainSection(for: userID)
+            restoreDelayedPlanStartIfNeeded()
+        }
+        .onChange(of: selectedSection) { _, section in
+            let account = session.profile.userID.uuidString
+            if persistedTrainSectionAccount != account {
+                persistedTrainSectionAccount = account
+            }
+            let key: String
+            switch section {
+            case .today: key = "today"
+            case .plan: key = "plan"
+            case .progress: key = "progress"
+            }
+            if persistedTrainSection != key {
+                persistedTrainSection = key
+            }
+            if section == .today {
+                scheduleTrainDailyRecommendationRefresh()
+            }
+        }
+        .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
+            guard isActive else { return }
+            // Retain the prepared catalog and plan state across quick
+            // Today/Plan/tab transitions. On account switch a new owner
+            // gets a full refresh rather than another owner's cache.
+            // Resolve navigation first so the selected tab can render
+            // before expensive plan reconciliation and catalog refresh.
+            handleNavigationRequest()
+            restoreInterruptedPlanDestinationIfNeeded()
+            restoreDelayedPlanStartIfNeeded()
+            let userID = session.profile.userID
+            // Previously plan graph reconciliation started after 160 ms,
+            // right in the native floating tab-pill animation (~300 ms).
+            // Existing plan data already renders immediately: do the
+            // expensive account reconciliation only after navigation has
+            // settled. Cancelling an abandoned Train tap skips the work.
             do {
-                try await Task.sleep(for: .milliseconds(350))
+                try await Task.sleep(for: .milliseconds(480))
             } catch {
                 return
             }
-            guard !Task.isCancelled, isActive else { return }
-            trainDashboardReady = true
+            guard !Task.isCancelled, isActive,
+                  session.profile.userID == userID else { return }
+            let reconciliationID = ATHLTHPerformance.begin(
+                "TrainPostTransitionReconcile"
+            )
+            defer {
+                ATHLTHPerformance.end(
+                    "TrainPostTransitionReconcile", id: reconciliationID
+                )
+            }
+            if preparedTrainUserID != userID {
+                session.refreshActivePlanForToday()
+                session.reconcilePlanLinkedPhoneWorkouts(
+                    phoneWorkout.history, healthWorkouts: health.workouts
+                )
+                // Local plan and workout state is ready even if the
+                // remote exercise catalog is slow or unavailable.
+                // Never tie Train's prepared state to network success.
+                preparedTrainUserID = userID
+                await exerciseLibrary.refresh()
+            } else {
+                refreshTrainDayIfChanged()
+                // Catch changes received while Train was off-screen.
+                session.reconcilePlanLinkedPhoneWorkouts(
+                    phoneWorkout.history, healthWorkouts: health.workouts
+                )
+            }
+            scheduleTrainDailyRecommendationRefresh()
+        }
+        // HealthKit and phone history can publish in bursts. Coalesce
+        // them rather than reconciling plans repeatedly in one frame.
+        .onReceive(phoneWorkout.$history) { _ in
+            scheduleTrainHistoryReconciliation()
+            scheduleTrainDailyRecommendationRefresh()
+        }
+        .onReceive(health.$workouts) { _ in
+            scheduleTrainHistoryReconciliation()
+            scheduleTrainDailyRecommendationRefresh()
+        }
+        .onReceive(strengthWorkout.$workoutHistory) { _ in
+            scheduleTrainDailyRecommendationRefresh()
+        }
+        .onChange(
+            of: navigationRequest?.id
+        ) { _, _ in
+            handleNavigationRequest()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, isActive {
+                // Returning from a short app switch preserves the ENTIRE
+                // existing sheet/navigation tree, including child editors.
+                // Only if iOS actually dismissed a sheet do we recover it.
+                restoreUnexpectedPlanDismissalIfNeeded()
+                restoreDelayedPlanStartIfNeeded()
+                // The first Train activation owns the heavy daily refresh
+                // in the post-transition task above.
+                if preparedTrainUserID == session.profile.userID {
+                    refreshTrainDayIfChanged()
+                }
+                resolveDelayedPlanStartIfReady()
+                scheduleTrainDailyRecommendationRefresh()
+            }
+        }
+        .task(id: delayedPlanStart?.id) {
+            guard let launch = delayedPlanStart else { return }
+            let interval = launch.startsAt.timeIntervalSinceNow
+            if interval > 0 {
+                try? await Task.sleep(for: .seconds(interval))
+            }
+            guard !Task.isCancelled else { return }
+            resolveDelayedPlanStartIfReady()
+        }
+        // iOS signals midnight, timezone and system-clock changes here.
+        // A visible Train scene must not keep yesterday's workout hero.
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIApplication.significantTimeChangeNotification
+        )) { _ in
+            refreshTrainDayIfChanged()
+        }
+        .onChange(of: isActive) { _, active in
+            // A restored root tab becomes active after its child onAppear;
+            // this second entry guarantees the plan editor is presented.
+            if active {
+                restoreInterruptedPlanDestinationIfNeeded()
+                return
+            }
+            trainHistoryReconcileTask?.cancel()
+            trainHistoryReconcileTask = nil
+            // Preserve the viewport when leaving Train. Resetting three
+            // ScrollPositions during a tab transition can force layout
+            // work on the main thread and cause a visible hitch.
+        }
+        .alert("ATHLTH", isPresented: Binding(
+            get: {
+                watchTransferMessage != nil ||
+                watchTransferError != nil
+            },
+            set: { newValue in
+                if !newValue {
+                    watchTransferMessage = nil
+                    watchTransferError = nil
+                }
+            }
+        )) {
+            Button("OK", role: .cancel) {
+                watchTransferMessage = nil
+                watchTransferError = nil
+            }
+        } message: {
+            Text(
+                watchTransferError ??
+                watchTransferMessage ??
+                ""
+            )
         }
     }
-
 
     @ViewBuilder
     private func trainRootScroll(for section: ATHLTHTrainSection) -> some View {
@@ -7274,6 +7313,8 @@ struct ATHLTHTrainView: View {
 
     @inline(never)
     private func makePremiumTodayDashboard() -> AnyView {
+        ATHLTHTrainSmokeTrace.record("dashboard-construction-start")
+        defer { ATHLTHTrainSmokeTrace.record("dashboard-construction-end") }
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
         let planSessionIDs = Set(sessions.map(\.id))
@@ -7457,14 +7498,8 @@ struct ATHLTHTrainView: View {
 
     // Require the actual dashboard, not just a nonblank loading frame.
     private func recordTrainDashboardSmokeReadiness() {
-        #if targetEnvironment(simulator)
-        guard ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview"),
-              isActive, selectedSection == .today else { return }
-        let marker = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "athlth-train-ready-\(ProcessInfo.processInfo.processIdentifier)"
-        )
-        try? Data("ready".utf8).write(to: marker, options: .atomic)
-        #endif
+        guard isActive, selectedSection == .today else { return }
+        ATHLTHTrainSmokeTrace.record("dashboard-ready")
     }
 
     // Keep the optional delayed-start banner independent of the heavy
@@ -13334,6 +13369,28 @@ private struct ProfileHexagonBadgeShape:
 
         path.closeSubpath()
         return path
+    }
+}
+
+/// Non-sensitive, per-process simulator-only evidence. No production
+/// recording, account data or workout state is changed by diagnostics.
+enum ATHLTHTrainSmokeTrace {
+    static func record(_ stage: String) {
+        #if targetEnvironment(simulator)
+        guard ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview")
+        else { return }
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let directory = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            .appendingPathComponent("tmp", isDirectory: true)
+        let marker = directory.appendingPathComponent("athlth-train-\(pid)-\(stage)")
+        guard !FileManager.default.fileExists(atPath: marker.path) else { return }
+        do {
+            try Data(stage.utf8).write(to: marker, options: .atomic)
+            print("ATHLTH Train smoke: \(stage)")
+        } catch {
+            print("ATHLTH Train smoke evidence write failed: \(stage): \(error)")
+        }
+        #endif
     }
 }
 

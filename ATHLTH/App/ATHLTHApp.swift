@@ -681,8 +681,12 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
         if ATHLTHDeviceRole.isIPad {
             ATHLTHiPadStudioRootView()
                 .environmentObject(ipadLiveScene)
+        } else if ProcessInfo.processInfo.arguments.contains("--athlth-smoke-home-train-hop") {
+            // Exercise the real native tab hierarchy for the transition test.
+            // The standalone compatibility switch below cannot change tabs.
+            ProductRootTabView()
         } else {
-            // Preserve the existing five-tab iPhone compatibility surface.
+            // Keep isolated cold-start checks for individual tab content.
             switch requestedTab {
         case 1:
             ATHLTHTrainView(
