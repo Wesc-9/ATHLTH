@@ -13317,7 +13317,8 @@ struct ATHLTHTrainDeferredContent: View {
 // SwiftUI's metadata can be deeply nested when a tab contains many distinct
 // sheet and full-screen destinations. Break up the nested type tree before
 // UIKit asks Swift to demangle it during presentation.
-private extension View {
+// Shared by the iPhone and iPad presentation roots within the app target.
+extension View {
     func athlthStablePresentationBoundary() -> AnyView {
         AnyView(self)
     }
