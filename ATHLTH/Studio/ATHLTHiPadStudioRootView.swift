@@ -1313,8 +1313,6 @@ struct ATHLTHiPadStudioRootView: View {
                 ? (route == .phoneStrength || route == .phoneStructuredManual || route == .phoneHybridStrength)
                 : (route == .watchStrength || route == .watchHybridStrength)
         case .running, .walking:
-            // The current endurance relay requires the complete plan link.
-            guard item.planID != nil else { return false }
             return device == .iPhone ? route == .phoneEndurance : route == .watchEndurance
         default:
             return false
@@ -1528,9 +1526,6 @@ struct ATHLTHiPadStudioRootView: View {
                         watchConnection: watchConnection, spotify: spotify
                     )
                 } else {
-                    guard let planID = item.planID else {
-                        throw ATHLTHWorkoutCaptureAdmission.Rejection.requiresDedicatedActivityCapture
-                    }
                     let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
                     defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
                     let environment = RunEnvironment.forPlannedSession(workout)
@@ -1559,8 +1554,13 @@ struct ATHLTHiPadStudioRootView: View {
                         spotifyAutoplay: workout.spotifyAutoplayOnStart ?? false,
                         gearIDs: workout.gearIDs ?? []
                     )
-                    envelope.plannedPlanID = planID
-                    envelope.plannedSessionID = workout.id
+                    if let planID = item.planID {
+                        envelope.plannedPlanID = planID
+                        envelope.plannedSessionID = workout.id
+                    } else {
+                        envelope.version = 2
+                        envelope.standaloneSessionID = workout.id
+                    }
                     try await WorkoutDeviceRelayStore.shared.enqueue(envelope)
                 }
                 if account == session.profile.userID { studioLastRelayAt = Date() }
