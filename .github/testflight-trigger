@@ -329,3 +329,5 @@ ATHLTH 2.2.8 build 137 gated retry 2026-11-23 after fixing two stale XCTest asse
 
 ATHLTH 2.2.9: request TestFlight after five-workflow release gate, interval Ghost integration, 2026-11-23.
 ATHLTH 2.3.0 build 139 user-authorized TestFlight release 2026-11-23; require exact-commit build backend hybrid iPhone iPad gates and signed archive
+
+ATHLTH 3.0.0 — user-authorized overnight TestFlight upload 2026-11-24. Latest source abed36bd07760fcfdfa233b99f6bcd63245bad1f. Require all five exact-commit CI gates, signed archive, App Store Connect delivery and verified processing. Fix verifiable failures on release/v3.0.0 and retry; never bypass gates or publish stale source.
