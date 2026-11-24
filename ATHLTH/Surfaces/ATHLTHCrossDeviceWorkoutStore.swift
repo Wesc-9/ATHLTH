@@ -1025,6 +1025,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     ATHLTHGymExerciseReference(exerciseID: $0.exercise.libraryExerciseID,
                         slug: nil, title: String($0.exercise.displayName.prefix(160)),
                         upcoming: strength.restEndsAt.map { $0 > now } ?? false)
+                },
+                gymStageDuration: strength.restStartedAt.flatMap { start in
+                    strength.restEndsAt.map { $0.timeIntervalSince(start) }
                 }
             )
         }
@@ -1317,6 +1320,14 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             snapshot.strengthReps = watch.strengthReps
             snapshot.strengthWeightKilograms = watch.strengthWeightKilograms
             snapshot.strengthRestEndsAt = watch.strengthRestEndsAt
+            if watch.kind == .strength, let index = watch.strengthExerciseIndex,
+               let entry = watch.socialStrengthExerciseQueue?.first(where: { $0.index == index }),
+               entry.isEmbeddedRunningInterval != true {
+                snapshot.gymExerciseGuide = ATHLTHGymExerciseReference(
+                    exerciseID: entry.libraryExerciseID, slug: nil,
+                    title: String(entry.name.prefix(160)),
+                    upcoming: watch.strengthRestEndsAt.map { $0 > watch.capturedAt } ?? false)
+            }
             snapshot.audioCoachEnabled = watch.watchAudioCoachEnabled
             // Spotify is only shown when account playback is confirmed.
             snapshot.spotifyPlaying = spotify.isPlaying
