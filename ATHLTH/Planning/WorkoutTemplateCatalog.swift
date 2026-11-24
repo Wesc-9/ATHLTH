@@ -1314,6 +1314,28 @@ struct WorkoutTemplateLibraryView: View {
 
     /// Library selection is shared by Plan and My Workouts. It must not
     /// automatically make a public recipe's targets the athlete's targets.
+    private func personalCatalogBlocks(_ entry: WorkoutTemplateCatalogEntry) -> [WorkoutTemplateBlock] {
+        let base = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+        return ATHLTHWorkoutUserTargetsStore.load(
+            userID: session.profile.userID.uuidString, workoutID: entry.id, original: base
+        ) ?? base
+    }
+
+    private func persistCatalogTargets(_ entry: WorkoutTemplateCatalogEntry, blocks: [WorkoutTemplateBlock]) {
+        ATHLTHWorkoutUserTargetsStore.save(
+            userID: session.profile.userID.uuidString, workoutID: entry.id,
+            original: ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks),
+            customized: blocks
+        )
+    }
+
+    private func personalRunningTemplate(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
+        guard source.isBuiltIn else { return source }
+        return ATHLTHRunningPrivateWorkoutStore.load(
+            userID: session.profile.userID, source: source
+        ) ?? ATHLTHRunningLibraryDefaults.unpersonalized(source)
+    }
+
     private func addCatalogToPlan(
         _ entry: WorkoutTemplateCatalogEntry,
         blocks: [WorkoutTemplateBlock]
@@ -1330,7 +1352,16 @@ struct WorkoutTemplateLibraryView: View {
     private func addRunningToPlan(_ source: RunningWorkoutTemplate) {
         // The athlete chose this source explicitly. Using it in a plan never
         // saves an extra template or silently substitutes a personal variant.
-        onSelectPlanned?(source.plannedSession())
+        let selected = personalRunningTemplate(source)
+        var planned = selected.plannedSession()
+        if source.isBuiltIn {
+            let base = ATHLTHUnifiedWorkout.editorBlocks(from: selected.plannedSession())
+            planned.workoutBlocks = ATHLTHWorkoutUserTargetsStore.load(
+                userID: session.profile.userID.uuidString, workoutID: source.id, original: base
+            ) ?? base
+            planned.workoutTemplateID = source.id
+        }
+        onSelectPlanned?(planned)
     }
 
     private func chooseCatalogForPlan(_ entry: WorkoutTemplateCatalogEntry) {
@@ -1343,14 +1374,11 @@ struct WorkoutTemplateLibraryView: View {
             pendingRunningAddition = nil
             // Synchronously install the real 8+ steps before presentation.
             // The advanced editor must never appear with a transient 0 steps.
-            pendingTargetSteps = entry.blocks
-            catalogPersonalBlocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(
-                entry.blocks
-            )
+            catalogPersonalBlocks = personalCatalogBlocks(entry)
+            pendingTargetSteps = catalogPersonalBlocks
             showingPersonalizationQuestion = true
         } else {
-            addCatalogToPlan(entry, blocks:
-                ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
+            addCatalogToPlan(entry, blocks: personalCatalogBlocks(entry))
         }
     }
 
@@ -1377,11 +1405,9 @@ struct WorkoutTemplateLibraryView: View {
                 }
                 onSelectPlanned?(copy)
             case .catalog(let entry):
-                let blocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(
-                    entry.blocks
-                )
-                addCatalogToPlan(entry, blocks:
-                    ATHLTHWorkoutQuickGoalApplier.apply(goal, to: blocks))
+                let blocks = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: personalCatalogBlocks(entry))
+                if goal != .none { persistCatalogTargets(entry, blocks: blocks) }
+                addCatalogToPlan(entry, blocks: blocks)
             case .running(let running):
                 var copy = running.plannedSession()
                 if goal != .none {
@@ -1398,23 +1424,27 @@ struct WorkoutTemplateLibraryView: View {
         guard source.isBuiltIn,
               ATHLTHWorkoutFirstUsePolicy.asksForTargets(
                 advanced: advancedMode,
-                hasPersonalCopy: runningLibrary.savedCopy(for: source) != nil
+                hasPersonalCopy: ATHLTHRunningPrivateWorkoutStore.load(
+                    userID: session.profile.userID, source: source
+                 ) != nil
               ) else {
             addRunningToPlan(source)
             return
         }
         pendingRunningAddition = source
         pendingCatalogAddition = nil
-        pendingTargetSteps = ATHLTHUnifiedWorkout.editorBlocks(
-            from: source.plannedSession()
+        let base = ATHLTHUnifiedWorkout.editorBlocks(
+            from: personalRunningTemplate(source).plannedSession()
         )
+        pendingTargetSteps = ATHLTHWorkoutUserTargetsStore.load(
+            userID: session.profile.userID.uuidString, workoutID: source.id, original: base
+        ) ?? base
         showingPersonalizationQuestion = true
     }
 
     private func saveFirstAdditionWithoutTargets() {
         if let entry = pendingCatalogAddition {
-            addCatalogToPlan(entry, blocks:
-                ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
+            addCatalogToPlan(entry, blocks: personalCatalogBlocks(entry))
         } else if let source = pendingRunningAddition {
             addRunningToPlan(source)
         }
@@ -1431,28 +1461,36 @@ struct WorkoutTemplateLibraryView: View {
         }
 
         if let entry = pendingCatalogAddition {
-            let clean = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
-            addCatalogToPlan(
-                entry,
-                blocks: ATHLTHWorkoutQuickGoalApplier.apply(goal, to: clean)
-            )
+            let edited = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: personalCatalogBlocks(entry))
+            persistCatalogTargets(entry, blocks: edited)
+            addCatalogToPlan(entry, blocks: edited)
         } else if let source = pendingRunningAddition {
             if case .pacePlan = goal {
                 // A legacy running template compresses repeated intervals.
                 // Preserve individual drag/recovery selection by storing its
                 // personal expanded timeline in the shared workout engine.
-                var personal = source.plannedSession()
-                personal.workoutBlocks = ATHLTHWorkoutQuickGoalApplier.apply(
-                    goal, to: pendingTargetSteps
+                let selected = personalRunningTemplate(source)
+                var personal = selected.plannedSession()
+                let base = ATHLTHUnifiedWorkout.editorBlocks(from: personal)
+                let edited = ATHLTHWorkoutQuickGoalApplier.apply(goal, to: pendingTargetSteps)
+                ATHLTHWorkoutUserTargetsStore.save(
+                    userID: session.profile.userID.uuidString, workoutID: source.id,
+                    original: base, customized: edited
                 )
-                // A pace plan is a customized plan step, not an automatic
-                // saved template in Mine.
+                personal.workoutBlocks = edited
+                personal.workoutTemplateID = source.id
                 onSelectPlanned?(personal)
             } else {
                 let customized = ATHLTHWorkoutQuickGoalApplier.apply(
-                    goal, to: source
+                    goal, to: personalRunningTemplate(source)
                 )
-                onSelectPlanned?(customized.plannedSession())
+                ATHLTHRunningPrivateWorkoutStore.save(
+                    userID: session.profile.userID, source: source, customized: customized
+                )
+                ATHLTHWorkoutUserTargetsStore.reset(
+                    userID: session.profile.userID.uuidString, workoutID: source.id
+                )
+                addRunningToPlan(source)
             }
         }
         pendingCatalogAddition = nil
@@ -2812,6 +2850,7 @@ struct WorkoutTemplateLibraryView: View {
                             Button(ATHLTHLocalization.choose(
                                 english: "Save and add", norwegian: "Lagre og legg til"
                             )) {
+                                persistCatalogTargets(entry, blocks: catalogPersonalBlocks)
                                 addCatalogToPlan(entry, blocks: catalogPersonalBlocks)
                                 showingCatalogPersonalization = false
                             }
@@ -2824,11 +2863,14 @@ struct WorkoutTemplateLibraryView: View {
             pendingRunningAddition = nil
         }) {
             if let source = pendingRunningAddition {
-                ATHLTHTrainIntervalComposerView(initial: source) { personalized in
-                    var saved = personalized
-                    saved.sharedSourceWorkoutID = source.id
-                    runningLibrary.save(saved)
-                    onSelectPlanned?(saved.plannedSession())
+                ATHLTHTrainIntervalComposerView(initial: personalRunningTemplate(source)) { personalized in
+                    guard ATHLTHRunningPrivateWorkoutStore.save(
+                        userID: session.profile.userID, source: source, customized: personalized
+                    ) else { return }
+                    ATHLTHWorkoutUserTargetsStore.reset(
+                        userID: session.profile.userID.uuidString, workoutID: source.id
+                    )
+                    addRunningToPlan(source)
                     showingRunningPersonalization = false
                 }
             }
