@@ -5,11 +5,13 @@ import SwiftUI
 struct GarminPersonalSettingsView: View {
     let accountID: UUID
     @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var store = GarminPersonalLocalStore.shared
     @State private var key = ""
 
     private var accountMatches: Bool {
-        session.signedIn && !session.previewModeEnabled && session.profile.userID == accountID
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled &&
+        session.profile.userID == accountID
     }
 
     var body: some View {
@@ -27,10 +29,14 @@ struct GarminPersonalSettingsView: View {
                         key = ""
                         store.connect(entered, account: accountID)
                     }
-                    .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.busy)
+                    .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              store.busy || store.needsKeyRemoval)
                     if store.isConnected(to: accountID) {
                         Button("Refresh Garmin data") { store.refresh(account: accountID, force: true) }
                             .disabled(store.busy)
+                    }
+                    if store.isConnected(to: accountID) ||
+                        (store.accountID == accountID && store.needsKeyRemoval) {
                         Button("Disconnect and remove local key", role: .destructive) {
                             key = ""
                             store.disconnect(account: accountID)

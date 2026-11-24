@@ -1,0 +1,52 @@
+name: Garmin private code compile check
+on:
+  workflow_dispatch:
+  push:
+    branches: [release/v3.0.1]
+    paths:
+      - 'ATHLTH/Wearables/**'
+      - 'ATHLTH/Views/ProductRootTabView.swift'
+      - 'ATHLTH/Insights/ATHLTHInsightsView.swift'
+      - 'ATHLTH/Social/WorkoutHistoryViews.swift'
+      - 'ATHLTH/Settings/ATHLTHSettingsView.swift'
+      - 'project.yml'
+      - '.github/workflows/garmin-private-compile.yml'
+permissions:
+  contents: read
+concurrency:
+  group: garmin-private-compile-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compile-private:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+      - name: Install XcodeGen
+        run: command -v xcodegen || brew install xcodegen
+      - name: Prepare bundled assets
+        run: |
+          bash scripts/optimize_hero_assets.sh
+          python3 scripts/prepare_repdb_offline.py
+      - name: Generate simulator project
+        run: |
+          cp project.yml project-garmin-private.yml
+          python3 - project-garmin-private.yml <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          path.write_text(path.read_text().replace("      - target: ATHLTHWatchApp\n        embed: true\n", ""))
+          PY
+          xcodegen generate --spec project-garmin-private.yml
+      - name: Compile opt-in private Garmin code (no account, keys, signing or upload)
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project ATHLTH.xcodeproj -scheme ATHLTH \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/GarminPrivateDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG ATHLTH_GARMIN_PERSONAL' \
+            build

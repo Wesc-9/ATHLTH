@@ -18,3 +18,6 @@ Remaining: verify response fields and compile the opt-in build, test a real
 account/device, confirm commercial processing terms, implement approved OAuth,
 account-scoped durable import, actual per-metric source priority and safe
 cross-source identity reconciliation before merging core readiness and history.
+
+A separate compile-only GitHub workflow checks the opt-in code with no Garmin
+keys, no authenticated account, no signing, and no distributed binary.

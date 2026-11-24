@@ -9,6 +9,7 @@ final class GarminPersonalLocalStore: ObservableObject {
     static let shared = GarminPersonalLocalStore()
     @Published private(set) var accountID: UUID?
     @Published private(set) var connected = false
+    @Published private(set) var needsKeyRemoval = false
     @Published private(set) var busy = false
     @Published private(set) var message: String?
     @Published private(set) var lastRefresh: Date?
@@ -39,7 +40,7 @@ final class GarminPersonalLocalStore: ObservableObject {
     }
 
     func connect(_ key: String, account: UUID) {
-        guard accountID == account, !busy else { return }
+        guard accountID == account, !busy, !needsKeyRemoval else { return }
         begin(account: account, key: key, replaceKey: true)
     }
 
@@ -62,7 +63,8 @@ final class GarminPersonalLocalStore: ObservableObject {
             try GarminPersonalKeychain.remove(account)
             message = "Local key and cached Garmin data removed. Revoke the key at Garmin if needed."
         } catch {
-            // Fail closed even if Keychain deletion failed.
+            // Keep a visible retry action, but never resume sync in this session.
+            needsKeyRemoval = true
             message = "Local data cleared, but key removal failed. Retry disconnect or revoke at Garmin."
         }
     }
@@ -74,6 +76,7 @@ final class GarminPersonalLocalStore: ObservableObject {
         job = nil
         client = nil
         connected = false
+        needsKeyRemoval = false
         busy = false
         preview = nil
         lastAttempt = nil
@@ -103,12 +106,12 @@ final class GarminPersonalLocalStore: ObservableObject {
             } catch {
                 guard let self, self.accountID == account, self.generation == requestID,
                       !Task.isCancelled else { return }
-                switch error {
-                case GarminPersonalClientError.unauthorized:
+                switch error as? GarminPersonalClientError {
+                case .some(.unauthorized):
                     self.preview = nil
                     self.lastRefresh = nil
                     self.message = "Garmin rejected access. Replace or revoke your key."
-                case GarminPersonalClientError.throttled:
+                case .some(.throttled):
                     self.message = "Garmin rate limit reached. Try again later."
                 default:
                     self.message = "Garmin refresh failed. Check your connection or key."
