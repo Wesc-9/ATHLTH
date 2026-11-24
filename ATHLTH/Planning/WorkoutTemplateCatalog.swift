@@ -1355,10 +1355,12 @@ struct WorkoutTemplateLibraryView: View {
         let selected = personalRunningTemplate(source)
         var planned = selected.plannedSession()
         if source.isBuiltIn {
-            let base = ATHLTHUnifiedWorkout.editorBlocks(from: selected.plannedSession())
-            planned.workoutBlocks = ATHLTHWorkoutUserTargetsStore.load(
+            let base = ATHLTHUnifiedWorkout.editorBlocks(from: planned)
+            if let targets = ATHLTHWorkoutUserTargetsStore.load(
                 userID: session.profile.userID.uuidString, workoutID: source.id, original: base
-            ) ?? base
+            ) {
+                planned.workoutBlocks = targets
+            }
             planned.workoutTemplateID = source.id
         }
         onSelectPlanned?(planned)
