@@ -1185,6 +1185,42 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         XCTAssertFalse(second.isExpanded)
     }
 
+    func testGymGuideUsesActualExerciseAndLooksAheadOnlyDuringRecovery() {
+        let first = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Squat",
+            exerciseSlug: "squat", distanceMeters: nil,
+            repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: 20, loadNote: nil, notes: nil, phase: .main
+        )
+        let rest = WorkoutTemplateBlock(
+            sequence: 2, kind: .rest, title: "Rest",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 30,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil, phase: .main
+        )
+        let next = WorkoutTemplateBlock(
+            sequence: 3, kind: .exercise, title: "Press",
+            exerciseSlug: "press", distanceMeters: nil,
+            repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: 10, loadNote: nil, notes: nil, phase: .main
+        )
+        let blocks = [first, rest, next]
+        XCTAssertEqual(ATHLTHGymExerciseReference.select(blocks: blocks, index: 0)?.id, first.id)
+        XCTAssertEqual(ATHLTHGymExerciseReference.select(blocks: blocks, index: 1)?.id, next.id)
+        XCTAssertEqual(ATHLTHGymExerciseReference.make(blocks: blocks, index: 1)?.upcoming, true)
+        XCTAssertNil(ATHLTHGymExerciseReference.select(blocks: [first, rest], index: 1))
+        XCTAssertNil(ATHLTHGymExerciseReference.select(blocks: blocks, index: 3))
+    }
+
+    func testGymRingRequiresKnownDuration() {
+        XCTAssertEqual(ATHLTHGymModeClock.fraction(remaining: 30, duration: 60), 0.5)
+        XCTAssertEqual(ATHLTHGymModeClock.fraction(remaining: 0, duration: 60), 0)
+        XCTAssertEqual(ATHLTHGymModeClock.fraction(remaining: 90, duration: 60), 1)
+        XCTAssertNil(ATHLTHGymModeClock.fraction(remaining: 30, duration: nil))
+        XCTAssertNil(ATHLTHGymModeClock.fraction(remaining: 30, duration: 0))
+        XCTAssertNil(ATHLTHGymModeClock.fraction(remaining: .nan, duration: 60))
+    }
+
     func testGymClockPrioritizesSourceRestAndNeverRunsPastExtrapolationLimit() {
         let now = Date(timeIntervalSince1970: 1_000)
         var frame = snapshot(capturedAt: now, stepRemaining: 70)
