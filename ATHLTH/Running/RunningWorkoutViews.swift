@@ -506,7 +506,7 @@ struct RunningWorkoutDetailView: View {
     private func continueWithSavedCopy() {
         // Choosing the original for a plan never silently creates or
         // switches to a personal copy. Mine is selected explicitly elsewhere.
-        onSelect?(workout)
+        onSelect?(previewWorkout)
         dismiss()
     }
 
@@ -514,7 +514,7 @@ struct RunningWorkoutDetailView: View {
         pendingAddToPlan = toPlan
         if workout.isBuiltIn &&
             ATHLTHWorkoutFirstUsePolicy.asksForTargets(
-                advanced: advancedMode, hasPersonalCopy: personalCopy != nil
+                advanced: advancedMode, hasPersonalCopy: privateSavedWorkout != nil
             ) {
             askingForTargets = true
         } else if toPlan {
@@ -851,7 +851,12 @@ struct RunningWorkoutDetailView: View {
                 }
 
                 Button {
-                        editPersonalizedCopy()
+                        pendingAddToPlan = false
+                        if workout.isBuiltIn {
+                            editPrivatePreset()
+                        } else {
+                            editPersonalizedCopy()
+                        }
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
@@ -964,7 +969,11 @@ struct RunningWorkoutDetailView: View {
             Button(ATHLTHLocalization.choose(
                 english: "Enter targets in Advanced", norwegian: "Legg inn mål i Avansert"
             )) {
-                editPersonalizedCopy()
+                if workout.isBuiltIn {
+                    editPrivatePreset()
+                } else {
+                    editPersonalizedCopy()
+                }
             }
             Button(ATHLTHLocalization.choose(
                 english: "Use workout without personal targets",
@@ -998,6 +1007,11 @@ struct RunningWorkoutDetailView: View {
                 // renamed; rejected saves keep the original intact.
                 if editingPrivatePreset {
                     savePrivateWorkout(personalized)
+                    if !editingPrivatePreset && pendingAddToPlan {
+                        pendingAddToPlan = false
+                        onSelect?(previewWorkout)
+                        dismiss()
+                    }
                 } else if library.save(personalized) {
                     if pendingAddToPlan {
                         onSelect?(personalized)
