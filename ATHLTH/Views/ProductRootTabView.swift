@@ -411,7 +411,7 @@ struct ProductRootTabView: View {
         else { return }
         ATHLTHTrainSmokeTrace.record("native-driver-started")
         // Wait for Home's actual appearance, not a fixed delay from process launch.
-        for _ in 0..<120 {
+        for _ in 0..<600 {
             if Task.isCancelled { return }
             if selectedTab == 0 && ATHLTHTrainSmokeTrace.hasRecorded("native-home-appeared") { break }
             try? await Task.sleep(for: .milliseconds(250))
@@ -421,7 +421,7 @@ struct ProductRootTabView: View {
         else { ATHLTHTrainSmokeTrace.record("native-home-timeout"); return }
         // The first transition uses the real native TabView binding.
         selectedTab = 1
-        for _ in 0..<120 {
+        for _ in 0..<600 {
             if Task.isCancelled { return }
             if ATHLTHTrainSmokeTrace.hasRecorded("native-home-to-train"),
                ATHLTHTrainSmokeTrace.hasRecorded("dashboard-ready") { break }
@@ -433,7 +433,16 @@ struct ProductRootTabView: View {
         else { ATHLTHTrainSmokeTrace.record("native-train-timeout"); return }
         ATHLTHTrainSmokeTrace.record("native-first-hop-verified")
         guard args.contains("--athlth-smoke-home-train-stress") else { return }
-        try? await Task.sleep(for: .seconds(2))
+        // The CI process must verify the first mounted Train frame before
+        // starting stress navigation. This is simulator-only synchronization.
+        for _ in 0..<1440 {
+            if Task.isCancelled { return }
+            if ATHLTHTrainSmokeTrace.hasRecorded("native-stress-start") { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        guard !Task.isCancelled, selectedTab == 1,
+              ATHLTHTrainSmokeTrace.hasRecorded("native-stress-start")
+        else { ATHLTHTrainSmokeTrace.record("native-stress-start-timeout"); return }
         for hop in 1...100 {
             guard !Task.isCancelled, selectedTab == 1 else { return }
             selectedTab = 0

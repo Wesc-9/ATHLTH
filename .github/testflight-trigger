@@ -349,3 +349,5 @@ ATHLTH 3.0.1 build 141 — user-authorized TestFlight upload 2026-11-24; latest 
 ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry after native Home-to-Train smoke lifecycle repair and fresh simulator app launch, 2026-11-24. Keep five exact-commit gates, real dashboard evidence and 100 cycles required; no bypass.
 
 ATHLTH 3.0.1 build 141 — user-authorized retry 2026-11-24; isolate iPhone smoke per compatible size, fresh job-owned device and native transition before individual tab previews; preserve all required assertions, 100 transitions and same-commit release gates. No stale upload or bypass.
+
+ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry 2026-11-24: one checksummed exact-commit simulator build shared across isolated device jobs, bounded lifecycle waiting, first-frame/stress handshake and durable host/main-thread diagnostics. All five release gates and 100 transitions remain mandatory; no bypass.

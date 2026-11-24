@@ -83,9 +83,116 @@ permissions:
   contents: read
 
 jobs:
+  build-smoke-app:
+    name: Build shared iPhone simulator app
+    runs-on: xcode-27
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Insights main-tab and preview routing
+        run: python3 scripts/audit_insights_entrypoints.py
+
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install validation tools
+        run: |
+          brew install xcodegen
+
+      - name: Optimize hero assets for runtime memory
+        shell: bash
+        run: bash scripts/optimize_hero_assets.sh
+
+      - name: Embed RepDB offline exercise assets
+        run: python3 scripts/prepare_repdb_offline.py
+
+      - name: Generate iPhone-only smoke-test project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp project.yml project-smoke.yml
+          python3 - project-smoke.yml <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          text = text.replace("      - target: ATHLTHWatchApp\n        embed: true\n", "")
+          path.write_text(text)
+          PY
+          xcodegen generate --spec project-smoke.yml
+
+      - name: Build simulator app
+        shell: bash
+        timeout-minutes: 75
+        run: |
+          set -euo pipefail
+          # Keep an on-runner build log and periodic progress output so a
+          # stalled Xcode build can be distinguished from a slow compile.
+          # Smoke tests validate launch and rendering; Release compilation is
+          # already verified separately by the required Build ATHLTH gate.
+          LOG="$RUNNER_TEMP/athlth-iphone-simulator-build.log"
+          set +e
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTH \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone \
+            -jobs 2 \
+            build > "$LOG" 2>&1 &
+          build_pid=$!
+          while kill -0 "$build_pid" 2>/dev/null; do
+            sleep 60
+            echo "::notice::iPhone simulator build still running (PID $build_pid)"
+            tail -n 12 "$LOG" || true
+          done
+          wait "$build_pid"
+          result=$?
+          set -e
+          tail -n 120 "$LOG" || true
+          exit "$result"
+
+      - name: Upload iPhone simulator build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-iphone-build-log
+          path: ${{ runner.temp }}/athlth-iphone-simulator-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Package exact-commit simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/ATHLTH.app"
+          test -x "$APP/ATHLTH"
+          mkdir -p "$RUNNER_TEMP/athlth-smoke-package"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/athlth-smoke-package/ATHLTH.zip"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/athlth-smoke-package/commit.txt"
+          lipo -archs "$APP/ATHLTH" > "$RUNNER_TEMP/athlth-smoke-package/architectures.txt"
+          (cd "$RUNNER_TEMP/athlth-smoke-package" && shasum -a 256 ATHLTH.zip > SHA256SUMS)
+
+      - name: Upload shared simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-iphone-simulator-app
+          overwrite: true
+          path: ${{ runner.temp }}/athlth-smoke-package/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
+
   launch-smoke:
     name: iPhone smoke (${{ matrix.size }})
+    needs: build-smoke-app
     runs-on: xcode-27
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       # Separate jobs, with bounded concurrency on the Xcode runner pool.
@@ -133,78 +240,35 @@ jobs:
           echo "available=true" >> "$GITHUB_OUTPUT"
           cat "$RUNNER_TEMP/iphone-device-matrix.txt"
 
-      - name: Install validation tools
+      - name: Install screenshot validation tools
         if: steps.device.outputs.available == 'true'
-        run: |
-          brew install xcodegen
-          brew install imagemagick
+        run: brew install imagemagick
 
-      - name: Optimize hero assets for runtime memory
+      - name: Download shared simulator app
         if: steps.device.outputs.available == 'true'
-        shell: bash
-        run: bash scripts/optimize_hero_assets.sh
-
-      - name: Embed RepDB offline exercise assets
-        if: steps.device.outputs.available == 'true'
-        run: python3 scripts/prepare_repdb_offline.py
-
-      - name: Generate iPhone-only smoke-test project
-        if: steps.device.outputs.available == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp project.yml project-smoke.yml
-          python3 - project-smoke.yml <<'PY'
-          import pathlib, sys
-          path = pathlib.Path(sys.argv[1])
-          text = path.read_text()
-          text = text.replace("      - target: ATHLTHWatchApp\n        embed: true\n", "")
-          path.write_text(text)
-          PY
-          xcodegen generate --spec project-smoke.yml
-
-      - name: Build simulator app
-        if: steps.device.outputs.available == 'true'
-        shell: bash
-        timeout-minutes: 75
-        run: |
-          set -euo pipefail
-          # Keep an on-runner build log and periodic progress output so a
-          # stalled Xcode build can be distinguished from a slow compile.
-          # Smoke tests validate launch and rendering; Release compilation is
-          # already verified separately by the required Build ATHLTH gate.
-          LOG="$RUNNER_TEMP/athlth-iphone-simulator-build.log"
-          set +e
-          xcodebuild \
-            -project ATHLTH.xcodeproj \
-            -scheme ATHLTH \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
-            SWIFT_OPTIMIZATION_LEVEL=-Onone \
-            build > "$LOG" 2>&1 &
-          build_pid=$!
-          while kill -0 "$build_pid" 2>/dev/null; do
-            sleep 60
-            echo "::notice::iPhone simulator build still running (PID $build_pid)"
-            tail -n 12 "$LOG" || true
-          done
-          wait "$build_pid"
-          result=$?
-          set -e
-          tail -n 120 "$LOG" || true
-          exit "$result"
-
-      - name: Upload iPhone simulator build diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/download-artifact@v4
         with:
-          name: athlth-iphone-build-log-${{ matrix.size }}
-          path: ${{ runner.temp }}/athlth-iphone-simulator-build.log
-          if-no-files-found: ignore
-          retention-days: 7
+          # The successful build job might be from an earlier workflow
+          # attempt when only failed device jobs are retried. Resolve its
+          # artifact explicitly using a stable run-scoped name.
+          name: athlth-iphone-simulator-app
+          path: ${{ runner.temp }}/athlth-smoke-package
+
+      - name: Verify and unpack exact-commit simulator app
+        if: steps.device.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/athlth-smoke-package"
+          test "$(cat commit.txt)" = "$GITHUB_SHA"
+          shasum -a 256 -c SHA256SUMS
+          grep -qw "$(uname -m)" architectures.txt
+          mkdir -p "$RUNNER_TEMP/athlth-shared-app"
+          ditto -x -k ATHLTH.zip "$RUNNER_TEMP/athlth-shared-app"
+          test -x "$RUNNER_TEMP/athlth-shared-app/ATHLTH.app/ATHLTH"
+          df -h "$RUNNER_TEMP"
+          vm_stat
+          sysctl vm.loadavg vm.swapusage || true
 
       - name: Launch isolated iPhone and verify all tabs and 100 native transitions
         if: steps.device.outputs.available == 'true'
@@ -271,10 +335,8 @@ jobs:
 
           # The app was built in an earlier workflow step. Explicitly
           # resolve it in this shell; step-local variables are not inherited.
-          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator" \
-            -maxdepth 1 -name 'ATHLTH.app' -print -quit)
-          test -n "$APP"
-          test -d "$APP"
+          APP="$RUNNER_TEMP/athlth-shared-app/ATHLTH.app"
+          test -x "$APP/ATHLTH"
 
           cleanup_device() {
             local udid="$1"
@@ -293,29 +355,63 @@ jobs:
             local expected_transition="${4:-false}"
             local transition="$container/tmp/athlth-train-$pid-native-home-to-train"
             local first_hop="$container/tmp/athlth-train-$pid-native-first-hop-verified"
-            local attempts=30
-            if [ "$expected_transition" = true ]; then attempts=75; fi
-            for attempt in $(seq 1 "$attempts"); do
-              if [ -s "$marker" ] && kill -0 "$pid" 2>/dev/null; then
-                if [ "$expected_transition" != true ] || { [ -s "$transition" ] && [ -s "$first_hop" ]; }; then
-                  echo "Verified real Train Today dashboard mounted: $label (PID $pid)."
-                  return 0
-                fi
-              fi
-              sleep 1
-            done
+            local seconds=120
+            if [ "$expected_transition" = true ]; then seconds=300; fi
+            # Use monotonic elapsed time and check actual process/marker state.
+            # A slow runner is not a pass; missing evidence and exits still fail.
+            if python3 - "$pid" "$marker" "$transition" "$first_hop" "$expected_transition" "$seconds" <<'PY'
+          import os, pathlib, sys, time
+          pid, dashboard, transition, first, required, timeout = sys.argv[1:]
+          pid = int(pid)
+          markers = [pathlib.Path(dashboard)]
+          if required == "true":
+              markers += [pathlib.Path(transition), pathlib.Path(first)]
+          start = time.monotonic()
+          deadline = start + int(timeout)
+          last = -30
+          while True:
+              try:
+                  os.kill(pid, 0)
+              except OSError:
+                  print(f"ATHLTH process {pid} is not alive.", flush=True)
+                  sys.exit(1)
+              ready = [p.is_file() and p.stat().st_size > 0 for p in markers]
+              if all(ready):
+                  print(f"All {len(markers)} lifecycle markers verified after {time.monotonic()-start:.1f}s.", flush=True)
+                  sys.exit(0)
+              elapsed = time.monotonic() - start
+              if elapsed - last >= 30:
+                  print(f"Waiting {elapsed:.1f}s: {ready}", flush=True)
+                  last = elapsed
+              if time.monotonic() >= deadline:
+                  sys.exit(2)
+              time.sleep(1)
+          PY
+            then
+              echo "Verified real Train Today dashboard mounted: $label (PID $pid)."
+              return 0
+            fi
             echo "Train lifecycle evidence for PID $pid:"
             find "$container/tmp" -maxdepth 1 -name "athlth-train-$pid-*" -print
-            simctl_bounded "capture failed Train transition" 55 io "$udid" screenshot "$RUNNER_TEMP/athlth-$CLASS-train-failure.png" || true
-            # A stack sample distinguishes a stalled main thread from a missing
-            # lifecycle signal without weakening the mandatory assertions.
+            # Capture main-thread evidence first, before potentially blocked
+            # simulator screenshot/log commands. Preserve partial diagnostics.
+            {
+              date -u
+              vm_stat
+              sysctl vm.loadavg vm.swapusage || true
+              df -h "$RUNNER_TEMP"
+              ps -p "$pid" -o pid,ppid,state,%cpu,%mem,etime,command || true
+              ps -Ao pid,ppid,%cpu,%mem,comm -r | head -30 || true
+            } > "$RUNNER_TEMP/athlth-$CLASS-train-host.txt" 2>&1
             python3 - "$pid" "$RUNNER_TEMP/athlth-$CLASS-train-sample.txt" <<'PY' || true
           import subprocess, sys
-          try:
-              subprocess.run(["sample", sys.argv[1], "5", "1", "-file", sys.argv[2]], timeout=25, check=False)
-          except subprocess.TimeoutExpired:
-              pass
+          with open(sys.argv[2], "w") as out:
+              try:
+                  subprocess.run(["sample", sys.argv[1], "5", "1"], stdout=out, stderr=subprocess.STDOUT, timeout=120, check=False)
+              except subprocess.TimeoutExpired:
+                  out.write("\nStack sampling exceeded 120s.\n")
           PY
+            simctl_bounded "capture failed Train transition" 90 io "$udid" screenshot "$RUNNER_TEMP/athlth-$CLASS-train-failure.png" || true
             simctl_bounded "collect Train lifecycle logs" 65 spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
             echo "::error::$label did not mount the real Train Today dashboard or perform the required native transition."
             return 1
@@ -330,8 +426,13 @@ jobs:
             local entropy="0"
 
             while [ "$attempt" -le 3 ]; do
-              simctl_bounded "capture $label" 55 io "$udid" screenshot "$screenshot"
-              test -s "$screenshot"
+              rm -f "$screenshot"
+              if ! simctl_bounded "capture $label" 90 io "$udid" screenshot "$screenshot" || [ ! -s "$screenshot" ]; then
+                echo "::warning::Screenshot transport unavailable ($label, attempt $attempt)."
+                attempt=$((attempt + 1))
+                sleep 5
+                continue
+              fi
 
               entropy=$(magick "$screenshot" -colorspace Gray -format "%[entropy]" info:)
               echo "$label screenshot entropy (attempt $attempt): $entropy"
@@ -489,8 +590,11 @@ jobs:
             validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train after dashboard mount"
             # Prove all 100 same-process Home -> Train cycles completed.
             STRESS_CONTAINER=$(simctl_bounded "locate Train stress evidence" 45 get_app_container "$UDID" com.wesc9.athlth data)
+            # Acknowledge the first verified screenshot before the app begins
+            # switching tabs repeatedly, so the first frame is not a Home frame.
+            printf 'start\n' > "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-native-stress-start"
             STRESS_COMPLETE=false
-            for attempt in $(seq 1 210); do
+            for attempt in $(seq 1 420); do
               if ! kill -0 "$HOP_PID" 2>/dev/null; then
                 echo "::error::ATHLTH crashed during repeated Train navigation on $DEVICE_NAME."
                 exit 1
@@ -603,6 +707,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: athlth-iphone-train-stack-${{ matrix.size }}
-          path: ${{ runner.temp }}/athlth-*-train-sample.txt
+          path: |
+            ${{ runner.temp }}/athlth-*-train-sample.txt
+            ${{ runner.temp }}/athlth-*-train-host.txt
           if-no-files-found: ignore
           retention-days: 7
