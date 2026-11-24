@@ -57,6 +57,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingLiveExerciseHistory = false
     @State private var liveExerciseHistory: ATHLTHExerciseProgress.Summary?
     @State private var liveHistoryExerciseID: UUID?
+    @State private var liveHistoryReferenceID: UUID?
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
     @State private var showingSpotifyControls = false
@@ -214,7 +215,8 @@ struct ActiveStrengthWorkoutView: View {
                     ScrollView {
                         if let liveExerciseHistory {
                             VStack(spacing: 14) {
-                                if let previous = liveExerciseHistory.sessions.last,
+                                if let previous = liveExerciseHistory.sessions.first(where: { $0.id == liveHistoryReferenceID }) ??
+                                    liveExerciseHistory.sessions.last,
                                    let exercise = strength.activeWorkout?.exercises.first(where: {
                                        $0.id == liveHistoryExerciseID
                                    }) {
@@ -224,9 +226,20 @@ struct ActiveStrengthWorkoutView: View {
                                         .filter { $0.isFinite && $0 > 0 }.max()
                                     VStack(alignment: .leading, spacing: 12) {
                                         Label(ATHLTHLocalization.choose(
-                                            english: "Against your previous session",
-                                            norwegian: "Mot din forrige økt"), systemImage: "flag.checkered")
+                                            english: "Compare with your own result",
+                                            norwegian: "Sammenlign med eget resultat"), systemImage: "flag.checkered")
                                             .font(.headline)
+                                        Picker(ATHLTHLocalization.choose(english: "Reference", norwegian: "Referanse"),
+                                               selection: Binding(
+                                                get: { liveHistoryReferenceID ?? previous.id },
+                                                set: { liveHistoryReferenceID = $0 })) {
+                                            ForEach(liveExerciseHistory.sessions.reversed()) { record in
+                                                Text(record.date.formatted(date: .abbreviated, time: .omitted) +
+                                                     " · " + record.workoutTitle)
+                                                    .tag(record.id)
+                                            }
+                                        }
+                                        .pickerStyle(.menu)
                                         HStack {
                                             Text(ATHLTHLocalization.choose(english: "Recorded sets", norwegian: "Registrerte sett"))
                                             Spacer()
@@ -247,8 +260,8 @@ struct ActiveStrengthWorkoutView: View {
                                             }
                                         }
                                         Text(ATHLTHLocalization.choose(
-                                            english: "Current / previous · reference only, not a competition score.",
-                                            norwegian: "Nå / forrige · referanse, ikke konkurransepoeng."))
+                                            english: "Current / selected reference · actual sets only. No competition score.",
+                                            norwegian: "Nå / valgt referanse · kun registrerte sett. Ingen konkurransepoeng."))
                                             .font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                     }
                                     .font(.subheadline)
@@ -2587,6 +2600,7 @@ struct ActiveStrengthWorkoutView: View {
                                 workouts: strength.workoutHistory,
                                 reference: reference
                             )
+                            liveHistoryReferenceID = liveExerciseHistory?.sessions.last?.id
                             showingLiveExerciseHistory = true
                         } label: {
                             HStack {

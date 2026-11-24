@@ -916,7 +916,11 @@ final class MirroredWorkoutAudioCoach:
             targetHeartRateMinimumBPM:
                 snapshot.heartRateTargetMinimumBPM ??
                 targetRange.map { Double($0.lowerBound) },
-            targetHeartRateMaximumBPM: targetRange.map { Double($0.upperBound) },
+            targetHeartRateMaximumBPM: snapshot.heartRateTargetMaximumBPM ??
+                targetRange.map { Double($0.upperBound) },
+            stepIndex: snapshot.runningStepIndex,
+            stepPhase: snapshot.runningStepPhase,
+            stepRemainingSeconds: snapshot.runningStepRemainingSeconds,
             reliableNotClimbing:
                 snapshot.coachReliableNonClimbingTerrain == true,
             norwegian: norwegian

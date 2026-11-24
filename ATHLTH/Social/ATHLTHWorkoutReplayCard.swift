@@ -178,6 +178,30 @@ struct ATHLTHWorkoutReplayCard: View {
                 norwegian: "Det er ikke nok sammenlignbare data til å anbefale endret intensitet. Bruk egen opplevd innsats og restitusjon når du planlegger neste økt.")
     }
 
+    private var completedWorkoutEvidence: String? {
+        guard !requiresDataReview, workout.duration.isFinite,
+              workout.duration > 0, workout.duration < 7 * 86_400 else { return nil }
+        // Use only workouts confirmed by the current account's local stores.
+        guard health.workouts.contains(where: { $0.id == workout.id }) ||
+              matchingStrengthLog != nil else { return nil }
+        var rows = [
+            workout.activity.rawValue,
+            String(format: "%.0f min", workout.duration / 60)
+        ]
+        if let distance = workout.distanceMeters, distance.isFinite, distance > 0,
+           distance < 1_000_000 {
+            rows.append(String(format: "%.2f km", distance / 1_000))
+        }
+        if let pace = validOverallPace, pace.isFinite {
+            rows.append(String(format: "%.0f sec/km", pace))
+        }
+        if let log = matchingStrengthLog, log.isFinished {
+            rows.append("\(log.totalCompletedSets) completed sets")
+        }
+        return ATHLTHLocalization.choose(english: "Recorded workout: ", norwegian: "Registrert økt: ") +
+            rows.joined(separator: " · ") + "\n" + nextSessionGuidance
+    }
+
     private var nextSessionAdvice: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label(ATHLTHLocalization.choose(english: "COACH · NEXT SESSION", norwegian: "COACH · NESTE ØKT"), systemImage: "sparkles")
@@ -793,7 +817,8 @@ struct ATHLTHWorkoutReplayCard: View {
                 initialNotes: ATHLTHLocalization.choose(
                     english: "Review the next comparable planned workout. Keep my goal and suggest only a justified change, if any.",
                     norwegian: "Vurder neste sammenlignbare planlagte økt. Behold målet mitt og foreslå kun en begrunnet endring dersom det er nødvendig."),
-                planID: session.activePlan?.id
+                planID: session.activePlan?.id,
+                workoutEvidence: completedWorkoutEvidence
             )
         }
         .sheet(isPresented: $showingDataReview.keepingPresentedWhenInactive(scenePhase)) {

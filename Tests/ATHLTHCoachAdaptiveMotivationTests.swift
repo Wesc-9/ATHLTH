@@ -4,6 +4,29 @@ import XCTest
 
 @MainActor
 final class ATHLTHCoachAdaptiveMotivationTests: XCTestCase {
+    func testRecoveryAndCountdownSuppressPacePushAndResetStepEvidence() {
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.coachingMode = .custom
+        settings.pushWhenBelowTargetPace = true
+        var state = ATHLTHCoachAdaptiveMotivation()
+        func cue(_ t: Double, index: Int, phase: String, remaining: Double = 90) -> String? {
+            state.nextCue(settings: settings, elapsed: t,
+                measuredPaceSecondsPerKilometer: 420,
+                targetSlowestPaceSecondsPerKilometer: 330,
+                measuredHeartRateBPM: 145, targetHeartRateMinimumBPM: nil,
+                stepIndex: index, stepPhase: phase, stepRemainingSeconds: remaining,
+                reliableNotClimbing: true, norwegian: true)
+        }
+        XCTAssertNil(cue(100, index: 0, phase: "work"))
+        XCTAssertNil(cue(115, index: 0, phase: "work"))
+        XCTAssertNil(cue(120, index: 1, phase: "recovery"))
+        XCTAssertNil(cue(160, index: 1, phase: "recovery"))
+        XCTAssertNil(cue(180, index: 2, phase: "work"))
+        XCTAssertNil(cue(195, index: 2, phase: "work", remaining: 12))
+        XCTAssertNil(cue(210, index: 3, phase: "work"))
+        XCTAssertNotNil(cue(231, index: 3, phase: "work"))
+    }
+
     func testHighPulseSuppressesConflictingPacePush() {
         var settings = ATHLTHAudioCoachSmartSettings()
         settings.coachingMode = .custom

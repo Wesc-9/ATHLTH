@@ -12,10 +12,17 @@ struct CoachPlanAdaptationView: View {
     @State private var infoMessage: String?
     @State private var appliedRecordID: UUID?
     private let requestedPlanID: UUID?
+    private let workoutEvidence: String?
+    @State private var includeWorkoutEvidence = false
 
-    init(initialNotes: String = "", planID: UUID? = nil) {
+    init(initialNotes: String = "", planID: UUID? = nil, workoutEvidence: String? = nil) {
         _userNotes = State(initialValue: initialNotes)
         self.requestedPlanID = planID
+        self.workoutEvidence = workoutEvidence
+    }
+
+    private var canIncludeWorkoutEvidence: Bool {
+        session.signedIn && CoachHistoryPermission.isEnabled(userID: session.profile.userID)
     }
 
     private let service = CoachPlanAdaptationService()
@@ -23,8 +30,10 @@ struct CoachPlanAdaptationView: View {
     private var plan: TrainingPlan? {
         // The iPad editor can open an owned plan that is not currently active.
         // Proposal versioning and writes still use the canonical session store.
-        requestedPlanID.flatMap { session.trainingPlan(withID: $0) } ??
-            session.activePlan
+        if let requestedPlanID {
+            return session.trainingPlan(withID: requestedPlanID)
+        }
+        return session.activePlan
     }
 
     private var proposal: CoachPlanChangeProposal? {
@@ -256,6 +265,33 @@ struct CoachPlanAdaptationView: View {
                         lineWidth: 1
                     )
                 }
+
+            if let workoutEvidence {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(ATHLTHLocalization.choose(english: "Completed workout evidence", norwegian: "Resultater fra gjennomført økt"),
+                          systemImage: "chart.bar.xaxis")
+                        .font(.subheadline.weight(.semibold))
+                    Text(workoutEvidence)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .textSelection(.enabled)
+                    Toggle(ATHLTHLocalization.choose(
+                        english: "Include this evidence in Coach review",
+                        norwegian: "Ta med disse resultatene i Coach-vurderingen"),
+                        isOn: $includeWorkoutEvidence)
+                        .font(.subheadline)
+                        .disabled(!canIncludeWorkoutEvidence)
+                    if !canIncludeWorkoutEvidence {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Training history sharing is disabled. The results stay local.",
+                            norwegian: "Deling av treningshistorikk er deaktivert. Resultatene forblir lokale."))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+                .padding(12)
+                .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 14))
+            }
 
             if let errorMessage {
                 Label(
@@ -590,7 +626,8 @@ struct CoachPlanAdaptationView: View {
         let request = CoachPlanAdaptationService.makeRequest(
             plan: plan,
             goals: resolvedGoals,
-            recentTraining: recentTraining,
+            recentTraining: (includeWorkoutEvidence && canIncludeWorkoutEvidence
+                ? workoutEvidence.map { [$0] } ?? [] : []) + recentTraining,
             userNotes: userNotes
         )
 
@@ -610,6 +647,7 @@ struct CoachPlanAdaptationView: View {
                 return
             }
         } catch {
+            guard session.signedIn, session.profile.userID == requestOwner else { return }
             errorMessage = error.localizedDescription
         }
     }

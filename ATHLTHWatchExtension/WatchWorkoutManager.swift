@@ -5638,6 +5638,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 ? target?.heartRateMinimumBPM : nil,
             targetHeartRateMaximumBPM: target?.heartRateEnabled == true
                 ? target?.heartRateMaximumBPM : nil,
+            stepIndex: currentStructuredRunningStep == nil ? nil : structuredStepIndex,
+            stepPhase: awaitingMainStart ? "warmup" : currentStructuredRunningStep?.phase,
             reliableNotClimbing: usesOutdoorGPS &&
                 smartCoachState.isReliablyNotClimbing,
             norwegian: norwegian

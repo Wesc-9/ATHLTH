@@ -2297,6 +2297,7 @@ struct PerformanceStatsView: View {
                         .font(.subheadline)
                     }
                 }
+                recentMuscleCoverage(since: start)
                 Text(text("Frequency and mix describe your recorded training, not your physical capacity.",
                           "Frekvens og fordeling beskriver registrert trening, ikke din fysiske kapasitet."))
                     .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
@@ -2305,6 +2306,46 @@ struct PerformanceStatsView: View {
         .padding(16)
         .athlthTrainPaper()
         .accessibilityIdentifier("athlth-training-profile-28-days")
+    }
+
+    private func recentMuscleCoverage(since start: Date) -> some View {
+        var coverage: [String: Int] = [:]
+        var seen = Set<UUID>()
+        let now = Date()
+        for workout in strengthWorkout.workoutHistory where workout.isFinished {
+            let date = workout.endedAt ?? workout.startedAt
+            guard date >= start, date <= now, seen.insert(workout.id).inserted else { continue }
+            for exercise in workout.exercises where exercise.isEmbeddedRunningInterval != true {
+                let count = exercise.sets.filter(\.countsTowardTrainingLoad).count
+                guard count > 0 else { continue }
+                let groups = Set(exercise.exercise.primaryMuscles
+                    .flatMap { StrengthMuscleResolver.regions(for: $0) }
+                    .map(\.activityDisplayTitle))
+                for group in groups { coverage[group, default: 0] += count }
+            }
+        }
+        let rows = coverage.sorted {
+            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+        }
+        let peak = rows.first?.value ?? 1
+        return VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text(text("Muscle focus", "Muskelfokus"))
+                .font(.subheadline.weight(.semibold))
+            if rows.isEmpty {
+                Text(text("No completed strength sets with mapped muscles in this period.",
+                          "Ingen fullførte styrkesett med registrerte muskler i perioden."))
+                    .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+            } else {
+                ForEach(rows, id: \.key) { row in
+                    trainingProfileRow(row.key, count: row.value, total: peak)
+                }
+                Text(text("Completed sets by primary muscle group. One set can involve several groups. Missing groups are not proof of weakness.",
+                          "Fullførte sett per primær muskelgruppe. Ett sett kan berøre flere grupper. Manglende grupper betyr ikke nødvendigvis svakhet."))
+                    .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+            }
+        }
+        .accessibilityIdentifier("athlth-training-profile-muscle-focus")
     }
 
     private func trainingProfileRow(_ title: String, count: Int, total: Int) -> some View {

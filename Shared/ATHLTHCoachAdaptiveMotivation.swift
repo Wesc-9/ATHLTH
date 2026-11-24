@@ -17,6 +17,16 @@ struct ATHLTHCoachAdaptiveMotivation {
     private var zonePromptCount = 0
     private var targetPacePromptCount = 0
     private var dropPromptCount = 0
+    private var lastStepIndex: Int?
+    private var lastStepPhase: String?
+
+    private mutating func clearStepEvidence() {
+        lowZoneSince = nil
+        highZoneSince = nil
+        slowTargetSince = nil
+        paceDropSince = nil
+        reliablePaceBaseline = nil
+    }
 
     mutating func reset() { self = Self() }
 
@@ -30,12 +40,29 @@ struct ATHLTHCoachAdaptiveMotivation {
         measuredHeartRateBPM: Double?,
         targetHeartRateMinimumBPM: Double?,
         targetHeartRateMaximumBPM: Double? = nil,
+        stepIndex: Int? = nil,
+        stepPhase: String? = nil,
+        stepRemainingSeconds: TimeInterval? = nil,
         reliableNotClimbing: Bool,
         norwegian: Bool
     ) -> String? {
         guard settings.coachingMode == .custom,
               elapsed.isFinite, elapsed >= 0 else { return nil }
 
+        let phase = stepPhase?.lowercased()
+        if stepIndex != lastStepIndex || phase != lastStepPhase {
+            clearStepEvidence()
+            lastStepIndex = stepIndex
+            lastStepPhase = phase
+        }
+        let easyPhase = ["recovery", "rest", "pause", "warmup", "cooldown", "activeRecovery".lowercased()]
+            .contains(phase ?? "")
+        // No ordinary adaptive cue in the final countdown window.
+        if let remaining = stepRemainingSeconds, remaining.isFinite,
+           remaining <= 15 {
+            clearStepEvidence()
+            return nil
+        }
         // Never push pace while measured heart rate exceeds a valid target.
         let aboveTarget: Bool = {
             guard let bpm = measuredHeartRateBPM, (30...240).contains(bpm),
@@ -54,9 +81,19 @@ struct ATHLTHCoachAdaptiveMotivation {
                   elapsed - lastCueElapsed >= settings.resolvedAdaptiveCooldown else { return nil }
             lastHighZonePrompt = elapsed
             lastCueElapsed = elapsed
+            if easyPhase {
+                return norwegian
+                    ? "Pulsen ligger fortsatt over målområdet. Vurder litt roligere tempo eller lengre pause hvis du trenger det."
+                    : "Your heart rate is still above target. Consider slowing down or taking a longer recovery if needed."
+            }
             return norwegian
                 ? "Pulsen ligger over målområdet. Senk farten litt og finn tilbake til en kontrollert intensitet."
                 : "Your heart rate is above the target range. Ease the pace and return to a controlled effort."
+        }
+
+        guard !easyPhase else {
+            clearStepEvidence()
+            return nil
         }
 
         let pace: Double? = {
