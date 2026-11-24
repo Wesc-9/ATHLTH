@@ -42,9 +42,8 @@ enum ATHLTHiPadKeepAwakeCoordinator {
     }
 }
 
-/// iPad's full-screen, read-only companion for an iPhone/Apple Watch workout.
-/// Uses exactly the same private snapshot as the small Home return pill.
-/// This view never starts/stops workouts, opens HealthKit, or controls Watch.
+/// iPad companion for an iPhone/Apple Watch workout. Gym Mode is only
+/// a presentation of the same snapshot and source-authorized controls.
 struct ATHLTHiPadLiveWorkoutView: View {
     let snapshot: ATHLTHCrossDeviceWorkoutSnapshot
     let onMinimize: () -> Void
@@ -57,6 +56,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var liveSharing: ATHLTHCrossDeviceWorkoutStore
     @State private var confirmingRemoteEnd = false
+    @State private var gymMode = false
+    private var screenAwake: Bool { (keepAwake || gymMode) && scenePhase == .active }
 
     private var liveMaximumBPM: Double? {
         snapshot.maximumHeartRateBPM ??
@@ -112,6 +113,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
             let wide = geometry.size.width >= 840 && !dynamicTypeSize.isAccessibilitySize
             let threeColumns = geometry.size.width >= 1160 && !dynamicTypeSize.isAccessibilitySize
 
+            if gymMode {
+                gymScreen
+            } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     topBar
@@ -241,6 +245,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
             }
             .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+            }
         }
         .accessibilityIdentifier("athlth-ipad-live-workout-fullscreen")
         .confirmationDialog(
@@ -257,24 +262,63 @@ struct ATHLTHiPadLiveWorkoutView: View {
         }
         .onAppear {
             ATHLTHiPadKeepAwakeCoordinator.setEnabled(
-                keepAwake && scenePhase == .active, for: keepAwakeWindowID
+                screenAwake, for: keepAwakeWindowID
             )
         }
-        .onChange(of: keepAwake) { _, enabled in
-            ATHLTHiPadKeepAwakeCoordinator.setEnabled(
-                enabled && scenePhase == .active, for: keepAwakeWindowID
-            )
-        }
-        .onChange(of: scenePhase) { _, phase in
-            ATHLTHiPadKeepAwakeCoordinator.setEnabled(
-                keepAwake && phase == .active, for: keepAwakeWindowID
-            )
+        .onChange(of: screenAwake) { _, enabled in
+            ATHLTHiPadKeepAwakeCoordinator.setEnabled(enabled, for: keepAwakeWindowID)
         }
         .onDisappear {
             ATHLTHiPadKeepAwakeCoordinator.setEnabled(
                 false, for: keepAwakeWindowID
             )
         }
+    }
+
+    private var gymScreen: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                HStack {
+                    Label("GYM MODE", systemImage: "display")
+                        .font(.caption.weight(.bold)).tracking(2)
+                    Spacer()
+                    Button {
+                        gymMode = false
+                    } label: {
+                        Label(tr("Standard view", "Vanlig visning"), systemImage: "rectangle.split.2x1")
+                            .frame(minHeight: 48)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("athlth-gym-exit")
+                    Button(action: onMinimize) {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .frame(width: 48, height: 48)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel(tr("Minimize", "Minimer"))
+                }
+                .foregroundStyle(ATHLTHGymModeDisplay.gold)
+                ATHLTHGymModeDisplay(snapshot: snapshot, local: false)
+                TrainTogetherStatusStrip()
+                remoteControlPanel
+                if snapshot.spotifyPlaying == true {
+                    Label(snapshot.spotifyTrackTitle ?? tr("Music playing", "Musikk spiller"),
+                          systemImage: "music.note")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                Label(tr("Screen stays awake in Gym Mode", "Skjermen holdes våken i Gym Mode"),
+                      systemImage: "sun.max")
+                    .font(.caption).foregroundStyle(.white.opacity(0.65))
+            }
+            .padding(22)
+            .frame(maxWidth: 1440)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHGymModeDisplay.canvas.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .accessibilityIdentifier("athlth-ipad-gym-mode")
     }
 
     private func sendRemoteAction(_ action: ATHLTHRemoteWorkoutAction) {
@@ -350,7 +394,7 @@ struct ATHLTHiPadLiveWorkoutView: View {
         } label: {
             Label(label.0, systemImage: label.1)
                 .font(.subheadline.weight(.semibold))
-                .frame(minHeight: 38)
+                .frame(minHeight: gymMode ? 56 : 38)
         }
         .buttonStyle(.borderedProminent)
         .tint(action == .end ? .red : bronze)
@@ -388,6 +432,17 @@ struct ATHLTHiPadLiveWorkoutView: View {
                 .foregroundStyle(secondary)
                 .lineLimit(1)
             }
+
+            Button {
+                gymMode = true
+            } label: {
+                Label("Gym Mode", systemImage: "display")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(bronze)
+            .accessibilityIdentifier("athlth-gym-enter")
 
             Toggle(isOn: $keepAwake) {
                 Label(tr("Keep screen awake", "Hold skjermen på"),
@@ -989,5 +1044,155 @@ enum ATHLTHiPadLiveMetrics {
             return "\(min(max(0, done), total)) / \(total)"
         }
         return "\(max(0, done))"
+    }
+}
+
+
+/// Large, high-contrast readout. Neither this view nor its clock starts a
+/// workout or advances a stage. The original engine remains authoritative.
+enum ATHLTHGymModeClock {
+    static func restRemaining(_ snapshot: ATHLTHCrossDeviceWorkoutSnapshot,
+                              at now: Date) -> TimeInterval? {
+        guard let deadline = snapshot.strengthRestEndsAt,
+              let captured = snapshot.capturedAt,
+              deadline.timeIntervalSince1970.isFinite,
+              captured.timeIntervalSince1970.isFinite else { return nil }
+        let initial = deadline.timeIntervalSince(captured)
+        guard initial > 0, initial <= 86_400 else { return nil }
+        let extra = snapshot.paused == true ? 0 : min(8, max(0, now.timeIntervalSince(captured)))
+        return max(0, initial - extra)
+    }
+
+    static func countdown(_ snapshot: ATHLTHCrossDeviceWorkoutSnapshot,
+                          at now: Date) -> TimeInterval? {
+        restRemaining(snapshot, at: now) ?? ATHLTHiPadLiveMetrics.remaining(snapshot, at: now)
+    }
+}
+
+struct ATHLTHGymModeDisplay: View {
+    let snapshot: ATHLTHCrossDeviceWorkoutSnapshot
+    let local: Bool
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    static let canvas = Color(red: 0.07, green: 0.075, blue: 0.085)
+    static let gold = Color(red: 0.84, green: 0.72, blue: 0.49)
+    private let panel = Color(red: 0.13, green: 0.14, blue: 0.16)
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(snapshot.title)
+                        .font(.title3.weight(.medium)).foregroundStyle(.white.opacity(0.68))
+                    Text(snapshot.currentStep ?? tr("Free workout", "Fri trening"))
+                        .font(.system(size: 46, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: snapshot.symbol)
+                    .font(.system(size: 34, weight: .medium))
+                    .foregroundStyle(Self.gold)
+                    .accessibilityHidden(true)
+            }
+            if let next = snapshot.nextStep, !next.isEmpty {
+                Label(tr("Up next", "Neste") + " · " + next, systemImage: "arrow.turn.down.right")
+                    .font(.title3.weight(.medium)).foregroundStyle(Self.gold)
+            }
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let now = context.date
+                let remaining = ATHLTHGymModeClock.countdown(snapshot, at: now)
+                let rest = ATHLTHGymModeClock.restRemaining(snapshot, at: now) != nil ||
+                    snapshot.runningInRecovery == true
+                let delayed = !local && ATHLTHiPadLiveMetrics.isDelayed(snapshot, at: now)
+                VStack(spacing: 8) {
+                    Text(snapshot.paused == true ? tr("PAUSED", "PAUSET") :
+                         delayed ? tr("WAITING FOR SOURCE", "VENTER PÅ OPPDATERING") :
+                         rest ? tr("RECOVERY", "PAUSE") :
+                         remaining != nil ? tr("TIME LEFT", "TID IGJEN") :
+                         tr("WORKOUT TIME", "ØKTTID"))
+                        .font(.headline.weight(.semibold)).tracking(1.5)
+                        .foregroundStyle(delayed ? .orange : Self.gold)
+                    Text(ATHLTHiPadLiveMetrics.duration(remaining ??
+                         ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                        .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 66 : 140,
+                                      weight: .bold, design: .rounded))
+                        .monospacedDigit().foregroundStyle(.white)
+                        .lineLimit(1).minimumScaleFactor(0.32)
+                        .accessibilityLabel((remaining == nil ? tr("Workout time", "Økttid") :
+                            tr("Time remaining", "Tid igjen")) + " " +
+                            ATHLTHiPadLiveMetrics.duration(remaining ??
+                                ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                    if remaining != nil {
+                        Text(tr("Total", "Totalt") + " · " +
+                             ATHLTHiPadLiveMetrics.duration(ATHLTHiPadLiveMetrics.elapsed(snapshot, at: now)))
+                            .font(.title2.monospacedDigit()).foregroundStyle(.white.opacity(0.65))
+                    }
+                    if delayed {
+                        Text(tr("Last known values. Controls are disabled until sync resumes.",
+                                "Sist kjente verdier. Styring krever oppdatert synkronisering."))
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+                .padding(.vertical, 18)
+                .frame(maxWidth: .infinity)
+                .background(panel, in: RoundedRectangle(cornerRadius: 26))
+                .accessibilityIdentifier("athlth-gym-clock")
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 240 : 150), spacing: 12)], spacing: 12) {
+                if let step = snapshot.runningIntervalOrdinal, let count = snapshot.runningIntervalTotal, count > 0 {
+                    metric(tr("Interval", "Drag"), "\(step) / \(count)")
+                } else if let step = snapshot.runningStepIndex, let count = snapshot.runningStepCount, count > 0 {
+                    metric(tr("Step", "Deløkt"), "\(min(step + 1, count)) / \(count)")
+                }
+                if let set = snapshot.strengthSetNumber, let total = snapshot.strengthSetTotal, total > 0 {
+                    metric(tr("Set", "Sett"), "\(set) / \(total)")
+                } else if snapshot.completedSets != nil && snapshot.captureEvidence != "structuredManual" {
+                    metric(tr("Completed sets", "Fullførte sett"), ATHLTHiPadLiveMetrics.sets(snapshot))
+                }
+                if let reps = snapshot.strengthReps, reps >= 0 { metric(tr("Target reps", "Målreps"), "\(reps)") }
+                if let kg = snapshot.strengthWeightKilograms, kg.isFinite, kg >= 0 {
+                    metric(tr("Target load", "Målvekt"), "\(kg.formatted()) kg")
+                }
+                if !ATHLTHSpectatorSportMetricPolicy.isManual(snapshot.captureEvidence) {
+                    metric(tr("Heart rate · bpm", "Puls · slag/min"), ATHLTHiPadLiveMetrics.heartRate(snapshot.heartRateBPM))
+                    if ATHLTHSpectatorSportMetricPolicy.supportsDistance(snapshot.kind) {
+                        metric(tr("Distance", "Distanse"), ATHLTHiPadLiveMetrics.distance(snapshot.distanceMeters))
+                    }
+                    if ATHLTHSpectatorSportMetricPolicy.supportsRunningPace(snapshot.kind) {
+                        metric(snapshot.paceIsTreadmillTarget == true ? tr("Belt pace · min/km", "Mølletempo · min/km") :
+                            tr("Pace · min/km", "Tempo · min/km"), ATHLTHiPadLiveMetrics.pace(snapshot.currentPaceSecondsPerKilometer))
+                    }
+                }
+            }
+            if let progress = ATHLTHiPadLiveMetrics.normalized(snapshot.runningOverallProgress) ??
+                (snapshot.totalSets.flatMap { total in
+                    total > 0 ? min(1, max(0, Double(snapshot.completedSets ?? 0) / Double(total))) : nil
+                }) {
+                ProgressView(value: progress)
+                    .tint(Self.gold)
+                    .accessibilityLabel(tr("Workout progress", "Øktfremdrift"))
+            }
+        }
+        .padding(20)
+        .background(Self.canvas, in: RoundedRectangle(cornerRadius: 24))
+        .environment(\.colorScheme, .dark)
+    }
+
+    private func metric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.65))
+            Text(value).font(.system(size: 39, weight: .bold, design: .rounded))
+                .monospacedDigit().foregroundStyle(.white).minimumScaleFactor(0.45).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(panel, in: RoundedRectangle(cornerRadius: 18))
+        .accessibilityElement(children: .combine)
     }
 }
