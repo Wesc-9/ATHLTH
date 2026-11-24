@@ -9,17 +9,13 @@ struct ATHLTHStudioInsightsView: View {
     @State private var showingDetailedInsights = false
     @State private var showingSpecificProgress = false
     @State private var showingReportExport = false
+    @State private var showingWorkoutComparison = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var result: ATHLTHStudioAnalytics.Snapshot {
-        ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays)
-    }
-
-    private var previousPeriod: ATHLTHStudioAnalytics.Snapshot {
-        let anchor = Calendar.current.date(byAdding: .day, value: -periodDays, to: .now) ?? .now
-        return ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays, now: anchor)
-    }
-
-    private var trainingTimeChange: String {
+    private func trainingTimeChange(
+        result: ATHLTHStudioAnalytics.Snapshot,
+        previousPeriod: ATHLTHStudioAnalytics.Snapshot
+    ) -> String {
         guard previousPeriod.minutes > 0 else {
             return ATHLTHLocalization.choose(english: "No previous baseline", norwegian: "Ingen tidligere sammenligning")
         }
@@ -29,12 +25,20 @@ struct ATHLTHStudioInsightsView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            // Aggregate once per render, rather than re-filtering the complete
+            // history for every metric and both charts.
+            let anchor = Date.now
+            let result = ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays, now: anchor)
+            let previousPeriod = ATHLTHStudioAnalytics.snapshot(
+                from: health.workouts, days: periodDays,
+                now: Calendar.current.date(byAdding: .day, value: -periodDays, to: anchor) ?? anchor
+            )
             let columns = Array(
                 repeating: GridItem(.flexible(), spacing: 12),
-                count: geometry.size.width >= 1130 ? 3 :
-                    geometry.size.width >= 670 ? 2 : 1
+                count: dynamicTypeSize.isAccessibilitySize ? 1 :
+                    (geometry.size.width >= 1130 ? 3 : geometry.size.width >= 670 ? 2 : 1)
             )
-            let sideBySideCharts = geometry.size.width >= 890
+            let sideBySideCharts = geometry.size.width >= 890 && !dynamicTypeSize.isAccessibilitySize
             ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(alignment: .top) {
@@ -86,7 +90,7 @@ struct ATHLTHStudioInsightsView: View {
                     )
                     ATHLTHStudioMetricCard(
                         title: ATHLTHLocalization.choose(english: "Duration change", norwegian: "Endring i varighet"),
-                        value: trainingTimeChange,
+                        value: trainingTimeChange(result: result, previousPeriod: previousPeriod),
                         note: ATHLTHLocalization.choose(english: "Descriptive, not a readiness score", norwegian: "Beskrivende, ikke restitusjonsscore")
                     )
                 }
@@ -100,14 +104,14 @@ struct ATHLTHStudioInsightsView: View {
                                 unit: ATHLTHLocalization.choose(
                                     english: "hours", norwegian: "timer"
                                 ),
-                                distance: false
+                                distance: false, result: result
                             )
                             chartCard(
                                 title: ATHLTHLocalization.choose(
                                     english: "Distance", norwegian: "Distanse"
                                 ),
                                 unit: "km",
-                                distance: true
+                                distance: true, result: result
                             )
                         }
                     } else {
@@ -119,20 +123,30 @@ struct ATHLTHStudioInsightsView: View {
                                 unit: ATHLTHLocalization.choose(
                                     english: "hours", norwegian: "timer"
                                 ),
-                                distance: false
+                                distance: false, result: result
                             )
                             chartCard(
                                 title: ATHLTHLocalization.choose(
                                     english: "Distance", norwegian: "Distanse"
                                 ),
                                 unit: "km",
-                                distance: true
+                                distance: true, result: result
                             )
                         }
                     }
                 }
                 ATHLTHStudioTrainingLoadView()
                 ATHLTHStudioProgressExplorerView()
+                Button {
+                    showingWorkoutComparison = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Compare two recorded workouts",
+                        norwegian: "Sammenlign to gjennomførte økter"
+                    ), systemImage: "rectangle.split.2x1")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("athlth-ipad-insights-compare")
                 Button {
                     showingReportExport = true
                 } label: {
@@ -173,6 +187,19 @@ struct ATHLTHStudioInsightsView: View {
             .frame(maxWidth: .infinity)
             }
         }
+        .sheet(isPresented: $showingWorkoutComparison) {
+            NavigationStack {
+                ATHLTHStudioHistoryView(onInspect: { _ in })
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                                showingWorkoutComparison = false
+                            }
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+        }
         .sheet(isPresented: $showingReportExport) {
             ATHLTHStudioReportExportView()
                 .presentationDetents([.large])
@@ -193,7 +220,8 @@ struct ATHLTHStudioInsightsView: View {
         }
     }
 
-    private func chartCard(title: String, unit: String, distance: Bool) -> some View {
+    private func chartCard(title: String, unit: String, distance: Bool,
+                           result: ATHLTHStudioAnalytics.Snapshot) -> some View {
         VStack(alignment: .leading, spacing: 17) {
             Text(title).font(.headline)
             Chart(result.days) { day in
