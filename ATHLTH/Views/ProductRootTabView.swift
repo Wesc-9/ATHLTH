@@ -479,6 +479,7 @@ struct ProductRootTabView: View {
                 ATHLTHTrainSmokeTrace.record("native-home-to-train")
             }
             if session.signedIn && !session.previewModeEnabled {
+                if previous != next { ATHLTHAliveController.navigationDidChange() }
                 persistedSelectedTab = next
                 persistedTabAccount = session.profile.userID.uuidString
             }

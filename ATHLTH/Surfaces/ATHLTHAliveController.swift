@@ -12,15 +12,57 @@ enum ATHLTHAliveController {
     private static var workoutActive = false
     private static var revision: UInt64 = 0
     private static var worker: Task<Void, Never>?
+    private static var resetExpressionTask: Task<Void, Never>?
+    private static var expression: ATHLTHAliveExpression = .awake
+    private static var lastNavigationReaction = Date.distantPast
 
     static func reconcile(isForeground: Bool) {
+        let wasAllowed = foregroundAllowed
         foregroundAllowed = isForeground
+        if !isForeground {
+            resetExpressionTask?.cancel()
+            resetExpressionTask = nil
+            expression = .awake
+        } else if !wasAllowed && !workoutActive {
+            react(.hello)
+        }
         scheduleReconciliation()
     }
 
     static func workoutDidChange(isActive: Bool) {
+        let wasActive = workoutActive
         workoutActive = isActive
+        if isActive {
+            resetExpressionTask?.cancel()
+            resetExpressionTask = nil
+            expression = .awake
+        } else if wasActive && foregroundAllowed {
+            react(.excited)
+        }
         scheduleReconciliation()
+    }
+
+    static func navigationDidChange() {
+        guard foregroundAllowed, !workoutActive,
+              Date().timeIntervalSince(lastNavigationReaction) >= 8,
+              expression == .awake else { return }
+        lastNavigationReaction = Date()
+        react(.wink)
+    }
+
+    private static func react(_ next: ATHLTHAliveExpression) {
+        guard foregroundAllowed, !workoutActive else { return }
+        resetExpressionTask?.cancel()
+        expression = next
+        scheduleReconciliation()
+        resetExpressionTask = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(3)) }
+            catch { return }
+            guard !Task.isCancelled, foregroundAllowed, !workoutActive else { return }
+            expression = .awake
+            scheduleReconciliation()
+            resetExpressionTask = nil
+        }
     }
 
     private static func scheduleReconciliation() {
@@ -55,6 +97,12 @@ enum ATHLTHAliveController {
         for activity in activities {
             if !kept && (activity.activityState == .active || activity.activityState == .stale) {
                 kept = true
+                if activity.content.state.expression != expression.rawValue {
+                    await activity.update(ActivityContent(
+                        state: .init(expression: expression.rawValue),
+                        staleDate: nil
+                    ))
+                }
                 continue
             }
             await activity.end(nil, dismissalPolicy: .immediate)
@@ -68,7 +116,7 @@ enum ATHLTHAliveController {
         do {
             let attributes = ATHLTHAliveActivityAttributes(openedAt: Date())
             let content = ActivityContent(
-                state: ATHLTHAliveActivityAttributes.ContentState(expression: "awake"),
+                state: ATHLTHAliveActivityAttributes.ContentState(expression: expression.rawValue),
                 staleDate: nil
             )
             _ = try Activity.request(attributes: attributes, content: content, pushType: nil)
