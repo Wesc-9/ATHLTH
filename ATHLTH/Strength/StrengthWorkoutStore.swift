@@ -5035,6 +5035,7 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func addRest(seconds: Int, at date: Date = Date()) {
+        guard activeWorkout != nil, seconds > 0, seconds <= 600 else { return }
         if restStartedAt == nil {
             restStartedAt = date
         }
@@ -5046,10 +5047,10 @@ final class StrengthWorkoutStore: ObservableObject {
             )
         restEndsAt =
             base.addingTimeInterval(
-                TimeInterval(
-                    max(seconds, 0)
-                )
+                TimeInterval(seconds)
             )
+        // Persist the revised deadline before the app can be suspended.
+        persistCheckpointNow()
     }
 
     private func finalizeActualRestIfNeeded(at date: Date = Date()) {

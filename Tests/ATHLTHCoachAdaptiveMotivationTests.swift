@@ -4,6 +4,19 @@ import XCTest
 
 @MainActor
 final class ATHLTHCoachAdaptiveMotivationTests: XCTestCase {
+    func testLiveDurationEditProtectsCountdownAndRecordedTime() {
+        XCTAssertEqual(ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+            original: 120, elapsed: 50, delta: 30, phase: "recovery", countdownProtected: false), 150)
+        XCTAssertEqual(ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+            original: 240, elapsed: 60, delta: -30, phase: "work", countdownProtected: false), 210)
+        XCTAssertNil(ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+            original: 120, elapsed: 110, delta: 30, phase: "recovery", countdownProtected: false))
+        XCTAssertNil(ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+            original: 120, elapsed: 80, delta: -30, phase: "work", countdownProtected: false))
+        XCTAssertNil(ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+            original: 120, elapsed: 30, delta: 30, phase: "work", countdownProtected: true))
+    }
+
     func testRecoveryAndCountdownSuppressPacePushAndResetStepEvidence() {
         var settings = ATHLTHAudioCoachSmartSettings()
         settings.coachingMode = .custom

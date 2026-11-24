@@ -1039,6 +1039,9 @@ struct RecoveryCoachView: View {
     @State private var pendingWizardScope: ATHLTHCoachProgressScope?
     @State private var progressScopeForNextQuestion: ATHLTHCoachProgressScope?
     @State private var showingCoachPlanAdaptation = false
+    @State private var showingCoachTrainingMemory = false
+    @State private var trainingMemoryDraft = ""
+    @State private var trainingMemoryOwner: UUID?
     @State private var showingCoachWorkoutProfileReview = false
     @State private var pendingWorkoutCreationPrompt = ""
     @State private var showingCoachAddConfirmation = false
@@ -1294,6 +1297,9 @@ struct RecoveryCoachView: View {
             errorMessage = nil
             didLoadConversation = false
             conversationOwnerID = nil
+            trainingMemoryDraft = ""
+            trainingMemoryOwner = nil
+            showingCoachTrainingMemory = false
             aiConsentApproved = false
             healthConsentApproved = false
             shareHealthForNextQuestion = false
@@ -1354,6 +1360,50 @@ struct RecoveryCoachView: View {
                     pendingWizardPrompt = prompt
                     pendingWizardScope = scope
                     activeQuickWizard = nil
+                }
+            }
+        }
+        .sheet(isPresented: $showingCoachTrainingMemory.keepingPresentedWhenInactive(scenePhase)) {
+            NavigationStack {
+                Form {
+                    Section {
+                        TextEditor(text: $trainingMemoryDraft)
+                            .frame(minHeight: 160)
+                    } header: {
+                        Text(recoveryAIText("Training preferences", "Treningspreferanser"))
+                    } footer: {
+                        Text(recoveryAIText(
+                            "Saved locally in your training profile. You choose when to include the notes in a question. Avoid private medical details.",
+                            "Lagres lokalt i treningsprofilen. Du velger selv når notatene skal brukes i et spørsmål. Unngå private medisinske opplysninger."))
+                    }
+                    Section {
+                        Button(recoveryAIText("Add saved notes to my question", "Legg notatene til i spørsmålet")) {
+                            guard trainingMemoryOwner == session.profile.userID, session.signedIn else { return }
+                            let notes = ATHLTHCoachProfileNotesPolicy.coachContext(
+                                profileNotes: ATHLTHTrainingProfile.load(userID: session.profile.userID).trainingNotes,
+                                selectedByAthlete: true)
+                            guard !notes.isEmpty else { return }
+                            question = [question, notes].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                            showingCoachTrainingMemory = false
+                        }
+                    }
+                }
+                .navigationTitle(recoveryAIText("Coach memory", "Coach-hukommelse"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(recoveryAIText("Cancel", "Avbryt")) { showingCoachTrainingMemory = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(recoveryAIText("Save", "Lagre")) {
+                            guard session.signedIn, trainingMemoryOwner == session.profile.userID else { return }
+                            var profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+                            profile.trainingNotes = String(trainingMemoryDraft.prefix(700))
+                            profile.updatedAt = Date()
+                            profile.save(userID: session.profile.userID)
+                            showingCoachTrainingMemory = false
+                        }
+                    }
                 }
             }
         }
@@ -1854,6 +1904,15 @@ struct RecoveryCoachView: View {
                     )
                 }
                 .disabled(session.activePlan == nil)
+
+                Button {
+                    guard session.signedIn else { return }
+                    trainingMemoryOwner = session.profile.userID
+                    trainingMemoryDraft = ATHLTHTrainingProfile.load(userID: session.profile.userID).trainingNotes
+                    showingCoachTrainingMemory = true
+                } label: {
+                    Label(recoveryAIText("Coach memory", "Coach-hukommelse"), systemImage: "person.text.rectangle")
+                }
 
                 Button {
                     question = recoveryAIText(

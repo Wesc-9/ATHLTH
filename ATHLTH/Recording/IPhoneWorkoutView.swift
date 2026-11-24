@@ -1473,6 +1473,55 @@ struct IPhoneWorkoutView: View {
     @State private var routeCamera:
         MapCameraPosition = .automatic
 
+    @ViewBuilder
+    private func liveDurationAdjustment(_ workout: PhoneWorkout, at now: Date) -> some View {
+        if workout.resumedAt != nil, workout.awaitingMainStart != true,
+           workout.structuredWorkoutComplete != true,
+           let index = workout.structuredStepIndex, let plan = workout.structuredRunningWorkout,
+           plan.steps.indices.contains(index), plan.steps[index].measure == .time,
+           let duration = plan.steps[index].durationSeconds {
+            let step = plan.steps[index]
+            let elapsed = max(0, workout.elapsed(at: now) - (workout.structuredStepStartElapsedTime ?? 0))
+            let canExtend = ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+                original: duration, elapsed: elapsed, delta: 30,
+                phase: step.phase, countdownProtected: false) != nil
+            let canShorten = ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+                original: duration, elapsed: elapsed, delta: -30,
+                phase: step.phase, countdownProtected: false) != nil
+            if canExtend || canShorten {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(ATHLTHLocalization.choose(english: "Adjust current step", norwegian: "Juster pågående deløkt"))
+                        .font(.subheadline.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only this workout changes. Recorded time and distance are kept.",
+                        norwegian: "Gjelder kun denne økten. Registrert tid og distanse beholdes."))
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Button {
+                            _ = recorder.adjustCurrentTimedStep(workoutID: workout.id, stepID: step.id, seconds: -30)
+                        } label: {
+                            Label("30 s", systemImage: "minus.circle")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .disabled(!canShorten)
+                        Button {
+                            _ = recorder.adjustCurrentTimedStep(workoutID: workout.id, stepID: step.id, seconds: 30)
+                        } label: {
+                            Label("30 s", systemImage: "plus.circle")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .disabled(!canExtend)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+                .padding(12)
+                .athlthPlanCard(radius: 16)
+                .accessibilityIdentifier("athlth-phone-live-duration-adjustment")
+            }
+        }
+    }
+
     private func runningPulseZones(
         for workout: PhoneWorkout, at now: Date
     ) -> some View {
@@ -1531,6 +1580,10 @@ struct IPhoneWorkoutView: View {
                         )
                         .frame(maxWidth: 720)
                         .frame(maxWidth: .infinity)
+
+                        TimelineView(.periodic(from: .now, by: 1)) { tick in
+                            liveDurationAdjustment(workout, at: tick.date)
+                        }
 
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             runningPulseZones(
@@ -2279,14 +2332,14 @@ struct IPhoneWorkoutView: View {
                     norwegian: "Innendørs løping bruker ikke GPS. Distanse på tredemølle krever oppgitt møllehastighet."
                 ))
             }
-            .sheet(isPresented: $showingLiveAudioCoach) {
+            .sheet(isPresented: $showingLiveAudioCoach.keepingPresentedWhenInactive(scenePhase)) {
                 IPhoneAudioCoachLiveSheet()
                     .environmentObject(recorder)
                     .environmentObject(settings)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showingWorkoutOverview) {
+            .sheet(isPresented: $showingWorkoutOverview.keepingPresentedWhenInactive(scenePhase)) {
                 NavigationStack {
                     List {
                         if let workout = recorder.active {
@@ -2351,7 +2404,7 @@ struct IPhoneWorkoutView: View {
                 .presentationDetents([.medium, .large])
                 .accessibilityIdentifier("athlth-run-live-workout-overview")
             }
-            .sheet(isPresented: $showingAddRunningWorkout) {
+            .sheet(isPresented: $showingAddRunningWorkout.keepingPresentedWhenInactive(scenePhase)) {
                 ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
                     guard let template = session.runningWorkout else {
                         return false
@@ -2362,7 +2415,7 @@ struct IPhoneWorkoutView: View {
                 }
                 .environmentObject(runningLibrary)
             }
-            .sheet(item: $completedTreadmillSpeedWorkout) { workout in
+            .sheet(item: $completedTreadmillSpeedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
                 TreadmillSpeedHistoryCorrectionView(workout: workout) { entries in
                     recorder.correctCompletedTreadmillSpeeds(
                         entries, workoutID: workout.id
@@ -2370,7 +2423,7 @@ struct IPhoneWorkoutView: View {
                 }
                 .presentationDetents([.large])
             }
-            .sheet(isPresented: $showingTreadmillSpeedEditor) {
+            .sheet(isPresented: $showingTreadmillSpeedEditor.keepingPresentedWhenInactive(scenePhase)) {
                 TreadmillSpeedEditorView(
                     initialValue:
                         recorder.active?.treadmillSpeedHistory?.last?.kilometersPerHour ??
@@ -2380,7 +2433,7 @@ struct IPhoneWorkoutView: View {
                 )
                 .presentationDetents([.medium])
             }
-            .sheet(isPresented: $showingAIConversation) {
+            .sheet(isPresented: $showingAIConversation.keepingPresentedWhenInactive(scenePhase)) {
                 ATHLTHGroqVoiceCoachView()
                     .environmentObject(recorder)
                     .environmentObject(settings)
@@ -2389,7 +2442,7 @@ struct IPhoneWorkoutView: View {
             }
             .sheet(
                 isPresented:
-                    $showingTreadmillInclineEditor
+                    $showingTreadmillInclineEditor.keepingPresentedWhenInactive(scenePhase)
             ) {
                 TreadmillInclineEditorView(
                     initialValue:
@@ -2416,7 +2469,7 @@ struct IPhoneWorkoutView: View {
                         value
                 }
             }
-            .sheet(isPresented: $confirmFinish) {
+            .sheet(isPresented: $confirmFinish.keepingPresentedWhenInactive(scenePhase)) {
                 if let active = recorder.active {
                     ATHLTHWorkoutFinishSheet(
                         metrics: [

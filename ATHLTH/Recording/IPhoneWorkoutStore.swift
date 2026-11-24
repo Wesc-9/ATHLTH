@@ -509,6 +509,9 @@ final class IPhoneWorkoutStore:
     @Published private(set) var coachSpeechPaused = false
     @Published private(set) var lastCoachMessage: String?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
+    private var phoneAdaptiveCoach = ATHLTHCoachAdaptiveMotivation()
+    private var phoneAdaptiveWorkoutID: UUID?
+    private var phoneAdaptiveLastSample: Date?
 
     var canReplayLastCoachMessage: Bool {
         active?.audioCoachConfiguration?.enabled == true &&
@@ -2673,6 +2676,9 @@ final class IPhoneWorkoutStore:
                 if coachSecond != lastCoachTickSecond {
                     lastCoachTickSecond = coachSecond
                     self.announceStructuredIntervalCues(current, elapsed: elapsed)
+                    if let config = current.audioCoachConfiguration {
+                        self.evaluatePhoneAdaptiveCoach(current, configuration: config)
+                    }
                 }
                 if minute > 0 && minuteKey != lastMinuteCheckpointKey {
                     lastMinuteCheckpointKey = minuteKey
@@ -2802,6 +2808,33 @@ final class IPhoneWorkoutStore:
         active = workout
         persistActiveCheckpoint(force: true)
         startStructuredTicksIfNeeded()
+        syncLiveActivity()
+        return true
+    }
+
+    /// An athlete-approved edit to the current timed stage only. Stale UI
+    /// requests cannot change the next stage or a different recording.
+    @discardableResult
+    func adjustCurrentTimedStep(workoutID: UUID, stepID: UUID, seconds: Int) -> Bool {
+        guard var workout = active, workout.id == workoutID,
+              !saving, workout.resumedAt != nil,
+              workout.awaitingMainStart != true, workout.structuredWorkoutComplete != true,
+              var plan = workout.structuredRunningWorkout,
+              let index = workout.structuredStepIndex, plan.steps.indices.contains(index),
+              plan.steps[index].id == stepID, plan.steps[index].measure == .time,
+              let duration = plan.steps[index].durationSeconds else { return false }
+        let now = Date()
+        let elapsed = max(0, workout.elapsed(at: now) - (workout.structuredStepStartElapsedTime ?? 0))
+        guard let revised = ATHLTHLiveStepDurationAdjustment.adjustedDuration(
+            original: duration, elapsed: elapsed, delta: seconds,
+            phase: plan.steps[index].phase,
+            countdownProtected: criticalCountdownEndsAt.map { now < $0 } ?? false
+        ) else { return false }
+        plan.steps[index].durationSeconds = revised
+        workout.structuredRunningWorkout = plan
+        active = workout
+        phoneAdaptiveCoach.reset()
+        persistActiveCheckpoint(force: true)
         syncLiveActivity()
         return true
     }
@@ -3301,6 +3334,9 @@ final class IPhoneWorkoutStore:
             WatchAudioCoachConfiguration?
     ) {
         lastGoalEncouragementAt = nil
+        phoneAdaptiveCoach.reset()
+        phoneAdaptiveWorkoutID = nil
+        phoneAdaptiveLastSample = nil
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: configuration?.activeCustomRules ?? [],
             distanceMeters: active?.distanceMeters ?? 0,
@@ -5056,6 +5092,7 @@ final class IPhoneWorkoutStore:
         }
 
         announceFuelIfDue(workout, configuration: configuration)
+        evaluatePhoneAdaptiveCoach(workout, configuration: configuration)
         let customDue = evaluateCustomAudioCoachRules(workout, configuration: configuration)
         let customMetrics = Set(customDue.flatMap(\.metrics))
 
@@ -5257,6 +5294,53 @@ final class IPhoneWorkoutStore:
                 validFor: 10
             )
         )
+    }
+
+    private func evaluatePhoneAdaptiveCoach(
+        _ workout: PhoneWorkout, configuration: WatchAudioCoachConfiguration
+    ) {
+        guard configuration.enabled, !coachSpeechPaused, workout.resumedAt != nil,
+              !workout.walking, workout.structuredWorkoutComplete != true,
+              workout.awaitingMainStart != true,
+              let settings = configuration.smartPrompts else { return }
+        let now = Date()
+        if phoneAdaptiveWorkoutID != workout.id ||
+            phoneAdaptiveLastSample.map({ now.timeIntervalSince($0) > 8 }) == true {
+            phoneAdaptiveCoach.reset()
+            phoneAdaptiveWorkoutID = workout.id
+        }
+        if let last = phoneAdaptiveLastSample, now.timeIntervalSince(last) < 0.85,
+           phoneAdaptiveWorkoutID == workout.id { return }
+        phoneAdaptiveLastSample = now
+        let index = workout.structuredStepIndex
+        let step = index.flatMap { index in
+            workout.structuredRunningWorkout?.steps.indices.contains(index) == true
+                ? workout.structuredRunningWorkout?.steps[index] : nil
+        }
+        let elapsed = workout.elapsed(at: now)
+        let remaining = step?.durationSeconds.map {
+            max(0, $0 - max(0, elapsed - (workout.structuredStepStartElapsedTime ?? 0)))
+        }
+        // GPS pace only. The phone recorder does not own a fresh heart-rate
+        // sensor stream; neither target values nor treadmill entries are measurements.
+        let pace = workout.runEnvironment == .outdoor &&
+            ATHLTHCoachSensorFreshness.validPace(
+                workout.currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
+            ) ? workout.currentPaceSecondsPerKilometer : nil
+        let norwegian = localizedCoachPhrase(english: "en", norwegian: "no", configuration: configuration) == "no"
+        if let phrase = phoneAdaptiveCoach.nextCue(
+            settings: settings, elapsed: elapsed, measuredPaceSecondsPerKilometer: pace,
+            targetSlowestPaceSecondsPerKilometer: step?.targetPaceMaxSecondsPerKilometer ??
+                step?.targetPaceMinSecondsPerKilometer,
+            measuredHeartRateBPM: nil, targetHeartRateMinimumBPM: nil,
+            stepIndex: index, stepPhase: step?.phase, stepRemainingSeconds: remaining,
+            reliableNotClimbing: false, norwegian: norwegian
+        ) {
+            speak(phrase, configuration: configuration, priority: .routineCoach,
+                  event: ATHLTHCoachEvent(kind: .routineMilestone,
+                    key: "phone-adaptive:\(Int(elapsed))", priority: .routineCoach,
+                    validFor: 8, runningStepIndex: index))
+        }
     }
 
     private func evaluateCustomAudioCoachRules(

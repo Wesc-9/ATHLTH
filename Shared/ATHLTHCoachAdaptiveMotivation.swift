@@ -261,3 +261,21 @@ struct ATHLTHCoachAdaptiveMotivation {
         return nil
     }
 }
+
+
+/// Live-only duration edits. The caller must verify the recording and step
+/// identity and persist the same workout. This never edits a saved plan.
+enum ATHLTHLiveStepDurationAdjustment {
+    static func adjustedDuration(
+        original: TimeInterval, elapsed: TimeInterval, delta: Int,
+        phase: String?, countdownProtected: Bool
+    ) -> TimeInterval? {
+        guard original.isFinite, elapsed.isFinite, original > 0, elapsed >= 0,
+              !countdownProtected, ["work", "main", "steady", "recovery"].contains(phase ?? ""),
+              original - elapsed > 15, (-60...60).contains(delta), delta != 0
+        else { return nil }
+        let revised = original + Double(delta)
+        guard revised >= 20, revised <= 3600, revised - elapsed > 15 else { return nil }
+        return revised
+    }
+}
