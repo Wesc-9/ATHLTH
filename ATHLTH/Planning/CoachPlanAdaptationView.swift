@@ -40,10 +40,13 @@ struct CoachPlanAdaptationView: View {
 
     private var recentTraining: [String] {
         guard session.signedIn, CoachHistoryPermission.isEnabled(userID: session.profile.userID) else { return [] }
-        let cutoff = Date().addingTimeInterval(-14 * 86_400)
-
-        return health.workouts
-            .filter { $0.startDate >= cutoff }
+        let now = Date()
+        let cutoff = now.addingTimeInterval(-14 * 86_400)
+        let valid = health.workouts.filter {
+            $0.startDate >= cutoff && $0.startDate <= now &&
+            $0.duration.isFinite && $0.duration > 0 && $0.duration <= 14 * 86_400
+        }
+        return Dictionary(grouping: valid, by: \.id).values.compactMap { $0.first }
             .sorted { $0.startDate > $1.startDate }
             .prefix(16)
             .map { workout in
@@ -57,7 +60,7 @@ struct CoachPlanAdaptationView: View {
                 ]
 
                 if let distance = workout.distanceMeters,
-                   distance > 0 {
+                   distance.isFinite, distance > 0 {
                     pieces.append(
                         String(
                             format: "%.1f km",
@@ -82,6 +85,7 @@ struct CoachPlanAdaptationView: View {
                         if let proposal {
                             proposalContent(proposal)
                         } else {
+                            recoverySuggestion
                             requestCard(plan)
                         }
 
@@ -184,6 +188,40 @@ struct CoachPlanAdaptationView: View {
                 style: .continuous
             )
         )
+    }
+
+    @ViewBuilder private var recoverySuggestion: some View {
+        if let score = health.recovery.score, health.recovery.baselineDays >= 5,
+           health.recovery.state == .recover || health.recovery.state == .takeItEasy {
+            let request = ATHLTHLocalization.choose(
+                english: "Please suggest a lighter session today, or move the hard session to another day. Keep the overall goal and explain the changes.",
+                norwegian: "Foreslå en roligere økt i dag, eller flytt den harde økten til en annen dag. Behold det overordnede målet og forklar endringene.")
+            VStack(alignment: .leading, spacing: 10) {
+                Label(ATHLTHLocalization.choose(english: "Recovery check", norwegian: "Dagens restitusjon"), systemImage: "heart.text.square")
+                    .font(.headline).foregroundStyle(ATHLTHTheme.primaryText)
+                Text(ATHLTHLocalization.choose(
+                    english: "Your recent readings suggest a lower readiness score (\(score)/100). Consider reviewing today's plan together with how you feel.",
+                    norwegian: "De siste målingene gir en lavere restitusjonsscore (\(score)/100). Vurder dagens plan sammen med hvordan du selv føler deg."))
+                    .font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                Button {
+                    if !userNotes.contains(request) {
+                        userNotes = [userNotes, request].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Ask for a lighter plan", norwegian: "Be om en roligere plan"), systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .buttonStyle(.plain)
+                Text(ATHLTHLocalization.choose(
+                    english: "The recovery score stays on your device. Only the request you choose to add is sent to Coach.",
+                    norwegian: "Restitusjonsscoren forblir på enheten. Bare forespørselen du velger å legge til, sendes til Coach."))
+                    .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(16)
+            .athlthTrainPaper()
+            .accessibilityIdentifier("athlth-coach-local-recovery-suggestion")
+        }
     }
 
     private func requestCard(_ plan: TrainingPlan) -> some View {

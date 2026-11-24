@@ -11,6 +11,12 @@ enum RecoveryReadinessEngine {
         lookbackDays: Int = 28,
         failedSignals: [RecoveryReadinessSignal] = []
     ) -> RecoveryReadinessSummary {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let earliest = calendar.date(byAdding: .day, value: -max(1, lookbackDays), to: today) ?? today
+        func inBaseline(_ day: Date) -> Bool {
+            day >= earliest && day < today
+        }
         let commonDays =
             Set(sleepDays.keys)
                 .intersection(hrvDays.keys)
@@ -18,7 +24,7 @@ enum RecoveryReadinessEngine {
                     restingHeartRateDays.keys
                 )
                 .filter { day in
-                    guard let sleep =
+                    guard inBaseline(day), let sleep =
                             sleepDays[day],
                           let hrv =
                             hrvDays[day],
@@ -39,11 +45,8 @@ enum RecoveryReadinessEngine {
             commonDays.count
 
         func usableCount(_ values: [Date: Double]) -> Int {
-            values.values.filter { $0.isFinite && $0 > 0 }.count
+            values.filter { inBaseline($0.key) && $0.value.isFinite && $0.value > 0 }.count
         }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: now)
         let days: [RecoveryReadinessDayCoverage] = (1...7).compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today)
             else { return nil }

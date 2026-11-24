@@ -50,9 +50,9 @@ enum ATHLTHCoachTrainingContext {
         var seenStrength = Set<UUID>()
         for log in strength.sorted(by: { ($0.endedAt ?? $0.startedAt) > ($1.endedAt ?? $1.startedAt) })
             where log.isFinished && log.totalCompletedSets > 0 {
-            guard seenStrength.insert(log.id).inserted else { continue }
             let date = log.endedAt ?? log.startedAt
-            guard date >= since, date <= now else { continue }
+            guard date >= since, date <= now,
+                  seenStrength.insert(log.id).inserted else { continue }
             rows.append((date, "Completed strength: " +
                          String(log.title.prefix(90)) +
                          " · \(log.totalCompletedSets) completed sets"))

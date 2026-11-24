@@ -4,6 +4,24 @@ import XCTest
 final class RecoveryReadinessEngineTests:
     XCTestCase {
 
+    func testBaselineExcludesOldCurrentAndFutureDays() {
+        let now = Date()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let valid = (1...4).compactMap { calendar.date(byAdding: .day, value: -$0, to: today) }
+        let invalid = [-60, 0, 1].compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+        let days = valid + invalid
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(totalAsleep: 8 * 3600, sleepEnd: now),
+            currentHeart: HeartSummary(restingHeartRate: 60, restingHeartRateDate: now,
+                                      hrvMilliseconds: 60, hrvDate: now),
+            sleepDays: dictionary(days, value: 8 * 3600),
+            hrvDays: dictionary(days, value: 60),
+            restingHeartRateDays: dictionary(days, value: 60), now: now)
+        XCTAssertEqual(result.baselineDays, 4)
+        XCTAssertNil(result.score)
+    }
+
     func testRequiresFiveCommonBaselineDays() {
         let now = Date()
         let days = baselineDays(
