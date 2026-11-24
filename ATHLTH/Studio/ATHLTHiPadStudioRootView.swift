@@ -1167,11 +1167,7 @@ struct ATHLTHiPadStudioRootView: View {
                     openStudioWorkoutStart(entry)
                 },
                 onSendToWatch: { entry in
-                    guard let planID = entry.planID else { return }
-                    trainRequest = .sendPlannedWorkoutToWatch(
-                        planID: planID, workoutID: entry.workout.id
-                    )
-                    showingTrain = true
+                    relayStudioWorkout(entry, device: .appleWatch)
                 },
                 onStartAfter: { entry, seconds in
                     guard let planID = entry.planID else { return }
@@ -1284,7 +1280,7 @@ struct ATHLTHiPadStudioRootView: View {
     /// measured phone/Watch sessions are handed off through the existing relay.
     private func localStudioRecipe(_ workout: PlannedSession) -> PlannedSession? {
         guard workout.kind != .running, workout.kind != .walking,
-              !workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run })
+              !workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run && !$0.isActiveRecovery })
         else { return nil }
         if workout.isStructuredWorkout { return workout }
         return ATHLTHUnifiedWorkout.timedNonCardioProjection(from: workout)
@@ -1377,6 +1373,12 @@ struct ATHLTHiPadStudioRootView: View {
     private func relayStudioWorkout(
         _ item: ATHLTHStudioSchedule.Occurrence, device: WorkoutCaptureDevice
     ) {
+        guard canRelayStudioWorkout(item, device: device) else {
+            studioLaunchError = ATHLTHLocalization.choose(
+                english: "This device does not support this workout.", norwegian: "Denne enheten støtter ikke denne økten."
+            )
+            return
+        }
         guard let workout = checkedStudioWorkout(item) else { return }
         studioLaunchInProgress = true
         let account = session.profile.userID
