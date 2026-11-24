@@ -100,6 +100,8 @@ struct WorkoutDeviceRelayEnvelope:
     /// Optional to retain decoding of legacy free-workout relays.
     var plannedPlanID: UUID? = nil
     var plannedSessionID: UUID? = nil
+    /// Version 2: exact independent calendar session, not a half plan link.
+    var standaloneSessionID: UUID? = nil
     let kind: WorkoutDeviceRelayKind
     let target: WorkoutDeviceRelayTarget
     let workoutPayload:
@@ -130,6 +132,18 @@ enum ATHLTHDeviceRelayPlanLinkPolicy {
         ) else { return false }
         guard planID != nil else { return true }
         return kind == .run || kind == .walk
+    }
+
+    static func allowsEnvelope(
+        version: Int, kind: WorkoutDeviceRelayKind, planID: UUID?,
+        sessionID: UUID?, standaloneID: UUID?
+    ) -> Bool {
+        if version == 1 {
+            return standaloneID == nil && allows(kind: kind, planID: planID, sessionID: sessionID)
+        }
+        // Old receivers reject v2 instead of launching an unlinked free run.
+        return version == 2 && standaloneID != nil && planID == nil &&
+            sessionID == nil && (kind == .run || kind == .walk)
     }
 }
 
@@ -238,7 +252,7 @@ enum WorkoutDeviceRelayClaimPolicy {
             kind == payloadKind &&
             expiresAt > now &&
             expiresAt.timeIntervalSince1970.isFinite &&
-            payloadVersion == 1 &&
+            (payloadVersion == 1 || payloadVersion == 2) &&
             claimedDeviceID == expectedDeviceID &&
             !expectedDeviceID.isEmpty &&
             completedAt == nil && failedAt == nil
@@ -784,10 +798,10 @@ final class WorkoutDeviceRelayStore:
     ) async throws {
         // Reject an incomplete planned-workout link before persisting a
         // remote command: the iPhone must never guess a free workout here.
-        guard ATHLTHDeviceRelayPlanLinkPolicy.allows(
-            kind: envelope.kind,
-            planID: envelope.plannedPlanID,
-            sessionID: envelope.plannedSessionID
+        guard ATHLTHDeviceRelayPlanLinkPolicy.allowsEnvelope(
+            version: envelope.version, kind: envelope.kind,
+            planID: envelope.plannedPlanID, sessionID: envelope.plannedSessionID,
+            standaloneID: envelope.standaloneSessionID
         ) else {
             throw ATHLTHWorkoutCaptureAdmission.Rejection
                 .requiresDedicatedActivityCapture
