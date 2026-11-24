@@ -404,6 +404,23 @@ final class WorkoutDeviceRelayClaimPolicyTests: XCTestCase {
     }
 
 
+    func testStandaloneEnvelopeRequiresExplicitVersionAndExactIdentity() {
+        let policy = ATHLTHDeviceRelayPlanLinkPolicy.self
+        let id = UUID()
+        XCTAssertTrue(policy.allowsEnvelope(version: 2, kind: .run,
+            planID: nil, sessionID: nil, standaloneID: id))
+        XCTAssertTrue(policy.allowsEnvelope(version: 2, kind: .walk,
+            planID: nil, sessionID: nil, standaloneID: id))
+        XCTAssertFalse(policy.allowsEnvelope(version: 1, kind: .run,
+            planID: nil, sessionID: nil, standaloneID: id))
+        XCTAssertFalse(policy.allowsEnvelope(version: 2, kind: .run,
+            planID: nil, sessionID: nil, standaloneID: nil))
+        XCTAssertFalse(policy.allowsEnvelope(version: 2, kind: .strength,
+            planID: nil, sessionID: nil, standaloneID: id))
+        XCTAssertFalse(policy.allowsEnvelope(version: 2, kind: .walk,
+            planID: UUID(), sessionID: UUID(), standaloneID: id))
+    }
+
     func testIPadRelayPlanLinkNeverFallsBackToFreeWorkout() {
         let plan = UUID(), workout = UUID()
         let policy = ATHLTHDeviceRelayPlanLinkPolicy.self
