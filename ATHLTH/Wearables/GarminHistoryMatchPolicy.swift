@@ -18,10 +18,31 @@ enum GarminHistoryMatchPolicy {
 
     /// Match only known sports. A candidate is a label, not permission to merge
     /// or erase a workout. Preserve the original source and both records.
+    /// Compact views prefer the existing local workout for a possible match.
+    /// The full history retains both records for review; no source is deleted.
+    static func unmatchedForDisplay(_ activities: [GarminImportedActivity],
+                                    local: [SocialPublishableWorkout]) -> [GarminImportedActivity] {
+        activities.filter { item in
+            !local.contains { possibleMatch(item.workout, $0) }
+        }
+    }
+
     static func possibleMatch(_ garmin: WearableWorkoutRecord, _ local: SocialPublishableWorkout) -> Bool {
+        possibleMatch(garmin, id: local.id, activity: local.activity, start: local.startDate,
+                      end: local.endDate, duration: local.duration, distance: local.distanceMeters)
+    }
+
+    static func possibleMatch(_ garmin: WearableWorkoutRecord, summary: WorkoutSummary) -> Bool {
+        possibleMatch(garmin, id: summary.id, activity: summary.activity, start: summary.startDate,
+                      end: summary.endDate, duration: summary.duration, distance: summary.distanceMeters)
+    }
+
+    private static func possibleMatch(_ garmin: WearableWorkoutRecord, id: UUID,
+                                      activity: WorkoutActivity, start: Date, end: Date,
+                                      duration: TimeInterval, distance: Double?) -> Bool {
         guard garmin.provider == .garmin else { return false }
         let kind: WorkoutKind
-        switch local.activity {
+        switch activity {
         case .running: kind = .running
         case .walking, .hiking: kind = .walking
         case .strength: kind = .strength
@@ -29,10 +50,10 @@ enum GarminHistoryMatchPolicy {
         default: return false
         }
         let reference = WearableWorkoutRecord(
-            id: local.id.uuidString, provider: .none, kind: kind,
-            startedAt: local.startDate, endedAt: local.endDate, duration: local.duration,
-            activeEnergyKilocalories: local.activeEnergyKilocalories,
-            distanceMeters: local.distanceMeters, averageHeartRate: nil, maximumHeartRate: nil, route: nil
+            id: id.uuidString, provider: .none, kind: kind,
+            startedAt: start, endedAt: end, duration: duration,
+            activeEnergyKilocalories: nil,
+            distanceMeters: distance, averageHeartRate: nil, maximumHeartRate: nil, route: nil
         )
         return GarminImportNormalizer.isPossibleDuplicate(garmin, reference)
     }

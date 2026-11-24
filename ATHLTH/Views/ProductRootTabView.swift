@@ -1153,6 +1153,9 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
 
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    #endif
     @State private var homeStreakDays: [Date]?
     @State private var lastHomeInitialLoadAt: Date?
     @State private var homeInitialLoadAccountID: UUID?
@@ -2001,18 +2004,19 @@ struct ATHLTHHomeView: View {
 
 
     private var homeStreakCount: Int {
-        guard let homeStreakDays,
-              !homeStreakDays.isEmpty
-        else {
-            return 0
-        }
-
         let calendar = Calendar.current
-        let active = Set(
-            homeStreakDays.map {
+        var active = Set(
+            (homeStreakDays ?? []).map {
                 calendar.startOfDay(for: $0)
             }
         )
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if homeScenePhase == .active, session.signedIn, !session.previewModeEnabled,
+           let snapshot = garminStore.snapshot(for: session.profile.userID) {
+            active.formUnion(snapshot.workouts.map { calendar.startOfDay(for: $0.workout.startedAt) })
+        }
+        #endif
+        guard !active.isEmpty else { return 0 }
         let today = calendar.startOfDay(for: Date())
 
         let startDay: Date

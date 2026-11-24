@@ -1823,6 +1823,14 @@ struct HomeWeeklyProgressStrip:
     private var composerDay: Double = 0
     @State private var showingStandaloneSessionEditor = false
     @State private var pendingComposerPresentation = false
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+            ? session.profile.userID : nil
+    }
+    #endif
+
 
     let plan: TrainingPlan?
     let workouts: [WorkoutSummary]
@@ -2238,9 +2246,15 @@ struct HomeWeeklyProgressStrip:
             scheduledCount > 0 &&
             completedScheduledCount >=
                 scheduledCount
-        let hasUnplannedActual =
-            scheduledCount == 0 &&
-            !actual.isEmpty
+        var hasRecordedActivity = !actual.isEmpty
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        if let account = garminAccount, let snapshot = garminStore.snapshot(for: account) {
+            hasRecordedActivity = hasRecordedActivity || snapshot.workouts.contains {
+                calendar.isDate($0.workout.startedAt, inSameDayAs: date)
+            }
+        }
+        #endif
+        let hasUnplannedActual = scheduledCount == 0 && hasRecordedActivity
         let isCompleted =
             allScheduledCompleted ||
             hasUnplannedActual
@@ -3220,6 +3234,26 @@ private struct HomeWeeklyProgressDaySheet: View {
     @EnvironmentObject private var messaging: MessagingStore
 
     let selection: HomeWeeklyProgressDaySelection
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+            ? session.profile.userID : nil
+    }
+    #endif
+    private var dayGarminRows: [GarminImportedActivity] {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        guard let account = garminAccount, let snapshot = garminStore.snapshot(for: account) else { return [] }
+        let candidates = snapshot.workouts.filter {
+            Calendar.current.isDate($0.workout.startedAt, inSameDayAs: selection.date)
+        }
+        return candidates.filter { item in
+            !selection.actual.contains { GarminHistoryMatchPolicy.possibleMatch(item.workout, summary: $0) }
+        }
+        #else
+        return []
+        #endif
+    }
     let plan: TrainingPlan?
     let recentWorkouts: [WorkoutSummary]
     var canStartWithWatch = false
@@ -3284,7 +3318,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     private var hasAnyWorkoutsToday: Bool {
         !currentPlanned.isEmpty ||
         !selection.communityEvents.isEmpty ||
-        !selection.actual.isEmpty
+        !selection.actual.isEmpty || !dayGarminRows.isEmpty
     }
 
     private var workoutSuggestions: [PlannedSession] {
@@ -4266,7 +4300,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
             }
 
-            if !selection.actual.isEmpty {
+            if !selection.actual.isEmpty || !dayGarminRows.isEmpty {
                 sectionTitle(ATHLTHLocalization.choose(
                     english: "Completed workouts", norwegian: "Utførte økter"
                 ))
@@ -4276,6 +4310,19 @@ private struct HomeWeeklyProgressDaySheet: View {
                     }
                     .buttonStyle(.plain)
                 }
+                #if ATHLTH_GARMIN_PERSONAL && DEBUG
+                if let account = garminAccount {
+                    ForEach(dayGarminRows, id: \.workout.id) { activity in
+                        NavigationLink {
+                            GarminReadOnlyWorkoutDetail(accountID: account, activityID: activity.workout.id)
+                        } label: {
+                            GarminExistingWorkoutRow(item: activity, possibleDuplicate: false)
+                                .padding(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                #endif
             }
         }
         .padding(12)

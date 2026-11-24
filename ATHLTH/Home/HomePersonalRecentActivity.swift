@@ -116,6 +116,7 @@ private enum HomeActivityTypeFilter:
 private enum HomeActivityStreamSource {
     case mine(SocialPublishableWorkout)
     case following(SocialFeedItem)
+    case garmin(account: UUID, activity: GarminImportedActivity)
 }
 
 private struct HomeActivityStreamItem:
@@ -128,6 +129,8 @@ private struct HomeActivityStreamItem:
             return "mine-\(workout.id.uuidString)"
         case .following(let item):
             return "following-\(item.id.uuidString)"
+        case .garmin(let account, let activity):
+            return account.uuidString + ":" + activity.workout.id
         }
     }
 
@@ -137,6 +140,8 @@ private struct HomeActivityStreamItem:
             return workout.startDate
         case .following(let item):
             return item.activity.createdAt
+        case .garmin(_, let activity):
+            return activity.workout.startedAt
         }
     }
 
@@ -149,14 +154,16 @@ private struct HomeActivityStreamItem:
                 item.activity
                     .metadata?["kind"]
             )
+        case .garmin(_, let activity):
+            return GarminHistoryMatchPolicy.activity(for: activity)
         }
     }
 
     var isMine: Bool {
-        if case .mine = source {
-            return true
+        switch source {
+        case .mine, .garmin: return true
+        case .following: return false
         }
-        return false
     }
 
     private static func resolveActivity(
@@ -543,7 +550,8 @@ private enum HomeActivityStreamBuilder {
         mine: [SocialPublishableWorkout],
         social: SocialStore,
         maximumCount: Int = 6,
-        feed: [SocialFeedItem]? = nil
+        feed: [SocialFeedItem]? = nil,
+        privateGarmin: [HomeActivityStreamItem] = []
     ) -> [HomeActivityStreamItem] {
         let limit = max(0, maximumCount)
         guard limit > 0 else { return [] }
@@ -571,6 +579,7 @@ private enum HomeActivityStreamBuilder {
         for workout in mine {
             consider(HomeActivityStreamItem(source: .mine(workout)))
         }
+        for item in privateGarmin { consider(item) }
         for item in uniqueFollowingFeed(mine: mine, social: social, feed: feed) {
             consider(HomeActivityStreamItem(source: .following(item)))
         }
@@ -1201,6 +1210,18 @@ struct HomePersonalRecentActivitySection:
 
     @State private var myWorkouts:
         [SocialPublishableWorkout] = []
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+            ? session.profile.userID : nil
+    }
+    private var privateGarminItems: [HomeActivityStreamItem] {
+        guard let account = garminAccount, let snapshot = garminStore.snapshot(for: account) else { return [] }
+        return GarminHistoryMatchPolicy.unmatchedForDisplay(snapshot.workouts, local: myWorkouts)
+            .map { HomeActivityStreamItem(source: .garmin(account: account, activity: $0)) }
+    }
+    #endif
     // A snapshot changes only when actual workout/feed sources publish.
     // Do not sort the social feed from SwiftUI's scrolling/body path.
     @State private var visibleItems: [HomeActivityStreamItem] = []
@@ -1247,7 +1268,15 @@ struct HomePersonalRecentActivitySection:
     @State private var recentStrengthProfiles: [UUID: StrengthMuscleProfile] = [:]
 
     var body: some View {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        let garminItems = privateGarminItems
+        let recent = garminItems.isEmpty ? visibleItems : HomeActivityStreamBuilder.recentPreview(
+            mine: myWorkouts, social: social, feed: social.feed,
+            privateGarmin: Array(garminItems.prefix(6))
+        )
+        #else
         let recent = visibleItems
+        #endif
         return VStack(
             alignment: .leading,
             spacing: 12
@@ -1527,6 +1556,39 @@ struct HomePersonalRecentActivitySection:
             }
             .accessibilityIdentifier("athlth-home-recent-own-card")
 
+        case .garmin(let account, let activity):
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            if garminAccount == account {
+                NavigationLink {
+                    GarminReadOnlyWorkoutDetail(accountID: account, activityID: activity.workout.id)
+                } label: {
+                    ATHLTHRecentActivityCardLayout(availableWidth: availableFeedWidth) {
+                        Image(systemName: GarminHistoryMatchPolicy.activity(for: activity).icon)
+                            .font(.system(size: 34, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: recentArtworkHeight)
+                            .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 14))
+                    } details: {
+                        VStack(alignment: .leading, spacing: 7) {
+                            HomeRecentActivityMetricLine(
+                                title: activity.originalActivityType.replacingOccurrences(of: "_", with: " ").capitalized,
+                                activity: GarminHistoryMatchPolicy.activity(for: activity),
+                                distanceMeters: activity.workout.distanceMeters,
+                                durationSeconds: activity.workout.duration,
+                                exerciseCount: nil, volumeKilograms: nil
+                            )
+                            Text("Garmin · " + activity.workout.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            #else
+            EmptyView()
+            #endif
         case .following(let feedItem):
             ATHLTHRecentActivityCardLayout(
                 availableWidth: availableFeedWidth
@@ -2623,6 +2685,20 @@ private struct HomeFollowingWorkoutArtwork:
 
 struct HomePersonalActivityHistoryView:
     View {
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+            ? session.profile.userID : nil
+    }
+    private var privateGarminItems: [HomeActivityStreamItem] {
+        guard let account = garminAccount, let snapshot = garminStore.snapshot(for: account) else { return [] }
+        return GarminHistoryMatchPolicy.unmatchedForDisplay(snapshot.workouts, local: myWorkouts)
+            .map { HomeActivityStreamItem(source: .garmin(account: account, activity: $0)) }
+    }
+    #endif
     @EnvironmentObject private var health:
         HealthKitManager
     @EnvironmentObject private var strength:
@@ -2655,10 +2731,15 @@ struct HomePersonalActivityHistoryView:
 
     private var allItems:
         [HomeActivityStreamItem] {
-        HomeActivityStreamBuilder.make(
+        let local = HomeActivityStreamBuilder.make(
             mine: myWorkouts,
             social: social
         )
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        return (local + privateGarminItems).sorted { $0.date > $1.date }
+        #else
+        return local
+        #endif
     }
 
     private var filtered:
@@ -2819,6 +2900,21 @@ struct HomePersonalActivityHistoryView:
             }
             .buttonStyle(.plain)
 
+        case .garmin(let account, let activity):
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            if garminAccount == account {
+                NavigationLink {
+                    GarminReadOnlyWorkoutDetail(accountID: account, activityID: activity.workout.id)
+                } label: {
+                    GarminExistingWorkoutRow(item: activity, possibleDuplicate: false)
+                        .padding(12)
+                        .background(ATHLTHUnifiedDesign.surface, in: RoundedRectangle(cornerRadius: 18))
+                }
+                .buttonStyle(.plain)
+            }
+            #else
+            EmptyView()
+            #endif
         case .following(let socialItem):
             HomeFollowingSocialFeedCard(
                 item: socialItem
