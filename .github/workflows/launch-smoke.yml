@@ -84,7 +84,14 @@ permissions:
 
 jobs:
   launch-smoke:
+    name: iPhone smoke (${{ matrix.size }})
     runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      # Separate jobs, with bounded concurrency on the Xcode runner pool.
+      max-parallel: 1
+      matrix:
+        size: [standard, large, compact, mini]
     steps:
       - uses: actions/checkout@v4
 
@@ -96,19 +103,53 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
           xcodebuild -version
 
+      - name: Discover compatible device for this isolated job
+        id: device
+        shell: bash
+        env:
+          SIZE: ${{ matrix.size }}
+        run: |
+          set -euo pipefail
+          df -h "$RUNNER_TEMP"
+          vm_stat
+          python3 - <<'PY'
+          import pathlib, subprocess, os
+          data = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], timeout=60)
+          pathlib.Path(os.environ["RUNNER_TEMP"], "athlth-iphone-devices.json").write_bytes(data)
+          PY
+          python3 scripts/select_iphone_simulators.py < "$RUNNER_TEMP/athlth-iphone-devices.json" > "$RUNNER_TEMP/iphone-device-matrix-all.txt"
+          awk -F'|' -v size="$SIZE" '$1 == size' "$RUNNER_TEMP/iphone-device-matrix-all.txt" > "$RUNNER_TEMP/iphone-device-matrix.txt"
+          if [ ! -s "$RUNNER_TEMP/iphone-device-matrix.txt" ]; then
+            case "$SIZE" in
+              compact|mini)
+                echo "::notice::No compatible $SIZE device on this installed runtime; no coverage claimed."
+                echo "available=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+              *) echo "::error::Required $SIZE iPhone is unavailable."; exit 1 ;;
+            esac
+          fi
+          test "$(wc -l < "$RUNNER_TEMP/iphone-device-matrix.txt" | tr -d ' ')" = 1
+          echo "available=true" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/iphone-device-matrix.txt"
+
       - name: Install validation tools
+        if: steps.device.outputs.available == 'true'
         run: |
           brew install xcodegen
           brew install imagemagick
 
       - name: Optimize hero assets for runtime memory
+        if: steps.device.outputs.available == 'true'
         shell: bash
         run: bash scripts/optimize_hero_assets.sh
 
       - name: Embed RepDB offline exercise assets
+        if: steps.device.outputs.available == 'true'
         run: python3 scripts/prepare_repdb_offline.py
 
       - name: Generate iPhone-only smoke-test project
+        if: steps.device.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -123,6 +164,7 @@ jobs:
           xcodegen generate --spec project-smoke.yml
 
       - name: Build simulator app
+        if: steps.device.outputs.available == 'true'
         shell: bash
         timeout-minutes: 75
         run: |
@@ -159,12 +201,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-iphone-build-log
+          name: athlth-iphone-build-log-${{ matrix.size }}
           path: ${{ runner.temp }}/athlth-iphone-simulator-build.log
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Launch across SE mini standard and large iPhones
+      - name: Launch isolated iPhone and verify all tabs and 100 native transitions
+        if: steps.device.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -194,15 +237,37 @@ jobs:
           PY
           }
 
-          # The device-type catalog contains older phones that iOS 27 cannot
-          # create. Select existing simulator UDIDs registered to compatible
-          # runtimes instead; report classes unavailable on this runner.
+          # Discovery selects exactly one installed runtime-compatible size.
           DEVICE_MATRIX="$RUNNER_TEMP/iphone-device-matrix.txt"
-          simctl_bounded "list registered iPhones" 45 list devices available -j \
-            | python3 scripts/select_iphone_simulators.py > "$DEVICE_MATRIX"
           test -s "$DEVICE_MATRIX"
-
           cat "$DEVICE_MATRIX"
+
+          # Use a new job-owned simulator with the exact registered type/runtime
+          # rather than reusing potentially corrupted device storage.
+          create_isolated_device() {
+            local template="$1" spec runtime device_type new_udid
+            spec=$(python3 - "$RUNNER_TEMP/athlth-iphone-devices.json" "$template" <<'PY'
+          import json, sys
+          devices = json.load(open(sys.argv[1]))["devices"]
+          for runtime, group in devices.items():
+              for device in group:
+                  if device.get("udid") == sys.argv[2]:
+                      kind = device.get("deviceTypeIdentifier")
+                      if not kind:
+                          raise SystemExit("Missing registered device type identifier")
+                      print(runtime + "|" + kind)
+                      raise SystemExit(0)
+          raise SystemExit("Registered template device not found")
+          PY
+            ) || return 1
+            IFS='|' read -r runtime device_type <<< "$spec"
+            new_udid=$(simctl_bounded "create isolated $CLASS iPhone" 90 create "ATHLTH-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$CLASS" "$device_type" "$runtime") || return 1
+            if ! [[ "$new_udid" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+              echo "::error::Invalid isolated simulator identifier" >&2
+              return 1
+            fi
+            printf '%s\n' "$new_udid"
+          }
 
           # The app was built in an earlier workflow step. Explicitly
           # resolve it in this shell; step-local variables are not inherited.
@@ -213,9 +278,10 @@ jobs:
 
           cleanup_device() {
             local udid="$1"
-            # These are registered runner-owned simulators, not temporary
-            # devices created by this job. Never delete them.
-            simctl_bounded "shutdown registered iPhone" 35 shutdown "$udid" >/dev/null 2>&1 || true
+            # Only delete the UUID returned by create_isolated_device.
+            [ -n "$udid" ] || return 0
+            simctl_bounded "shutdown isolated iPhone" 35 shutdown "$udid" >/dev/null 2>&1 || true
+            simctl_bounded "delete isolated iPhone" 45 delete "$udid" >/dev/null 2>&1 || true
           }
 
           verify_train_dashboard_ready() {
@@ -240,6 +306,16 @@ jobs:
             done
             echo "Train lifecycle evidence for PID $pid:"
             find "$container/tmp" -maxdepth 1 -name "athlth-train-$pid-*" -print
+            simctl_bounded "capture failed Train transition" 55 io "$udid" screenshot "$RUNNER_TEMP/athlth-$CLASS-train-failure.png" || true
+            # A stack sample distinguishes a stalled main thread from a missing
+            # lifecycle signal without weakening the mandatory assertions.
+            python3 - "$pid" "$RUNNER_TEMP/athlth-$CLASS-train-sample.txt" <<'PY' || true
+          import subprocess, sys
+          try:
+              subprocess.run(["sample", sys.argv[1], "5", "1", "-file", sys.argv[2]], timeout=25, check=False)
+          except subprocess.TimeoutExpired:
+              pass
+          PY
             simctl_bounded "collect Train lifecycle logs" 65 spawn "$udid" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
             echo "::error::$label did not mount the real Train Today dashboard or perform the required native transition."
             return 1
@@ -288,11 +364,11 @@ jobs:
           while IFS='|' read -r CLASS DEVICE_UDID DEVICE_NAME; do
             echo "Testing $CLASS layout on $DEVICE_NAME"
 
-            UDID="$DEVICE_UDID"
+            UDID=""
             trap 'cleanup_device "$UDID"' EXIT
-            # A runner-owned simulator may be registered but its CoreSimulator
-            # services can hang. Recover with an explicit service reset;
-            # the actual app launch and screenshot assertions stay mandatory.
+            UDID=$(create_isolated_device "$DEVICE_UDID")
+            # Each job has a fresh, private device data container.
+            # Only pre-launch infrastructure recovery may recreate the device.
             boot_ready=0
             for boot_attempt in 1 2 3; do
               echo "::notice::Boot check $boot_attempt/3 for $DEVICE_NAME"
@@ -301,7 +377,7 @@ jobs:
               else
                 echo "::warning::Boot request failed or simulator was already booted."
               fi
-              if simctl_bounded "wait for $DEVICE_NAME boot" 145 bootstatus "$UDID" -b; then
+              if simctl_bounded "wait for $DEVICE_NAME boot" 240 bootstatus "$UDID" -b; then
                 if simctl_bounded "probe $DEVICE_NAME launch services" 50 spawn "$UDID" launchctl list > /dev/null; then
                   boot_ready=1
                   break
@@ -316,10 +392,11 @@ jobs:
               if [ "$boot_attempt" -lt 3 ]; then
                 simctl_bounded "shutdown unresponsive $DEVICE_NAME" 35 shutdown "$UDID" || true
                 if [ "$boot_attempt" -eq 2 ]; then
-                  # Restart only the macOS simulator infrastructure. Do not
-                  # retry a failed ATHLTH launch or hide a real screenshot error.
-                  killall -9 Simulator 2>/dev/null || true
-                  killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+                  # Recreate only this job's device; avoid global service kills
+                  # that can interrupt other workflows on a shared runner.
+                  cleanup_device "$UDID"
+                  UDID=""
+                  UDID=$(create_isolated_device "$DEVICE_UDID")
                 fi
                 sleep 10
               fi
@@ -382,6 +459,60 @@ jobs:
 
             simctl_bounded "terminate ATHLTH $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
 
+            # Build 135 crashed only while moving between two already-mounted
+            # native tabs. A cold-start screenshot of tab 1 cannot detect it.
+            echo "Smoke testing Home -> Train tab switch on $DEVICE_NAME"
+            set +e
+            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch --terminate-running-process "$UDID" com.wesc9.athlth \
+              --athlth-compatibility-preview \
+              --athlth-compatibility-tab=0 \
+              --athlth-smoke-home-train-hop \
+              --athlth-smoke-home-train-stress 2>&1)
+            HOP_STATUS=$?
+            set -e
+            echo "$HOP_OUTPUT"
+            if [ "$HOP_STATUS" -ne 0 ]; then
+              echo "::error::ATHLTH failed to launch for Home -> Train regression."
+              exit 1
+            fi
+            HOP_PID=$(echo "$HOP_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+            # A fresh native process drives the transition only after Home
+            # actually appears. Evidence is required before accepting a frame.
+            sleep 8
+            if [ -z "$HOP_PID" ] || ! kill -0 "$HOP_PID" 2>/dev/null; then
+              echo "::error::ATHLTH crashed during Home -> Train transition on $DEVICE_NAME."
+              simctl_bounded "collect Home-to-Train crash logs" 65 spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
+              exit 1
+            fi
+            HOP_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-home-train.png"
+            verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME Home-to-Train" true
+            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train after dashboard mount"
+            # Prove all 100 same-process Home -> Train cycles completed.
+            STRESS_CONTAINER=$(simctl_bounded "locate Train stress evidence" 45 get_app_container "$UDID" com.wesc9.athlth data)
+            STRESS_COMPLETE=false
+            for attempt in $(seq 1 210); do
+              if ! kill -0 "$HOP_PID" 2>/dev/null; then
+                echo "::error::ATHLTH crashed during repeated Train navigation on $DEVICE_NAME."
+                exit 1
+              fi
+              if [ -s "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-stress-hop-100" ]; then
+                STRESS_COMPLETE=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$STRESS_COMPLETE" != true ]; then
+              echo "::error::Train stress test did not complete 100 navigation cycles."
+              exit 1
+            fi
+            for hop in $(seq 1 100); do
+              test -s "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-stress-hop-$hop"
+            done
+            verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME repeated Home-to-Train" true
+            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME after 100 Home-to-Train cycles"
+            simctl_bounded "terminate transition app $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
+
+            # Test individual tab cold starts after the native navigation regression.
             for TAB in 0 1 2 3 4; do
               echo "Rendering main tab $TAB on $DEVICE_NAME"
 
@@ -445,59 +576,6 @@ jobs:
 
             echo "All five main tabs rendered on $DEVICE_NAME."
 
-            # Build 135 crashed only while moving between two already-mounted
-            # native tabs. A cold-start screenshot of tab 1 cannot detect it.
-            echo "Smoke testing Home -> Train tab switch on $DEVICE_NAME"
-            set +e
-            HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch --terminate-running-process "$UDID" com.wesc9.athlth \
-              --athlth-compatibility-preview \
-              --athlth-compatibility-tab=0 \
-              --athlth-smoke-home-train-hop \
-              --athlth-smoke-home-train-stress 2>&1)
-            HOP_STATUS=$?
-            set -e
-            echo "$HOP_OUTPUT"
-            if [ "$HOP_STATUS" -ne 0 ]; then
-              echo "::error::ATHLTH failed to launch for Home -> Train regression."
-              exit 1
-            fi
-            HOP_PID=$(echo "$HOP_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
-            # A fresh native process drives the transition only after Home
-            # actually appears. Evidence is required before accepting a frame.
-            sleep 8
-            if [ -z "$HOP_PID" ] || ! kill -0 "$HOP_PID" 2>/dev/null; then
-              echo "::error::ATHLTH crashed during Home -> Train transition on $DEVICE_NAME."
-              simctl_bounded "collect Home-to-Train crash logs" 65 spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH" OR eventMessage CONTAINS "com.wesc9.athlth"' || true
-              exit 1
-            fi
-            HOP_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-home-train.png"
-            verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME Home-to-Train" true
-            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train after dashboard mount"
-            # Prove all 100 same-process Home -> Train cycles completed.
-            STRESS_CONTAINER=$(simctl_bounded "locate Train stress evidence" 45 get_app_container "$UDID" com.wesc9.athlth data)
-            STRESS_COMPLETE=false
-            for attempt in $(seq 1 210); do
-              if ! kill -0 "$HOP_PID" 2>/dev/null; then
-                echo "::error::ATHLTH crashed during repeated Train navigation on $DEVICE_NAME."
-                exit 1
-              fi
-              if [ -s "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-stress-hop-100" ]; then
-                STRESS_COMPLETE=true
-                break
-              fi
-              sleep 1
-            done
-            if [ "$STRESS_COMPLETE" != true ]; then
-              echo "::error::Train stress test did not complete 100 navigation cycles."
-              exit 1
-            fi
-            for hop in $(seq 1 100); do
-              test -s "$STRESS_CONTAINER/tmp/athlth-train-$HOP_PID-stress-hop-$hop"
-            done
-            verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME repeated Home-to-Train" true
-            validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME after 100 Home-to-Train cycles"
-            simctl_bounded "terminate transition app $DEVICE_NAME" 35 terminate "$UDID" com.wesc9.athlth || true
-
             cleanup_device "$UDID"
             trap - EXIT
           done < "$DEVICE_MATRIX"
@@ -506,7 +584,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-iphone-boot-diagnostics
+          name: athlth-iphone-boot-diagnostics-${{ matrix.size }}
           path: ${{ runner.temp }}/athlth-iphone-boot-diagnostics.txt
           if-no-files-found: ignore
           retention-days: 7
@@ -515,7 +593,16 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-iphone-smoke-screenshots
+          name: athlth-iphone-smoke-screenshots-${{ matrix.size }}
           path: ${{ runner.temp }}/athlth-*.png
           if-no-files-found: warn
           retention-days: 3
+
+      - name: Upload Train transition stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-iphone-train-stack-${{ matrix.size }}
+          path: ${{ runner.temp }}/athlth-*-train-sample.txt
+          if-no-files-found: ignore
+          retention-days: 7
