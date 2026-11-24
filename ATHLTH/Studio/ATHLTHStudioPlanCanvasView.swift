@@ -38,6 +38,8 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var copyingWeekID: UUID?
     @State private var pendingWeekCopyTarget: UUID?
     @State private var lastWeekCopy: AppSessionStore.PlanStudioWeekCopyReceipt?
+    @State private var lastWeekMove: AppSessionStore.PlanStudioWeekMoveReceipt?
+    @State private var movingWeek = false
     @State private var copyMessage: String?
     @SceneStorage("athlth.studio.canvas.draftOwnerID")
     private var draftOwnerID = ""
@@ -215,6 +217,8 @@ struct ATHLTHStudioPlanCanvasView: View {
             newWorkoutActivity = nil
             copyingWeekID = nil
             pendingWeekCopyTarget = nil
+            lastWeekMove = nil
+            movingWeek = false
             lastWeekCopy = nil
             copyMessage = nil
             actionToUndo = nil
@@ -247,6 +251,8 @@ struct ATHLTHStudioPlanCanvasView: View {
             newWorkoutActivity = nil
             copyingWeekID = nil
             pendingWeekCopyTarget = nil
+            lastWeekMove = nil
+            movingWeek = false
             lastWeekCopy = nil
             copyMessage = nil
             creatingPlan = false
@@ -350,8 +356,8 @@ struct ATHLTHStudioPlanCanvasView: View {
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
-                english: "Copy entire training week?",
-                norwegian: "Kopiere hele treningsuken?"
+                english: movingWeek ? "Move entire training week?" : "Copy entire training week?",
+                norwegian: movingWeek ? "Flytte hele treningsuken?" : "Kopiere hele treningsuken?"
             ),
             isPresented: Binding(
                 get: { pendingWeekCopyTarget != nil },
@@ -360,9 +366,10 @@ struct ATHLTHStudioPlanCanvasView: View {
             titleVisibility: .visible
         ) {
             Button(ATHLTHLocalization.choose(
-                english: "Copy week", norwegian: "Kopier uke"
+                english: movingWeek ? "Move week" : "Copy week",
+                norwegian: movingWeek ? "Flytt uke" : "Kopier uke"
             )) {
-                copySelectedWeek()
+                if movingWeek { moveSelectedWeek() } else { copySelectedWeek() }
             }
             Button(ATHLTHLocalization.choose(
                 english: "Cancel", norwegian: "Avbryt"
@@ -371,8 +378,12 @@ struct ATHLTHStudioPlanCanvasView: View {
             }
         } message: {
             Text(ATHLTHLocalization.choose(
-                english: "All seven days are copied in one step. The destination must be empty and in the future. Your original week is unchanged.",
-                norwegian: "Alle syv dager kopieres samlet. Måluken må være tom og ligge i fremtiden. Den opprinnelige uken endres ikke."
+                english: movingWeek
+                    ? "All seven days are moved together, retaining their workout identities. Both weeks must be current or future and the destination empty."
+                    : "All seven days are copied in one step. The destination must be empty and in the future. Your original week is unchanged.",
+                norwegian: movingWeek
+                    ? "Alle syv dager flyttes samlet med samme økt-ID-er. Begge uker må være nåværende eller fremtidige, og måluken tom."
+                    : "Alle syv dager kopieres samlet. Måluken må være tom og ligge i fremtiden. Den opprinnelige uken endres ikke."
             ))
         }
         .alert(
@@ -420,6 +431,14 @@ struct ATHLTHStudioPlanCanvasView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHStudioStyle.ink)
                     Spacer(minLength: 0)
+                    if let receipt = lastWeekMove,
+                       plan.id == receipt.planID,
+                       plan.version == receipt.expectedVersionAfterMove {
+                        Button(ATHLTHLocalization.choose(english: "Undo week move", norwegian: "Angre ukeflytting")) {
+                            undoWeekMove()
+                        }
+                        .buttonStyle(.bordered)
+                    }
                     if let receipt = lastWeekCopy,
                        plan.id == receipt.planID,
                        plan.version == receipt.expectedVersionAfterCopy {
@@ -456,6 +475,7 @@ struct ATHLTHStudioPlanCanvasView: View {
                         viewMode = StudioPlanMode.week.rawValue
                     },
                     onCopyWeek: { weekID in
+                        movingWeek = false
                         copyingWeekID = weekID
                         copyMessage = nil
                     }
@@ -783,14 +803,21 @@ struct ATHLTHStudioPlanCanvasView: View {
             in: plan, excluding: sourceWeekID
         )
         return HStack(spacing: 10) {
-            Image(systemName: "square.on.square")
+            Image(systemName: movingWeek ? "arrow.left.arrow.right" : "square.on.square")
                 .foregroundStyle(ATHLTHStudioStyle.gold)
             Text(ATHLTHLocalization.format(
-                english: "Copy week %d to",
-                norwegian: "Kopier uke %d til",
+                english: movingWeek ? "Move week %d to" : "Copy week %d to",
+                norwegian: movingWeek ? "Flytt uke %d til" : "Kopier uke %d til",
                 sourceWeek?.weekNumber ?? 0
             ))
             .font(.caption.weight(.semibold))
+
+            Picker(ATHLTHLocalization.choose(english: "Week action", norwegian: "Ukehandling"), selection: $movingWeek) {
+                Text(ATHLTHLocalization.choose(english: "Copy", norwegian: "Kopier")).tag(false)
+                Text(ATHLTHLocalization.choose(english: "Move", norwegian: "Flytt")).tag(true)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 190)
 
             Menu {
                 ForEach(targets) { target in
@@ -878,12 +905,53 @@ struct ATHLTHStudioPlanCanvasView: View {
             return
         }
         lastWeekCopy = receipt
+        lastWeekMove = nil
         copyingWeekID = nil
         copyMessage = ATHLTHLocalization.choose(
             english: "The whole week was copied. You can undo until the next change.",
             norwegian: "Hele uken er kopiert. Du kan angre frem til neste endring."
         )
         selectedWeekID = targetID
+    }
+
+    private func moveSelectedWeek() {
+        defer { pendingWeekCopyTarget = nil }
+        guard let sourceID = copyingWeekID, let targetID = pendingWeekCopyTarget,
+              let plan = selectedPlan,
+              let receipt = session.movePlanStudioWeek(
+                  planID: plan.id, sourceWeekID: sourceID, targetWeekID: targetID,
+                  expectedVersion: plan.version, healthWorkouts: health.workouts,
+                  strengthHistory: strength.workoutHistory
+              ) else {
+            warning = ATHLTHLocalization.choose(
+                english: "Cannot move the week. Check for past, started, completed or shared workouts and an empty target.",
+                norwegian: "Kan ikke flytte uken. Kontroller tidligere, påbegynte, fullførte eller delte økter og at måluken er tom."
+            )
+            return
+        }
+        lastWeekMove = receipt
+        lastWeekCopy = nil
+        copyingWeekID = nil
+        selectedWeekID = targetID
+        copyMessage = ATHLTHLocalization.choose(
+            english: "The week was moved. You can undo until the next change.",
+            norwegian: "Uken er flyttet. Du kan angre frem til neste endring."
+        )
+    }
+
+    private func undoWeekMove() {
+        guard let receipt = lastWeekMove,
+              session.undoPlanStudioWeekMove(receipt, healthWorkouts: health.workouts,
+                  strengthHistory: strength.workoutHistory) else {
+            warning = ATHLTHLocalization.choose(
+                english: "Cannot undo this week move because the plan or workout status changed.",
+                norwegian: "Kan ikke angre ukeflyttingen fordi planen eller øktstatus er endret."
+            )
+            return
+        }
+        selectedWeekID = receipt.sourceWeekID
+        lastWeekMove = nil
+        copyMessage = ATHLTHLocalization.choose(english: "Week move undone.", norwegian: "Ukeflyttingen er angret.")
     }
 
     private func undoWeekCopy() {
@@ -1314,6 +1382,14 @@ struct ATHLTHStudioPlanCanvasView: View {
             Button(ATHLTHLocalization.choose(
                 english: "Copy this week", norwegian: "Kopier denne uken"
             ), systemImage: "square.on.square") {
+                movingWeek = false
+                copyingWeekID = week.id
+                copyMessage = nil
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Move this week", norwegian: "Flytt denne uken"
+            ), systemImage: "arrow.left.arrow.right") {
+                movingWeek = true
                 copyingWeekID = week.id
                 copyMessage = nil
             }
