@@ -551,50 +551,6 @@ struct ATHLTHInsightsView: View {
         )
     }
 
-    private func trendMetric(
-        title: String,
-        value: String,
-        change: Double?,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accent)
-
-            Text(value)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            if let change {
-                HStack(spacing: 3) {
-                    Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
-                    Text("\(Int(abs(change).rounded()))%")
-                }
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(change >= 0 ? ATHLTHTheme.accent : .orange)
-            } else {
-                Text(ATHLTHLocalization.choose(english: "No comparison", norwegian: "Ingen sammenligning"))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
-        .background(
-            Color.primary.opacity(0.035),
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
-    }
 
     private var readinessRingCaption: String {
         if health.recovery.score != nil { return pulseTitle.capitalized }
