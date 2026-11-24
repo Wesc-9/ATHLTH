@@ -249,6 +249,12 @@ struct StructuredWorkoutSessionView: View {
     @State private var activeExecutionBlocks: [WorkoutTemplateBlock] = []
     @State private var restoringCheckpoint = false
     @State private var persistenceErrorMessage: String?
+    @State private var gymMode = false
+    @State private var gymExerciseDetails: WorkoutTemplateBlock?
+    @State private var gymAwakeWindowID = UUID()
+    private var gymScreenAwake: Bool {
+        gymMode && hasStarted && !savedCompletion && scenePhase == .active
+    }
 
     private var checkpointName: String {
         "structuredWorkoutInProgress.v1.\(workout.id.uuidString)"
@@ -305,6 +311,19 @@ struct StructuredWorkoutSessionView: View {
                                 dismiss()
                             }
                             Spacer(minLength: 5)
+                            if ATHLTHDeviceRole.isIPad {
+                                Button {
+                                    gymMode.toggle()
+                                } label: {
+                                    Label(gymMode ? ATHLTHLocalization.choose(
+                                        english: "Standard view", norwegian: "Vanlig visning") : "Gym Mode",
+                                        systemImage: gymMode ? "rectangle.split.2x1" : "display")
+                                        .frame(minHeight: 44)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ATHLTHTheme.accentDeep)
+                                .accessibilityIdentifier("athlth-local-gym-toggle")
+                            }
                             Button {
                                 toggleStructuredPause()
                             } label: {
@@ -321,7 +340,11 @@ struct StructuredWorkoutSessionView: View {
                             }
                         }
                     }
-                    sessionHeader
+                    if gymMode && !savedCompletion {
+                        localGymDisplay
+                    } else {
+                        sessionHeader
+                    }
                     if !savedCompletion { TrainTogetherStatusStrip() }
                     if ATHLTHThreeMinuteAllOut.isRunningTest(
                         title: workout.title, blocks: workout.resolvedWorkoutBlocks
@@ -330,16 +353,18 @@ struct StructuredWorkoutSessionView: View {
                     }
 
                     if let currentBlock {
-                        if currentBlock.executionGroupKind != nil {
-                            liveModeCard(currentBlock)
+                        if !gymMode || savedCompletion {
+                            if currentBlock.executionGroupKind != nil {
+                                liveModeCard(currentBlock)
+                            }
+                            currentBlockCard(currentBlock)
                         }
-                        currentBlockCard(currentBlock)
                         if currentBlock.kind == .exercise && !savedCompletion {
                             actualSetInputs(currentBlock)
                         }
                     }
 
-                    blockTimeline
+                    if !gymMode || showAllSteps || savedCompletion { blockTimeline }
 
                     if savedCompletion {
                         completionConfirmation
@@ -347,14 +372,35 @@ struct StructuredWorkoutSessionView: View {
                 }
                 .padding(18)
                 .padding(.bottom, 110)
-                .frame(maxWidth: 720)
+                .frame(maxWidth: gymMode && !savedCompletion ? 1320 : 720)
                 .frame(maxWidth: .infinity)
             }
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: Color.orange.opacity(0.14)
-                )
-            )
+            .background {
+                if gymMode && !savedCompletion {
+                    ATHLTHGymModeDisplay.canvas.ignoresSafeArea()
+                } else {
+                    ATHLTHPremiumCanvas(accent: Color.orange.opacity(0.14))
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { gymExerciseDetails != nil },
+                set: { if !$0 { gymExerciseDetails = nil } }
+            )) {
+                if let block = gymExerciseDetails {
+                    NavigationStack {
+                        ATHLTHLinkedExerciseDetailView(block: block)
+                    }
+                }
+            }
+            .onChange(of: gymScreenAwake) { _, enabled in
+                ATHLTHiPadKeepAwakeCoordinator.setEnabled(enabled, for: gymAwakeWindowID)
+            }
+            .onChange(of: currentIndex) { _, _ in
+                gymExerciseDetails = nil
+            }
+            .onDisappear {
+                ATHLTHiPadKeepAwakeCoordinator.setEnabled(false, for: gymAwakeWindowID)
+            }
             .navigationTitle(workout.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -609,6 +655,89 @@ struct StructuredWorkoutSessionView: View {
                 persistCheckpoint()
             }
         }
+    }
+
+    private var localGymDisplay: some View {
+        VStack(spacing: 14) {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                ATHLTHGymModeDisplay(snapshot: gymSnapshot(at: context.date), local: true)
+                    .onChange(of: context.date) { _, date in
+                        // Preserve the original EMOM/AMRAP boundary checks when
+                        // the standard mode card is hidden.
+                        checkTimedMode(at: date)
+                    }
+            }
+            if let block = currentBlock, block.kind == .exercise,
+               block.exerciseID != nil || block.exerciseSlug != nil {
+                Button {
+                    gymExerciseDetails = block
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Exercise guide / video", norwegian: "Øvelsesguide / video"),
+                          systemImage: "play.rectangle")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+            }
+            if spotify.isConnected {
+                HStack(spacing: 16) {
+                    Label(spotify.watchTrackTitle ?? "Spotify", systemImage: "music.note")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Button {
+                        if spotify.isPlaying { spotify.pause() } else { spotify.resume() }
+                    } label: {
+                        Image(systemName: spotify.isPlaying ? "pause.fill" : "play.fill")
+                            .frame(width: 48, height: 48)
+                    }
+                    .accessibilityLabel(spotify.isPlaying ? "Pause Spotify" : "Spill Spotify")
+                    Button { spotify.skipToNext() } label: {
+                        Image(systemName: "forward.end.fill").frame(width: 48, height: 48)
+                    }
+                    .accessibilityLabel("Neste sang")
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHGymModeDisplay.gold)
+                .padding(12)
+            }
+        }
+        .accessibilityIdentifier("athlth-local-gym-mode")
+    }
+
+    private func gymSnapshot(at now: Date) -> ATHLTHCrossDeviceWorkoutSnapshot {
+        let block = currentBlock
+        let effective = ATHLTHStructuredWorkoutClock.at(now, pause: pausedAt) ?? now
+        let remaining: TimeInterval? = block.flatMap { value in
+            let ordinal = blocks.prefix(currentIndex).filter {
+                $0.executionGroupID == value.executionGroupID
+            }.count
+            if let groupTime = timeRemaining(for: value, at: now, ordinal: ordinal) {
+                return groupTime
+            }
+            return value.durationSeconds.map {
+                max(0, $0 - max(0, effective.timeIntervalSince(stepEnteredAt)))
+            }
+        }
+        var snapshot = ATHLTHCrossDeviceWorkoutSnapshot(
+            sessionID: workout.id, kind: block.map { ATHLTHWorkoutSportMode.forBlock($0).category } ?? workout.kind.rawValue,
+            title: workout.title, startedAt: startedAt, elapsedSeconds: activeElapsed(at: now),
+            distanceMeters: nil, currentStep: block?.title,
+            nextStep: blocks.indices.contains(currentIndex + 1) ? blocks[currentIndex + 1].title : nil,
+            completedSets: completedBlockIDs.count, totalSets: blocks.count,
+            paused: pausedAt != nil, runningInRecovery: block?.kind == .rest || block?.isActiveRecovery == true || emomWaitingForMinute,
+            runningStepRemainingSeconds: remaining, capturedAt: now,
+            sourceDevice: "ipad", captureEvidence: "structuredManual",
+            runningStepIndex: currentIndex, runningStepCount: blocks.count
+        )
+        if block?.kind == .exercise {
+            snapshot.strengthReps = block?.repetitions
+            snapshot.strengthWeightKilograms = block?.targetWeightKilograms
+        }
+        return snapshot
     }
 
     private var sessionHeader: some View {
