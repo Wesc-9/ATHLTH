@@ -613,7 +613,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     } ?? false,
                     canStart: canStart(item),
                     onOpen: { onOpenWorkout(item) },
-                    onStart: { onStartWorkout(item) }
+                    onStart: { onStartWorkout(item) },
+                    featured: true
                 )
                 .contextMenu { workoutActions(item) }
             } else {
@@ -1128,9 +1129,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
         _ item: ATHLTHStudioSchedule.Occurrence,
         alreadyCompleted: Bool? = nil
     ) -> Bool {
-        guard let planID = item.planID,
-              !item.workout.isExplicitRestDay,
-              !session.isPlanSessionSkipped(planID: planID, sessionID: item.workout.id),
+        guard !item.workout.isExplicitRestDay,
+              item.workout.cancelledAt == nil,
+              !skipped(item),
               !(alreadyCompleted ?? completed(item)) else { return false }
         return true
     }
@@ -1148,7 +1149,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             } label: {
                 Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
             }
-            if [.running, .walking, .strength].contains(item.workout.kind) {
+            if item.planID != nil && [.running, .walking, .strength].contains(item.workout.kind) {
                 Button {
                     onSendToWatch(item)
                 } label: {
@@ -1156,6 +1157,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                           systemImage: "applewatch")
                 }
             }
+            if item.planID != nil {
             Menu {
                 Button(tr("In 5 minutes", "Om 5 minutter")) {
                     onStartAfter(item, 300)
@@ -1168,6 +1170,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 }
             } label: {
                 Label(tr("Start later", "Start senere"), systemImage: "clock")
+            }
             }
         }
         Button {
