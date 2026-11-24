@@ -327,8 +327,8 @@ struct MirroredWorkoutLiveView: View {
                 .font(.subheadline.weight(.semibold))
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Only this workout will be shared. iPad cannot control recording.",
-                    norwegian: "Kun denne økten deles. iPad kan ikke styre registreringen."
+                    english: "Choose viewing only or allow supported controls for this workout. The Watch remains the recording owner.",
+                    norwegian: "Velg kun visning eller tillat styring av denne økten. Klokken beholder ansvaret for registreringen."
                 ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -348,6 +348,18 @@ struct MirroredWorkoutLiveView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHPlanDesign.accentInk)
                     .accessibilityIdentifier("athlth-watch-live-approve-ipad")
+
+                    Button(ATHLTHLocalization.choose(
+                        english: "Allow control", norwegian: "Tillat styring"
+                    )) {
+                        Task {
+                            await liveSharing.respondToRequest(
+                                approve: true, accountID: appSession.profile.userID, allowControl: true
+                            )
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("athlth-watch-live-approve-ipad-control")
 
                     Button(ATHLTHLocalization.choose(
                         english: "Decline", norwegian: "Avslå"
