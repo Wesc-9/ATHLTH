@@ -25,7 +25,7 @@ struct ATHLTHGarminLiveRequest: Equatable {
 enum ATHLTHGarminLivePhase: String, Codable {
     case ready, recording, paused, saved, cancelled, expired, error
     var terminal: Bool {
-        self == .saved || self == .cancelled || self == .expired || self == .error
+        self == .saved || self == .cancelled || self == .expired
     }
 }
 
