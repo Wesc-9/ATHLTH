@@ -5531,10 +5531,22 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                if !isActive || !trainDashboardReady {
-                    // Retain the NavigationStack and presentation state while
-                    // avoiding all three expensive Train root trees offscreen.
+                if !isActive {
+                    // Keep navigation and presentation state mounted offscreen.
                     Color.clear
+                } else if !trainDashboardReady {
+                    // The selected tab must never be invisible while mounting.
+                    VStack(spacing: 20) {
+                        ATHLTHTrainHeaderRow(selection: $selectedSection)
+                        ProgressView()
+                            .tint(ATHLTHTheme.accentDeep)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Loading training", norwegian: "Laster trening"
+                            ))
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 } else if selectedSection == .progress {
                     ATHLTHTrainProgressReferenceView(
                         onReturnToToday: { selectedSection = .today },
@@ -6281,18 +6293,6 @@ struct ATHLTHTrainView: View {
                     scheduleTrainDailyRecommendationRefresh()
                 }
             }
-            .task(id: isActive) {
-                guard isActive, !trainDashboardReady else { return }
-                // Mount the heavy Train dashboard only after native tab selection
-                // has completed its initial SwiftUI layout transaction.
-                do {
-                    try await Task.sleep(for: .milliseconds(350))
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled, isActive else { return }
-                trainDashboardReady = true
-            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
                 // Retain the prepared catalog and plan state across quick
@@ -6429,6 +6429,18 @@ struct ATHLTHTrainView: View {
                     ""
                 )
             }
+        }
+        // Own activation on the stable NavigationStack, not its initially
+        // empty destination or deeply nested presentation modifier chain.
+        .task(id: isActive) {
+            guard isActive, !trainDashboardReady else { return }
+            do {
+                try await Task.sleep(for: .milliseconds(350))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, isActive else { return }
+            trainDashboardReady = true
         }
     }
 
@@ -7116,6 +7128,11 @@ struct ATHLTHTrainView: View {
     }
 
     private func restoreTrainSection(for userID: UUID) {
+        if ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview") {
+            // Compatibility launches explicitly verify the Today dashboard.
+            restoredTrainSectionAccount = userID
+            return
+        }
         let section = ATHLTHTrainSectionContinuityPolicy.restoredSection(
             persistedTrainSection,
             persistedAccountID: persistedTrainSectionAccount,
@@ -7432,7 +7449,22 @@ struct ATHLTHTrainView: View {
             onQuickFreeTraining: { startFreeTrainingQuick() },
             onGhostRace: { showingGhostHub = true }
             )
+            .onAppear {
+                recordTrainDashboardSmokeReadiness()
+            }
         )
+    }
+
+    // Require the actual dashboard, not just a nonblank loading frame.
+    private func recordTrainDashboardSmokeReadiness() {
+        #if targetEnvironment(simulator)
+        guard ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview"),
+              isActive, selectedSection == .today else { return }
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "athlth-train-ready-\(ProcessInfo.processInfo.processIdentifier)"
+        )
+        try? Data("ready".utf8).write(to: marker, options: .atomic)
+        #endif
     }
 
     // Keep the optional delayed-start banner independent of the heavy

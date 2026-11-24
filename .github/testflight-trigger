@@ -337,3 +337,5 @@ ATHLTH 3.0.1 build 141 — user-authorized TestFlight upload 2026-11-24; require
 ATHLTH 3.0.1 build 141 — authorized TestFlight retry after SwiftUI Studio root type-check timeout; split presentation/lifecycle/navigation modifier stages and explicitly type sidebar visibility persistence. Require all five exact-commit gates, signed archive and App Store Connect confirmation; no bypass.
 
 ATHLTH 3.0.1 build 141 — authorized gated TestFlight retry after correcting cross-file access to the shared SwiftUI stable presentation boundary. Require all five exact-commit gates before signing and upload; do not bypass checks.
+
+ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry after blank Train simulator screen. Stable NavigationStack activation, visible loading state, and mandatory actual Today dashboard mount verification for cold start and Home-to-Train smoke. Preserve all five same-commit gates; no upload before successful signed archive and Apple confirmation.
