@@ -111,17 +111,30 @@ struct ATHLTHTrainTodayPremiumView: View {
     private let champagne = ATHLTHTrainDesign.bronze
     private let hairline = ATHLTHTrainDesign.rule
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if let plan {
-                VStack(spacing: 9) {
-                    activePlanSection(plan)
-                    activeGoalSection
-                }
-            } else {
-                activeGoalSection
-            }
+    // Diagnostic stages are deliberately explicit. The default preserves all
+    // functionality; launch arguments allow device tests to isolate each group.
+    private var diagnosticStage: Int {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-ATHLTHTrainTodayStage"),
+              arguments.indices.contains(index + 1),
+              let stage = Int(arguments[index + 1]) else { return 4 }
+        return min(4, max(1, stage))
+    }
 
+    @ViewBuilder
+    private var goalAndPlanCards: some View {
+        if let plan {
+            VStack(spacing: 9) {
+                ATHLTHTrainDeferredContent { AnyView(activePlanSection(plan)) }
+                ATHLTHTrainDeferredContent { AnyView(activeGoalSection) }
+            }
+        } else {
+            ATHLTHTrainDeferredContent { AnyView(activeGoalSection) }
+        }
+    }
+
+    @ViewBuilder
+    private var dailyStatusCard: some View {
             // The live recording replaces the planned hero, never creates
             // a competing Start button or a second workout recorder.
             if hasActiveWorkout, let activeWorkoutCard {
@@ -157,19 +170,10 @@ struct ATHLTHTrainTodayPremiumView: View {
                 adaptiveOpenDayCard
             }
 
-            remainingTodaySection
-            standaloneTodaySection
-            quickTrainSection
+    }
 
-            // Ghost Race is a primary shortcut, shown before the active goal.
-            // Keep its existing card styling and launch action unchanged.
-            ghostRaceSection
-                .frame(maxWidth: .infinity)
-
-            // The compact active-goal row now lives directly under Active Plan.
-            // Daily Focus was removed: it repeated workout/context information.
-
-            // Hide an empty disclosure when no additional workout is available.
+    @ViewBuilder
+    private var additionalWorkoutOptions: some View {
             if primaryWorkout != nil {
                 DisclosureGroup {
                     suggestedWorkoutSection
@@ -182,6 +186,24 @@ struct ATHLTHTrainTodayPremiumView: View {
                         .frame(minHeight: 48)
                 }
                 .tint(champagne)
+            }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if diagnosticStage >= 2 {
+                ATHLTHTrainDeferredContent { AnyView(goalAndPlanCards) }
+            }
+            if diagnosticStage >= 3 {
+                ATHLTHTrainDeferredContent { AnyView(dailyStatusCard) }
+                ATHLTHTrainDeferredContent { AnyView(remainingTodaySection) }
+                ATHLTHTrainDeferredContent { AnyView(standaloneTodaySection) }
+            }
+            ATHLTHTrainDeferredContent { AnyView(quickTrainSection) }
+            if diagnosticStage >= 4 {
+                ATHLTHTrainDeferredContent { AnyView(ghostRaceSection) }
+                    .frame(maxWidth: .infinity)
+                ATHLTHTrainDeferredContent { AnyView(additionalWorkoutOptions) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
