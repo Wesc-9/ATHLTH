@@ -5,3 +5,6 @@
 *.key
 bin/
 .vscode/
+
+resources/coach_generated/
+source/ATHLTHCoachResources.mc

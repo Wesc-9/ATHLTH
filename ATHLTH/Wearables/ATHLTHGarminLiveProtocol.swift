@@ -11,23 +11,32 @@ struct ATHLTHGarminLiveRequest: Equatable {
     let expiresAt: Date
     let recipe: ATHLTHGarminEnduranceRecipe?
     let strengthRecipe: ATHLTHGarminStrengthRecipe?
+    let offlineCoach: ATHLTHGarminOfflineCoachPlan?
+
+    var recipeVersion: Int { strengthRecipe != nil ? 3 : (recipe == nil ? 1 : 2) }
 
     init(id: UUID = UUID(), sport: ATHLTHGarminLiveSport, now: Date = .now,
          recipe: ATHLTHGarminEnduranceRecipe? = nil,
-         strengthRecipe: ATHLTHGarminStrengthRecipe? = nil) {
+         strengthRecipe: ATHLTHGarminStrengthRecipe? = nil,
+         offlineCoach: ATHLTHGarminOfflineCoachPlan? = nil) {
         self.id = id
         self.sport = sport
         self.expiresAt = now.addingTimeInterval(90)
         self.recipe = recipe
         self.strengthRecipe = strengthRecipe
+        self.offlineCoach = offlineCoach
     }
 
     var message: [String: Any] {
-        var payload: [String: Any] = ["v": strengthRecipe != nil ? 3 : (recipe == nil ? 1 : 2),
+        var payload: [String: Any] = ["v": offlineCoach == nil ? recipeVersion : 4,
             "kind": "prepare", "id": id.uuidString, "sport": sport.rawValue,
             "expires": Int(expiresAt.timeIntervalSince1970)]
         if let recipe { payload["recipe"] = recipe.message }
         if let strengthRecipe { payload["recipe"] = strengthRecipe.message }
+        if let offlineCoach {
+            payload["recipeVersion"] = recipeVersion
+            payload["coach"] = offlineCoach.message
+        }
         return payload
     }
 }
@@ -52,9 +61,10 @@ struct ATHLTHGarminLiveEvent: Equatable {
     let version: Int
     let completedSets: Int?
     let resting: Bool?
+    let coachStatus: String?
 
     init?(message: [String: Any]) {
-        guard let version = message["v"] as? Int, [1, 2, 3].contains(version),
+        guard let version = message["v"] as? Int, [1, 2, 3, 4].contains(version),
               message["kind"] as? String == "event",
               let raw = message["id"] as? String, let id = UUID(uuidString: raw),
               let sequence = message["seq"] as? Int, sequence > 0,
@@ -78,6 +88,7 @@ struct ATHLTHGarminLiveEvent: Equatable {
         recipeComplete = message["recipeComplete"] as? Bool
         completedSets = (message["completedSets"] as? Int).flatMap { (0...32).contains($0) ? $0 : nil }
         resting = message["resting"] as? Bool
+        coachStatus = message["coachStatus"] as? String
     }
 }
 
@@ -101,8 +112,14 @@ struct ATHLTHGarminLiveHandshake {
         guard device == deviceID, event.requestID == request.id,
               event.sequence > (latest?.sequence ?? 0),
               latest?.phase.terminal != true else { return false }
+        let expectedVersion = request.offlineCoach == nil ? request.recipeVersion : 4
+        guard event.version == expectedVersion else { return false }
+        if request.offlineCoach != nil {
+            guard let status = event.coachStatus,
+                  ["ready", "playing", "error"].contains(status) else { return false }
+        }
         if let recipe = request.recipe {
-            guard event.version == 2, let index = event.stepIndex,
+            guard let index = event.stepIndex,
                   recipe.steps.indices.contains(index),
                   event.stepID == recipe.steps[index].id,
                   index >= (latest?.stepIndex ?? 0),
@@ -110,7 +127,7 @@ struct ATHLTHGarminLiveHandshake {
                   latest?.recipeComplete != true || event.recipeComplete == true
             else { return false }
         } else if let strength = request.strengthRecipe {
-            guard event.version == 3, let index = event.stepIndex,
+            guard let index = event.stepIndex,
                   strength.steps.indices.contains(index),
                   event.stepID == strength.steps[index].id,
                   let count = event.completedSets, let resting = event.resting,
@@ -120,7 +137,7 @@ struct ATHLTHGarminLiveHandshake {
                   event.recipeComplete != true || (count == strength.steps.count && !resting),
                   latest?.recipeComplete != true || event.recipeComplete == true
             else { return false }
-        } else if event.version != 1 { return false }
+        }
         if let previous = latest?.phase {
             switch (previous, event.phase) {
             case (.recording, .ready), (.paused, .ready),

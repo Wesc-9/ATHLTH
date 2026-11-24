@@ -40,6 +40,10 @@ class ATHLTHGarminSendListener extends Comms.ConnectionListener {
 class ATHLTHGarminController {
     var requestID = null;
     var version = 1;
+    var wireVersion = 1;
+    var coach = null;
+    var lastCountKey = null;
+    var lastCountNumber = null;
     var recipe = null;
     var stepIndex = 0;
     var stepTime = null;
@@ -72,6 +76,7 @@ class ATHLTHGarminController {
         ticker.start(method(:tick), 1000, true);
     }
     function end() {
+        if (coach != null) { coach.stop(); }
         if (ticker != null) { ticker.stop(); }
         Comms.registerForPhoneAppMessages(null);
         // Best effort to preserve a locally started recording on normal exit.
@@ -84,7 +89,7 @@ class ATHLTHGarminController {
     function received(message) {
         var data = message.data;
         if (!(data instanceof Lang.Dictionary)) { return; }
-        if (data["v"] != 1 && data["v"] != 2 && data["v"] != 3) { return; }
+        if (data["v"] != 1 && data["v"] != 2 && data["v"] != 3 && data["v"] != 4) { return; }
         var command = data["kind"];
         if (command == "prepare") {
             var id = data["id"];
@@ -99,10 +104,26 @@ class ATHLTHGarminController {
             if (id == requestID) { publish(); return; }
             if (state == "ready") { return; }
             var incomingRecipe = data["recipe"];
-            if (data["v"] == 2 && (requestedSport == "strength" || !validRecipe(incomingRecipe))) { return; }
-            if (data["v"] == 3 && (requestedSport != "strength" || !validStrength(incomingRecipe))) { return; }
-            if (data["v"] == 1 && incomingRecipe != null) { return; }
-            version = data["v"];
+            var incomingVersion = data["v"] == 4 ? data["recipeVersion"] : data["v"];
+            if (incomingVersion != 1 && incomingVersion != 2 && incomingVersion != 3) { return; }
+            if (incomingVersion == 2 && (requestedSport == "strength" || !validRecipe(incomingRecipe))) { return; }
+            if (incomingVersion == 3 && (requestedSport != "strength" || !validStrength(incomingRecipe))) { return; }
+            if (incomingVersion == 1 && incomingRecipe != null) { return; }
+            var nextCoach = null;
+            if (data["v"] == 4) {
+                nextCoach = new ATHLTHOfflineCoach(data["coach"]);
+                if (!nextCoach.valid) {
+                    statusText = "Coach unavailable";
+                    Ui.requestUpdate();
+                    return;
+                }
+            }
+            if (coach != null) { coach.stop(); }
+            coach = nextCoach;
+            lastCountKey = null;
+            lastCountNumber = null;
+            version = incomingVersion;
+            wireVersion = data["v"];
             page = 0;
             savedSeconds = null;
             savedMeters = null;
@@ -155,6 +176,7 @@ class ATHLTHGarminController {
                     state = "recording";
                     statusText = "START pause | BACK save";
                     setStepAnchor(Activity.getActivityInfo());
+                    speak("start", "start");
                 } else {
                     state = "error";
                     statusText = "Recording not started";
@@ -187,6 +209,7 @@ class ATHLTHGarminController {
                 session = null;
                 state = "saved";
                 statusText = "Saved on watch";
+                speak("complete", "complete");
                 publish();
             } else {
                 state = "paused";
@@ -197,12 +220,15 @@ class ATHLTHGarminController {
             if (session.stop()) {
                 state = "paused";
                 statusText = "START resume | BACK save";
+                if (coach != null) { coach.stop(); }
+                speak("pauseResume", "pause");
                 publish();
             }
         } else if (state == "paused" && session != null) {
             if (session.start()) {
                 state = "recording";
                 statusText = "START pause | BACK save";
+                speak("pauseResume", "resume");
                 publish();
             }
         }
@@ -231,6 +257,8 @@ class ATHLTHGarminController {
             statusText = "Request expired";
             publish();
         }
+        if (coach != null) { coach.poll(); }
+        if (state == "recording" && !finishArmed) { coachCountdown(Activity.getActivityInfo()); }
         if (state == "recording" && version == 3 && recipe != null && !recipeComplete && !finishArmed) {
             var strengthInfo = Activity.getActivityInfo();
             if (strengthInfo != null) {
@@ -323,6 +351,7 @@ class ATHLTHGarminController {
             if (progress == null || progress < step["target"]) { return false; }
         }
         completedSets += 1;
+        speak("setComplete", "setComplete");
         if (completedSets == recipe["steps"].size()) {
             recipeComplete = true;
             statusText = "Plan done | BACK save";
@@ -330,6 +359,7 @@ class ATHLTHGarminController {
             resting = true;
             restStart = info.timerTime / 1000.0;
             statusText = "Rest";
+            speak("restStart", "restStart");
         } else {
             advanceStrength(info);
             return true;
@@ -339,6 +369,7 @@ class ATHLTHGarminController {
     }
 
     function advanceStrength(info) {
+        if (resting) { speak("restEnd", "restEnd"); }
         resting = false;
         restStart = null;
         stepIndex += 1;
@@ -390,6 +421,44 @@ class ATHLTHGarminController {
         }
         publish();
     }
+    function speak(flag, cue) {
+        if (coach != null && coach.plan[flag] == true) {
+            coach.speak(cue);
+        }
+    }
+
+    function coachCountdown(info) {
+        if (coach == null || recipe == null || recipeComplete || info == null) { return; }
+        var limit = null;
+        var left = null;
+        var key = null;
+        var step = recipe["steps"][stepIndex];
+        if (version == 3 && resting) {
+            limit = coach.plan["restCountdown"];
+            left = remainingRest(info);
+            key = "rest:" + stepIndex.toString();
+        } else if (version == 2 && step["measure"] == "time" && !waitingForNext &&
+                   stepIndex + 1 < recipe["steps"].size()) {
+            var next = recipe["steps"][stepIndex + 1];
+            if (step["phase"] == "recovery" && next["phase"] != "recovery") {
+                limit = coach.plan["fromRecovery"];
+            } else if (step["phase"] != "recovery" && next["phase"] == "recovery") {
+                limit = coach.plan["toRecovery"];
+            }
+            var progress = stepProgress(info);
+            if (progress != null) { left = step["target"] - progress; }
+            key = "step:" + stepIndex.toString();
+        }
+        if (limit == null || left == null || left <= 0 || left > limit) { return; }
+        var number = (left + 0.999).toNumber();
+        if (number < 1 || number > 10) { return; }
+        if (lastCountKey != key || lastCountNumber != number) {
+            lastCountKey = key;
+            lastCountNumber = number;
+            coach.speak("n" + number.toString());
+        }
+    }
+
     function sent() {
         sending = false;
         if (pending) { pending = false; publish(); }
@@ -398,8 +467,9 @@ class ATHLTHGarminController {
         if (requestID == null) { return; }
         if (sending) { pending = true; return; }
         sequence += 1;
-        var data = {"v" => version, "kind" => "event", "id" => requestID,
+        var data = {"v" => wireVersion, "kind" => "event", "id" => requestID,
                     "seq" => sequence, "state" => state};
+        if (coach != null) { data["coachStatus"] = coach.status; }
         if (recipe != null) {
             data["stepIndex"] = stepIndex;
             data["stepID"] = recipe["steps"][stepIndex]["id"];

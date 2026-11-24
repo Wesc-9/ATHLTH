@@ -114,7 +114,8 @@ class ATHLTHGarminView extends Ui.View {
             }
         }
         ring(dc, fraction);
-        text(dc, 13, "ATHLTH", Gfx.FONT_XTINY, GOLD);
+        text(dc, 13, controller.coach != null && controller.coach.status == "error"
+            ? "COACH ERROR" : "ATHLTH", Gfx.FONT_XTINY, GOLD);
 
         if (controller.state == "saved") {
             text(dc, 29, "Workout saved", Gfx.FONT_MEDIUM, GOLD);
