@@ -147,6 +147,23 @@ struct WorkoutHistoryView: View {
     @State private var workouts: [SocialPublishableWorkout] = []
     @State private var filter: WorkoutHistoryFilter = .all
     @State private var loading = false
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var garminSession: AppSessionStore
+    @Environment(\.scenePhase) private var garminScenePhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    private var garminAccount: UUID? {
+        garminScenePhase == .active && garminSession.signedIn && !garminSession.previewModeEnabled
+            ? garminSession.profile.userID : nil
+    }
+    private var garminWorkouts: [GarminImportedActivity] {
+        guard let account = garminAccount, let snapshot = garminStore.snapshot(for: account) else { return [] }
+        return snapshot.workouts.filter { item in
+            filter.includes(GarminHistoryMatchPolicy.activity(for: item)) &&
+            (startDate.map { item.workout.startedAt >= $0 } ?? true) &&
+            (endDate.map { item.workout.startedAt <= $0 } ?? true)
+        }
+    }
+    #endif
 
     init(
         startDate: Date? = nil,
@@ -187,17 +204,16 @@ struct WorkoutHistoryView: View {
             .padding()
 
             #if ATHLTH_GARMIN_PERSONAL && DEBUG
-            GarminPersonalHistoryEntry(
-                existing: workouts, startDate: startDate, endDate: endDate
-            )
-            .padding(.horizontal)
+            let rows = GarminUnifiedHistoryRow.merge(local: filtered, garmin: garminWorkouts)
+            #else
+            let rows = filtered.map { GarminUnifiedHistoryRow.local($0) }
             #endif
 
-            if loading && workouts.isEmpty {
+            if loading && rows.isEmpty {
                 Spacer()
                 ProgressView(ATHLTHLocalization.choose(english: "Loading workout history…", norwegian: "Laster treningshistorikk…"))
                 Spacer()
-            } else if filtered.isEmpty {
+            } else if rows.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No workouts", norwegian: "Ingen treningsøkter"),
                     systemImage: "figure.run.circle",
@@ -206,18 +222,33 @@ struct WorkoutHistoryView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 11) {
-                        ForEach(filtered) { workout in
-                            NavigationLink {
-                                WorkoutHistoryDetailView(workout: workout)
-                            } label: {
-                                WorkoutHistoryRow(workout: workout)
-                                    .padding(12)
-                                    .background(
-                                        ATHLTHUnifiedDesign.surface,
-                                        in: RoundedRectangle(cornerRadius: 18)
-                                    )
+                        ForEach(rows) { row in
+                            switch row {
+                            case .local(let workout):
+                                NavigationLink {
+                                    WorkoutHistoryDetailView(workout: workout)
+                                } label: {
+                                    WorkoutHistoryRow(workout: workout)
+                                        .padding(12)
+                                        .background(ATHLTHUnifiedDesign.surface, in: RoundedRectangle(cornerRadius: 18))
+                                }
+                                .buttonStyle(.plain)
+                            case .garmin(let item, let possibleDuplicate):
+                                #if ATHLTH_GARMIN_PERSONAL && DEBUG
+                                if let account = garminAccount {
+                                    NavigationLink {
+                                        GarminReadOnlyWorkoutDetail(accountID: account, activityID: item.workout.id)
+                                    } label: {
+                                        GarminExistingWorkoutRow(item: item, possibleDuplicate: possibleDuplicate)
+                                            .padding(12)
+                                            .background(ATHLTHUnifiedDesign.surface, in: RoundedRectangle(cornerRadius: 18))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                #else
+                                EmptyView()
+                                #endif
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding()
@@ -232,7 +263,15 @@ struct WorkoutHistoryView: View {
         }
         .refreshable {
             await load(forceRefresh: true)
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            if let account = garminAccount { garminStore.refresh(account: account, force: true) }
+            #endif
         }
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        .task(id: "\(garminAccount?.uuidString ?? "")|\(garminStore.connected)") {
+            if let account = garminAccount { garminStore.refresh(account: account) }
+        }
+        #endif
     }
 
     private func load(forceRefresh: Bool = false) async {

@@ -32,6 +32,14 @@ struct GarminPersonalSettingsView: View {
                     .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                               store.busy || store.needsKeyRemoval)
                     if store.isConnected(to: accountID) {
+                        Picker("Datakilde", selection: Binding(
+                            get: { store.preference(for: accountID) },
+                            set: { store.setPreference($0, account: accountID) }
+                        )) {
+                            ForEach(WearableDisplayPreference.allCases) { value in
+                                Text(value.title).tag(value)
+                            }
+                        }
                         Button("Refresh Garmin data") { store.refresh(account: accountID, force: true) }
                             .disabled(store.busy)
                     }

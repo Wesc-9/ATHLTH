@@ -21,6 +21,10 @@ struct ATHLTHInsightsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+    @Environment(\.scenePhase) private var garminScenePhase
+    #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedSection: ATHLTHInsightsSection = .overview
@@ -229,9 +233,6 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
-            #if ATHLTH_GARMIN_PERSONAL && DEBUG
-            AnyView(GarminPersonalLocalCard(surface: .insights, isActive: isActive))
-            #endif
             ATHLTHInsightsDailyRhythmCard()
             ATHLTHInsightsMuscleCard(summary: muscleSummary)
             ATHLTHInsightsSleepStagesCard()
@@ -407,27 +408,63 @@ struct ATHLTHInsightsView: View {
             }
 
             HStack(spacing: 7) {
-                readinessMetric(tr("Sleep", "Søvn"), sleepValue, "moon.stars.fill")
-                readinessMetric(tr("Resting HR", "Hvilepuls"), restingHRValue, "heart.fill")
-                readinessMetric("HRV", hrvValue, "waveform.path.ecg")
+                readinessMetric(tr("Sleep", "Søvn"), sleepValue, "moon.stars.fill",
+                                garmin: garminReading(.sleep))
+                readinessMetric(tr("Resting HR", "Hvilepuls"), restingHRValue, "heart.fill",
+                                garmin: garminReading(.restingHeartRate))
+                readinessMetric("HRV", hrvValue, "waveform.path.ecg",
+                                garmin: garminReading(.hrv))
+            }
+            if garminReading(.sleep) != nil || garminReading(.restingHeartRate) != nil || garminReading(.hrv) != nil {
+                Text(tr("Garmin measurements are displayed here. The readiness score still uses the Apple Health baseline.",
+                        "Garmin-målinger vises her. Dagsformscoren bruker fortsatt grunnlinjen fra Apple Helse."))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
         }
         .padding(18)
         .athlthInsightsSurface()
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        .task(id: "\(isActive)|\(session.profile.userID)|\(garminStore.connected)|\(garminScenePhase)") {
+            guard isActive, garminScenePhase == .active, session.signedIn, !session.previewModeEnabled else { return }
+            garminStore.refresh(account: session.profile.userID)
+        }
+        #endif
     }
 
-    private func readinessMetric(_ title: String, _ value: String, _ icon: String) -> some View {
+    private func garminReading(_ metric: WearableDisplayMetric) -> GarminDisplayReading? {
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        guard garminScenePhase == .active, session.signedIn, !session.previewModeEnabled,
+              let snapshot = garminStore.snapshot(for: session.profile.userID),
+              Calendar.current.isDateInToday(snapshot.measurementDay) else { return nil }
+        let apple: Double?
+        let garmin: Double?
+        switch metric {
+        case .sleep: apple = health.sleep.totalAsleep; garmin = snapshot.sleepSeconds
+        case .restingHeartRate: apple = health.heart.restingHeartRate; garmin = snapshot.restingHeartRate
+        case .hrv: apple = health.heart.hrvMilliseconds; garmin = snapshot.overnightHRV
+        case .steps: apple = health.training.stepsToday; garmin = snapshot.steps.map(Double.init)
+        }
+        return WearableDisplaySourcePolicy.garminReading(metric: metric, apple: apple,
+            garmin: garmin, preference: garminStore.preference(for: session.profile.userID))
+        #else
+        return nil
+        #endif
+    }
+
+    private func readinessMetric(_ title: String, _ value: String, _ icon: String,
+                                 garmin: GarminDisplayReading? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Image(systemName: icon)
                 .foregroundStyle(ATHLTHTrainDesign.gold)
                 .font(.caption)
-            Text(value)
+            Text(garmin?.formattedValue ?? value)
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(ATHLTHTrainDesign.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.67)
-            Text(title)
+            Text(garmin.map { title + " · " + $0.sourceLabel } ?? title)
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
                 .lineLimit(1)

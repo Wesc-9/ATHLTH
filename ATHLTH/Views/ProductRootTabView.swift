@@ -1304,10 +1304,6 @@ struct ATHLTHHomeView: View {
                         isActive: isActive
                     )
 
-                    #if ATHLTH_GARMIN_PERSONAL && DEBUG
-                    AnyView(GarminPersonalLocalCard(surface: .home, isActive: isActive))
-                    #endif
-
                     HomeWeeklyProgressStrip(
                         plan: session.activePlan,
                         workouts: homeRecordedWorkouts,

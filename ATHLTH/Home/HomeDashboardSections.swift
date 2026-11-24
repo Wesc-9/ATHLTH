@@ -402,6 +402,43 @@ private enum HomeHealthMetricRange:
 
 struct HomeHealthMetricStrip: View {
     @EnvironmentObject private var health: HealthKitManager
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var garminSession: AppSessionStore
+    @Environment(\.scenePhase) private var garminScenePhase
+    @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
+
+    private var garminAccount: UUID? {
+        garminScenePhase == .active && garminSession.signedIn && !garminSession.previewModeEnabled
+            ? garminSession.profile.userID : nil
+    }
+
+    private func garminMetric(_ kind: HomeHealthMetricKind) -> GarminDisplayReading? {
+        guard let account = garminAccount, let snapshot = garminStore.snapshot(for: account),
+              Calendar.current.isDateInToday(snapshot.measurementDay) else { return nil }
+        let apple: Double?
+        let garmin: Double?
+        let metric: WearableDisplayMetric
+        switch kind {
+        case .sleep:
+            apple = health.sleep.totalAsleep
+            garmin = snapshot.sleepSeconds
+            metric = .sleep
+        case .steps:
+            apple = health.training.stepsToday
+            garmin = snapshot.steps.map(Double.init)
+            metric = .steps
+        case .hrv:
+            apple = health.heart.hrvMilliseconds
+            garmin = snapshot.overnightHRV
+            metric = .hrv
+        default: return nil
+        }
+        return WearableDisplaySourcePolicy.garminReading(
+            metric: metric, apple: apple, garmin: garmin,
+            preference: garminStore.preference(for: account)
+        )
+    }
+    #endif
     @State private var stepHistory: [ATHLTHInsightHealthDay] = []
 
     let snapshot: RecoveryTrendSnapshot
@@ -439,6 +476,12 @@ struct HomeHealthMetricStrip: View {
                     readinessText
             )
         }
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        .task(id: "\(isActive)|\(garminAccount?.uuidString ?? "")|\(garminStore.connected)") {
+            guard isActive, let account = garminAccount else { return }
+            garminStore.refresh(account: account)
+        }
+        #endif
         // Refresh the real seven-day bars whenever HealthKit publishes fresh
         // data. Previously this one-shot task never reran after the first
         // Health refresh, leaving old/empty bars until a full view reload.
@@ -458,11 +501,21 @@ struct HomeHealthMetricStrip: View {
         value: String,
         badge: String? = nil
     ) -> some View {
-        NavigationLink {
-            HomeHealthMetricDetailView(
-                kind: kind,
-                snapshot: snapshot
-            )
+        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        let reading = garminMetric(kind)
+        #else
+        let reading: GarminDisplayReading? = nil
+        #endif
+        return NavigationLink {
+            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            if reading != nil, let account = garminAccount {
+                GarminExistingMetricDetailView(kind: kind, accountID: account)
+            } else {
+                HomeHealthMetricDetailView(kind: kind, snapshot: snapshot)
+            }
+            #else
+            HomeHealthMetricDetailView(kind: kind, snapshot: snapshot)
+            #endif
         } label: {
             VStack(
                 alignment: .leading,
@@ -523,7 +576,7 @@ struct HomeHealthMetricStrip: View {
                     )
                 }
 
-                Text(value)
+                Text(reading?.formattedValue ?? value)
                     .font(
                         .system(
                             size: 17,
@@ -541,7 +594,11 @@ struct HomeHealthMetricStrip: View {
                     )
 
                 HStack(spacing: 4) {
-                    if let change =
+                    if let reading {
+                        Text(reading.sourceLabel)
+                            .font(.system(size: 8.5, weight: .semibold))
+                            .lineLimit(1)
+                    } else if let change =
                             changePercent(
                                 for: kind
                             ) {
@@ -591,19 +648,15 @@ struct HomeHealthMetricStrip: View {
                     }
                 }
                 .foregroundStyle(
-                    changeTint(
-                        for: kind
-                    )
+                    reading != nil ? ATHLTHTheme.mutedText : changeTint(for: kind)
                 )
                 .frame(height: 13)
 
                 HomeMetricMiniBars(
                     values:
-                        points(
-                            for: kind
-                        )
-                        .suffix(7)
-                        .map(\.value),
+                        reading != nil
+                            ? Array(repeating: nil, count: 7)
+                            : Array(points(for: kind).suffix(7).map(\.value)),
                     tint: kind.tint,
                     zeroIsEmpty:
                         kind == .load

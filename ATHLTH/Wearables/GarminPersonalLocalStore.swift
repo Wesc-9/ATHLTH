@@ -10,6 +10,7 @@ final class GarminPersonalLocalStore: ObservableObject {
     @Published private(set) var accountID: UUID?
     @Published private(set) var connected = false
     @Published private(set) var needsKeyRemoval = false
+    @Published private(set) var displayPreference: WearableDisplayPreference = .automatic
     @Published private(set) var busy = false
     @Published private(set) var message: String?
     @Published private(set) var lastRefresh: Date?
@@ -25,10 +26,26 @@ final class GarminPersonalLocalStore: ObservableObject {
         guard account != accountID else { return }
         reset()
         accountID = account
+        displayPreference = account.flatMap {
+            UserDefaults.standard.string(forKey: preferenceKey($0))
+                .flatMap(WearableDisplayPreference.init(rawValue:))
+        } ?? .automatic
         if let account {
             do { connected = try GarminPersonalKeychain.read(account) != nil }
             catch { message = "Unable to access the local Keychain." }
         }
+    }
+
+    private func preferenceKey(_ account: UUID) -> String {
+        "garmin.private.displayPreference." + account.uuidString
+    }
+    func preference(for account: UUID) -> WearableDisplayPreference {
+        accountID == account ? displayPreference : .automatic
+    }
+    func setPreference(_ value: WearableDisplayPreference, account: UUID) {
+        guard accountID == account else { return }
+        displayPreference = value
+        UserDefaults.standard.set(value.rawValue, forKey: preferenceKey(account))
     }
 
     func isConnected(to account: UUID) -> Bool {
