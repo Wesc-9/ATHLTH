@@ -109,6 +109,14 @@ enum ATHLTHCompetitionCreationPolicy {
         }
     }
 
+    static func opponentsAfterFormatChange(
+        _ chosen: Set<UUID>, format: ATHLTHCompetitionFormat, preferred: UUID?
+    ) -> Set<UUID> {
+        guard format == .duel, chosen.count > 1 else { return chosen }
+        if let preferred, chosen.contains(preferred) { return [preferred] }
+        return Set(chosen.sorted { $0.uuidString < $1.uuidString }.prefix(1))
+    }
+
     static func canPublish(
         name: String,
         ownerID: UUID,
@@ -207,6 +215,8 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var showingDuelRules = false
     @State private var showingParticipantChoices = false
     @State private var groupStartMode: ATHLTHCompetitionStartMode = .manual
+    @State private var setupScrollTarget: String?
+    @State private var rulesScrollTarget: String?
 
     private let ink = ATHLTHPlanDesign.ink
     private let bronze = ATHLTHPlanDesign.accentInk
@@ -322,15 +332,17 @@ struct ATHLTHCompetitionCreationView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if showingDuelRules {
-                        competitionRules
+                        competitionRules.id("rules")
                     } else {
-                        competitionDetails
+                        competitionDetails.id("details")
                         titleBlock(tr("Competition format", "Konkurranseform"))
+                            .id("format-heading")
                         VStack(spacing: 9) {
                             ForEach(ATHLTHCompetitionFormat.allCases) { option in
                                 formatOption(option)
                             }
                         }
+                        .id("formats")
                     if initialFormat == nil || initialFormat != .duel {
                         Button {
                             showingSavedCompetitionTemplates = true
@@ -354,14 +366,15 @@ struct ATHLTHCompetitionCreationView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("athlth-competition-load-template")
+                        .id("template")
                     }
                         if initialActivity == .running && format == .duel && !advanced {
-                            sprintSection
+                            sprintSection.id("sprint")
                         }
                         if !advanced {
-                            simpleCompetitionRules
+                            simpleCompetitionRules.id("simple")
                         } else if format == .league {
-                            leagueOrCupSetup
+                            leagueOrCupSetup.id("league")
                         }
                     }
 
@@ -380,10 +393,16 @@ struct ATHLTHCompetitionCreationView: View {
                     .foregroundStyle(muted)
                     .padding(.horizontal, 3)
                 }
+                .scrollTargetLayout()
                 .padding(16)
                 .frame(maxWidth: 650)
                 .frame(maxWidth: .infinity)
             }
+            .scrollPosition(id: Binding<String?>(
+                get: { showingDuelRules ? rulesScrollTarget : setupScrollTarget },
+                set: { if showingDuelRules { rulesScrollTarget = $0 }
+                       else { setupScrollTarget = $0 } }
+            ))
             .scrollDismissesKeyboard(.interactively)
             .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
@@ -404,6 +423,7 @@ struct ATHLTHCompetitionCreationView: View {
                         if showingDuelRules || !advanced {
                             Task { await publish() }
                         } else if format == .duel {
+                            rulesScrollTarget = "rules"
                             showingDuelRules = true
                         } else {
                             showingExistingTournamentRules = true
@@ -486,6 +506,9 @@ struct ATHLTHCompetitionCreationView: View {
                 fixedInvitees: competitionAthletes,
                 fixedStartMode: groupStartMode,
                 fixedStartDate: groupStartMode == .scheduled ? startsAt : nil,
+                onBack: { draft in
+                    restoredCompetitionTemplate = draft
+                },
                 onPublished: { _ in
                     showingExistingTournamentRules = false
                     successful = true
@@ -556,16 +579,12 @@ struct ATHLTHCompetitionCreationView: View {
 
     private func formatOption(_ option: ATHLTHCompetitionFormat) -> some View {
         Button {
+            if format != option { restoredCompetitionTemplate = nil }
             format = option
-            if option == .duel && chosenIDs.count > 1 {
-                if let friend = preselectedFriend, chosenIDs.contains(friend.userID) {
-                    chosenIDs = [friend.userID]
-                } else {
-                    chosenIDs = Set(chosenIDs.sorted { $0.uuidString < $1.uuidString }.prefix(1))
-                }
-            }
+            chosenIDs = ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
+                chosenIDs, format: option, preferred: preselectedFriend?.userID
+            )
             competitionTitle = "\(option.title) · \(initialActivity.title)"
-            restoredCompetitionTemplate = nil
             errorMessage = nil
         } label: {
             HStack(spacing: 13) {
@@ -801,11 +820,7 @@ struct ATHLTHCompetitionCreationView: View {
             }
             ForEach(selectedPeople, id: \.userID) { friend in
                 HStack(spacing: 10) {
-                    ZStack {
-                        Circle().fill(ATHLTHPlanDesign.selectedSurface).frame(width: 36, height: 36)
-                        Text(String(friend.resolvedName.prefix(1)).uppercased())
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(bronze)
-                    }
+                    SocialAvatar(profile: friend, size: 36)
                     Text(friend.resolvedName).font(.subheadline.weight(.medium))
                     Spacer()
                     Button {

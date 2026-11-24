@@ -5,6 +5,15 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
     private let owner = UUID()
     private let rival = UUID()
 
+    func testChangingCompetitionFormatPreservesSelectedFriend() {
+        let other = UUID()
+        let roster: Set<UUID> = [rival, other]
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
+            roster, format: .duel, preferred: rival), Set([rival]))
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
+            roster, format: .single, preferred: rival), roster)
+    }
+
     private func valid(
         activity: ATHLTHQuickStartActivity,
         format: ATHLTHCompetitionFormat,

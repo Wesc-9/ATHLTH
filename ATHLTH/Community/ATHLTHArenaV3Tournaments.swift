@@ -35,6 +35,7 @@ struct ATHLTHTournamentCreator: View {
     let fixedInvitees: [ATHLTHTournamentParticipant]?
     let fixedStartMode: ATHLTHCompetitionStartMode?
     let fixedStartDate: Date?
+    let onBack: ((ATHLTHTournamentDraft) -> Void)?
     let onSave: (ATHLTHTournamentDraft) -> Void
     let onPublished: ((UUID) -> Void)?
     private let tournamentCloud = ATHLTHTournamentCloudService()
@@ -101,6 +102,7 @@ struct ATHLTHTournamentCreator: View {
         fixedInvitees: [ATHLTHTournamentParticipant]? = nil,
         fixedStartMode: ATHLTHCompetitionStartMode? = nil,
         fixedStartDate: Date? = nil,
+        onBack: ((ATHLTHTournamentDraft) -> Void)? = nil,
         onPublished: ((UUID) -> Void)? = nil,
         onSave: @escaping (ATHLTHTournamentDraft) -> Void
     ) {
@@ -112,6 +114,7 @@ struct ATHLTHTournamentCreator: View {
         self.fixedInvitees = fixedInvitees
         self.fixedStartMode = fixedStartMode
         self.fixedStartDate = fixedStartDate
+        self.onBack = onBack
         self.onSave = onSave
         self.onPublished = onPublished
         _format = State(initialValue:
@@ -175,9 +178,9 @@ struct ATHLTHTournamentCreator: View {
         }
         _chosenNames = State(initialValue: previousNames)
         _selectedClubID = State(initialValue:
-            fixedClubID ?? continuation?.clubID)
+            fixedInvitees == nil ? fixedClubID ?? continuation?.clubID : nil)
         _inviteSource = State(initialValue:
-            (fixedClubID ?? continuation?.clubID) == nil ? .friends : .club)
+            fixedInvitees != nil || (fixedClubID ?? continuation?.clubID) == nil ? .friends : .club)
     }
 
     private var athletes: [ATHLTHTournamentParticipant] {
@@ -310,7 +313,10 @@ struct ATHLTHTournamentCreator: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(fixedInvitees == nil ? "Avbryt" : "Tilbake") { dismiss() }
+                    Button(fixedInvitees == nil ? "Avbryt" : "Tilbake") {
+                        onBack?(makeDraft())
+                        dismiss()
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -357,6 +363,7 @@ struct ATHLTHTournamentCreator: View {
             }
         }
         .environment(\.colorScheme, .light)
+        .interactiveDismissDisabled(fixedInvitees != nil)
         .task {
             guard fixedInvitees == nil else { return }
             if let fixedClubID { await loadClub(fixedClubID) }
