@@ -88,6 +88,32 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var deactivatedTrainingPlanIDs: Set<UUID>
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
+
+    /// Published names are reserved for the original library recipes.
+    /// Keep legacy records in account storage (history and recovery may
+    /// reference their IDs), but do not present them as separate own workouts.
+    func isPublishedWorkoutName(_ title: String) -> Bool {
+        let name = ATHLTHWorkoutSearch.normalized(title)
+        guard !name.isEmpty else { return false }
+        return WorkoutTemplateCatalogStore.shared.entries.contains {
+            ATHLTHWorkoutSearch.normalized($0.title) == name
+        } || RunningWorkoutLibraryStore.builtInTemplates.contains {
+            ATHLTHWorkoutSearch.normalized($0.title) == name
+        }
+    }
+
+    var personalWorkoutTemplates: [PlannedSession] {
+        guard !savedWorkoutTemplates.isEmpty else { return [] }
+        let names = Set(
+            (WorkoutTemplateCatalogStore.shared.entries.map(\.title) +
+             RunningWorkoutLibraryStore.builtInTemplates.map(\.title))
+                .map { ATHLTHWorkoutSearch.normalized($0) }
+        )
+        return savedWorkoutTemplates.filter {
+            !names.contains(ATHLTHWorkoutSearch.normalized($0.title))
+        }
+    }
+
     @Published private(set) var standalonePlannedSessions: [PlannedSession]
     @Published private(set) var recordedPlannedWorkoutTimes:
         [String: ATHLTHPlannedWorkoutRecordedTimes]
