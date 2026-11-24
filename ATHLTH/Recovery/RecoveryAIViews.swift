@@ -1029,6 +1029,7 @@ struct RecoveryCoachView: View {
     @State private var didLoadConversation =
         false
     @State private var coachPinned = true
+    @State private var conversationOwnerID: UUID?
     @State private var proposalActionNotice: String?
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var showingCoachWorkoutBuilder = false
@@ -1285,6 +1286,24 @@ struct RecoveryCoachView: View {
             loadConversationIfNeeded()
             loadCoachConsent()
             receiveIncomingQuestionIfNeeded()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            messages = []
+            quickQuestions = []
+            question = ""
+            errorMessage = nil
+            didLoadConversation = false
+            conversationOwnerID = nil
+            aiConsentApproved = false
+            healthConsentApproved = false
+            shareHealthForNextQuestion = false
+            pendingHealthQuestion = nil
+            pendingWizardPrompt = nil
+            pendingWizardScope = nil
+            progressScopeForNextQuestion = nil
+            selectedCoachProposal = nil
+            loadConversationIfNeeded()
+            loadCoachConsent()
         }
         .sheet(isPresented: $showingCoachWorkoutBuilder.keepingPresentedWhenInactive(scenePhase)) {
             if let proposal = selectedCoachProposal,
@@ -1835,6 +1854,15 @@ struct RecoveryCoachView: View {
                     )
                 }
                 .disabled(session.activePlan == nil)
+
+                Button {
+                    question = recoveryAIText(
+                        "Review my last seven days of training using the available recorded data. Summarize consistency, progress, recovery and what to prioritize next week. Distinguish missing data from actual results.",
+                        "Evaluer de siste syv dagene med trening ut fra tilgjengelige registrerte data. Oppsummer kontinuitet, fremgang, restitusjon og hva jeg bør prioritere neste uke. Skill manglende data fra faktiske resultater."
+                    )
+                } label: {
+                    Label(recoveryAIText("Weekly review", "Ukesevaluering"), systemImage: "calendar")
+                }
 
                 Button {
                     coachPinned.toggle()
@@ -2648,7 +2676,9 @@ struct RecoveryCoachView: View {
         guard !didLoadConversation else {
             return
         }
+        guard session.signedIn else { return }
         didLoadConversation = true
+        conversationOwnerID = session.profile.userID
 
         let currentSignature =
             try? RecoveryAIService
@@ -2786,6 +2816,8 @@ struct RecoveryCoachView: View {
             return
         }
 
+        let requestOwnerID = session.profile.userID
+        guard conversationOwnerID == requestOwnerID, session.signedIn else { return }
         let selectedScope = progressScopeForNextQuestion
         // Do not include unrelated past messages in a scoped review.
         let priorHistory = selectedScope == nil ? messages : []
@@ -2815,6 +2847,7 @@ struct RecoveryCoachView: View {
                 clean, hasActivePlan: session.activePlan != nil
             ) {
                 await respondToPlanChangeRequest(clean, sharingApproved: shareHealthData)
+                guard session.signedIn, session.profile.userID == requestOwnerID else { return }
                 persistConversation()
                 return
             }
@@ -2862,6 +2895,8 @@ struct RecoveryCoachView: View {
                         : nil
                 )
 
+            guard session.signedIn, session.profile.userID == requestOwnerID,
+                  conversationOwnerID == requestOwnerID else { return }
             messages.append(
                 RecoveryCoachMessage(
                     role: .assistant,
@@ -2883,6 +2918,7 @@ struct RecoveryCoachView: View {
 
             persistConversation()
         } catch {
+            guard session.signedIn, session.profile.userID == requestOwnerID else { return }
             errorMessage =
                 error.localizedDescription
             quickQuestions =
@@ -3044,6 +3080,7 @@ struct RecoveryCoachView: View {
                 planReviewPlanVersion: candidate.planVersion
             ))
         } catch {
+            guard session.signedIn, session.profile.userID == requestOwnerID else { return }
             messages.append(RecoveryCoachMessage(
                 role: .assistant,
                 text: recoveryAIText(
@@ -3197,6 +3234,8 @@ struct RecoveryCoachView: View {
         contextSignature:
             String? = nil
     ) {
+        guard session.signedIn,
+              conversationOwnerID == session.profile.userID else { return }
         let signature =
             contextSignature ??
             (

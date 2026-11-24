@@ -2240,6 +2240,15 @@ struct PerformanceStatsView: View {
         let running = unique.filter { $0.activity == .running }.count
         let strength = unique.filter { $0.activity == .strength }.count
         let other = max(0, unique.count - running - strength)
+        let previousStart = calendar.date(byAdding: .day, value: -28, to: start) ?? start
+        let previousRecords = resolvedPerformanceWorkouts.filter {
+            $0.startDate >= previousStart && $0.startDate < start &&
+                $0.duration.isFinite && $0.duration > 0
+        }
+        let previous = Dictionary(grouping: previousRecords, by: \.id).values.compactMap { $0.first }
+        let previousActiveDays = Set(previous.map { calendar.startOfDay(for: $0.startDate) }).count
+        let currentMinutes = unique.reduce(0.0) { $0 + $1.duration / 60 }
+        let previousMinutes = previous.reduce(0.0) { $0 + $1.duration / 60 }
         return VStack(alignment: .leading, spacing: 12) {
             Text(text("Your training profile", "Din treningsprofil"))
                 .font(.system(size: 22, weight: .semibold, design: .serif))
@@ -2266,6 +2275,28 @@ struct PerformanceStatsView: View {
                 trainingProfileRow(text("Running", "Løping"), count: running, total: unique.count)
                 trainingProfileRow(text("Strength", "Styrke"), count: strength, total: unique.count)
                 trainingProfileRow(text("Other activity", "Annen aktivitet"), count: other, total: unique.count)
+                if !previous.isEmpty {
+                    Divider()
+                    Text(text("Compared with previous 28 days", "Mot forrige 28 dager"))
+                        .font(.subheadline.weight(.semibold))
+                    HStack {
+                        Text(text("Active days", "Aktive dager"))
+                        Spacer()
+                        Text(String(format: "%+d", activeDays - previousActiveDays))
+                            .monospacedDigit()
+                    }
+                    .font(.subheadline)
+                    if currentMinutes.isFinite, previousMinutes.isFinite,
+                       abs(currentMinutes - previousMinutes) < 100_000 {
+                        HStack {
+                            Text(text("Recorded training time", "Registrert treningstid"))
+                            Spacer()
+                            Text(String(format: "%+.0f min", currentMinutes - previousMinutes))
+                                .monospacedDigit()
+                        }
+                        .font(.subheadline)
+                    }
+                }
                 Text(text("Frequency and mix describe your recorded training, not your physical capacity.",
                           "Frekvens og fordeling beskriver registrert trening, ikke din fysiske kapasitet."))
                     .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)

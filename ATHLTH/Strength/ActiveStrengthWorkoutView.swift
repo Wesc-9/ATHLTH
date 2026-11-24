@@ -56,6 +56,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingExerciseInstructions = false
     @State private var showingLiveExerciseHistory = false
     @State private var liveExerciseHistory: ATHLTHExerciseProgress.Summary?
+    @State private var liveHistoryExerciseID: UUID?
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
     @State private var showingSpotifyControls = false
@@ -212,8 +213,51 @@ struct ActiveStrengthWorkoutView: View {
                 NavigationStack {
                     ScrollView {
                         if let liveExerciseHistory {
-                            ATHLTHExerciseProgressView(progress: liveExerciseHistory)
-                                .padding(16)
+                            VStack(spacing: 14) {
+                                if let previous = liveExerciseHistory.sessions.last,
+                                   let exercise = strength.activeWorkout?.exercises.first(where: {
+                                       $0.id == liveHistoryExerciseID
+                                   }) {
+                                    let completed = exercise.sets.filter(\.countsTowardTrainingLoad)
+                                    let reps = completed.compactMap(\.resolvedCompletedReps).reduce(0, +)
+                                    let weight = completed.compactMap(\.completedWeightKilograms)
+                                        .filter { $0.isFinite && $0 > 0 }.max()
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Against your previous session",
+                                            norwegian: "Mot din forrige økt"), systemImage: "flag.checkered")
+                                            .font(.headline)
+                                        HStack {
+                                            Text(ATHLTHLocalization.choose(english: "Recorded sets", norwegian: "Registrerte sett"))
+                                            Spacer()
+                                            Text("\(completed.count) / \(previous.completedSets)").monospacedDigit()
+                                        }
+                                        HStack {
+                                            Text(ATHLTHLocalization.choose(english: "Recorded reps", norwegian: "Registrerte reps"))
+                                            Spacer()
+                                            Text("\(reps) / \(previous.repetitions)").monospacedDigit()
+                                        }
+                                        if let previousWeight = previous.highestWeightKilograms {
+                                            HStack {
+                                                Text(ATHLTHLocalization.choose(english: "Top recorded weight", norwegian: "Høyeste registrerte vekt"))
+                                                Spacer()
+                                                Text((weight.map { String(format: "%.1f", $0) } ?? "–") + " / " +
+                                                     String(format: "%.1f kg", previousWeight))
+                                                    .monospacedDigit()
+                                            }
+                                        }
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Current / previous · reference only, not a competition score.",
+                                            norwegian: "Nå / forrige · referanse, ikke konkurransepoeng."))
+                                            .font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                    .font(.subheadline)
+                                    .padding(16)
+                                    .athlthTrainPaper()
+                                }
+                                ATHLTHExerciseProgressView(progress: liveExerciseHistory)
+                            }
+                            .padding(16)
                         }
                     }
                     .navigationTitle(ATHLTHLocalization.choose(english: "Exercise history", norwegian: "Øvelseshistorikk"))
@@ -2535,8 +2579,9 @@ struct ActiveStrengthWorkoutView: View {
                     if exercise.isEmbeddedRunningInterval != true {
                         Button {
                             let reference = exercise.exercise
+                            liveHistoryExerciseID = exercise.id
                             liveExerciseHistory = ATHLTHExerciseProgress.summary(
-                                exerciseID: reference.libraryExerciseID ?? exercise.plannedExerciseID,
+                                exerciseID: reference.libraryExerciseID ?? exercise.plannedExerciseID ?? exercise.id,
                                 name: reference.name,
                                 isCustom: reference.libraryExerciseID == nil,
                                 workouts: strength.workoutHistory,

@@ -113,8 +113,8 @@ enum ATHLTHCompoundExerciseProgress {
         var matching: [[ATHLTHRecordedRunningStep]] = []
         for offset in 0...(actual.count - expected.count) {
             let sample = Array(actual[offset..<(offset + expected.count)])
-            let contiguous = zip(sample, sample.dropFirst()).allSatisfy { left, right in
-                right.index - left.index == 1
+            let contiguous = zip(sample, sample.dropFirst()).allSatisfy { pair in
+                pair.1.index == pair.0.index + 1
             }
             if contiguous && match(expected, sample) { matching.append(sample) }
         }
