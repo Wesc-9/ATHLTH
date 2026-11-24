@@ -57,6 +57,10 @@ class ATHLTHGarminController {
     var ticker = null;
     var tickCount = 0;
     var statusText = "Open ATHLTH on phone";
+    var page = 0;
+    var savedSeconds = null;
+    var savedMeters = null;
+    var savedAverageHR = null;
 
     function initialize() {}
     function begin() {
@@ -95,6 +99,10 @@ class ATHLTHGarminController {
             if (data["v"] == 2 && (requestedSport == "strength" || !validRecipe(incomingRecipe))) { return; }
             if (data["v"] == 1 && incomingRecipe != null) { return; }
             version = data["v"];
+            page = 0;
+            savedSeconds = null;
+            savedMeters = null;
+            savedAverageHR = null;
             recipe = incomingRecipe;
             stepIndex = 0;
             stepTime = null;
@@ -156,7 +164,19 @@ class ATHLTHGarminController {
                 statusText = "Stop failed - retry";
                 return;
             }
+            var finalInfo = Activity.getActivityInfo();
+            var finalSeconds = null;
+            var finalMeters = null;
+            var finalHR = null;
+            if (finalInfo != null) {
+                if (finalInfo.timerTime != null) { finalSeconds = finalInfo.timerTime / 1000.0; }
+                finalMeters = finalInfo.elapsedDistance;
+                finalHR = finalInfo.averageHeartRate;
+            }
             if (session.save()) {
+                savedSeconds = finalSeconds;
+                savedMeters = finalMeters;
+                savedAverageHR = finalHR;
                 session = null;
                 state = "saved";
                 statusText = "Saved on watch";
@@ -311,6 +331,11 @@ class ATHLTHGarminController {
                 if (info.currentHeartRate != null) { data["bpm"] = info.currentHeartRate; }
             }
         }
+        if (state == "saved") {
+            if (savedSeconds != null) { data["seconds"] = savedSeconds; }
+            if (savedMeters != null) { data["meters"] = savedMeters; }
+            if (savedAverageHR != null) { data["averageBPM"] = savedAverageHR; }
+        }
         sending = true;
         try {
             Comms.transmit(data, {}, new ATHLTHGarminSendListener(self));
@@ -318,59 +343,24 @@ class ATHLTHGarminController {
     }
 }
 
-class ATHLTHGarminView extends Ui.View {
-    var controller;
-    function initialize(owner) { View.initialize(); controller = owner; }
-    function onUpdate(dc) {
-        var w = dc.getWidth();
-        var h = dc.getHeight();
-        dc.setColor(Gfx.COLOR_BLACK, Gfx.COLOR_BLACK);
-        dc.clear();
-        dc.setColor(0xC5AA76, Gfx.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 16 / 100, Gfx.FONT_SMALL, "ATHLTH", Gfx.TEXT_JUSTIFY_CENTER);
-        dc.setColor(Gfx.COLOR_WHITE, Gfx.COLOR_TRANSPARENT);
-        var title = "Ready";
-        if (controller.sport != null) { title = controller.sport; }
-        if (controller.recipe != null) {
-            title = controller.recipe["steps"][controller.stepIndex]["title"];
-            if (title.length() > 22) { title = title.substring(0, 22); }
-        }
-        dc.drawText(w / 2, h * 29 / 100, Gfx.FONT_MEDIUM, title, Gfx.TEXT_JUSTIFY_CENTER);
-        var main = controller.state;
-        if (controller.session != null) {
-            var info = Activity.getActivityInfo();
-            if (info != null && info.timerTime != null) {
-                var secs = info.timerTime / 1000;
-                main = (secs / 60).format("%02d") + ":" + (secs % 60).format("%02d");
-            }
-        }
-        dc.drawText(w / 2, h * 43 / 100, Gfx.FONT_LARGE, main, Gfx.TEXT_JUSTIFY_CENTER);
-        if (controller.session != null) {
-            var data = Activity.getActivityInfo();
-            var hr = "-- bpm";
-            if (data != null && data.currentHeartRate != null) { hr = data.currentHeartRate.toString() + " bpm"; }
-            dc.drawText(w / 2, h * 61 / 100, Gfx.FONT_SMALL, hr, Gfx.TEXT_JUSTIFY_CENTER);
-            if (controller.recipe != null) {
-                var step = controller.recipe["steps"][controller.stepIndex];
-                var progress = controller.stepProgress(data);
-                var detail = (controller.stepIndex + 1).toString() + "/" + controller.recipe["steps"].size().toString();
-                if (progress != null && step["target"] != null && !controller.recipeComplete) {
-                    var remaining = step["target"] - progress;
-                    if (remaining < 0) { remaining = 0; }
-                    detail += " | " + remaining.format("%.0f") + (step["measure"] == "time" ? " s" : " m");
-                }
-                dc.drawText(w / 2, h * 70 / 100, Gfx.FONT_XTINY, detail, Gfx.TEXT_JUSTIFY_CENTER);
-            }
-        }
-        dc.setColor(0xC5AA76, Gfx.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 78 / 100, Gfx.FONT_XTINY, controller.statusText, Gfx.TEXT_JUSTIFY_CENTER);
-    }
-}
-
 class ATHLTHGarminDelegate extends Ui.BehaviorDelegate {
     var controller;
     function initialize(owner) { BehaviorDelegate.initialize(); controller = owner; }
     function onSelect() { controller.select(); Ui.requestUpdate(); return true; }
-    function onNextPage() { var handled = controller.nextStep(); Ui.requestUpdate(); return handled; }
+    function onNextPage() {
+        if (!controller.nextStep() && controller.session != null && !controller.finishArmed) {
+            controller.page = (controller.page + 1) % 2;
+        }
+        Ui.requestUpdate();
+        return true;
+    }
+    function onPreviousPage() {
+        if (controller.session != null && !controller.finishArmed) {
+            controller.page = (controller.page + 1) % 2;
+            Ui.requestUpdate();
+            return true;
+        }
+        return false;
+    }
     function onBack() { var handled = controller.back(); Ui.requestUpdate(); return handled; }
 }
