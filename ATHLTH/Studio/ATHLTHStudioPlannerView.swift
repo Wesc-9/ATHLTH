@@ -18,6 +18,7 @@ struct ATHLTHStudioPlannerView: View {
     @State private var additionalMinutes: Double = 30
     @State private var scenario = 0
     @State private var dragMode: DragMode = .move
+    @State private var targetedDayID: UUID?
     @State private var moveError: String?
     @State private var showingLegacyOverview = false
     @State private var showingScenarioPreview = false
@@ -307,7 +308,7 @@ struct ATHLTHStudioPlannerView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            if session.savedWorkoutTemplates.isEmpty {
+            if session.personalWorkoutTemplates.isEmpty {
                 Text(ATHLTHLocalization.choose(
                     english: "Your saved workouts will appear here.",
                     norwegian: "Lagrede treningsøkter vises her."
@@ -317,7 +318,7 @@ struct ATHLTHStudioPlannerView: View {
             } else {
                 ScrollView(.horizontal) {
                     HStack(spacing: 10) {
-                        ForEach(session.savedWorkoutTemplates.prefix(20)) { item in
+                        ForEach(session.personalWorkoutTemplates.prefix(20)) { item in
                             Label(item.title, systemImage: item.kind.systemImage)
                                 .font(.subheadline)
                                 .lineLimit(1)
@@ -512,8 +513,14 @@ struct ATHLTHStudioPlannerView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: 170, alignment: .top)
         .background(ATHLTHStudioStyle.canvas, in: RoundedRectangle(cornerRadius: 15))
+        .overlay {
+            RoundedRectangle(cornerRadius: 15)
+                .strokeBorder(targetedDayID == day.id ? ATHLTHStudioStyle.gold : .clear, lineWidth: 2)
+        }
         .dropDestination(for: String.self) { values, _ in
-            guard let raw = values.first,
+            targetedDayID = nil
+            guard !day.sessions.contains(where: \.isExplicitRestDay),
+                  let raw = values.first,
                   let start = plan.startDate,
                   let target = Calendar.current.date(
                     byAdding: .day,
@@ -559,6 +566,12 @@ struct ATHLTHStudioPlannerView: View {
                 )
             }
             return success
+        } isTargeted: { targeted in
+            if targeted && !day.sessions.contains(where: \.isExplicitRestDay) {
+                targetedDayID = day.id
+            } else if targetedDayID == day.id {
+                targetedDayID = nil
+            }
         }
     }
 
