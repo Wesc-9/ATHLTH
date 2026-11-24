@@ -508,27 +508,14 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     private var restDayCard: some View {
-        Button(action: onOpenPlan) {
-            HStack(alignment: .top, spacing: 16) {
-                Image(systemName: "moon.stars")
-                    .font(.title2.weight(.light))
-                    .foregroundStyle(champagne)
-                    .frame(width: 48, height: 48)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.3), in: Circle())
-                    .accessibilityHidden(true)
-                ATHLTHTrainSectionHeading(
-                    eyebrow: tr("REST DAY", "HVILEDAG"),
-                    title: tr("Recovery is on the schedule", "Restitusjon er planlagt"),
-                    detail: tr("View the day in your training plan.", "Se dagen i treningsplanen."))
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right").font(.caption)
-                    .foregroundStyle(champagne)
-            }
-            .padding(20)
-            .athlthTrainPaper(emphasized: true)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        ATHLTHTodayCompactCard(
+            eyebrow: tr("REST DAY", "HVILEDAG"),
+            title: tr("Recovery is on the schedule", "Restitusjon er planlagt"),
+            detail: tr("View the day in your training plan.", "Se dagen i treningsplanen."),
+            symbol: "moon.stars",
+            actionTitle: tr("View plan", "Se treningsplanen"),
+            action: onOpenPlan
+        )
     }
     // A full date on regular widths, a shorter date where labels need room.
     private func todayDateLabel(color: Color) -> some View {
@@ -722,87 +709,26 @@ struct ATHLTHTrainTodayPremiumView: View {
         default:
             hasWorkout = true
         }
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(tr("BASED ON YOUR HISTORY", "BASERT PÅ HISTORIKKEN DIN"))
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(champagne)
-                    Text(advice.suggestedTitle.isEmpty ? advice.title : advice.suggestedTitle)
-                        .font(.system(size: 25, weight: .regular, design: .serif))
-                        .foregroundStyle(ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Label(tr("TODAY'S RECOMMENDATION", "DAGENS ANBEFALING"),
-                          systemImage: "sparkles")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(champagne)
+        return VStack(alignment: .leading, spacing: 8) {
+            ATHLTHTodayCompactCard(
+                eyebrow: tr("TODAY'S RECOMMENDATION", "DAGENS ANBEFALING"),
+                title: advice.suggestedTitle.isEmpty ? advice.title : advice.suggestedTitle,
+                detail: advice.shortDescription,
+                symbol: "sparkles",
+                actionTitle: hasWorkout ? tr("Choose workout", "Velg økt") : tr("See recommendation", "Se anbefaling"),
+                action: {
+                    if hasWorkout { onChooseDailyRecommendedWorkout(advice) }
+                    else { onShowDailyRecommendationDetails() }
                 }
-                Spacer(minLength: 4)
-                Button(action: onShowDailyRecommendationDetails) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(champagne)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tr(
-                    "Why today's recommendation?", "Hvorfor dagens anbefaling?"
-                ))
+            )
+            HStack {
+                Button(tr("Why this recommendation?", "Hvorfor denne anbefalingen?"), action: onShowDailyRecommendationDetails)
+                Spacer()
+                Button(tr("Library", "Bibliotek"), action: onOpenLibrary)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 13)
-
-            VStack(alignment: .leading, spacing: 13) {
-                Text(advice.shortDescription)
-                    .font(.subheadline)
-                    .foregroundStyle(muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !advice.suggestedDetail.isEmpty &&
-                   advice.suggestedDetail != advice.shortDescription {
-                    Text(advice.suggestedDetail)
-                        .font(.caption)
-                        .foregroundStyle(muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                HStack(spacing: 9) {
-                    Button {
-                        if hasWorkout {
-                            onChooseDailyRecommendedWorkout(advice)
-                        } else {
-                            onShowDailyRecommendationDetails()
-                        }
-                    } label: {
-                        HStack(spacing: 9) {
-                            Spacer(minLength: 0)
-                            Image(systemName: hasWorkout ? "play.fill" : "info.circle")
-                            Text(hasWorkout
-                                ? tr("Choose workout", "Velg økt")
-                                : tr("See recommendation", "Se anbefaling"))
-                            Spacer(minLength: 0)
-                        }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(minHeight: 52)
-                        .background(ink, in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-                    Button(action: onOpenLibrary) {
-                        Image(systemName: "square.grid.2x2")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(ink)
-                            .frame(width: 52, height: 52)
-                            .background(ATHLTHPlanDesign.warmSurface,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tr("Training library", "Treningsbibliotek"))
-                }
-            }
-            .padding(16)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(champagne)
         }
-        .athlthTrainPaper(emphasized: true)
         .accessibilityIdentifier("athlth-train-today-daily-recommendation")
     }
 
@@ -868,58 +794,17 @@ struct ATHLTHTrainTodayPremiumView: View {
             )
         }
 
-        return VStack(alignment: .leading, spacing: 0) {
-            ATHLTHTrainSectionHeading(eyebrow: eyebrow, title: title)
-                .padding(20)
-
-            VStack(alignment: .leading, spacing: 13) {
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(muted)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 9) {
-                    Button {
-                        if let kind {
-                            openQuickActivity(kind)
-                        } else if case .library = choice,
-                                  let suggestion = suggestedWorkouts.first {
-                            onChooseSuggestedWorkout(suggestion)
-                        } else {
-                            onOpenLibrary()
-                        }
-                    } label: {
-                        HStack(spacing: 9) {
-                            Spacer(minLength: 0)
-                            Image(systemName:
-                                kind == nil ? "square.grid.2x2" : "play.fill")
-                            Text(kind == nil
-                                ? tr("Explore workouts", "Utforsk økter")
-                                : tr("Set up workout", "Velg økt"))
-                            Spacer(minLength: 0)
-                        }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(minHeight: 52)
-                        .background(ink, in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: onOpenLibrary) {
-                        Image(systemName: "square.grid.2x2")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(ink)
-                            .frame(width: 52, height: 52)
-                            .background(ATHLTHPlanDesign.warmSurface,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tr("Training library", "Treningsbibliotek"))
-                }
+        return ATHLTHTodayCompactCard(
+            eyebrow: eyebrow, title: title, detail: detail,
+            symbol: kind == nil ? "square.grid.2x2" : "play.circle",
+            actionTitle: kind == nil ? tr("Explore workouts", "Utforsk økter") : tr("Set up workout", "Velg økt"),
+            action: {
+                if let kind { openQuickActivity(kind) }
+                else if case .library = choice, let suggestion = suggestedWorkouts.first {
+                    onChooseSuggestedWorkout(suggestion)
+                } else { onOpenLibrary() }
             }
-            .padding(16)
-        }
-        .athlthTrainPaper(emphasized: true)
+        )
     }
 
     /// A plan-free day is not automatically a prescribed rest day. Keep
@@ -1211,34 +1096,14 @@ struct ATHLTHTrainTodayPremiumView: View {
     // Shortcuts reuse the existing training library. No new recommendation
     // engine or Quick Train changes are needed for this navigation improvement.
     private func completedTodayCard(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 29, weight: .light))
-                    .foregroundStyle(champagne)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("Today's training is done", "Dagens trening er fullført"))
-                        .font(ATHLTHTrainDesign.sectionTitle)
-                        .foregroundStyle(ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(tr(
-                        "Your planned sessions are complete.",
-                        "De planlagte øktene dine er gjennomført."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                    todayDateLabel(color: muted)
-                }
-                Spacer(minLength: 0)
-            }
-            Button(action: onOpenPlan) {
-                Label(tr("View your plan", "Se treningsplanen"),
-                      systemImage: "calendar")
-            }
-            .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
-        }
-        .padding(17)
-        .premiumTrainSurface(line: hairline)
+        ATHLTHTodayCompactCard(
+            eyebrow: tr("COMPLETED", "FULLFØRT"),
+            title: tr("Today's training is done", "Dagens trening er fullført"),
+            detail: tr("Your planned sessions are complete.", "De planlagte øktene dine er gjennomført."),
+            symbol: "checkmark.circle.fill",
+            actionTitle: tr("View your plan", "Se treningsplanen"),
+            action: onOpenPlan
+        )
     }
 
     // Click history reflects intentional entry choices, not completed
