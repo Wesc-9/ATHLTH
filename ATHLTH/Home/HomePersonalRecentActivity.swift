@@ -1487,6 +1487,15 @@ struct HomePersonalRecentActivitySection:
                 .buttonStyle(.plain)
             } details: {
                 VStack(alignment: .leading, spacing: 7) {
+                    HomeRecentActivityMetricLine(
+                        title: workout.title,
+                        activity: workout.activity,
+                        distanceMeters: workout.distanceMeters,
+                        durationSeconds: workout.duration,
+                        exerciseCount: workout.strengthExerciseCount,
+                        volumeKilograms: workout.strengthTotalVolumeKilograms
+                    )
+
                     NavigationLink {
                         ATHLTHProfileView()
                     } label: {
@@ -1507,14 +1516,6 @@ struct HomePersonalRecentActivitySection:
                         )
                     }
                     .buttonStyle(.plain)
-
-                    HomeRecentActivityMetricLine(
-                        activity: workout.activity,
-                        distanceMeters: workout.distanceMeters,
-                        durationSeconds: workout.duration,
-                        exerciseCount: workout.strengthExerciseCount,
-                        volumeKilograms: workout.strengthTotalVolumeKilograms
-                    )
 
                     HomeCompactActivityEngagementRow(
                         item: socialFeedItem(
@@ -1545,23 +1546,8 @@ struct HomePersonalRecentActivitySection:
                 .buttonStyle(.plain)
             } details: {
                 VStack(alignment: .leading, spacing: 7) {
-                    NavigationLink {
-                        FriendProfileView(userID: feedItem.actor.userID)
-                    } label: {
-                        HomeRecentAuthorLine(
-                            avatar: SocialAvatar(profile: feedItem.actor, size: 36),
-                            username: feedItem.actor.usernameLabel.isEmpty
-                                ? feedItem.actor.resolvedName
-                                : feedItem.actor.usernameLabel,
-                            displayName: feedItem.actor.resolvedName,
-                            partnerNames: feedItem.activity.metadata?["with_names"],
-                            partnerUsernames: feedItem.activity.metadata?["with_usernames"],
-                            date: feedItem.activity.createdAt
-                        )
-                    }
-                    .buttonStyle(.plain)
-
                     HomeRecentActivityMetricLine(
+                        title: feedItem.activity.title,
                         activity: HomeFollowingWorkoutPresentation.activity(for: feedItem),
                         distanceMeters: HomeRecentCardFormat.number(
                             feedItem, key: "distance_meters"
@@ -1576,6 +1562,22 @@ struct HomePersonalRecentActivitySection:
                             feedItem, key: "volume_kg"
                         )
                     )
+
+                    NavigationLink {
+                        FriendProfileView(userID: feedItem.actor.userID)
+                    } label: {
+                        HomeRecentAuthorLine(
+                            avatar: SocialAvatar(profile: feedItem.actor, size: 30),
+                            username: feedItem.actor.usernameLabel.isEmpty
+                                ? feedItem.actor.resolvedName
+                                : feedItem.actor.usernameLabel,
+                            displayName: feedItem.actor.resolvedName,
+                            partnerNames: feedItem.activity.metadata?["with_names"],
+                            partnerUsernames: feedItem.activity.metadata?["with_usernames"],
+                            date: feedItem.activity.createdAt
+                        )
+                    }
+                    .buttonStyle(.plain)
 
                     HomeCompactActivityEngagementRow(item: feedItem)
                 }
@@ -1622,7 +1624,7 @@ struct HomePersonalRecentActivitySection:
                 ownRecentAvatarFallback
             }
         }
-        .frame(width: 36, height: 36)
+        .frame(width: 30, height: 30)
         .clipShape(Circle())
         .overlay {
             Circle()
@@ -1635,7 +1637,7 @@ struct HomePersonalRecentActivitySection:
             .fill(ATHLTHTheme.accent.opacity(0.10))
             .overlay {
                 Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 24, weight: .regular))
+                    .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
             }
     }
@@ -1666,13 +1668,13 @@ struct HomePersonalRecentActivitySection:
         }
 
         var body: some View {
-            HStack(alignment: .top, spacing: 9) {
+            HStack(alignment: .center, spacing: 8) {
                 avatar
-                    .frame(width: 36, height: 36)
+                    .frame(width: 30, height: 30)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(authorName)
-                        .font(.system(size: 13.5, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1706,7 +1708,7 @@ struct HomePersonalRecentActivitySection:
                     .minimumScaleFactor(0.8)
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .frame(minHeight: 36, alignment: .top)
+            .frame(minHeight: 30, alignment: .center)
             .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
         }
@@ -1715,6 +1717,7 @@ struct HomePersonalRecentActivitySection:
     /// Activity stays left; actual recorded metrics move to the right.
     /// The same information layout is used for my posts and friends' posts.
     private struct HomeRecentActivityMetricLine: View {
+        let title: String
         let activity: WorkoutActivity
         let distanceMeters: Double?
         let durationSeconds: TimeInterval?
@@ -1724,10 +1727,13 @@ struct HomePersonalRecentActivitySection:
         var body: some View {
             VStack(alignment: .trailing, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(HomeRecentCardFormat.activity(activity))
-                        .font(.system(size: 13, weight: .semibold))
+                    Text(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                         ? HomeRecentCardFormat.activity(activity) : title)
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
 
                     Spacer(minLength: 4)
 
@@ -3318,26 +3324,6 @@ private struct HomePersonalHistoryCard:
                 alignment: .leading,
                 spacing: 10
             ) {
-                HStack(spacing: 9) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 23, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 30, height: 30)
-                    Text(
-                        session.profile.displayName.isEmpty
-                            ? ATHLTHLocalization.choose(
-                                english: "My profile", norwegian: "Min profil"
-                            )
-                            : session.profile.displayName
-                    )
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                }
-                .accessibilityIdentifier("athlth-history-activity-username")
-
                 HStack(
                     alignment:
                         .firstTextBaseline
@@ -3419,6 +3405,27 @@ private struct HomePersonalHistoryCard:
                 }
 
                 metricRow
+
+                HStack(spacing: 9) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 23, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 30, height: 30)
+                    Text(
+                        session.profile.displayName.isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english: "My profile", norwegian: "Min profil"
+                            )
+                            : session.profile.displayName
+                    )
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                }
+                .accessibilityIdentifier("athlth-history-activity-username")
+
 
                 if let strengthWorkout {
                     let names =
@@ -3731,40 +3738,6 @@ private struct HomeFollowingSocialFeedCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                NavigationLink {
-                    FriendProfileView(
-                        userID: item.actor.userID
-                    )
-                } label: {
-                    SocialAvatar(
-                        profile: item.actor,
-                        size: 42
-                    )
-                }
-                .buttonStyle(.plain)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.actor.resolvedName)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(
-                        item.activity.createdAt,
-                        style: .relative
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-
-                Spacer()
-
-                Image(systemName: "ellipsis")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-            }
-            .padding(14)
-
             NavigationLink {
                 HomeFollowingWorkoutDetailView(
                     item: item
@@ -3784,6 +3757,39 @@ private struct HomeFollowingSocialFeedCard: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                 metrics
+
+                HStack(spacing: 10) {
+                    NavigationLink {
+                        FriendProfileView(
+                            userID: item.actor.userID
+                        )
+                    } label: {
+                        SocialAvatar(
+                            profile: item.actor,
+                            size: 30
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.actor.resolvedName)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        if !item.actor.usernameLabel.isEmpty {
+                            Text(item.actor.usernameLabel)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }
+
+                    Spacer()
+
+                    Text(HomeRecentCardFormat.date(item.activity.createdAt))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
 
                 if let caption {
                     Text(caption)
