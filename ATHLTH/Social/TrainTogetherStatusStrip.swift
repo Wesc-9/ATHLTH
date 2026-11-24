@@ -103,12 +103,12 @@ struct TrainTogetherStatusStrip: View {
                                         else { showingChat = true }
                                     } label: { avatar(person, size: 28) }
                                     .buttonStyle(.plain)
-                                    .offset(x: 2 + width * CGFloat(p.fraction), y: CGFloat(index % 2) * 25)
+                                    .offset(x: 2 + width * CGFloat(p.fraction), y: CGFloat(index) * 25)
                                     .accessibilityLabel("\(person.displayNameSnapshot), \(p.completed)/\(p.total)")
                                 }
                             }
                         }
-                    }.frame(height: 54)
+                    }.frame(height: max(54, CGFloat(participants.count) * 25 + 4))
                     HStack {
                         Text(tr("Start", "Start"))
                         Spacer()
@@ -873,6 +873,8 @@ private struct SocialWorkoutCompanionSheet:
     @StateObject private var companion =
         SocialWorkoutCompanionStore()
     @State private var messageText = ""
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     let sessionID: UUID
     var progressOnly = false
@@ -898,13 +900,27 @@ private struct SocialWorkoutCompanionSheet:
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if !chatOnly { liveProgressSection }
-                    if !progressOnly { chatSection }
+            GeometryReader { geometry in
+                let wide = geometry.size.width >= 760 && !dynamicTypeSize.isAccessibilitySize
+                ScrollView {
+                    Group {
+                        if wide && !chatOnly && !progressOnly {
+                            HStack(alignment: .top, spacing: 16) {
+                                liveProgressSection(wide: false)
+                                    .frame(maxWidth: .infinity, alignment: .top)
+                                chatSection
+                                    .frame(maxWidth: .infinity, alignment: .top)
+                            }
+                        } else {
+                            VStack(spacing: 16) {
+                                if !chatOnly { liveProgressSection(wide: wide) }
+                                if !progressOnly { chatSection }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .padding(.bottom, 24)
                 }
-                .padding(16)
-                .padding(.bottom, 24)
             }
             .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
             .navigationTitle(
@@ -936,19 +952,15 @@ private struct SocialWorkoutCompanionSheet:
         }
         .task(id: sessionID) {
             while !Task.isCancelled {
-                await companion.refresh(
-                    sessionID:
-                        sessionID
-                )
-                try? await Task.sleep(
-                    for: .seconds(3)
-                )
+                if scenePhase == .active {
+                    await companion.refresh(sessionID: sessionID)
+                }
+                do { try await Task.sleep(for: .seconds(3)) } catch { break }
             }
         }
     }
 
-    private var liveProgressSection:
-        some View {
+    private func liveProgressSection(wide: Bool) -> some View {
         ATHLTHTrainTogetherSurface {
             VStack(
                 alignment: .leading,
@@ -989,12 +1001,16 @@ private struct SocialWorkoutCompanionSheet:
                         .secondary
                     )
                 } else {
-                    ForEach(
-                        companion.liveStates
-                    ) { state in
-                        liveStateCard(
-                            state
-                        )
+                    let ordered = companion.liveStates.sorted { lhs, rhs in
+                        if lhs.userID == social.currentUserID { return rhs.userID != lhs.userID }
+                        if rhs.userID == social.currentUserID { return false }
+                        return lhs.displayNameSnapshot.localizedCaseInsensitiveCompare(rhs.displayNameSnapshot) == .orderedAscending
+                    }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: wide ? 2 : 1), spacing: 12) {
+                        ForEach(ordered) { state in
+                            liveStateCard(state)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
                     }
                 }
             }
