@@ -250,7 +250,7 @@ struct StructuredWorkoutSessionView: View {
     @State private var restoringCheckpoint = false
     @State private var persistenceErrorMessage: String?
     @State private var gymMode = false
-    @State private var gymExerciseDetails: WorkoutTemplateBlock?
+    @Environment(\.accessibilityReduceMotion) private var gymReduceMotion
 
     private var checkpointName: String {
         "structuredWorkoutInProgress.v1.\(workout.id.uuidString)"
@@ -309,7 +309,9 @@ struct StructuredWorkoutSessionView: View {
                             Spacer(minLength: 5)
                             if ATHLTHDeviceRole.isIPad {
                                 Button {
-                                    gymMode.toggle()
+                                    withAnimation(gymReduceMotion ? nil : .easeInOut(duration: 0.28)) {
+                                        gymMode.toggle()
+                                    }
                                 } label: {
                                     Label(gymMode ? ATHLTHLocalization.choose(
                                         english: "Standard view", norwegian: "Vanlig visning") : "Gym Mode",
@@ -355,7 +357,7 @@ struct StructuredWorkoutSessionView: View {
                             }
                             currentBlockCard(currentBlock)
                         }
-                        if currentBlock.kind == .exercise && !savedCompletion {
+                        if currentBlock.kind == .exercise && !savedCompletion && !gymMode {
                             actualSetInputs(currentBlock)
                         }
                     }
@@ -378,21 +380,8 @@ struct StructuredWorkoutSessionView: View {
                     ATHLTHPremiumCanvas(accent: Color.orange.opacity(0.14))
                 }
             }
-            .sheet(isPresented: Binding(
-                get: { gymExerciseDetails != nil },
-                set: { if !$0 { gymExerciseDetails = nil } }
-            )) {
-                if let block = gymExerciseDetails {
-                    NavigationStack {
-                        ATHLTHLinkedExerciseDetailView(block: block)
-                    }
-                }
-            }
             .onChange(of: gymMode) { _, _ in
                 updateScreenAwakeState()
-            }
-            .onChange(of: currentIndex) { _, _ in
-                gymExerciseDetails = nil
             }
             .navigationTitle(workout.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -651,28 +640,24 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private var localGymDisplay: some View {
-        VStack(spacing: 14) {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                ATHLTHGymModeDisplay(snapshot: gymSnapshot(at: context.date), local: true)
-                    .onChange(of: context.date) { _, date in
-                        // Preserve the original EMOM/AMRAP boundary checks when
-                        // the standard mode card is hidden.
-                        checkTimedMode(at: date)
+        let guide = ATHLTHGymExerciseReference.make(
+            blocks: blocks, index: currentIndex, waiting: emomWaitingForMinute)
+        let guideBlock = ATHLTHGymExerciseReference.select(
+            blocks: blocks, index: currentIndex, waiting: emomWaitingForMinute)
+        return VStack(spacing: 14) {
+            ATHLTHGymModeSplitView(guide: guide, localBlock: guideBlock) {
+                VStack(spacing: 12) {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        ATHLTHGymModeDisplay(snapshot: gymSnapshot(at: context.date), local: true)
+                            .onChange(of: context.date) { _, date in
+                                checkTimedMode(at: date)
+                            }
                     }
-            }
-            if let block = currentBlock, block.kind == .exercise,
-               block.exerciseID != nil || block.exerciseSlug != nil {
-                Button {
-                    gymExerciseDetails = block
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Exercise guide / video", norwegian: "Øvelsesguide / video"),
-                          systemImage: "play.rectangle")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                    if let block = currentBlock, block.kind == .exercise, !savedCompletion {
+                        actualSetInputs(block)
+                            .environment(\.colorScheme, .light)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
             }
             if spotify.isConnected {
                 HStack(spacing: 16) {
@@ -728,6 +713,13 @@ struct StructuredWorkoutSessionView: View {
             sourceDevice: "ipad", captureEvidence: "structuredManual",
             runningStepIndex: currentIndex, runningStepCount: blocks.count
         )
+        snapshot.gymExerciseGuide = ATHLTHGymExerciseReference.make(
+            blocks: blocks, index: currentIndex, waiting: emomWaitingForMinute)
+        if let block, let kind = block.executionGroupKind, kind.usesGroupClock {
+            snapshot.gymStageDuration = block.executionGroupClockSeconds ?? (kind == .emom ? 60 : 720)
+        } else {
+            snapshot.gymStageDuration = block?.durationSeconds
+        }
         if block?.kind == .exercise {
             snapshot.strengthReps = block?.repetitions
             snapshot.strengthWeightKilograms = block?.targetWeightKilograms
@@ -1641,7 +1633,9 @@ struct StructuredWorkoutSessionView: View {
                 stepEnteredAt: stepEnteredAt,
                 completedCount: completedBlockIDs.count,
                 pausedAt: pausedAt,
-                completedPauseSeconds: completedPauseSeconds
+                completedPauseSeconds: completedPauseSeconds,
+                gymExerciseGuide: ATHLTHGymExerciseReference.make(
+                    blocks: blocks, index: currentIndex, waiting: emomWaitingForMinute)
             )
         )
     }
