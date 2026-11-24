@@ -10,6 +10,7 @@ struct ATHLTHStudioInsightsView: View {
     @State private var showingSpecificProgress = false
     @State private var showingReportExport = false
     @State private var showingWorkoutComparison = false
+    @State private var inspectedComparisonWorkout: WorkoutSummary?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private func trainingTimeChange(
@@ -189,7 +190,20 @@ struct ATHLTHStudioInsightsView: View {
         }
         .sheet(isPresented: $showingWorkoutComparison) {
             NavigationStack {
-                ATHLTHStudioHistoryView(onInspect: { _ in })
+                ATHLTHStudioHistoryView(onInspect: { inspectedComparisonWorkout = $0 })
+                    .sheet(item: $inspectedComparisonWorkout) { workout in
+                        NavigationStack {
+                            ATHLTHStudioWorkoutInspectionView(workout: workout)
+                                .toolbar {
+                                    ToolbarItem(placement: .confirmationAction) {
+                                        Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                                            inspectedComparisonWorkout = nil
+                                        }
+                                    }
+                                }
+                        }
+                        .presentationDetents([.large])
+                    }
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
