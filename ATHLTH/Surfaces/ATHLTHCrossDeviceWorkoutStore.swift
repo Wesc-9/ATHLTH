@@ -74,6 +74,11 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     // Only iPhone's observed Spotify track; Watch playback is not inferred.
     var spotifyTrackTitle: String? = nil
     var spotifyArtistName: String? = nil
+    // Optional, per-session, source-issued control capability. A viewing
+    // grant by itself never includes these values.
+    var controlGrantID: UUID? = nil
+    var controlDeviceID: String? = nil
+    var supportedControls: [ATHLTHRemoteWorkoutAction]? = nil
 
     var id: UUID { sessionID }
     var symbol: String {
@@ -195,6 +200,51 @@ struct ATHLTHCrossDevicePresenceRow: Codable, Equatable {
         case sourceDevice = "source_device"
         case updatedAt = "updated_at"
         case expiresAt = "expires_at"
+    }
+}
+
+enum ATHLTHRemoteWorkoutAction: String, Codable, CaseIterable, Hashable {
+    case pause, resume, end, next
+    case skipRest = "skip_rest"
+}
+
+struct ATHLTHRemoteWorkoutControlCommand: Codable, Identifiable {
+    let id: UUID
+    let userID: UUID
+    let sessionID: UUID
+    let targetDeviceID: String
+    let grantID: UUID
+    let action: ATHLTHRemoteWorkoutAction
+    let expectedStep: Int?
+    let expectedRestEnd: Date?
+    let requestedAt: Date
+    let expiresAt: Date
+    var status: String = "pending"
+
+    enum CodingKeys: String, CodingKey {
+        case id, action, status
+        case userID = "user_id"
+        case sessionID = "session_id"
+        case targetDeviceID = "target_device_id"
+        case grantID = "grant_id"
+        case expectedStep = "expected_step"
+        case expectedRestEnd = "expected_rest_end"
+        case requestedAt = "requested_at"
+        case expiresAt = "expires_at"
+    }
+}
+
+enum ATHLTHRemoteWorkoutControlPolicy {
+    static func accepts(_ command: ATHLTHRemoteWorkoutControlCommand,
+                        accountID: UUID, sessionID: UUID, deviceID: String,
+                        grantID: UUID, available: [ATHLTHRemoteWorkoutAction],
+                        at now: Date = .now) -> Bool {
+        command.userID == accountID && command.sessionID == sessionID &&
+        command.targetDeviceID == deviceID && command.grantID == grantID &&
+        command.expiresAt > now &&
+        (-5...25).contains(now.timeIntervalSince(command.requestedAt)) &&
+        command.expiresAt.timeIntervalSince(command.requestedAt) <= 30 &&
+        available.contains(command.action)
     }
 }
 
@@ -599,6 +649,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     @Published private(set) var outgoingRequestState: ATHLTHLiveViewRequestState = .idle
     @Published private(set) var requestError: String?
     @Published private(set) var sourceWorkoutTitle: String?
+    @Published private(set) var pendingRemoteControlID: UUID?
+    @Published private(set) var remoteControlMessage: String?
+    private var pendingRemoteControlExpiry: Date?
+    private var pendingRemoteControlSessionID: UUID?
+    private var controlGrantID: UUID?
+    private var lastDeviceHeartbeatAt: Date?
 
     private var lastSourceSessionID: UUID?
     private var lastSourceStartedAt: Date?
@@ -648,6 +704,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     ) {
         guard lastSourceSessionID != currentID else { return }
         approvedSourceSessionID = nil
+        controlGrantID = nil
         incomingRequest = nil
         lastSourceSessionID = currentID
         lastSourceStartedAt = startedAt
@@ -744,6 +801,12 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         outgoingRequestState = .idle
         requestError = nil
         approvedSourceSessionID = nil
+        controlGrantID = nil
+        lastDeviceHeartbeatAt = nil
+        pendingRemoteControlID = nil
+        pendingRemoteControlExpiry = nil
+        pendingRemoteControlSessionID = nil
+        remoteControlMessage = nil
         lastSourceSessionID = nil
         lastSourceStartedAt = nil
         sourceWorkoutTitle = nil
@@ -760,7 +823,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         phone: IPhoneWorkoutStore,
         strength: StrengthWorkoutStore,
         mirroredWatch: WorkoutMirroringStore,
-        spotify: SpotifyPlaybackStore
+        spotify: SpotifyPlaybackStore,
+        watchConnection: AppleWatchConnectionStore? = nil,
+        appSession: AppSessionStore? = nil
     ) async {
         guard signedIn else {
             clearLocalState()
@@ -798,6 +863,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         break
                     }
                     await pollOutgoingRequest(accountID: accountID)
+                    await pollRemoteControlReceipt(accountID: accountID)
                 } else {
                     // The Web API may report an active Spotify Connect player
                     // on Watch even when the iPhone App Remote is not attached.
@@ -818,6 +884,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         spotify: spotify
                     )
                     await pollIncomingRequests(accountID: accountID)
+                    await publishDeviceHeartbeat(accountID: accountID, watchConnection: watchConnection)
+                    await pollRemoteControlCommands(accountID: accountID, phone: phone,
+                        strength: strength, mirroredWatch: mirroredWatch, spotify: spotify,
+                        appSession: appSession)
                 }
             } else if ownsPolling && isPad {
                 // Authentication may be refreshing after launch. This isn't
@@ -1362,12 +1432,22 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         mirroredWatch: WorkoutMirroringStore,
         spotify: SpotifyPlaybackStore
     ) async {
-        let active = liveSnapshot(
+        var active = liveSnapshot(
             phone: phone, strength: strength, mirroredWatch: mirroredWatch,
             spotify: spotify
         )
         reconcileSession(active?.id, title: active?.title,
                          startedAt: active?.startedAt)
+        if let snapshot = active, let grant = controlGrantID,
+           isApprovedForSession(snapshot.id) {
+            let actions = availableRemoteActions(snapshot, phone: phone, strength: strength,
+                                                 mirroredWatch: mirroredWatch)
+            if !actions.isEmpty {
+                active?.controlGrantID = grant
+                active?.controlDeviceID = ATHLTHDeviceRole.persistentDeviceID
+                active?.supportedControls = actions
+            }
+        }
         // Presence is intentionally independent from session-scoped approval.
         // No metrics or workout names enter this table.
         await publishPresence(accountID: accountID, snapshot: active)
@@ -1411,6 +1491,221 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 }
             }
         }
+    }
+
+    private func publishDeviceHeartbeat(accountID: UUID, watchConnection: AppleWatchConnectionStore?) async {
+        guard ATHLTHDeviceRole.isIPhone, trackingAccountID == accountID,
+              client.auth.currentUser?.id == accountID, !Task.isCancelled,
+              lastDeviceHeartbeatAt.map({ Date().timeIntervalSince($0) >= 12 }) ?? true else { return }
+        lastDeviceHeartbeatAt = .now
+        let paired = watchConnection?.paired == true
+        let installed = paired && watchConnection?.watchAppInstalled == true
+        let row = ATHLTHWorkoutDeviceHeartbeat(userID: accountID,
+            deviceID: ATHLTHDeviceRole.persistentDeviceID, watchPaired: paired,
+            watchInstalled: installed, watchReachable: installed && watchConnection?.reachable == true,
+            observedAt: .now)
+        do {
+            try await client.from("private_workout_device_availability")
+                .upsert(row, onConflict: "user_id,device_id").execute()
+        } catch { /* optional presence never interrupts recording */ }
+    }
+
+    private func availableRemoteActions(
+        _ snapshot: ATHLTHCrossDeviceWorkoutSnapshot, phone: IPhoneWorkoutStore,
+        strength: StrengthWorkoutStore, mirroredWatch: WorkoutMirroringStore
+    ) -> [ATHLTHRemoteWorkoutAction] {
+        if snapshot.sourceDevice == "watch" {
+            guard let watch = mirroredWatch.snapshot,
+                  ATHLTHWatchSpectatorSessionPolicy.canRelay(watch, to: trackingAccountID),
+                  ATHLTHWatchSpectatorSessionPolicy.verifiedID(watch) == snapshot.id,
+                  (-5...15).contains(Date().timeIntervalSince(watch.capturedAt)),
+                  watch.state == .running || watch.state == .paused else { return [] }
+            var actions: [ATHLTHRemoteWorkoutAction] = [watch.state == .paused ? .resume : .pause, .end]
+            if watch.state == .running, watch.runningManualAdvanceRequired == true,
+               watch.runningStepIndex != nil { actions.append(.next) }
+            return actions
+        }
+        if let run = phone.active, run.id == snapshot.id, run.end == nil {
+            var actions: [ATHLTHRemoteWorkoutAction] = [run.resumedAt == nil ? .resume : .pause, .end]
+            if run.resumedAt != nil, run.structuredWorkoutComplete != true,
+               phone.currentStructuredStep != nil,
+               run.awaitingMainStart == true || phone.nextStructuredStep != nil {
+                actions.append(.next)
+            }
+            return actions
+        }
+        if let log = strength.activeWorkout, log.id == snapshot.id, log.captureDevice == .iPhone {
+            var actions: [ATHLTHRemoteWorkoutAction] = [.end]
+            if let rest = strength.restEndsAt, rest > .now { actions.append(.skipRest) }
+            return actions
+        }
+        // Manual/structured timers require their original local player.
+        return []
+    }
+
+    func enqueueRemoteControl(
+        _ action: ATHLTHRemoteWorkoutAction, snapshot: ATHLTHCrossDeviceWorkoutSnapshot,
+        accountID: UUID
+    ) async {
+        guard ATHLTHDeviceRole.isIPad, trackingAccountID == accountID,
+              client.auth.currentUser?.id == accountID,
+              pendingRemoteControlID == nil, let current = remote,
+              current.id == snapshot.id, let grant = current.controlGrantID,
+              grant == snapshot.controlGrantID, let target = current.controlDeviceID,
+              current.supportedControls?.contains(action) == true,
+              let capturedAt = current.capturedAt,
+              (-5...15).contains(Date().timeIntervalSince(capturedAt))
+        else {
+            remoteControlMessage = ATHLTHLocalization.choose(
+                english: "Control is unavailable or the live view is out of date.",
+                norwegian: "Fjernstyring er utilgjengelig eller livevisningen er utdatert.")
+            return
+        }
+        // An advance/skip must still refer to the step/rest visible at tap time.
+        guard action != .next || (snapshot.runningStepIndex != nil && snapshot.runningStepIndex == current.runningStepIndex),
+              action != .skipRest || (snapshot.strengthRestEndsAt != nil && snapshot.strengthRestEndsAt == current.strengthRestEndsAt)
+        else { return }
+        let now = Date()
+        let request = ATHLTHRemoteWorkoutControlCommand(
+            id: UUID(), userID: accountID, sessionID: current.id, targetDeviceID: target,
+            grantID: grant, action: action, expectedStep: current.runningStepIndex,
+            expectedRestEnd: current.strengthRestEndsAt, requestedAt: now,
+            expiresAt: now.addingTimeInterval(25))
+        pendingRemoteControlID = request.id
+        pendingRemoteControlExpiry = request.expiresAt
+        pendingRemoteControlSessionID = current.id
+        remoteControlMessage = nil
+        do {
+            // Old commands cannot accumulate indefinitely.
+            try? await client.from("private_workout_control_commands").delete()
+                .eq("user_id", value: accountID)
+                .lt("expires_at", value: ISO8601DateFormatter().string(from: now.addingTimeInterval(-60)))
+                .execute()
+            guard trackingAccountID == accountID, client.auth.currentUser?.id == accountID,
+                  pendingRemoteControlID == request.id, !Task.isCancelled else { return }
+            try await client.from("private_workout_control_commands").insert(request).execute()
+        } catch {
+            guard trackingAccountID == accountID, pendingRemoteControlID == request.id else { return }
+            pendingRemoteControlID = nil
+            pendingRemoteControlExpiry = nil
+            pendingRemoteControlSessionID = nil
+            remoteControlMessage = error.localizedDescription
+        }
+    }
+
+    private func pollRemoteControlReceipt(accountID: UUID) async {
+        guard let id = pendingRemoteControlID else { return }
+        let now = Date()
+        if pendingRemoteControlExpiry.map({ $0 <= now }) ?? true {
+            pendingRemoteControlID = nil
+            pendingRemoteControlExpiry = nil
+            pendingRemoteControlSessionID = nil
+            remoteControlMessage = ATHLTHLocalization.choose(
+                english: "No confirmation from the recording device. Check it before retrying.",
+                norwegian: "Ingen bekreftelse fra treningsenheten. Kontroller den før du prøver igjen.")
+            return
+        }
+        do {
+            let rows: [ATHLTHRemoteWorkoutControlCommand] = try await client
+                .from("private_workout_control_commands").select()
+                .eq("user_id", value: accountID).eq("id", value: id).limit(1).execute().value
+            guard trackingAccountID == accountID, pendingRemoteControlID == id,
+                  client.auth.currentUser?.id == accountID, !Task.isCancelled,
+                  let row = rows.first, row.sessionID == pendingRemoteControlSessionID,
+                  row.status == "sent" || row.status == "rejected" else { return }
+            pendingRemoteControlID = nil
+            pendingRemoteControlExpiry = nil
+            pendingRemoteControlSessionID = nil
+            remoteControlMessage = row.status == "sent"
+                ? ATHLTHLocalization.choose(english: "Command sent to recorder. Live data confirms the result.", norwegian: "Kommando sendt til treningsenheten. Livevisningen bekrefter resultatet.")
+                : ATHLTHLocalization.choose(english: "Command rejected. Check the active workout.", norwegian: "Kommando avvist. Kontroller den aktive økten.")
+        } catch { /* expiry remains decisive */ }
+    }
+
+    private func pollRemoteControlCommands(
+        accountID: UUID, phone: IPhoneWorkoutStore, strength: StrengthWorkoutStore,
+        mirroredWatch: WorkoutMirroringStore, spotify: SpotifyPlaybackStore,
+        appSession: AppSessionStore?
+    ) async {
+        guard ATHLTHDeviceRole.isIPhone, trackingAccountID == accountID,
+              client.auth.currentUser?.id == accountID, let grant = controlGrantID,
+              let sessionID = lastSourceSessionID, isApprovedForSession(sessionID)
+        else { return }
+        let deviceID = ATHLTHDeviceRole.persistentDeviceID
+        do {
+            let rows: [ATHLTHRemoteWorkoutControlCommand] = try await client
+                .from("private_workout_control_commands").select()
+                .eq("user_id", value: accountID).eq("target_device_id", value: deviceID)
+                .eq("session_id", value: sessionID).eq("grant_id", value: grant)
+                .eq("status", value: "pending")
+                .gt("expires_at", value: ISO8601DateFormatter().string(from: .now))
+                .order("requested_at", ascending: true).limit(1).execute().value
+            guard let command = rows.first, trackingAccountID == accountID,
+                  client.auth.currentUser?.id == accountID, controlGrantID == grant,
+                  isApprovedForSession(sessionID), !Task.isCancelled else { return }
+            // Claim once before any side effect; a reconnect never replays a claimed command.
+            let claimed: [ATHLTHRemoteWorkoutControlCommand] = try await client
+                .from("private_workout_control_commands").update(["status": "claimed"])
+                .eq("user_id", value: accountID).eq("id", value: command.id)
+                .eq("status", value: "pending").select().execute().value
+            guard claimed.count == 1, claimed.first?.id == command.id,
+                  trackingAccountID == accountID, client.auth.currentUser?.id == accountID,
+                  controlGrantID == grant, isApprovedForSession(sessionID), !Task.isCancelled,
+                  let snapshot = liveSnapshot(phone: phone, strength: strength,
+                                               mirroredWatch: mirroredWatch, spotify: spotify),
+                  snapshot.id == sessionID else { return }
+            let available = availableRemoteActions(snapshot, phone: phone, strength: strength,
+                                                  mirroredWatch: mirroredWatch)
+            var sent = false
+            if ATHLTHRemoteWorkoutControlPolicy.accepts(command, accountID: accountID,
+                sessionID: sessionID, deviceID: deviceID, grantID: grant, available: available) {
+                if snapshot.sourceDevice == "watch" {
+                    switch command.action {
+                    case .pause: sent = mirroredWatch.sendCommand(.pause)
+                    case .resume: sent = mirroredWatch.sendCommand(.resume)
+                    case .end: sent = mirroredWatch.sendCommand(.end)
+                    case .next:
+                        if let index = command.expectedStep, let watch = mirroredWatch.snapshot {
+                            sent = mirroredWatch.advanceRunningStep(expectedIndex: index, startedAt: watch.startedAt)
+                        }
+                    case .skipRest: break
+                    }
+                } else if let run = phone.active, run.id == sessionID {
+                    switch command.action {
+                    case .pause: phone.pause(); sent = phone.active?.resumedAt == nil
+                    case .resume: phone.resume(); sent = phone.active?.resumedAt != nil
+                    case .end: await phone.finish(); sent = phone.active?.id != sessionID
+                    case .next:
+                        if let index = command.expectedStep, index == run.structuredStepIndex {
+                            phone.advanceStructuredStepManually()
+                            sent = phone.active?.structuredStepIndex != index ||
+                                phone.active?.awaitingMainStart != run.awaitingMainStart
+                        }
+                    case .skipRest: break
+                    }
+                } else if let log = strength.activeWorkout, log.id == sessionID,
+                          log.captureDevice == .iPhone {
+                    switch command.action {
+                    case .end:
+                        if let appSession, appSession.profile.userID == accountID, appSession.signedIn {
+                            sent = strength.finish(duration: strength.elapsedSessionSeconds(for: log, at: .now))
+                            if sent { appSession.endTrainingStatus() }
+                        }
+                    case .skipRest:
+                        if let expected = command.expectedRestEnd, let actual = strength.restEndsAt,
+                           abs(expected.timeIntervalSince(actual)) < 0.5, actual > .now {
+                            sent = strength.skipRest()
+                        }
+                    default: break
+                    }
+                }
+            }
+            guard trackingAccountID == accountID, client.auth.currentUser?.id == accountID else { return }
+            try await client.from("private_workout_control_commands")
+                .update(["status": sent ? "sent" : "rejected"])
+                .eq("user_id", value: accountID).eq("id", value: command.id)
+                .eq("status", value: "claimed").execute()
+        } catch { /* do not retry a claimed command */ }
     }
 
     private func publishPresence(
@@ -1581,7 +1876,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private func pollIncomingRequests(accountID: UUID) async {
         guard !ATHLTHDeviceRole.isIPad,
               lastSourceSessionID != nil,
-              !isSharingActiveSession else {
+              controlGrantID == nil else {
             incomingRequest = nil
             return
         }
@@ -1615,7 +1910,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
 
     /// The iPhone alone commits the in-memory session grant. Neither an
     /// iPad database update nor a request row can authorize publication.
-    func respondToRequest(approve: Bool, accountID: UUID) async {
+    func respondToRequest(approve: Bool, accountID: UUID, allowControl: Bool = false) async {
         guard !ATHLTHDeviceRole.isIPad,
               let request = incomingRequest,
               let exactSessionID = lastSourceSessionID,
@@ -1629,6 +1924,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         incomingRequest = nil
         if approve {
             approvedSourceSessionID = exactSessionID
+            controlGrantID = allowControl ? UUID() : nil
         }
         let decision = ATHLTHLiveViewDecision(
             status: approve ? "approved" : "denied",
@@ -1650,6 +1946,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     /// Revocation and end-of-workout remove the only live authorization.
     func revokeLiveSharing() {
         approvedSourceSessionID = nil
+        controlGrantID = nil
         shareNextWorkout = false
         nextWorkoutSharingExpiresAt = nil
     }
