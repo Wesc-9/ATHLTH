@@ -158,6 +158,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @Binding var selectedDate: Date
     let scrollToTopRequest: Int
     @State private var periodDays = 28
+    @State private var featuredWorkoutID: String?
     /// Each iPad scene remembers whether the athlete deliberately browsed
     /// a different week; reopening must not silently jump back to today.
     @SceneStorage("athlth.studio.homeFollowsToday") private var followsToday = true
@@ -220,13 +221,17 @@ struct ATHLTHStudioEditorialDashboardView: View {
                   "Kun på denne enheten · ikke på kontoen ennå")
     }
 
-    private func nextWorkout(
+    private func nextWorkouts(
         from upcoming: [ATHLTHStudioSchedule.Occurrence]
-    ) -> ATHLTHStudioSchedule.Occurrence? {
-        upcoming.first { item in
+    ) -> [ATHLTHStudioSchedule.Occurrence] {
+        let pending = upcoming.filter { item in
             guard ATHLTHStudioSchedule.isUpcoming(item) else { return false }
-            return !skipped(item) && !completed(item) && !item.workout.isExplicitRestDay
+            return !skipped(item) && !completed(item) &&
+                !item.workout.isExplicitRestDay && item.workout.cancelledAt == nil
         }
+        guard let first = pending.first else { return [] }
+        // Keep the carousel focused on the next training day.
+        return pending.filter { Calendar.current.isDate($0.date, inSameDayAs: first.date) }
     }
 
     private func makeHomeProjection() -> ATHLTHStudioHomeProjection {
@@ -334,7 +339,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             // avoiding rebuilding the full training dashboard
                             // for every four-second spectator heartbeat.
                             ATHLTHiPadLiveWorkoutStatusCard()
-                            let upcoming = nextWorkout(from: home.upcoming)
+                            let upcoming = nextWorkouts(from: home.upcoming)
 
                             if split {
                                 HStack(alignment: .top, spacing: 18) {
@@ -584,10 +589,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func nextWorkoutCard(
-        _ next: ATHLTHStudioSchedule.Occurrence?,
+        _ upcoming: [ATHLTHStudioSchedule.Occurrence],
         availableWidth: CGFloat
     ) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
+        let index = upcoming.firstIndex { $0.id == featuredWorkoutID } ?? 0
+        let next = upcoming.indices.contains(index) ? upcoming[index] : nil
+        return VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 10) {
                 Text(tr("Next workout", "Neste økt"))
                     .font(.system(size: 22, weight: .medium, design: .serif))
@@ -599,6 +606,29 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     ))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(bronze)
+                }
+                if upcoming.count > 1 {
+                    HStack(spacing: 5) {
+                        Button {
+                            featuredWorkoutID = upcoming[max(0, index - 1)].id
+                        } label: {
+                            Image(systemName: "chevron.left").frame(width: 34, height: 36)
+                        }
+                        .disabled(index == 0)
+                        .accessibilityLabel(tr("Previous workout", "Forrige økt"))
+                        Text("\(index + 1)/\(upcoming.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                        Button {
+                            featuredWorkoutID = upcoming[min(upcoming.count - 1, index + 1)].id
+                        } label: {
+                            Image(systemName: "chevron.right").frame(width: 34, height: 36)
+                        }
+                        .disabled(index + 1 == upcoming.count)
+                        .accessibilityLabel(tr("Next workout", "Neste økt"))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ink)
                 }
             }
             if let item = next {
