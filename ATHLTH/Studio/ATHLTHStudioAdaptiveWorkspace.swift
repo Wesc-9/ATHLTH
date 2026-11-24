@@ -30,10 +30,11 @@ enum ATHLTHStudioWorkspaceLayout {
 /// iPhone never instantiates this component.
 struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// A temporary edit-session preference: every opening uses the standard
-    /// layout again, including after previous iPad Stage Manager resizing.
-    @State private var savedPlanFraction = 0.32
+    /// Per-window visual preference. Resuming a scene or rotating the iPad
+    /// must not undo the user's column resize.
+    @SceneStorage("athlth.studio.workspace.planFraction") private var savedPlanFraction = 0.32
 
     @GestureState private var dragTranslation: CGFloat = 0
     @State private var focusOnWorkout = false
@@ -58,7 +59,7 @@ struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>:
 
     var body: some View {
         GeometryReader { geometry in
-            if geometry.size.width >= minimumSideBySideWidth {
+            if geometry.size.width >= minimumSideBySideWidth && !dynamicTypeSize.isAccessibilitySize {
                 HStack(spacing: 0) {
                     if focusOnWorkout {
                         focusRail
@@ -99,7 +100,6 @@ struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>:
             }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
-        .onAppear { savedPlanFraction = 0.32 }
     }
 
     private func planWidth(for width: CGFloat) -> CGFloat {
