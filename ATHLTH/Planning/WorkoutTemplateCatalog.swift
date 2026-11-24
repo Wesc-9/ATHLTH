@@ -7749,6 +7749,13 @@ struct WorkoutTemplateBuilderView: View {
                 selectedPhase = phase
                 openExercisePicker()
             },
+            onDropLibraryExercise: (initialActivity == .strength || initialActivity == nil) ? { id, phase in
+                guard let entry = exerciseLibrary.selectableExercises.first(where: { $0.id == id }) else { return false }
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                addExerciseBlock(entry)
+                return true
+            } : nil,
             onAddFreeStrength: { phase in
                 guard mayInsertStrengthModes else { return }
                 selectedPhase = phase
