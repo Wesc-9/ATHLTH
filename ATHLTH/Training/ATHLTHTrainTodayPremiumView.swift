@@ -172,8 +172,9 @@ struct ATHLTHTrainTodayPremiumView: View {
     private var additionalWorkoutOptions: some View {
             if primaryWorkout != nil {
                 DisclosureGroup {
-                    suggestedWorkoutSection
+                    ATHLTHTrainDeferredContent { AnyView(suggestedWorkoutSection) }
                         .padding(.top, 12)
+                        .task { await workoutCatalog.refresh() }
                 } label: {
                     Label(tr("More training options", "Flere treningsmuligheter"),
                           systemImage: "sparkles")
@@ -205,17 +206,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .task(id: isActive) {
             guard isActive else { return }
-            // The existing offline catalog and local check-in are already
-            // usable. Do not begin optional remote catalog synchronization
-            // in the middle of the system tab-bar animation.
             reloadCheckIn()
-            do {
-                try await Task.sleep(for: .milliseconds(700))
-            } catch {
-                return
-            }
-            guard !Task.isCancelled, isActive else { return }
-            await workoutCatalog.refresh()
         }
         .task(id: session.profile.userID) {
             quickActivityTapCounts =
@@ -300,10 +291,9 @@ struct ATHLTHTrainTodayPremiumView: View {
     /// shown directly beneath the primary workout action.
     private func alternativeRecommendationCard(
         for workout: PlannedSession,
-        suggestion: ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion
+        alternatives: [ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion]
     ) -> some View {
-        let alternatives = Array(ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
-            for: workout, signals: selfReportedSignals).prefix(2))
+        let suggestion = alternatives[0]
 
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 7) {
@@ -463,11 +453,12 @@ struct ATHLTHTrainTodayPremiumView: View {
             .foregroundStyle(champagne)
             if workout.dailyAlternativeOriginal != nil {
                 ATHLTHTrainDeferredContent { AnyView(undoAlternativeRow(workout)) }
-            } else if canStart,
-                      let suggestion = ATHLTHDailyWorkoutAlternativeAdvisor
-                        .suggestions(for: workout, signals: selfReportedSignals).first {
+            } else if canStart {
                 ATHLTHTrainDeferredContent {
-                    AnyView(alternativeRecommendationCard(for: workout, suggestion: suggestion))
+                    let alternatives = Array(ATHLTHDailyWorkoutAlternativeAdvisor
+                        .suggestions(for: workout, signals: selfReportedSignals).prefix(2))
+                    if alternatives.isEmpty { return AnyView(EmptyView()) }
+                    return AnyView(alternativeRecommendationCard(for: workout, alternatives: alternatives))
                 }
             }
         }
