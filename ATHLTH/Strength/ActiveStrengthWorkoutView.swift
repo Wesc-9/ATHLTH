@@ -54,6 +54,8 @@ struct ActiveStrengthWorkoutView: View {
         Task<Void, Never>?
     @State private var focusedExerciseMediaIndex = 0
     @State private var showingExerciseInstructions = false
+    @State private var showingLiveExerciseHistory = false
+    @State private var liveExerciseHistory: ATHLTHExerciseProgress.Summary?
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
     @State private var showingSpotifyControls = false
@@ -172,7 +174,7 @@ struct ActiveStrengthWorkoutView: View {
                     showingExerciseQueue = true
                 }
             }
-            .sheet(isPresented: $showingStrengthAudioCoachSettings) {
+            .sheet(isPresented: $showingStrengthAudioCoachSettings.keepingPresentedWhenInactive(scenePhase)) {
                 if strength.activeWorkout?.captureDevice == .iPhone {
                     StrengthAudioCoachSettingsView(
                         configuration: Binding(
@@ -188,7 +190,7 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingTrainingPlacePicker) {
+            .sheet(isPresented: $showingTrainingPlacePicker.keepingPresentedWhenInactive(scenePhase)) {
                 ATHLTHPlanTrainingPlacePicker(
                     initial: strength.activeWorkout?.plannedTrainingPlace
                 ) { place in
@@ -196,7 +198,7 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 .environmentObject(appSession)
             }
-            .sheet(isPresented: $showingAppendWorkout) {
+            .sheet(isPresented: $showingAppendWorkout.keepingPresentedWhenInactive(scenePhase)) {
                 ActiveHybridWorkoutPicker { session, startNow in
                     strength.appendWorkoutDuringSession(
                         session,
@@ -206,11 +208,30 @@ struct ActiveStrengthWorkoutView: View {
                 .environmentObject(appSession)
                 .environmentObject(runningWorkoutLibrary)
             }
-            .sheet(isPresented: $showingExerciseQueue) {
+            .sheet(isPresented: $showingLiveExerciseHistory.keepingPresentedWhenInactive(scenePhase)) {
+                NavigationStack {
+                    ScrollView {
+                        if let liveExerciseHistory {
+                            ATHLTHExerciseProgressView(progress: liveExerciseHistory)
+                                .padding(16)
+                        }
+                    }
+                    .navigationTitle(ATHLTHLocalization.choose(english: "Exercise history", norwegian: "Øvelseshistorikk"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                                showingLiveExerciseHistory = false
+                            }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingExerciseQueue.keepingPresentedWhenInactive(scenePhase)) {
                 StrengthActiveExerciseQueueView()
                     .environmentObject(strength)
             }
-            .sheet(isPresented: $showingExerciseLibrary) {
+            .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
                 NavigationStack {
                     ExerciseLibraryView(
                         selectionTitle:
@@ -231,7 +252,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .sheet(
                 isPresented:
-                    $showingAIExercisePlanner
+                    $showingAIExercisePlanner.keepingPresentedWhenInactive(scenePhase)
             ) {
                 StrengthAIExercisePlannerView(
                     existingExercises:
@@ -247,7 +268,7 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingQuickAISuggestion) {
+            .sheet(isPresented: $showingQuickAISuggestion.keepingPresentedWhenInactive(scenePhase)) {
                 StrengthAIExercisePlannerView(
                     existingExercises: activeExistingPlannedExercises,
                     recentWorkouts: strength.workoutHistory,
@@ -257,7 +278,7 @@ struct ActiveStrengthWorkoutView: View {
                     appendAIExercises(Array(additions.prefix(1)))
                 }
             }
-            .sheet(item: $pendingExercise) { entry in
+            .sheet(item: $pendingExercise.keepingPresentedItemWhenInactive(scenePhase)) { entry in
                 FreestyleExercisePrescriptionView(entry: entry) {
                     strength.appendExercise(
                         entry.exercise,
@@ -278,7 +299,7 @@ struct ActiveStrengthWorkoutView: View {
                 }
             }
             .sheet(
-                item: $editingSetResult
+                item: $editingSetResult.keepingPresentedItemWhenInactive(scenePhase)
             ) { target in
                 StrengthSetResultEditorView(
                     target: target
@@ -312,7 +333,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .sheet(
                 isPresented:
-                    $showingExerciseSwap
+                    $showingExerciseSwap.keepingPresentedWhenInactive(scenePhase)
             ) {
                 if let exercise =
                         strength.currentExercise {
@@ -334,7 +355,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .sheet(
                 isPresented:
-                    $showingExerciseGroupBuilder
+                    $showingExerciseGroupBuilder.keepingPresentedWhenInactive(scenePhase)
             ) {
                 if let workout =
                         strength.activeWorkout,
@@ -362,7 +383,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .sheet(
                 isPresented:
-                    $showingExerciseRestEditor
+                    $showingExerciseRestEditor.keepingPresentedWhenInactive(scenePhase)
             ) {
                 if let exercise =
                         strength.currentExercise {
@@ -383,7 +404,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .sheet(
                 isPresented:
-                    $showingPlateCalculator
+                    $showingPlateCalculator.keepingPresentedWhenInactive(scenePhase)
             ) {
                 StrengthPlateCalculatorView(
                     targetWeightKilograms: strength.draftWeightKilograms,
@@ -398,7 +419,7 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 )
             }
-            .sheet(item: $editingBarMass) { edit in
+            .sheet(item: $editingBarMass.keepingPresentedItemWhenInactive(scenePhase)) { edit in
                 StrengthBarMassEditor(
                     initialKilograms: edit.kilograms
                 ) { kilograms, remember in
@@ -414,7 +435,7 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 .presentationDetents([.height(350)])
             }
-            .sheet(isPresented: $showingFinishConfirmation) {
+            .sheet(isPresented: $showingFinishConfirmation.keepingPresentedWhenInactive(scenePhase)) {
                 strengthFinishConfirmationSheet
                     .presentationDetents([.height(510), .large])
                     .presentationDragIndicator(.visible)
@@ -2510,6 +2531,37 @@ struct ActiveStrengthWorkoutView: View {
                         workout: workout,
                         exercise: exercise
                     )
+
+                    if exercise.isEmbeddedRunningInterval != true {
+                        Button {
+                            let reference = exercise.exercise
+                            liveExerciseHistory = ATHLTHExerciseProgress.summary(
+                                exerciseID: reference.libraryExerciseID ?? exercise.plannedExerciseID,
+                                name: reference.name,
+                                isCustom: reference.libraryExerciseID == nil,
+                                workouts: strength.workoutHistory,
+                                reference: reference
+                            )
+                            showingLiveExerciseHistory = true
+                        } label: {
+                            HStack {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Previous results", norwegian: "Tidligere resultater"),
+                                    systemImage: "clock.arrow.circlepath")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .padding(12)
+                            .frame(minHeight: 44)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-live-exercise-history")
+                    }
 
                     if exercise.isEmbeddedRunningInterval != true &&
                        exercise.sets.contains(where: {
@@ -5105,6 +5157,9 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedExerciseLibraryEntry(
         _ exercise: StrengthExerciseLog
     ) -> ExerciseLibraryEntry? {
+        if let id = exercise.exercise.libraryExerciseID {
+            return exerciseLibrary.allExercises.first { $0.id == id }
+        }
         let snapshotName =
             exercise.exercise.name
                 .trimmingCharacters(

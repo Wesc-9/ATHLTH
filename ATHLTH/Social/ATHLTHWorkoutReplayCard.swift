@@ -105,6 +105,9 @@ struct ATHLTHWorkoutReplayCard: View {
     let context: WorkoutAIInsightContext?
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthStore: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showingPlanReview = false
     @State private var showingMoments = true
     @State private var showingDataReview = false
     @State private var userConfirmedUnusual = false
@@ -147,8 +150,7 @@ struct ATHLTHWorkoutReplayCard: View {
         "athlth.replay.reviewed.\(workout.id.uuidString)"
     }
 
-    private var nextSessionAdvice: some View {
-        let guidance: String = {
+    private var nextSessionGuidance: String {
             if requiresDataReview {
                 return ATHLTHLocalization.choose(
                     english: "Review recorded duration and distance before planning progression.",
@@ -174,17 +176,33 @@ struct ATHLTHWorkoutReplayCard: View {
             return ATHLTHLocalization.choose(
                 english: "Not enough comparable evidence to recommend changing intensity. Use perceived effort and recovery when planning the next workout.",
                 norwegian: "Det er ikke nok sammenlignbare data til å anbefale endret intensitet. Bruk egen opplevd innsats og restitusjon når du planlegger neste økt.")
-        }()
-        return VStack(alignment: .leading, spacing: 7) {
+    }
+
+    private var nextSessionAdvice: some View {
+        VStack(alignment: .leading, spacing: 7) {
             Label(ATHLTHLocalization.choose(english: "COACH · NEXT SESSION", norwegian: "COACH · NESTE ØKT"), systemImage: "sparkles")
                 .font(.caption2.weight(.semibold)).tracking(0.8)
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
-            Text(guidance).font(.subheadline)
+            Text(nextSessionGuidance).font(.subheadline)
                 .foregroundStyle(ATHLTHTheme.primaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Text(ATHLTHLocalization.choose(english: "Local advice · no plan is changed automatically",
                                            norwegian: "Lokalt forslag · ingen plan endres automatisk"))
                 .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+            if session.activePlan != nil && !requiresDataReview {
+                Button {
+                    showingPlanReview = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Review next planned workout", norwegian: "Vurder neste planlagte økt"),
+                        systemImage: "calendar.badge.clock")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-replay-review-next-plan")
+            }
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -770,7 +788,15 @@ struct ATHLTHWorkoutReplayCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(Color.white.opacity(0.95), lineWidth: 0.9)
         }
-        .sheet(isPresented: $showingDataReview) {
+        .sheet(isPresented: $showingPlanReview.keepingPresentedWhenInactive(scenePhase)) {
+            CoachPlanAdaptationView(
+                initialNotes: ATHLTHLocalization.choose(
+                    english: "Review the next comparable planned workout. Keep my goal and suggest only a justified change, if any.",
+                    norwegian: "Vurder neste sammenlignbare planlagte økt. Behold målet mitt og foreslå kun en begrunnet endring dersom det er nødvendig."),
+                planID: session.activePlan?.id
+            )
+        }
+        .sheet(isPresented: $showingDataReview.keepingPresentedWhenInactive(scenePhase)) {
             NavigationStack {
                 VStack(alignment: .leading, spacing: 16) {
                     Label(

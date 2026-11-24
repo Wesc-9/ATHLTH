@@ -572,7 +572,7 @@ struct ProductRootTabView: View {
                 .padding(.bottom, 44)
                 .zIndex(40)
             }
-            .sheet(isPresented: $showingCoachFromDock) {
+            .sheet(isPresented: $showingCoachFromDock.keepingPresentedWhenInactive(scenePhase)) {
                 NavigationStack {
                     RecoveryCoachInboxDestinationView()
                         .toolbar {
@@ -1116,6 +1116,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @Environment(\.dynamicTypeSize) private var homeDynamicTypeSize
+    @Environment(\.scenePhase) private var homeScenePhase
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
@@ -1340,7 +1341,7 @@ struct ATHLTHHomeView: View {
             .athlthStablePresentationBoundary()
             .sheet(
                 isPresented:
-                    $showingGettingStartedPopup
+                    $showingGettingStartedPopup.keepingPresentedWhenInactive(homeScenePhase)
             ) {
                 HomeGettingStartedPopupView(
                     hasPlan:
@@ -1351,7 +1352,8 @@ struct ATHLTHHomeView: View {
                         hasCompletedProfileSetup
                 )
             }
-            .sheet(item: $selectedHomeStrengthSession, onDismiss: {
+            .sheet(item: $selectedHomeStrengthSession.keepingPresentedItemWhenInactive(homeScenePhase), onDismiss: {
+                guard homeScenePhase == .active else { return }
                 guard ATHLTHScratchComposerPresentationPolicy
                     .startsLiveAfterSetupDismiss(
                         queued: pendingHomeStrengthLiveAfterDismiss,
@@ -1407,7 +1409,8 @@ struct ATHLTHHomeView: View {
                 }
             }
             .athlthStablePresentationBoundary()
-            .sheet(item: $pendingHomeQuickStartKind, onDismiss: {
+            .sheet(item: $pendingHomeQuickStartKind.keepingPresentedItemWhenInactive(homeScenePhase), onDismiss: {
+                guard homeScenePhase == .active else { return }
                 guard ATHLTHScratchComposerPresentationPolicy
                     .startsLiveAfterSetupDismiss(
                         queued: pendingHomeStrengthLiveAfterDismiss,
@@ -1575,7 +1578,7 @@ struct ATHLTHHomeView: View {
                 )
             }
             .athlthStablePresentationBoundary()
-            .fullScreenCover(item: $selectedHomeStructuredWorkout) { workout in
+            .fullScreenCover(item: $selectedHomeStructuredWorkout.keepingPresentedItemWhenInactive(homeScenePhase)) { workout in
                 // Newer workout builders store their ordered sets in blocks,
                 // not legacy session.exercises. Reuse the real timeline
                 // recorder rather than starting an empty strength log.
@@ -1586,7 +1589,7 @@ struct ATHLTHHomeView: View {
                     )
                 )
             }
-            .fullScreenCover(isPresented: $showingHomeStrengthWorkout) {
+            .fullScreenCover(isPresented: $showingHomeStrengthWorkout.keepingPresentedWhenInactive(homeScenePhase)) {
                 ActiveStrengthWorkoutView()
                     .environmentObject(strengthWorkout)
                     .environmentObject(session)
@@ -1661,11 +1664,11 @@ struct ATHLTHHomeView: View {
                 )
             }
             // Invitations open the same edge-to-edge inbox as the side menu.
-            .fullScreenCover(isPresented: $showingHomeSocialInbox) {
+            .fullScreenCover(isPresented: $showingHomeSocialInbox.keepingPresentedWhenInactive(homeScenePhase)) {
                 ATHLTHSideMenuUtilitiesView(destination: .inbox)
             }
             // Independent sessions share the calendar but not a plan ID.
-            .sheet(item: $homeDeferredPhoneWorkout) { workout in
+            .sheet(item: $homeDeferredPhoneWorkout.keepingPresentedItemWhenInactive(homeScenePhase)) { workout in
                 ATHLTHHomeDeferredPhoneStartSheet(
                     workoutTitle: workout.title,
                     delaySeconds: homeDeferredPhoneDelaySeconds,
@@ -1690,13 +1693,13 @@ struct ATHLTHHomeView: View {
                 onSelectTab(0)
                 startCalendarPreview(workout, planID: nil, device: request.device)
             }
-            .sheet(item: $selectedHomeStandaloneWorkout) { workout in
+            .sheet(item: $selectedHomeStandaloneWorkout.keepingPresentedItemWhenInactive(homeScenePhase)) { workout in
                 homeCalendarWorkoutSheet(workout)
                 .presentationDetents([.fraction(0.76), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
-            .sheet(item: $selectedHomeCompletedWorkout) { workout in
+            .sheet(item: $selectedHomeCompletedWorkout.keepingPresentedItemWhenInactive(homeScenePhase)) { workout in
                 NavigationStack {
                     WorkoutHistoryDetailView(workout: workout)
                         .navigationTitle(ATHLTHLocalization.choose(
@@ -1715,7 +1718,7 @@ struct ATHLTHHomeView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
-            .sheet(isPresented: $showingHomeTodayCalendarAll) {
+            .sheet(isPresented: $showingHomeTodayCalendarAll.keepingPresentedWhenInactive(homeScenePhase)) {
                 homeTodayCalendarAllSheet
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
@@ -3155,7 +3158,7 @@ struct ATHLTHHomeView: View {
                 } message: {
                     Text(homeWorkoutPendingRemoval?.title ?? "")
                 }
-        .sheet(item: $selectedHomeAllStandaloneWorkout) { workout in
+        .sheet(item: $selectedHomeAllStandaloneWorkout.keepingPresentedItemWhenInactive(homeScenePhase)) { workout in
                 homeCalendarWorkoutSheet(workout)
                 .presentationDetents([.fraction(0.76), .large])
             .presentationDragIndicator(.visible)

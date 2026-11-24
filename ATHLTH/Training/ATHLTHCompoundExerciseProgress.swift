@@ -105,6 +105,7 @@ enum ATHLTHCompoundExerciseProgress {
               expected.contains(where: {
                   $0.kind == .run && !$0.isActiveRecovery
               }) else { return nil }
+        guard Set(steps.map(\.index)).count == steps.count else { return nil }
         let actual = steps.sorted { $0.index < $1.index }.filter {
             !["warmup", "cooldown"].contains(($0.phase ?? "").lowercased())
         }
@@ -112,7 +113,10 @@ enum ATHLTHCompoundExerciseProgress {
         var matching: [[ATHLTHRecordedRunningStep]] = []
         for offset in 0...(actual.count - expected.count) {
             let sample = Array(actual[offset..<(offset + expected.count)])
-            if match(expected, sample) { matching.append(sample) }
+            let contiguous = zip(sample, sample.dropFirst()).allSatisfy { left, right in
+                right.index - left.index == 1
+            }
+            if contiguous && match(expected, sample) { matching.append(sample) }
         }
         guard matching.count == 1, let steps = matching.first else { return nil }
         let work = steps.filter { !isRecovery($0) }
@@ -136,8 +140,17 @@ enum ATHLTHCompoundExerciseProgress {
         for exercise: ATHLTHCompoundExercise,
         completed: [ATHLTHCompletedRunningPerformance]
     ) -> [Result] {
-        completed.compactMap { result(for: exercise, in: $0) }
-            .sorted { $0.date > $1.date }
+        var seenIDs = Set<UUID>()
+        var seenHealthIDs = Set<UUID>()
+        return completed.sorted { $0.completedAt > $1.completedAt }.compactMap { record in
+            guard let result = result(for: exercise, in: record),
+                  !seenIDs.contains(record.id),
+                  record.healthWorkoutUUID.map({ !seenHealthIDs.contains($0) }) ?? true
+            else { return nil }
+            seenIDs.insert(record.id)
+            if let healthID = record.healthWorkoutUUID { seenHealthIDs.insert(healthID) }
+            return result
+        }
     }
 
     static func bestMeasured(_ results: [Result]) -> Result? {

@@ -1005,6 +1005,7 @@ struct RecoveryCoachInboxDestinationView:
 
 struct RecoveryCoachView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session:
         AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
@@ -1285,7 +1286,7 @@ struct RecoveryCoachView: View {
             loadCoachConsent()
             receiveIncomingQuestionIfNeeded()
         }
-        .sheet(isPresented: $showingCoachWorkoutBuilder) {
+        .sheet(isPresented: $showingCoachWorkoutBuilder.keepingPresentedWhenInactive(scenePhase)) {
             if let proposal = selectedCoachProposal,
                let prepared = ATHLTHCoachProposalBridge.workout(proposal) {
                 WorkoutTemplateBuilderView(
@@ -1306,7 +1307,7 @@ struct RecoveryCoachView: View {
                 )
             }
         }
-        .sheet(item: $activeQuickWizard, onDismiss: deliverQuickWizardResult) { action in
+        .sheet(item: $activeQuickWizard.keepingPresentedItemWhenInactive(scenePhase), onDismiss: { if scenePhase == .active { deliverQuickWizardResult() } }) { action in
             switch action {
             case .createWorkout:
                 ATHLTHCoachWorkoutWizardView { prompt in
@@ -1337,10 +1338,10 @@ struct RecoveryCoachView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingCoachPlanAdaptation) {
+        .sheet(isPresented: $showingCoachPlanAdaptation.keepingPresentedWhenInactive(scenePhase)) {
             CoachPlanAdaptationView(initialNotes: question)
         }
-        .sheet(isPresented: $showingCoachWorkoutProfileReview) {
+        .sheet(isPresented: $showingCoachWorkoutProfileReview.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHCoachWorkoutRequestSheet(
                 request: pendingWorkoutCreationPrompt,
                 profile: ATHLTHTrainingProfile.load(
@@ -1356,7 +1357,7 @@ struct RecoveryCoachView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingCoachPlanBuilder) {
+        .sheet(isPresented: $showingCoachPlanBuilder.keepingPresentedWhenInactive(scenePhase)) {
             if let proposal = selectedCoachProposal,
                let seed = ATHLTHCoachProposalBridge.planSeed(proposal) {
                 AIProgramBuilderView(

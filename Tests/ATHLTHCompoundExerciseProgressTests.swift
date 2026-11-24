@@ -76,6 +76,15 @@ final class ATHLTHCompoundExerciseProgressTests: XCTestCase {
         XCTAssertNotEqual(result.averageWorkSpeedKmh, 24, accuracy: 0.1)
     }
 
+    func testDuplicateOrMissingStepIdentityCannotCreateAnIntervalRecord() throws {
+        var steps = recorded()
+        steps[1].index = steps[0].index
+        XCTAssertNil(try result(steps))
+        steps = recorded()
+        for index in 3..<steps.count { steps[index].index += 1 }
+        XCTAssertNil(try result(steps))
+    }
+
     func testIncompleteEffortCannotBeAnAchievedResult() throws {
         var steps = recorded()
         steps[4].activeSeconds = 40

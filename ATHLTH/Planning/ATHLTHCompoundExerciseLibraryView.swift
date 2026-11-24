@@ -223,13 +223,17 @@ struct ATHLTHCompoundExerciseDetailView: View {
     var insertionPhase: WorkoutPhaseKind = .main
     var onSelect: (([WorkoutTemplateBlock]) -> Void)? = nil
 
+    @State private var completedHistory: [ATHLTHCompletedRunningPerformance] = []
+
+    private func reloadHistory() {
+        completedHistory = ATHLTHRunningPerformanceHistory.load(userID: session.profile.userID)
+    }
+
     private var measuredIntervalResults: [ATHLTHCompoundExerciseProgress.Result] {
         guard exercise.isRunning else { return [] }
         return ATHLTHCompoundExerciseProgress.results(
             for: exercise,
-            completed: ATHLTHRunningPerformanceHistory.load(
-                userID: session.profile.userID
-            )
+            completed: completedHistory
         )
     }
 
@@ -259,7 +263,7 @@ struct ATHLTHCompoundExerciseDetailView: View {
               )
         else { return [] }
         return ATHLTHFourByFourRecords.records(
-            ATHLTHRunningPerformanceHistory.load(userID: session.profile.userID)
+            completedHistory
         ).filter { $0.recoverySeconds == recovery }
     }
 
@@ -359,8 +363,7 @@ struct ATHLTHCompoundExerciseDetailView: View {
                     .padding(16)
                     .athlthPlanCard(radius: 19)
                 }
-                if exercise.isRunning &&
-                   exercise.familyID != "athlth:running:interval:4x4" {
+                if exercise.isRunning {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(ATHLTHLocalization.choose(
                             english: "My interval exercise history",
@@ -390,6 +393,27 @@ struct ATHLTHCompoundExerciseDetailView: View {
                             ))
                             .font(.caption)
                         }
+                        if !measuredIntervalResults.isEmpty {
+                            Divider()
+                            Text(ATHLTHLocalization.choose(english: "Latest attempts", norwegian: "Siste gjennomføringer"))
+                                .font(.subheadline.weight(.semibold))
+                            ForEach(Array(measuredIntervalResults.prefix(5))) { result in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(result.date.formatted(date: .abbreviated, time: .omitted))
+                                            .font(.subheadline.weight(.medium))
+                                        Text(result.reported
+                                             ? ATHLTHLocalization.choose(english: "Reported", norwegian: "Manuelt oppgitt")
+                                             : result.source)
+                                            .font(.caption2)
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                    Spacer()
+                                    Text(String(format: "%.1f km/t", result.averageWorkSpeedKmh))
+                                        .font(.subheadline.monospacedDigit())
+                                }
+                            }
+                        }
                         Text(ATHLTHLocalization.choose(
                             english: "\(measuredIntervalResults.count) comparable completed attempts",
                             norwegian: "\(measuredIntervalResults.count) sammenlignbare fullførte forsøk"
@@ -417,6 +441,10 @@ struct ATHLTHCompoundExerciseDetailView: View {
         .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         .navigationTitle(exercise.title)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: session.profile.userID) { reloadHistory() }
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            reloadHistory()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 LibraryFavoriteButton(

@@ -223,7 +223,12 @@ enum ATHLTHRunningPerformanceHistory {
         _ completed: [PhoneWorkout], userID: UUID
     ) {
         var stored = load(userID: userID)
-        var byID = Dictionary(uniqueKeysWithValues: stored.map { ($0.id, $0) })
+        var byID = Dictionary(stored.map { ($0.id, $0) }, uniquingKeysWith: { previous, next in
+            // Old imported duplicates must never crash account activation.
+            if previous.healthWorkoutUUID != nil && next.healthWorkoutUUID == nil { return previous }
+            if next.healthWorkoutUUID != nil && previous.healthWorkoutUUID == nil { return next }
+            return previous.completedAt >= next.completedAt ? previous : next
+        })
         var changed = false
         for workout in completed {
             guard let proposed = ATHLTHCompletedRunningPerformance(phone: workout),
