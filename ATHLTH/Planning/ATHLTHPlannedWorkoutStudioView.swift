@@ -64,11 +64,19 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @State private var intervalToAdjust: IntervalSelection?
     @State private var intervalPendingDeletion: UUID?
     @State private var draggingID: UUID?
-    @State private var addSheetPhase: WorkoutPhaseKind?
+    @State private var addSheetRequest: AddSheetRequest?
     @State private var queuedAddAction: AddSheetAction?
-    @State private var addPage: AddPage = .root
+    @State private var addSubpageOverride: AddPage?
 
     private enum AddPage { case root, freeCardio, recovery, runningMode, strengthMode }
+
+    /// The entry page belongs to the presented item, not a separate state
+    /// write that SwiftUI may not observe on the first sheet presentation.
+    private struct AddSheetRequest: Identifiable {
+        let id = UUID()
+        let phase: WorkoutPhaseKind
+        let entryPage: AddPage
+    }
     private var usesActivityActions: Bool {
         activity == .running || activity == .walking || activity == .strength
     }
@@ -270,17 +278,19 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         // live workout/settings data updates the parent. A persistent sheet
         // owns scrolling independently of those updates and keeps the same
         // underlying add callbacks, with no duplicated workout engine.
-        .sheet(item: $addSheetPhase, onDismiss: {
-            addPage = .root
+        .sheet(item: $addSheetRequest, onDismiss: {
+            addSubpageOverride = nil
             performQueuedAddAction()
-        }) { phase in
+        }) { request in
+            let phase = request.phase
+            let addPage = addSubpageOverride ?? request.entryPage
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         if addPage == .root {
                             addSheetOptions(for: phase)
                         } else {
-                            addSubpage(for: phase)
+                            addSubpage(addPage, for: phase)
                         }
                     }
                     .padding(17)
@@ -295,9 +305,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        if addPage != .root {
+                        if request.entryPage == .root && addPage != .root {
                             Button(ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")) {
-                                addPage = .root
+                                addSubpageOverride = nil
                             }
                         }
                     }
@@ -305,7 +315,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         Button(ATHLTHLocalization.choose(
                             english: "Close", norwegian: "Lukk"
                         )) {
-                            addSheetPhase = nil
+                            addSheetRequest = nil
                         }
                     }
                 }
@@ -581,8 +591,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     /// A shared capsule style prevents the library action from dominating
     /// the exercise and route actions on narrow iPhone displays.
     private func openAddPage(_ page: AddPage, phase: WorkoutPhaseKind) {
-        addPage = page
-        addSheetPhase = phase
+        addSubpageOverride = nil
+        addSheetRequest = AddSheetRequest(phase: phase, entryPage: page)
     }
 
     private var activityEmptyActions: some View {
@@ -1541,8 +1551,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     @ViewBuilder
-    private func addSubpage(for phase: WorkoutPhaseKind) -> some View {
-        switch addPage {
+    private func addSubpage(_ page: AddPage, for phase: WorkoutPhaseKind) -> some View {
+        switch page {
         case .root: EmptyView()
         case .freeCardio:
             addSheetRow(ATHLTHLocalization.choose(english: "Free walking", norwegian: "Fri gå"), "figure.walk", action: .walk(phase))
@@ -1565,7 +1575,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     private func addPageRow(_ title: String, _ symbol: String, page: AddPage) -> some View {
-        Button { addPage = page } label: {
+        Button { addSubpageOverride = page } label: {
             HStack(spacing: 13) {
                 Image(systemName: symbol).foregroundStyle(bronze).frame(width: 28)
                 Text(title).font(.subheadline.weight(.medium)).foregroundStyle(ink)
@@ -1586,7 +1596,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     ) -> some View {
         Button {
             queuedAddAction = action
-            addSheetPhase = nil
+            addSheetRequest = nil
         } label: {
             HStack(spacing: 13) {
                 Image(systemName: icon)
