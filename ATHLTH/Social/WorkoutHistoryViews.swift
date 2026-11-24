@@ -317,6 +317,7 @@ struct WorkoutHistoryDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var phoneRecorder: IPhoneWorkoutStore
 
     let workout: SocialPublishableWorkout
 
@@ -327,6 +328,14 @@ struct WorkoutHistoryDetailView: View {
     @State private var showingReview = false
     @State private var startingGhostRace = false
     @State private var ghostRaceError: String?
+    @State private var ghostCaptureDevice: WorkoutCaptureDevice = .iPhone
+
+    private var ghostDeviceReady: Bool {
+        switch ghostCaptureDevice {
+        case .iPhone: return phoneRecorder.active == nil
+        case .appleWatch: return watchConnection.isReady && !watchConnection.workoutLaunchInProgress
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -496,14 +505,14 @@ struct WorkoutHistoryDetailView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Race this effort")
+                    Text(ATHLTHLocalization.choose(english: "Race this workout", norwegian: "Konkurrer mot denne økten"))
                         .font(.headline)
 
                     Text(
                         healthDetailLoaded &&
                         healthDetail.route.count >= 2
-                            ? "Use this GPS run as a live ghost."
-                            : "A saved GPS route is required."
+                            ? ATHLTHLocalization.choose(english: "Replay your recorded GPS effort.", norwegian: "Løp mot din registrerte GPS-økt.")
+                            : ATHLTHLocalization.choose(english: "A recorded GPS route is required.", norwegian: "En registrert GPS-rute er påkrevd.")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -530,10 +539,15 @@ struct WorkoutHistoryDetailView: View {
                     startingGhostRace ||
                     !healthDetailLoaded ||
                     healthDetail.route.count < 2 ||
-                    settings.trainingDeviceProvider != .appleWatch ||
-                    !watchConnection.isReady
+                    !ghostDeviceReady
                 )
             }
+            Picker(ATHLTHLocalization.choose(english: "Recording device", norwegian: "Registreringsenhet"), selection: $ghostCaptureDevice) {
+                Text("iPhone").tag(WorkoutCaptureDevice.iPhone)
+                Text("Apple Watch").tag(WorkoutCaptureDevice.appleWatch)
+            }
+            .pickerStyle(.segmented)
+            .padding(.top, 10)
         }
     }
 
@@ -543,11 +557,10 @@ struct WorkoutHistoryDetailView: View {
             return
         }
 
-        guard settings.trainingDeviceProvider == .appleWatch,
-              watchConnection.isReady
-        else {
-            ghostRaceError =
-                "Connect Apple Watch before starting a Ghost Race."
+        guard ghostDeviceReady, !startingGhostRace else {
+            ghostRaceError = ATHLTHLocalization.choose(
+                english: "Finish the active recording or connect your chosen device.",
+                norwegian: "Avslutt aktiv registrering eller koble til valgt enhet.")
             return
         }
 
@@ -563,7 +576,13 @@ struct WorkoutHistoryDetailView: View {
                 ownerID: session.profile.userID,
                 ghostRace: ghostRace,
                 watchConnection: watchConnection,
-                settings: settings
+                phoneWorkout: phoneRecorder,
+                captureDevice: ghostCaptureDevice,
+                settings: settings,
+                maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                    configured: session.onboardingProfile?.maximumHeartRateBPM,
+                    dateOfBirth: session.onboardingProfile?.dateOfBirth
+                )
             )
         } catch {
             ghostRaceError = error.localizedDescription
