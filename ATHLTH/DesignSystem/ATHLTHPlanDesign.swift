@@ -330,7 +330,7 @@ struct ATHLTHQuickStartDeviceLaunchBar: View {
         switch watchSelection.resolve(apple: watchAvailable, garmin: garminCanStart) {
         case .appleWatch: onAppleWatch()
         case .garmin: onGarmin?()
-        case nil: showingWatchChoice = true
+        case .automatic, nil: showingWatchChoice = true
         }
     }
 
