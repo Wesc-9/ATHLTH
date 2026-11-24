@@ -77,6 +77,7 @@ struct ATHLTHStudioPlanCanvasView: View {
         var id: UUID { workout.id }
     }
     @State private var dropMode: DropMode = .move
+    @State private var targetedDayID: UUID?
     @State private var warning: String?
     @State private var actionToUndo: StudioAction?
     @State private var actionToRedo: StudioAction?
@@ -1074,7 +1075,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             .background(ATHLTHStudioStyle.canvas,
                         in: RoundedRectangle(cornerRadius: 10))
 
-            let saved = session.savedWorkoutTemplates.filter {
+            let saved = session.personalWorkoutTemplates.filter {
                 favorites.isFavorite(.workout, itemID: $0.id.uuidString) &&
                 $0.title.localizedStandardContains(favoriteQuery)
             }
@@ -1490,12 +1491,22 @@ struct ATHLTHStudioPlanCanvasView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 13)
                 .stroke(
-                    selected ? ATHLTHStudioStyle.gold.opacity(0.65)
-                             : ATHLTHStudioStyle.outline.opacity(0.35)
+                    targetedDayID == day.id ? ATHLTHStudioStyle.gold :
+                        (selected ? ATHLTHStudioStyle.gold.opacity(0.65)
+                             : ATHLTHStudioStyle.outline.opacity(0.35)),
+                    lineWidth: targetedDayID == day.id ? 2 : 1
                 )
         }
         .dropDestination(for: String.self) { values, _ in
-            handleDrop(values, into: day, plan: plan, weekIndex: weekIndex)
+            targetedDayID = nil
+            return handleDrop(values, into: day, plan: plan, weekIndex: weekIndex)
+        } isTargeted: { targeted in
+            let valid = date.map { Calendar.current.startOfDay(for: $0) >= Calendar.current.startOfDay(for: .now) } ?? false
+            if targeted && valid && !day.sessions.contains(where: \.isExplicitRestDay) {
+                targetedDayID = day.id
+            } else if targetedDayID == day.id {
+                targetedDayID = nil
+            }
         }
     }
 
