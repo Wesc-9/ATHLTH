@@ -27,7 +27,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
         case let .sendPlannedWorkoutToWatch(planID, workoutID):
             return "watch:\(planID.uuidString):\(workoutID.uuidString)"
         case let .startPlannedWorkoutAfter(planID, workoutID, seconds):
-            return "delayed:\(planID.uuidString):\(workoutID.uuidString):\(Int(seconds))"
+            return "delayed:\(planID.uuidString):\(workoutID.uuidString):\(seconds.bitPattern)"
         case let .quick(kind):
             return "quick:\(kind.title)"
         case .customQuick:

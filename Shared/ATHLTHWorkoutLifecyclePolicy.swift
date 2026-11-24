@@ -67,7 +67,7 @@ enum ATHLTHWorkoutLifecyclePolicy {
             guard phase == .work || phase == .recovery,
                   let stageIndex, let stageCount,
                   stageCount > 0, stageIndex >= 0,
-                  stageIndex + 1 < stageCount else { return nil }
+                  stageIndex < stageCount - 1 else { return nil }
             return phase
         }
     }
