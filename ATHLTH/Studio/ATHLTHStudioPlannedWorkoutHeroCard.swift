@@ -12,6 +12,7 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
     let onOpen: () -> Void
     let onStart: () -> Void
     var compact: Bool = false
+    var featured: Bool = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -21,12 +22,13 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
     private let outline = ATHLTHStudioStyle.outline
 
     private var horizontal: Bool {
-        (compact ? availableWidth >= 360 : availableWidth >= 760) &&
+        (featured ? availableWidth >= 420 : (compact ? availableWidth >= 360 : availableWidth >= 760)) &&
             !dynamicTypeSize.isAccessibilitySize
     }
 
     private var mediaWidth: CGFloat {
-        compact ? min(175, max(118, availableWidth * 0.32))
+        if featured { return min(270, max(125, availableWidth * 0.31)) }
+        return compact ? min(175, max(118, availableWidth * 0.32))
             : min(365, max(230, (availableWidth - 100) * 0.35))
     }
 
@@ -120,7 +122,7 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
             if horizontal {
                 HStack(spacing: 0) {
                     image
-                        .frame(width: mediaWidth, height: compact ? 182 : 225)
+                        .frame(width: mediaWidth, height: featured ? 220 : (compact ? 182 : 225))
                     information
                         .padding(compact ? 12 : 18)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -249,12 +251,12 @@ struct ATHLTHStudioPlannedWorkoutHeroCard: View {
     private var workoutButtons: some View {
                 if canStart {
                     Button(action: onStart) {
-                        Label(tr("Start workout", "Start økt"),
+                        Label(tr("Start training", "Start trening"),
                               systemImage: "play.fill")
                             .frame(minHeight: 38)
                             .padding(.horizontal, 13)
                             .foregroundStyle(.white)
-                            .background(ink, in: Capsule())
+                            .background(gold, in: Capsule())
                     }
                     .accessibilityIdentifier("athlth-ipad-featured-workout-start")
                 }
