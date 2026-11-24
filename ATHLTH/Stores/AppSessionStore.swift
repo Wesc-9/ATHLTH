@@ -4684,6 +4684,95 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    struct PlanStudioWeekMoveReceipt {
+        let planID: UUID
+        let sourceWeekID: UUID
+        let targetWeekID: UUID
+        let sessionIDs: Set<UUID>
+        let expectedVersionAfterMove: Int
+    }
+
+    /// Moves every day in one revision. Existing IDs, local targets and
+    /// exercise definitions are preserved; completed/history/shared sessions
+    /// are not silently rescheduled.
+    @discardableResult
+    func movePlanStudioWeek(
+        planID: UUID, sourceWeekID: UUID, targetWeekID: UUID,
+        expectedVersion: Int, healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> PlanStudioWeekMoveReceipt? {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              let sourceIndex = plan.weeks.firstIndex(where: { $0.id == sourceWeekID }),
+              let targetIndex = plan.weeks.firstIndex(where: { $0.id == targetWeekID }),
+              sourceIndex != targetIndex,
+              plan.weeks[targetIndex].days.allSatisfy(\.sessions.isEmpty)
+        else { return nil }
+        let sourceWeek = plan.weeks[sourceIndex]
+        let destination = plan.weeks[targetIndex]
+        let originals = sourceWeek.days.flatMap(\.sessions)
+        guard sourceWeek.days.count == 7, destination.days.count == 7,
+              !originals.isEmpty, Set(originals.map(\.id)).count == originals.count,
+              originals.allSatisfy({
+                  $0.cancelledAt == nil &&
+                  !PlannedWorkoutWithdrawalPolicy.isOrganizerWorkout($0) &&
+                  recordedTimes(for: $0.id)?.startedAt == nil &&
+                  !isPlanSessionSkipped(planID: planID, sessionID: $0.id) &&
+                  !isPlanSessionCompleted(planID: planID, sessionID: $0.id,
+                    healthWorkouts: healthWorkouts, strengthHistory: strengthHistory)
+              }) else { return nil }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        var moved: [PlannedSession] = []
+        for day in destination.days {
+            guard let source = sourceWeek.days.first(where: { $0.dayIndex == day.dayIndex }),
+                  let sourceLocation = planStudioDayLocation(in: plan, dayID: source.id),
+                  let target = planStudioDayLocation(in: plan, dayID: day.id),
+                  sourceLocation.date >= today, target.date >= today else { return nil }
+            var sessions: [PlannedSession] = []
+            for original in source.sessions {
+                var workout = original
+                if let scheduled = original.scheduledStart {
+                    let time = calendar.dateComponents([.hour, .minute, .second], from: scheduled)
+                    guard let newDate = calendar.date(bySettingHour: time.hour ?? 18,
+                        minute: time.minute ?? 0, second: time.second ?? 0, of: target.date)
+                    else { return nil }
+                    workout.scheduledStart = newDate
+                }
+                sessions.append(workout)
+                moved.append(workout)
+            }
+            plan.weeks[targetIndex].days[target.day].sessions = sessions
+        }
+        for index in plan.weeks[sourceIndex].days.indices {
+            plan.weeks[sourceIndex].days[index].sessions.removeAll()
+        }
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        for workout in moved { PlannedWorkoutReminderScheduler.sync(workout) }
+        return PlanStudioWeekMoveReceipt(planID: planID, sourceWeekID: sourceWeekID,
+            targetWeekID: targetWeekID, sessionIDs: Set(moved.map(\.id)),
+            expectedVersionAfterMove: plan.version)
+    }
+
+    @discardableResult
+    func undoPlanStudioWeekMove(
+        _ receipt: PlanStudioWeekMoveReceipt,
+        healthWorkouts: [WorkoutSummary], strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard let plan = trainingPlan(withID: receipt.planID),
+              plan.version == receipt.expectedVersionAfterMove,
+              let week = plan.weeks.first(where: { $0.id == receipt.targetWeekID }),
+              Set(week.days.flatMap(\.sessions).map(\.id)) == receipt.sessionIDs
+        else { return false }
+        return movePlanStudioWeek(planID: receipt.planID,
+            sourceWeekID: receipt.targetWeekID, targetWeekID: receipt.sourceWeekID,
+            expectedVersion: plan.version, healthWorkouts: healthWorkouts,
+            strengthHistory: strengthHistory) != nil
+    }
+
     /// Undo only the exact week-copy transaction that is still current.
     /// Any intervening edit/version bump prevents rollback rather than
     /// overwriting other changes or recorded training.
