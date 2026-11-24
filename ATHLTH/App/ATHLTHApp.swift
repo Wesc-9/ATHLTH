@@ -1595,6 +1595,16 @@ struct AppRootView: View {
                 }
             }
             Button(ATHLTHLocalization.choose(
+                english: "Allow view and control",
+                norwegian: "Tillat visning og styring"
+            )) {
+                Task {
+                    await crossDeviceWorkout.respondToRequest(
+                        approve: true, accountID: appSession.profile.userID, allowControl: true
+                    )
+                }
+            }
+            Button(ATHLTHLocalization.choose(
                 english: "Decline",
                 norwegian: "Avslå"
             ), role: .cancel) {
@@ -1613,8 +1623,8 @@ struct AppRootView: View {
                         norwegian: "Aktiv økt"
                     )) +
                 ATHLTHLocalization.choose(
-                    english: "\nOnly the current workout can be viewed. Access ends automatically with this session. No workout controls are transferred.",
-                    norwegian: "\nKun denne økten kan vises. Tilgangen avsluttes automatisk når økten er ferdig. Ingen treningskontroller overføres."
+                    english: "\nChoose viewing only or explicitly allow supported controls. Access ends with this workout.",
+                    norwegian: "\nVelg kun visning eller tillat støttede treningskontroller. Tilgangen opphører når økten avsluttes."
                 )
             )
         }
@@ -1645,7 +1655,9 @@ struct AppRootView: View {
                 phone: phoneWorkout,
                 strength: strengthWorkout,
                 mirroredWatch: workoutMirroring,
-                spotify: spotifyPlayback
+                spotify: spotifyPlayback,
+                watchConnection: watchConnection,
+                appSession: appSession
             )
         }
         .onChange(of: crossDeviceWorkout.remote?.sessionID) { _, _ in
