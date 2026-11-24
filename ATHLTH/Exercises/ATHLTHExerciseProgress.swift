@@ -3,7 +3,7 @@ import Foundation
 /// Per-exercise, recorded-only strength progress. Planned weights and
 /// exercises that were never completed do not count as achieved results.
 enum ATHLTHExerciseProgress {
-    struct Session: Identifiable, Equatable {
+    struct Session: Identifiable, Codable, Equatable {
         let id: UUID
         let date: Date
         let workoutTitle: String
@@ -11,6 +11,45 @@ enum ATHLTHExerciseProgress {
         let repetitions: Int
         let volumeKilograms: Double
         let highestWeightKilograms: Double?
+    }
+
+    /// Frozen local-only reference for a specific active workout/exercise.
+    /// It is not embedded in shared workouts or their HealthKit exports.
+    struct GhostReference: Codable, Equatable {
+        let workoutID: UUID
+        let exerciseID: UUID
+        let exerciseSnapshot: ExerciseSnapshot
+        let result: Session
+
+        func applies(to workoutID: UUID, exercise: StrengthExerciseLog) -> Bool {
+            self.workoutID == workoutID && exerciseID == exercise.id &&
+                ATHLTHCoachStrengthComparableHistory.isSameExercise(exerciseSnapshot, exercise.exercise)
+        }
+    }
+
+    struct GhostProgress: Equatable {
+        let sets: Int
+        let reps: Int
+        let volume: Double
+        let peakWeight: Double?
+
+        init(sets entries: [StrengthSetLog]) {
+            let completed = entries.filter(\.countsTowardTrainingLoad)
+            sets = completed.count
+            reps = completed.compactMap(\.resolvedCompletedReps).reduce(0, +)
+            volume = completed.reduce(0) { sum, entry in
+                guard let load = entry.completedWeightKilograms, load.isFinite,
+                      load > 0, let reps = entry.resolvedCompletedReps, reps > 0 else { return sum }
+                return sum + load * Double(reps)
+            }
+            peakWeight = completed.compactMap(\.completedWeightKilograms)
+                .filter { $0.isFinite && $0 > 0 }.max()
+        }
+
+        func setProgress(against reference: Session) -> Double {
+            guard reference.completedSets > 0 else { return 0 }
+            return min(1, Double(sets) / Double(reference.completedSets))
+        }
     }
 
     struct Summary: Equatable {

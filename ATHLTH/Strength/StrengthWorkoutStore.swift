@@ -260,6 +260,43 @@ final class StrengthWorkoutStore: ObservableObject {
 
     private var accountID: UUID?
     private var loadingAccount = false
+    @Published private(set) var activeGhostReferences: [UUID: ATHLTHExerciseProgress.GhostReference] = [:]
+
+    func ghostReference(for exercise: StrengthExerciseLog) -> ATHLTHExerciseProgress.GhostReference? {
+        guard let workout = activeWorkout, let reference = activeGhostReferences[exercise.id],
+              reference.applies(to: workout.id, exercise: exercise),
+              workoutHistory.contains(where: { $0.id == reference.result.id && $0.isFinished })
+        else { return nil }
+        return reference
+    }
+
+    @discardableResult
+    func pinGhostReference(workoutID: UUID, exerciseID: UUID, historicalWorkoutID: UUID) -> Bool {
+        guard let workout = activeWorkout, workout.id == workoutID,
+              let exercise = workout.exercises.first(where: { $0.id == exerciseID }),
+              exercise.isEmbeddedRunningInterval != true else { return false }
+        let snapshot = exercise.exercise
+        // Require known movement and load/equipment provenance, not name alone.
+        guard ATHLTHCoachStrengthComparableHistory.isSameExercise(snapshot, snapshot) else { return false }
+        let summary = ATHLTHExerciseProgress.summary(
+            exerciseID: snapshot.libraryExerciseID ?? exercise.plannedExerciseID ?? exercise.id,
+            name: snapshot.name, isCustom: snapshot.libraryExerciseID == nil,
+            workouts: workoutHistory, reference: snapshot)
+        guard let reference = summary.sessions.first(where: { $0.id == historicalWorkoutID }),
+              reference.completedSets > 0 else { return false }
+        activeGhostReferences = activeGhostReferences.filter { $0.value.workoutID == workoutID }
+        activeGhostReferences[exerciseID] = .init(
+            workoutID: workoutID, exerciseID: exerciseID,
+            exerciseSnapshot: snapshot, result: reference)
+        persistCheckpointNow()
+        return true
+    }
+
+    func clearGhostReference(workoutID: UUID, exerciseID: UUID) {
+        guard activeWorkout?.id == workoutID else { return }
+        activeGhostReferences.removeValue(forKey: exerciseID)
+        persistCheckpointNow()
+    }
 
     /// The Watch command observer must not process, publish or acknowledge
     /// account-owned set data before the authoritative store has actually
@@ -296,6 +333,7 @@ final class StrengthWorkoutStore: ObservableObject {
         var setEffortClock: StrengthSetEffortClock? = nil
         var cardioWatchCaptures: [UUID: StrengthWatchCardioCapture]? = nil
         var savedAt: Date? = nil
+        var ghostReferences: [UUID: ATHLTHExerciseProgress.GhostReference]? = nil
     }
 
     init() {
@@ -309,6 +347,7 @@ final class StrengthWorkoutStore: ObservableObject {
         loadingAccount = true
         defer { loadingAccount = false }
         accountID = userID
+        activeGhostReferences = [:]
         cardioWatchCaptures = [:]
         watchCaptureNeedsBaseline = []
         completedWorkout = nil
@@ -350,6 +389,13 @@ final class StrengthWorkoutStore: ObservableObject {
                 }
            ) {
             activeWorkout = nil
+        }
+        if let workout = activeWorkout {
+            activeGhostReferences = (checkpoint?.ghostReferences ?? [:]).filter { _, reference in
+                reference.workoutID == workout.id &&
+                    workout.exercises.contains(where: { reference.applies(to: workout.id, exercise: $0) }) &&
+                    workoutHistory.contains(where: { $0.id == reference.result.id && $0.isFinished })
+            }
         }
         recoveredCheckpointSavedAt =
             activeWorkout == nil
@@ -536,7 +582,10 @@ final class StrengthWorkoutStore: ObservableObject {
                 timedSetCountdown: timedSetCountdown,
                 setEffortClock: setEffortClock,
                 cardioWatchCaptures: cardioWatchCaptures,
-                savedAt: Date()
+                savedAt: Date(),
+                ghostReferences: activeWorkout.map { workout in
+                    activeGhostReferences.filter { $0.value.workoutID == workout.id }
+                }
             ),
             name: "strengthActive",
             userID: accountID

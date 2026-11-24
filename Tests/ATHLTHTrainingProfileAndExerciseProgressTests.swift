@@ -129,6 +129,17 @@ final class ATHLTHTrainingProfileAndExerciseProgressTests: XCTestCase {
         )
     }
 
+    func testGhostProgressNeverCountsPlannedSetsOrExceedsProgressRange() {
+        let progress = ATHLTHExerciseProgress.GhostProgress(sets: [])
+        let reference = ATHLTHExerciseProgress.Session(
+            id: UUID(), date: Date(), workoutTitle: "Reference", completedSets: 3,
+            repetitions: 24, volumeKilograms: 1200, highestWeightKilograms: 50)
+        XCTAssertEqual(progress.sets, 0)
+        XCTAssertEqual(progress.reps, 0)
+        XCTAssertEqual(progress.volume, 0)
+        XCTAssertEqual(progress.setProgress(against: reference), 0)
+    }
+
     func testExerciseProgressCountsOnlyActualWorkingSetsAndCompletedWorkouts() {
         let summary = ATHLTHExerciseProgress.summary(
             exerciseID: UUID(), name: "Bench Press", isCustom: false,

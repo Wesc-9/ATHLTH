@@ -240,6 +240,22 @@ struct ActiveStrengthWorkoutView: View {
                                             }
                                         }
                                         .pickerStyle(.menu)
+                                        if let workout = strength.activeWorkout {
+                                            Button {
+                                                if strength.pinGhostReference(workoutID: workout.id,
+                                                    exerciseID: exercise.id, historicalWorkoutID: previous.id) {
+                                                    showingLiveExerciseHistory = false
+                                                }
+                                            } label: {
+                                                Label(ATHLTHLocalization.choose(
+                                                    english: "Pin as live Ghost", norwegian: "Fest som live Ghost"),
+                                                    systemImage: "flag.checkered")
+                                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                            }
+                                            .buttonStyle(.borderedProminent)
+                                            .tint(ATHLTHPlanDesign.accentInk)
+                                            .disabled(!ATHLTHCoachStrengthComparableHistory.isSameExercise(exercise.exercise, exercise.exercise))
+                                        }
                                         HStack {
                                             Text(ATHLTHLocalization.choose(english: "Recorded sets", norwegian: "Registrerte sett"))
                                             Spacer()
@@ -2600,7 +2616,8 @@ struct ActiveStrengthWorkoutView: View {
                                 workouts: strength.workoutHistory,
                                 reference: reference
                             )
-                            liveHistoryReferenceID = liveExerciseHistory?.sessions.last?.id
+                            liveHistoryReferenceID = strength.ghostReference(for: exercise)?.result.id ??
+                                liveExerciseHistory?.sessions.last?.id
                             showingLiveExerciseHistory = true
                         } label: {
                             HStack {
@@ -2620,6 +2637,9 @@ struct ActiveStrengthWorkoutView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("athlth-live-exercise-history")
+                        if let ghost = strength.ghostReference(for: exercise) {
+                            liveStrengthGhostCard(ghost, exercise: exercise)
+                        }
                     }
 
                     if exercise.isEmbeddedRunningInterval != true &&
@@ -5211,6 +5231,59 @@ struct ActiveStrengthWorkoutView: View {
         )
 
         return values
+    }
+
+    private func liveStrengthGhostCard(
+        _ ghost: ATHLTHExerciseProgress.GhostReference, exercise: StrengthExerciseLog
+    ) -> some View {
+        let progress = ATHLTHExerciseProgress.GhostProgress(sets: exercise.sets)
+        let reference = ghost.result
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Ghost", systemImage: "flag.checkered")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Spacer()
+                Button {
+                    strength.clearGhostReference(workoutID: ghost.workoutID, exerciseID: exercise.id)
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(english: "Remove Ghost", norwegian: "Fjern Ghost"))
+            }
+            Text(reference.date.formatted(date: .abbreviated, time: .omitted) + " · " + reference.workoutTitle)
+                .font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            ProgressView(value: progress.setProgress(against: reference))
+                .tint(ATHLTHPlanDesign.accentInk)
+            HStack {
+                Text(ATHLTHLocalization.choose(english: "Completed sets", norwegian: "Fullførte sett"))
+                Spacer()
+                Text("\(progress.sets) / \(reference.completedSets)").monospacedDigit()
+            }
+            HStack {
+                Text(ATHLTHLocalization.choose(english: "Repetitions", norwegian: "Repetisjoner"))
+                Spacer()
+                Text("\(progress.reps) / \(reference.repetitions)").monospacedDigit()
+            }
+            if reference.volumeKilograms > 0, progress.volume.isFinite {
+                HStack {
+                    Text(ATHLTHLocalization.choose(english: "Recorded volume", norwegian: "Registrert volum"))
+                    Spacer()
+                    Text(String(format: "%.0f / %.0f kg", progress.volume, reference.volumeKilograms))
+                        .monospacedDigit()
+                }
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Historical comparison only. Follow your planned load; do not increase it just to beat Ghost.",
+                norwegian: "Historisk sammenligning. Følg planlagt belastning; ikke øk vekten bare for å slå Ghost."))
+                .font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .font(.subheadline)
+        .padding(14)
+        .athlthTrainPaper()
+        .accessibilityIdentifier("athlth-live-strength-ghost")
     }
 
     private func focusedExerciseLibraryEntry(
