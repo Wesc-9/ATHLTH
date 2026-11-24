@@ -194,7 +194,15 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
     @State private var showingTrain = false
     @State private var studioStartChoice: ATHLTHStudioSchedule.Occurrence?
-    @State private var showingStudioStartChoice = false
+    @StateObject private var registeredPhone = ATHLTHRegisteredPhoneAvailability()
+    @State private var pendingStudioStart: StudioStartAction?
+    @State private var showingQuickActivityPicker = false
+    @State private var pendingQuickActivity: ATHLTHTrainNavigationRequest?
+
+    private enum StudioStartAction {
+        case local(ATHLTHStudioSchedule.Occurrence)
+        case relay(ATHLTHStudioSchedule.Occurrence, WorkoutCaptureDevice)
+    }
     @State private var studioLocalLaunch: StudioLocalLaunch?
     @State private var studioLaunchInProgress = false
     @State private var studioLaunchError: String?
@@ -280,28 +288,19 @@ struct ATHLTHiPadStudioRootView: View {
             )
             .environmentObject(session)
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(english: "Start training", norwegian: "Start trening"),
-            isPresented: $showingStudioStartChoice,
-            titleVisibility: .visible,
-            presenting: studioStartChoice
-        ) { item in
-            if canRelayStudioWorkout(item, device: .iPhone) {
-                Button("iPhone") { relayStudioWorkout(item, device: .iPhone) }
+        .sheet(item: $studioStartChoice, onDismiss: performPendingStudioStart) { item in
+            studioDevicePicker(item)
+        }
+        .sheet(isPresented: $showingQuickActivityPicker, onDismiss: {
+            guard let request = pendingQuickActivity else { return }
+            pendingQuickActivity = nil
+            trainRequest = request
+            showingTrain = true
+        }) {
+            ATHLTHStudioQuickActivityPicker { request in
+                pendingQuickActivity = request
+                showingQuickActivityPicker = false
             }
-            if localStudioRecipe(item.workout) != nil {
-                Button(ATHLTHLocalization.choose(
-                    english: "iPad · manual workout", norwegian: "iPad · manuell økt"
-                )) { startLocalStudioWorkout(item) }
-            }
-            if canRelayStudioWorkout(item, device: .appleWatch) {
-                Button(ATHLTHLocalization.choose(
-                    english: "Apple Watch via iPhone", norwegian: "Apple Watch via iPhone"
-                )) { relayStudioWorkout(item, device: .appleWatch) }
-            }
-            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
-        } message: { item in
-            Text(item.workout.title)
         }
         .alert(
             ATHLTHLocalization.choose(english: "Unable to start workout", norwegian: "Kunne ikke starte økten"),
@@ -735,6 +734,18 @@ struct ATHLTHiPadStudioRootView: View {
                             sidebarPage == nil
                     ) { openStudio(.overview) }
                     .accessibilityIdentifier("athlth-ipad-sidebar-home")
+                    .keyboardShortcut("1", modifiers: [.command])
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Train now", norwegian: "Tren nå"),
+                        symbol: "play.circle",
+                        selected: false
+                    ) {
+                        pendingQuickActivity = nil
+                        showingQuickActivityPicker = true
+                    }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .accessibilityIdentifier("athlth-ipad-sidebar-quick-train")
 
                     ATHLTHStudioInboxSidebarButton(
                         selected: showingInspector,
@@ -753,6 +764,7 @@ struct ATHLTHiPadStudioRootView: View {
                         symbol: "magnifyingglass",
                         selected: sidebarPage == .search
                     ) { openSidebarPage(.search) }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
 
                     Divider().padding(.vertical, 7).padding(.horizontal, 10)
 
@@ -762,6 +774,7 @@ struct ATHLTHiPadStudioRootView: View {
                         selected: selection == .planner && libraryPage == nil &&
                             sidebarPage == nil
                     ) { openStudio(.planner) }
+                    .keyboardShortcut("2", modifiers: [.command])
 
                     trainingLibraryShortcut
 
@@ -808,6 +821,7 @@ struct ATHLTHiPadStudioRootView: View {
                         selected: selection == .insights && libraryPage == nil &&
                             sidebarPage == nil
                     ) { openStudio(.insights) }
+                    .keyboardShortcut("3", modifiers: [.command])
                     .contextMenu {
                         Button {
                             openStudio(.history)
@@ -1253,7 +1267,9 @@ struct ATHLTHiPadStudioRootView: View {
         pendingWeekStandaloneWorkout = nil
         selectedStandaloneWorkout = nil
         studioStartChoice = nil
-        showingStudioStartChoice = false
+        pendingStudioStart = nil
+        showingQuickActivityPicker = false
+        pendingQuickActivity = nil
         studioLocalLaunch = nil
         studioLaunchInProgress = false
         studioLaunchError = nil
@@ -1319,8 +1335,120 @@ struct ATHLTHiPadStudioRootView: View {
             }
             return
         }
+        pendingStudioStart = nil
         studioStartChoice = item
-        showingStudioStartChoice = true
+    }
+
+    private func performPendingStudioStart() {
+        guard let action = pendingStudioStart else { return }
+        pendingStudioStart = nil
+        switch action {
+        case .local(let item): startLocalStudioWorkout(item)
+        case .relay(let item, let device): relayStudioWorkout(item, device: device)
+        }
+    }
+
+    private func studioDevicePicker(_ item: ATHLTHStudioSchedule.Occurrence) -> some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(item.workout.title)
+                        .font(.system(size: 25, weight: .semibold, design: .serif))
+                        .foregroundStyle(ink)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose the device that records your workout.",
+                        norwegian: "Velg enheten som skal registrere treningen."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    if localStudioRecipe(item.workout) != nil {
+                        studioDeviceRow(
+                            title: ATHLTHLocalization.choose(english: "This iPad", norwegian: "Denne iPaden"),
+                            subtitle: ATHLTHLocalization.choose(english: "Manual workout · no sensor recording", norwegian: "Manuell økt · uten sensormålinger"),
+                            symbol: "ipad.landscape", enabled: true
+                        ) {
+                            pendingStudioStart = .local(item)
+                            studioStartChoice = nil
+                        }
+                    }
+                    if registeredPhone.status == .registered {
+                        if canRelayStudioWorkout(item, device: .iPhone) {
+                            studioDeviceRow(
+                                title: "iPhone",
+                                subtitle: ATHLTHLocalization.choose(english: "Registered · connection verified at start", norwegian: "Registrert · tilkobling sjekkes ved start"),
+                                symbol: "iphone", enabled: true
+                            ) {
+                                pendingStudioStart = .relay(item, .iPhone)
+                                studioStartChoice = nil
+                            }
+                        }
+                        if canRelayStudioWorkout(item, device: .appleWatch) {
+                            studioDeviceRow(
+                                title: "Apple Watch",
+                                subtitle: ATHLTHLocalization.choose(english: "Via iPhone · Watch pairing checked at start", norwegian: "Via iPhone · klokken sjekkes ved start"),
+                                symbol: "applewatch", enabled: true
+                            ) {
+                                pendingStudioStart = .relay(item, .appleWatch)
+                                studioStartChoice = nil
+                            }
+                        }
+                    } else if registeredPhone.status == .checking {
+                        ProgressView(ATHLTHLocalization.choose(english: "Checking registered devices…", norwegian: "Sjekker registrerte enheter…"))
+                    } else {
+                        Text(registeredPhone.status == .notRegistered
+                             ? ATHLTHLocalization.choose(english: "No recent iPhone registration on this account.", norwegian: "Ingen nylig registrert iPhone på denne kontoen.")
+                             : ATHLTHLocalization.choose(english: "Could not verify devices. Try again.", norwegian: "Kunne ikke bekrefte enhetene. Prøv igjen."))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button(ATHLTHLocalization.choose(english: "Refresh devices", norwegian: "Oppdater enheter")) {
+                            Task { await registeredPhone.refresh(for: session.profile.userID) }
+                        }
+                    }
+                }
+                .padding(22)
+                .frame(maxWidth: 540)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .background(canvas)
+            .navigationTitle(ATHLTHLocalization.choose(english: "Start training", norwegian: "Start trening"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                        pendingStudioStart = nil
+                        studioStartChoice = nil
+                    }
+                }
+            }
+            .task(id: session.profile.userID) {
+                await registeredPhone.refresh(for: session.profile.userID)
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func studioDeviceRow(title: String, subtitle: String, symbol: String,
+                                 enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.title2)
+                    .foregroundStyle(gold)
+                    .frame(width: 44, height: 44)
+                    .background(gold.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline).foregroundStyle(ink)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").foregroundStyle(gold)
+            }
+            .padding(12)
+            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     private func checkedStudioWorkout(_ item: ATHLTHStudioSchedule.Occurrence) -> PlannedSession? {
