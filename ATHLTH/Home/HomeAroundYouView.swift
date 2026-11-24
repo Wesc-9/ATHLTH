@@ -2954,56 +2954,6 @@ struct AroundYouExploreView: View {
             .lineLimit(1)
     }
 
-    private func leaderboardChip(
-        _ attempt: RouteAttemptRecord,
-        rank: Int
-    ) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 3) {
-                Text("#\(rank)")
-                    .foregroundStyle(
-                        rank == 1
-                            ? ATHLTHTheme.premiumGold
-                            : ATHLTHTheme.mutedText
-                    )
-
-                Text(
-                    attempt.userID ==
-                        session.profile.userID
-                        ? "You"
-                        : compactAthleteName(attempt)
-                )
-                .lineLimit(1)
-            }
-            .font(
-                .system(
-                    size: 9,
-                    weight: .semibold
-                )
-            )
-
-            Text(
-                routeClock(
-                    attempt.durationSeconds
-                )
-            )
-            .font(
-                .caption
-                    .monospacedDigit()
-                    .weight(.bold)
-            )
-        }
-        .foregroundStyle(ATHLTHTheme.primaryText)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 7)
-        .background(
-            Color.primary.opacity(0.035),
-            in: RoundedRectangle(
-                cornerRadius: 11,
-                style: .continuous
-            )
-        )
-    }
 
     @ViewBuilder
     private func creatorAvatar(

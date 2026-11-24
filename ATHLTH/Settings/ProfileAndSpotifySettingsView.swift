@@ -914,25 +914,6 @@ struct ATHLTHEditProfileView: View {
         .buttonStyle(.plain)
     }
 
-    private func profileField<Field: View>(
-        title: String,
-        icon: String,
-        @ViewBuilder field: () -> Field
-    ) -> some View {
-        HStack(spacing: 12) {
-            profileFieldIcon(icon)
-
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-
-            Spacer(minLength: 12)
-
-            field()
-                .foregroundStyle(ATHLTHTheme.primaryText)
-        }
-        .padding(.vertical, 15)
-    }
 
     private func profileFieldIcon(_ systemImage: String) -> some View {
         Image(systemName: systemImage)
