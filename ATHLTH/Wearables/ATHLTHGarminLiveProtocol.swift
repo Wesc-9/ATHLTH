@@ -9,16 +9,22 @@ struct ATHLTHGarminLiveRequest: Equatable {
     let id: UUID
     let sport: ATHLTHGarminLiveSport
     let expiresAt: Date
+    let recipe: ATHLTHGarminEnduranceRecipe?
 
-    init(id: UUID = UUID(), sport: ATHLTHGarminLiveSport, now: Date = .now) {
+    init(id: UUID = UUID(), sport: ATHLTHGarminLiveSport, now: Date = .now,
+         recipe: ATHLTHGarminEnduranceRecipe? = nil) {
         self.id = id
         self.sport = sport
         self.expiresAt = now.addingTimeInterval(90)
+        self.recipe = recipe
     }
 
     var message: [String: Any] {
-        ["v": 1, "kind": "prepare", "id": id.uuidString, "sport": sport.rawValue,
-         "expires": Int(expiresAt.timeIntervalSince1970)]
+        var payload: [String: Any] = ["v": recipe == nil ? 1 : 2,
+            "kind": "prepare", "id": id.uuidString, "sport": sport.rawValue,
+            "expires": Int(expiresAt.timeIntervalSince1970)]
+        if let recipe { payload["recipe"] = recipe.message }
+        return payload
     }
 }
 
@@ -36,9 +42,14 @@ struct ATHLTHGarminLiveEvent: Equatable {
     let seconds: Double?
     let meters: Double?
     let bpm: Double?
+    let stepIndex: Int?
+    let stepID: UUID?
+    let recipeComplete: Bool?
+    let version: Int
 
     init?(message: [String: Any]) {
-        guard message["v"] as? Int == 1, message["kind"] as? String == "event",
+        guard let version = message["v"] as? Int, [1, 2].contains(version),
+              message["kind"] as? String == "event",
               let raw = message["id"] as? String, let id = UUID(uuidString: raw),
               let sequence = message["seq"] as? Int, sequence > 0,
               let state = message["state"] as? String, let phase = ATHLTHGarminLivePhase(rawValue: state)
@@ -49,12 +60,16 @@ struct ATHLTHGarminLiveEvent: Equatable {
                   number.doubleValue <= maximum else { return nil }
             return number.doubleValue
         }
+        self.version = version
         requestID = id
         self.sequence = sequence
         self.phase = phase
         seconds = measurement("seconds", maximum: 172800)
         meters = measurement("meters", maximum: 1000000)
         bpm = measurement("bpm", maximum: 300).flatMap { $0 > 0 ? $0 : nil }
+        stepIndex = (message["stepIndex"] as? Int).flatMap { $0 >= 0 && $0 < 32 ? $0 : nil }
+        stepID = (message["stepID"] as? String).flatMap(UUID.init(uuidString:))
+        recipeComplete = message["recipeComplete"] as? Bool
     }
 }
 
@@ -78,6 +93,15 @@ struct ATHLTHGarminLiveHandshake {
         guard device == deviceID, event.requestID == request.id,
               event.sequence > (latest?.sequence ?? 0),
               latest?.phase.terminal != true else { return false }
+        if let recipe = request.recipe {
+            guard event.version == 2, let index = event.stepIndex,
+                  recipe.steps.indices.contains(index),
+                  event.stepID == recipe.steps[index].id,
+                  index >= (latest?.stepIndex ?? 0),
+                  event.recipeComplete != true || index == recipe.steps.count - 1,
+                  latest?.recipeComplete != true || event.recipeComplete == true
+            else { return false }
+        } else if event.version != 1 { return false }
         if let previous = latest?.phase {
             switch (previous, event.phase) {
             case (.recording, .ready), (.paused, .ready),

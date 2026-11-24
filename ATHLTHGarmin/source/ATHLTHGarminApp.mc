@@ -39,6 +39,13 @@ class ATHLTHGarminSendListener extends Comms.ConnectionListener {
 // it never starts recording without an explicit select on the watch.
 class ATHLTHGarminController {
     var requestID = null;
+    var version = 1;
+    var recipe = null;
+    var stepIndex = 0;
+    var stepTime = null;
+    var stepDistance = null;
+    var recipeComplete = false;
+    var waitingForNext = false;
     var sport = null;
     var expires = 0;
     var session = null;
@@ -70,7 +77,7 @@ class ATHLTHGarminController {
     function received(message) {
         var data = message.data;
         if (!(data instanceof Lang.Dictionary)) { return; }
-        if (data["v"] != 1) { return; }
+        if (data["v"] != 1 && data["v"] != 2) { return; }
         var command = data["kind"];
         if (command == "prepare") {
             var id = data["id"];
@@ -84,6 +91,16 @@ class ATHLTHGarminController {
             if (session != null || state == "recording" || state == "paused") { return; }
             if (id == requestID) { publish(); return; }
             if (state == "ready") { return; }
+            var incomingRecipe = data["recipe"];
+            if (data["v"] == 2 && (requestedSport == "strength" || !validRecipe(incomingRecipe))) { return; }
+            if (data["v"] == 1 && incomingRecipe != null) { return; }
+            version = data["v"];
+            recipe = incomingRecipe;
+            stepIndex = 0;
+            stepTime = null;
+            stepDistance = null;
+            recipeComplete = false;
+            waitingForNext = false;
             requestID = id;
             sport = requestedSport;
             expires = deadline;
@@ -122,6 +139,7 @@ class ATHLTHGarminController {
                 if (session != null && session.start()) {
                     state = "recording";
                     statusText = "START pause | BACK save";
+                    setStepAnchor(Activity.getActivityInfo());
                 } else {
                     state = "error";
                     statusText = "Recording not started";
@@ -186,9 +204,89 @@ class ATHLTHGarminController {
             statusText = "Request expired";
             publish();
         }
+        if (state == "recording" && recipe != null && !recipeComplete && !waitingForNext && !finishArmed) {
+            var info = Activity.getActivityInfo();
+            if (info != null) {
+                if (stepTime == null || stepDistance == null) { setStepAnchor(info); }
+                var step = recipe["steps"][stepIndex];
+                var progress = stepProgress(info);
+                if (progress != null && step["measure"] != "open" && progress >= step["target"]) {
+                    var steps = recipe["steps"];
+                    var nextNeedsConfirm = stepIndex + 1 < steps.size() &&
+                        step["phase"] == "warmup" && steps[stepIndex + 1]["phase"] != "warmup" &&
+                        recipe["autoStartMain"] == false;
+                    if ((step["measure"] == "time" && recipe["autoAdvance"] == false) || nextNeedsConfirm) {
+                        waitingForNext = true;
+                        statusText = "NEXT to continue";
+                        publish();
+                    } else { advanceStep(info); }
+                }
+            }
+        }
         tickCount += 1;
         if (session != null && tickCount % 5 == 0) { publish(); }
         Ui.requestUpdate();
+    }
+    function validRecipe(value) {
+        if (!(value instanceof Lang.Dictionary) || !(value["title"] instanceof Lang.String)) { return false; }
+        var steps = value["steps"];
+        if (!(steps instanceof Lang.Array) || steps.size() == 0 || steps.size() > 32) { return false; }
+        for (var i = 0; i < steps.size(); i++) {
+            var step = steps[i];
+            if (!(step instanceof Lang.Dictionary) || !(step["id"] instanceof Lang.String) ||
+                step["id"].length() != 36 || !(step["title"] instanceof Lang.String)) { return false; }
+            var measure = step["measure"];
+            if (measure != "time" && measure != "distance" && measure != "open") { return false; }
+            if (measure != "open") {
+                var target = step["target"];
+                if (!(target instanceof Lang.Number || target instanceof Lang.Float || target instanceof Lang.Double) ||
+                    !(target > 0 && target <= 172800)) { return false; }
+            }
+            for (var j = 0; j < i; j++) {
+                if (steps[j]["id"] == step["id"]) { return false; }
+            }
+        }
+        return true;
+    }
+    function setStepAnchor(info) {
+        if (info == null) { return; }
+        if (stepTime == null && info.timerTime != null) { stepTime = info.timerTime / 1000.0; }
+        if (stepDistance == null && info.elapsedDistance != null) { stepDistance = info.elapsedDistance; }
+    }
+    function stepProgress(info) {
+        if (recipe == null || info == null) { return null; }
+        var measure = recipe["steps"][stepIndex]["measure"];
+        if (measure == "time" && stepTime != null && info.timerTime != null) {
+            return info.timerTime / 1000.0 - stepTime;
+        }
+        if (measure == "distance" && stepDistance != null && info.elapsedDistance != null) {
+            return info.elapsedDistance - stepDistance;
+        }
+        return null;
+    }
+    function nextStep() {
+        if (state != "recording" || recipe == null || recipeComplete || finishArmed) { return false; }
+        var info = Activity.getActivityInfo();
+        if (info == null) { return false; }
+        // Manual next is for open steps and acknowledged timed targets only;
+        // do not claim a distance/time target completed early.
+        if (recipe["steps"][stepIndex]["measure"] != "open" && !waitingForNext) { return false; }
+        advanceStep(info);
+        return true;
+    }
+    function advanceStep(info) {
+        waitingForNext = false;
+        if (stepIndex + 1 >= recipe["steps"].size()) {
+            recipeComplete = true;
+            statusText = "Plan done | BACK save";
+        } else {
+            stepIndex += 1;
+            stepTime = null;
+            stepDistance = null;
+            setStepAnchor(info);
+            statusText = "START pause | NEXT step";
+        }
+        publish();
     }
     function sent() {
         sending = false;
@@ -198,8 +296,13 @@ class ATHLTHGarminController {
         if (requestID == null) { return; }
         if (sending) { pending = true; return; }
         sequence += 1;
-        var data = {"v" => 1, "kind" => "event", "id" => requestID,
+        var data = {"v" => version, "kind" => "event", "id" => requestID,
                     "seq" => sequence, "state" => state};
+        if (recipe != null) {
+            data["stepIndex"] = stepIndex;
+            data["stepID"] = recipe["steps"][stepIndex]["id"];
+            data["recipeComplete"] = recipeComplete;
+        }
         if (session != null && (state == "recording" || state == "paused")) {
             var info = Activity.getActivityInfo();
             if (info != null) {
@@ -228,6 +331,10 @@ class ATHLTHGarminView extends Ui.View {
         dc.setColor(Gfx.COLOR_WHITE, Gfx.COLOR_TRANSPARENT);
         var title = "Ready";
         if (controller.sport != null) { title = controller.sport; }
+        if (controller.recipe != null) {
+            title = controller.recipe["steps"][controller.stepIndex]["title"];
+            if (title.length() > 22) { title = title.substring(0, 22); }
+        }
         dc.drawText(w / 2, h * 29 / 100, Gfx.FONT_MEDIUM, title, Gfx.TEXT_JUSTIFY_CENTER);
         var main = controller.state;
         if (controller.session != null) {
@@ -242,7 +349,18 @@ class ATHLTHGarminView extends Ui.View {
             var data = Activity.getActivityInfo();
             var hr = "-- bpm";
             if (data != null && data.currentHeartRate != null) { hr = data.currentHeartRate.toString() + " bpm"; }
-            dc.drawText(w / 2, h * 64 / 100, Gfx.FONT_SMALL, hr, Gfx.TEXT_JUSTIFY_CENTER);
+            dc.drawText(w / 2, h * 61 / 100, Gfx.FONT_SMALL, hr, Gfx.TEXT_JUSTIFY_CENTER);
+            if (controller.recipe != null) {
+                var step = controller.recipe["steps"][controller.stepIndex];
+                var progress = controller.stepProgress(data);
+                var detail = (controller.stepIndex + 1).toString() + "/" + controller.recipe["steps"].size().toString();
+                if (progress != null && step["target"] != null && !controller.recipeComplete) {
+                    var remaining = step["target"] - progress;
+                    if (remaining < 0) { remaining = 0; }
+                    detail += " | " + remaining.format("%.0f") + (step["measure"] == "time" ? " s" : " m");
+                }
+                dc.drawText(w / 2, h * 70 / 100, Gfx.FONT_XTINY, detail, Gfx.TEXT_JUSTIFY_CENTER);
+            }
         }
         dc.setColor(0xC5AA76, Gfx.COLOR_TRANSPARENT);
         dc.drawText(w / 2, h * 78 / 100, Gfx.FONT_XTINY, controller.statusText, Gfx.TEXT_JUSTIFY_CENTER);
@@ -253,5 +371,6 @@ class ATHLTHGarminDelegate extends Ui.BehaviorDelegate {
     var controller;
     function initialize(owner) { BehaviorDelegate.initialize(); controller = owner; }
     function onSelect() { controller.select(); Ui.requestUpdate(); return true; }
+    function onNextPage() { var handled = controller.nextStep(); Ui.requestUpdate(); return handled; }
     function onBack() { var handled = controller.back(); Ui.requestUpdate(); return handled; }
 }
