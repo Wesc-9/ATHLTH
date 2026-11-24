@@ -25,6 +25,11 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddIntervals: (WorkoutPhaseKind) -> Void
     var onAddRunningPreset: (WorkoutPhaseKind, ATHLTHRunningExercisePreset) -> Void = { _, _ in }
     let onAddExercise: (WorkoutPhaseKind) -> Void
+    var onDropLibraryExercise: ((UUID, WorkoutPhaseKind) -> Bool)? = nil
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @State private var showingDragLibrary = false
+    @State private var dragLibraryQuery = ""
+    @State private var libraryDropPhase: WorkoutPhaseKind?
     let onAddFreeStrength: (WorkoutPhaseKind) -> Void
     let onAddSuperset: (WorkoutPhaseKind) -> Void
     let onAddCircuit: (WorkoutPhaseKind) -> Void
@@ -163,6 +168,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 addSectionMenu
             }
 
+            if ATHLTHDeviceRole.isIPad, let onDropLibraryExercise {
+                dragExerciseLibrary(onDrop: onDropLibraryExercise)
+            }
+
             // Library selection always uses the shared ATHLTH/Mine workout
             // picker. Keep it discoverable after the first step was added.
             if !phases.isEmpty {
@@ -260,6 +269,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 .padding(22)
                 .frame(maxWidth: .infinity)
                 .athlthPlanCard(radius: 22)
+                .dropDestination(for: String.self) { values, _ in
+                    receiveLibraryExercise(values, phase: .main)
+                }
             }
 
             if routeAsWholeWorkout == nil {
@@ -269,6 +281,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     }
                 } else {
                     simpleBuilderOutline
+                        .dropDestination(for: String.self) { values, _ in
+                            receiveLibraryExercise(values, phase: .main)
+                        }
                 }
             }
         }
@@ -682,6 +697,76 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
     }
 
+    private func receiveLibraryExercise(_ values: [String], phase: WorkoutPhaseKind) -> Bool {
+        guard ATHLTHDeviceRole.isIPad, let onDropLibraryExercise,
+              values.count == 1, let value = values.first,
+              value.hasPrefix("athlth-exercise:"),
+              let id = UUID(uuidString: String(value.dropFirst("athlth-exercise:".count)))
+        else { return false }
+        let inserted = onDropLibraryExercise(id, phase)
+        if inserted { collapsedPhases.remove(phase) }
+        return inserted
+    }
+
+    private func dragExerciseLibrary(onDrop: @escaping (UUID, WorkoutPhaseKind) -> Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                showingDragLibrary.toggle()
+            } label: {
+                HStack {
+                    Label(ATHLTHLocalization.choose(english: "Exercise library", norwegian: "Øvelsesbibliotek"),
+                          systemImage: "dumbbell")
+                    Spacer()
+                    Image(systemName: showingDragLibrary ? "chevron.up" : "chevron.down")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(bronze)
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            if showingDragLibrary {
+                TextField(ATHLTHLocalization.choose(english: "Search exercises", norwegian: "Søk øvelser"),
+                          text: $dragLibraryQuery)
+                    .textFieldStyle(.roundedBorder)
+                Text(ATHLTHLocalization.choose(english: "Drag into a workout section, or tap to add to the selected section.",
+                                                norwegian: "Dra inn i en kategori, eller trykk for å legge til i valgt kategori."))
+                    .font(.caption).foregroundStyle(.secondary)
+                let query = dragLibraryQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                let entries = exerciseLibrary.selectableExercises.lazy.filter {
+                    query.isEmpty || exerciseLibrary.localizedExerciseName($0).localizedStandardContains(query)
+                }.prefix(50)
+                if entries.isEmpty {
+                    Text(ATHLTHLocalization.choose(english: "No matching exercises", norwegian: "Ingen øvelser funnet"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 8) {
+                        ForEach(Array(entries), id: \.id) { entry in
+                            Button {
+                                if onDrop(entry.id, selectedPhase) { collapsedPhases.remove(selectedPhase) }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Image(systemName: "dumbbell").foregroundStyle(bronze)
+                                    Text(exerciseLibrary.localizedExerciseName(entry))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ink).lineLimit(2)
+                                }
+                                .frame(width: 116, height: 62, alignment: .leading)
+                                .padding(9)
+                                .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
+                            .draggable("athlth-exercise:\(entry.id.uuidString)")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .athlthPlanCard(radius: 19)
+        .accessibilityIdentifier("athlth-ipad-exercise-drag-library")
+    }
+
     private func phaseCard(_ phase: WorkoutPhaseKind) -> some View {
         let rows = entries(in: phase)
         let expanded = advanced && !collapsedPhases.contains(phase)
@@ -823,9 +908,18 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 21)
                 .strokeBorder(
-                    selectedPhase == phase ? bronze.opacity(0.43)
-                        : ATHLTHPlanDesign.outline, lineWidth: 1
+                    libraryDropPhase == phase ? bronze :
+                        (selectedPhase == phase ? bronze.opacity(0.43)
+                        : ATHLTHPlanDesign.outline), lineWidth: libraryDropPhase == phase ? 2 : 1
                 )
+        }
+        .dropDestination(for: String.self) { values, _ in
+            libraryDropPhase = nil
+            return receiveLibraryExercise(values, phase: phase)
+        } isTargeted: { targeted in
+            guard ATHLTHDeviceRole.isIPad, onDropLibraryExercise != nil else { return }
+            if targeted { libraryDropPhase = phase }
+            else if libraryDropPhase == phase { libraryDropPhase = nil }
         }
         .shadow(color: bronze.opacity(0.055), radius: 10, y: 5)
         .zIndex(draggingID.map { id in
