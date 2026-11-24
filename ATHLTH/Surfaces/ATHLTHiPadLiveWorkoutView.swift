@@ -1159,8 +1159,11 @@ struct ATHLTHGymModeDisplay: View {
                         .foregroundStyle(delayed ? .orange : Self.gold)
                     ZStack {
                         if let fraction = ATHLTHGymModeClock.fraction(
-                            remaining: remaining, duration: snapshot.gymStageDuration
-                        ), ATHLTHGymModeClock.restRemaining(snapshot, at: now) == nil {
+                            remaining: remaining, duration: snapshot.gymStageDuration ??
+                                (ATHLTHGymModeClock.restRemaining(snapshot, at: now) == nil
+                                    ? snapshot.runningSteps?.first(where: { $0.index == snapshot.runningStepIndex })?.durationSeconds
+                                    : nil)
+                        ) {
                             Circle().stroke(Self.gold.opacity(0.12), lineWidth: 8)
                             Circle().trim(from: 0, to: fraction)
                                 .stroke(AngularGradient(colors: [Self.gold.opacity(0.48), Self.gold, .white],
@@ -1328,8 +1331,9 @@ private struct ATHLTHGymExercisePanel: View {
     private let gold = ATHLTHGymModeDisplay.gold
 
     private var entry: ExerciseLibraryEntry? {
-        if let localBlock {
-            return ATHLTHExerciseReferenceResolver.resolve(localBlock, in: library.allExercises)
+        if let localBlock,
+           let resolved = ATHLTHExerciseReferenceResolver.resolve(localBlock, in: library.allExercises) {
+            return resolved
         }
         if let id = reference.exerciseID {
             return library.allExercises.first { $0.id == id }
@@ -1458,7 +1462,7 @@ private struct ATHLTHGymExerciseMedia: View {
             } else { placeholder }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: scenePhase) {
+        .task(id: "\(scenePhase)-\(reduceMotion)-\(videoFailed)") {
             guard !reduceMotion, scenePhase == .active,
                   (allowed(video) == nil || videoFailed),
                   allowed(start) != nil, allowed(peak) != nil, start != peak else { return }
