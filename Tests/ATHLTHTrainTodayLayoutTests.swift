@@ -4,6 +4,21 @@ import XCTest
 
 final class ATHLTHTrainTodayLayoutTests: XCTestCase {
     @MainActor
+    func testDeferredTrainContentDoesNotBuildDuringParentConstruction() {
+        var builds = 0
+        let deferred = ATHLTHTrainDeferredContent {
+            builds += 1
+            return AnyView(Text("Today"))
+        }
+        let parent = VStack { deferred }
+        XCTAssertEqual(builds, 0)
+        let host = UIHostingController(rootView: parent)
+        host.loadViewIfNeeded()
+        _ = host.sizeThatFits(in: CGSize(width: 375, height: 800))
+        XCTAssertGreaterThan(builds, 0)
+    }
+
+    @MainActor
     func testWorkoutSuggestionsPreferRelevantAndDifferentCategories() {
         func make(_ category: String, _ difficulty: String, _ sortOrder: Int,
                   tags: [String] = []) -> WorkoutTemplateCatalogEntry {

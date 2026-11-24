@@ -6816,8 +6816,7 @@ struct ATHLTHTrainView: View {
                     // out of the parent ScrollView's AttributeGraph metadata.
                     // iOS 27.3 build 135 crashed while evaluating this tree
                     // during Home -> Train (stack-guard SIGSEGV).
-                    premiumTodayScreen
-                        .athlthStablePresentationBoundary()
+                    ATHLTHTrainDeferredContent(makeContent: { premiumTodayScreen })
                         .padding(.top, -40)
                         .zIndex(1)
                 }
@@ -7609,8 +7608,16 @@ struct ATHLTHTrainView: View {
         return latestKind
     }
 
-    @ViewBuilder
-    private var premiumTodayScreen: some View {
+    private var premiumTodayScreen: AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 10) {
+            delayedTrainStartBanner
+            ATHLTHTrainDeferredContent(makeContent: { makePremiumTodayDashboard() })
+                .id(displayedTrainDay)
+        })
+    }
+
+    @inline(never)
+    private func makePremiumTodayDashboard() -> AnyView {
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
         let planSessionIDs = Set(sessions.map(\.id))
@@ -7656,12 +7663,7 @@ struct ATHLTHTrainView: View {
             now: today
         )
 
-        VStack(alignment: .leading, spacing: 10) {
-            delayedTrainStartBanner
-
-            // Erase the dashboard's very large generic view type before
-            // combining it with the Today container's other branches.
-            AnyView(
+        return AnyView(
             ATHLTHTrainTodayPremiumView(
                 workoutCatalog: trainWorkoutCatalog,
                 isActive: isActive,
@@ -7790,17 +7792,8 @@ struct ATHLTHTrainView: View {
             onQuickCustom: { activity in startCustomQuick(as: activity) },
             onQuickFreeTraining: { startFreeTrainingQuick() },
             onGhostRace: { showingGhostHub = true }
-        )
             )
-        // Reset date-specific check-in and proposed workout state exactly
-        // once when the calendar day changes; never reset the live recorder.
-        .id(displayedTrainDay)
-        // The large Today view owns many closures and dynamic sections.
-        // Erase their composite view type *inside* the enclosing VStack:
-        // otherwise the type's metadata instantiation overflows the main
-        // thread's stack on some devices when switching Home -> Train.
-        .athlthStablePresentationBoundary()
-        }
+        )
     }
 
     // Keep the optional delayed-start banner independent of the heavy
@@ -15005,6 +14998,15 @@ private struct ProfileHexagonBadgeShape:
         path.closeSubpath()
         return path
     }
+}
+
+/// Defer expensive construction until SwiftUI evaluates the child body.
+struct ATHLTHTrainDeferredContent: View {
+    let makeContent: @MainActor () -> AnyView
+
+    @MainActor
+    @inline(never)
+    var body: AnyView { makeContent() }
 }
 
 // SwiftUI's metadata can be deeply nested when a tab contains many distinct
