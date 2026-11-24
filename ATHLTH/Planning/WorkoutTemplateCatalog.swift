@@ -1575,7 +1575,7 @@ struct WorkoutTemplateLibraryView: View {
                 .flatMap { $0.sessions }
         let names = catalog.entries.flatMap {
             ATHLTHWorkoutLibraryExerciseIndex.availableExercises(in: $0.blocks)
-        } + (session.savedWorkoutTemplates + scheduled).flatMap {
+        } + (session.personalWorkoutTemplates + scheduled).flatMap {
             ATHLTHWorkoutLibraryExerciseIndex.availableExercises(
                 in: ATHLTHUnifiedWorkout.editorBlocks(from: $0)
             )
@@ -1821,7 +1821,7 @@ struct WorkoutTemplateLibraryView: View {
                 catalog.entries.map { ($0.id, $0) },
                 uniquingKeysWith: { first, _ in first }
             ) : [:]
-        let matching = session.savedWorkoutTemplates.filter { workout in
+        let matching = session.personalWorkoutTemplates.filter { workout in
             guard sourceFilter.matches(
                 isPersonal: true,
                 isFavorite: favorites.isFavorite(
@@ -4312,7 +4312,7 @@ struct MyWorkoutTemplatesView: View {
     }
 
     private var displayedSavedWorkouts: [PlannedSession] {
-        session.savedWorkoutTemplates.filter {
+        session.personalWorkoutTemplates.filter {
             $0.title.localizedStandardContains(query) &&
             (!favoritesOnly || favorites.isFavorite(.workout, itemID: $0.id.uuidString))
         }
@@ -9189,7 +9189,7 @@ struct WorkoutTemplateBuilderView: View {
     private var savedWorkoutPickerSheet: some View {
         NavigationStack {
             List {
-                ForEach(session.savedWorkoutTemplates.filter { workout in
+                ForEach(session.personalWorkoutTemplates.filter { workout in
                     let imported = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
                     return !imported.isEmpty &&
                         ATHLTHStrengthModeAvailability.canImport(
@@ -9212,7 +9212,7 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     .foregroundStyle(studioInk)
                 }
-                if !session.savedWorkoutTemplates.contains(where: {
+                if !session.personalWorkoutTemplates.contains(where: {
                     !($0.workoutBlocks ?? []).isEmpty
                 }) {
                     Text(tr("Save a structured workout under My workouts first.",
@@ -9424,6 +9424,15 @@ struct WorkoutTemplateBuilderView: View {
     private func saveToMyWorkouts(asNew: Bool = false) {
         actionNotice = nil
         guard canSave, let snapshot = libraryBoundSnapshot() else { return }
+        // A plan or a target adjustment of a published workout is never a
+        // new personal recipe with the same name.
+        guard !session.isPublishedWorkoutName(snapshot.title) else {
+            actionNotice = tr(
+                "This workout already exists in the library. Personal targets belong to the original. Use a different name for a new workout.",
+                "Økten finnes allerede i biblioteket. Personlige mål hører til originaløkten. Bruk et annet navn for en ny økt."
+            )
+            return
+        }
         if let savedTemplateID, !asNew,
            session.updateSavedWorkoutTemplate(snapshot, id: savedTemplateID) {
             savedToMyWorkouts = true
@@ -9469,7 +9478,7 @@ struct WorkoutTemplateBuilderView: View {
 
     private var saveBar: some View {
         VStack(spacing: 8) {
-            if (focusedPlannerDay != nil || onSaveSharedRevision != nil), let actionNotice {
+            if let actionNotice {
                 Label(actionNotice, systemImage: "info.circle")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(studioAccent)
@@ -10033,6 +10042,14 @@ struct WorkoutTemplateBuilderView: View {
             basicFreeRunning: isPlannedWorkout && !studioAdvanced &&
                 initialActivity == .running && studioBasicRunMode == .free
         )
+        if onSaveToPlan == nil, onAddStandalone == nil,
+           session.isPublishedWorkoutName(cleanTitle) {
+            actionNotice = tr(
+                "Choose a different name for a new workout.",
+                "Velg et annet navn for en ny treningsøkt."
+            )
+            return
+        }
         if sourceTemplateID != nil, onSaveToPlan == nil, onAddStandalone == nil {
             // Copying an ATHLTH/public recipe is an explicit new workout,
             // never a silent duplicate of the original.
@@ -10160,7 +10177,7 @@ struct SavedWorkoutPickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                if session.savedWorkoutTemplates.isEmpty {
+                if session.personalWorkoutTemplates.isEmpty {
                     ContentUnavailableView(
                         "No saved workouts",
                         systemImage: "rectangle.stack",
@@ -10171,7 +10188,7 @@ struct SavedWorkoutPickerView: View {
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(
-                        session.savedWorkoutTemplates
+                        session.personalWorkoutTemplates
                     ) { workout in
                         Button {
                             onSelect(workout)
