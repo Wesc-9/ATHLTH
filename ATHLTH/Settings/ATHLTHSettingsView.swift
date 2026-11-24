@@ -3366,6 +3366,9 @@ private struct SettingsDivider: View {
 }
 
 private struct ATHLTHTrainingDeviceSettingsView: View {
+    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    @EnvironmentObject private var session: AppSessionStore
+    #endif
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     var body: some View {
@@ -3488,6 +3491,26 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                         .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
                         .padding(.leading, 16)
 
+                    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+                    if session.signedIn && !session.previewModeEnabled {
+                        PremiumSettingsCard {
+                            NavigationLink {
+                                GarminPersonalSettingsView(accountID: session.profile.userID)
+                                    .id(session.profile.userID)
+                            } label: {
+                                Label("Garmin · Personal API", systemImage: "watch.analog")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(16)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("Sign in to your own ATHLTH account to use private Garmin testing.")
+                            .font(.caption)
+                    }
+                    #else
                     PremiumSettingsCard {
                         HStack(spacing: 14) {
                             Image(systemName: "watch.analog")
@@ -3529,6 +3552,7 @@ private struct ATHLTHTrainingDeviceSettingsView: View {
                         }
                         .padding(16)
                     }
+                    #endif
                 }
             }
             .padding(.horizontal, 18)
