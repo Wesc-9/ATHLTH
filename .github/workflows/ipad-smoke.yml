@@ -98,7 +98,7 @@ jobs:
           # Wait on a cheap Linux runner, not an occupied macOS runner.
           # Standalone iPad pushes may not trigger the iPhone workflow.
           for attempt in $(seq 1 80); do
-            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/launch-smoke.yml/runs?head_sha=$GITHUB_SHA&per_page=100" --jq '[.workflow_runs[] | select(.head_branch == env.GITHUB_REF_NAME and .head_sha == env.GITHUB_SHA and (.event == "push" or .event == "workflow_dispatch"))] | sort_by(.id) | last // empty')
+            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/launch-smoke.yml/runs?head_sha=$GITHUB_SHA&per_page=100" | jq -c --arg branch "$GITHUB_REF_NAME" --arg sha "$GITHUB_SHA" '[.workflow_runs[] | select(.head_branch == $branch and .head_sha == $sha and (.event == "push" or .event == "workflow_dispatch"))] | sort_by(.id) | last // empty')
             if [ -z "$run" ]; then
               if [ "$attempt" -ge 3 ]; then break; fi
             else
@@ -117,7 +117,8 @@ jobs:
   ipad-smoke:
     needs: resolve-smoke-app
     runs-on: xcode-27
-    # Independent iPad build/launch check; no TestFlight upload.
+    # Independent iPad launch check using a universal app from the same SHA.
+    # If no shareable artifact exists, build locally as before.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
