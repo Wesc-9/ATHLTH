@@ -5340,7 +5340,7 @@ final class AppSessionStore: ObservableObject {
               localAccountID == source.ownerID,
               !trainingStorageRequiresRecovery,
               accountPlanDocument(withID: source.id) == nil else { return false }
-        let workouts = source.weeks.flatMap(\.days).flatMap(\.sessions)
+        var workouts = source.weeks.flatMap(\.days).flatMap(\.sessions)
         guard workouts.count <= 1,
               workouts.allSatisfy({ $0.id == source.id && $0.scheduledStart != nil }),
               !workouts.isEmpty || source.standaloneCalendarTiming == nil else { return false }
@@ -5357,6 +5357,10 @@ final class AppSessionStore: ObservableObject {
             guard let incoming = source.standaloneCalendarTiming,
                   !workouts.isEmpty,
                   existing.endedAt == nil || incoming == existing else { return false }
+        }
+        if workouts.contains(where: { ATHLTHWorkoutExerciseBinding.needsRowingMigration($0) }),
+           let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: ExerciseLibraryStore().allExercises) {
+            workouts = workouts.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
         }
         standalonePlannedSessions.removeAll { $0.id == source.id }
         if let workout = workouts.first {
@@ -5402,6 +5406,10 @@ final class AppSessionStore: ObservableObject {
     func importAccountPlanDocument(_ source: TrainingPlan) -> Bool {
         guard source.ownerID == profile.userID else { return false }
         var plan = source
+        if ATHLTHWorkoutExerciseBinding.needsRowingMigration(plan),
+           let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: ExerciseLibraryStore().allExercises) {
+            plan = ATHLTHWorkoutExerciseBinding.migrateRowing(plan, to: rower)
+        }
         let template = plan.tags.contains("sync:template")
         let paused = plan.tags.contains("sync:paused")
         let inactive = plan.tags.contains("sync:inactive")

@@ -4105,7 +4105,7 @@ extension WorkoutTemplateCatalogEntry {
                         80,
                         nil
                     ),
-                    ("Row", "rowing-erg", 1_000, nil),
+                    ("Rowing Machine", "rowing-erg", 1_000, nil),
                     (
                         "Farmers Carry",
                         "farmers-carry",
@@ -4237,7 +4237,7 @@ extension WorkoutTemplateCatalogEntry {
             WorkoutTemplateBlock(
                 sequence: 4,
                 kind: .exercise,
-                title: "Row / Run",
+                title: "Rowing Machine / Run",
                 exerciseSlug: "rowing-erg",
                 distanceMeters: 1_000,
                 repetitions: nil,

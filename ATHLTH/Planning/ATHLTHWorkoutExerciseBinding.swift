@@ -62,7 +62,7 @@ enum ATHLTHWorkoutExerciseBinding {
     }
 
     private static func replaceRowing(_ block: inout WorkoutTemplateBlock, with rower: ExerciseLibraryEntry) {
-        if ATHLTHExerciseReferenceResolver.key(block.title) == "row run" {
+        if ["row run", "rowing machine run", "romaskin loping"].contains(ATHLTHExerciseReferenceResolver.key(block.title)) {
             block.title = ATHLTHLocalization.choose(english: "Rowing Machine / Run", norwegian: "Romaskin / løping")
         } else {
             block.title = ATHLTHLocalization.choose(english: "Rowing Machine", norwegian: "Romaskin")

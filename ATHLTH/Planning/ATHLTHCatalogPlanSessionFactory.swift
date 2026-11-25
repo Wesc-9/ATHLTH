@@ -83,7 +83,7 @@ enum ATHLTHCatalogPlanSessionFactory {
         // Never infer a different equipment variant from a display name.
         let stationIDs: [String: String] = [
             "SkiErg": "athlth:skierg",
-            "Row": "athlth:rowing",
+            "Rowing Machine": "rowing-erg",
             "Wall Balls": "athlth:wall-ball",
             "Farmers Carry": "athlth:farmers-carry",
             "Sandbag Lunges": "athlth:sandbag-walking-lunge"
@@ -393,7 +393,7 @@ enum ATHLTHCatalogPlanSessionFactory {
                   seconds: 90),
             block(.run, tr("Controlled run", "Kontrollert løping"),
                   phase: .main, meters: distance),
-            block(.exercise, "Row", phase: .main, meters: distance,
+            block(.exercise, "Rowing Machine", phase: .main, meters: distance,
                   notes: tr("Maintain controlled rowing technique.",
                             "Behold kontrollert roteknikk.")),
             block(.exercise, "Wall Balls", phase: .main, reps: reps,
