@@ -48,11 +48,15 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     private var accountID: UUID?
     private var acknowledgements: [String: ATHLTHStudioPlanSyncDecision.Acknowledgement] = [:]
     private var scheduledTask: Task<Void, Never>?
+    private var pendingSync = false
+    private static let standaloneTable = "studio_standalone_workout_documents"
+    private static let planTable = "studio_plan_documents"
 
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
         scheduledTask?.cancel()
         scheduledTask = nil
+        pendingSync = false
         accountID = userID
         conflicts = []
         verifiedRemotePlanIDs = nil
@@ -107,6 +111,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
     func scheduleSync(session: AppSessionStore) {
         guard session.signedIn else { return }
         switchAccount(session.profile.userID)
+        if isBusy { pendingSync = true; return }
         scheduledTask?.cancel()
         scheduledTask = Task { [weak self, weak session] in
             try? await Task.sleep(for: .milliseconds(850))
@@ -143,7 +148,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         isBusy = true
         defer {
             Self.accountsWithNetworkMutation.remove(userID)
-            isBusy = false
+            if accountID == userID {
+                isBusy = false
+                if pendingSync {
+                    pendingSync = false
+                    scheduleSync(session: session)
+                }
+            }
         }
         var unresolved: [Conflict] = []
         var hasNewLocalEdits = false
@@ -170,26 +181,34 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             // Fetch every page before interpreting an absent document as deleted.
             var remoteRows: [RemotePlan] = []
             let pageSize = 250
-            while true {
-                let page: [RemotePlan] = try await client
-                    .from("studio_plan_documents")
-                    .select("plan_id,revision,body_base64")
-                    .eq("user_id", value: userID)
-                    .order("plan_id")
-                    .range(from: remoteRows.count, to: remoteRows.count + pageSize - 1)
-                    .execute().value
-                guard enabled, accountID == userID else { return }
-                remoteRows.append(contentsOf: page)
-                if page.count < pageSize { break }
+            for table in [Self.planTable, Self.standaloneTable] {
+                var offset = 0
+                while true {
+                    let page: [RemotePlan] = try await client
+                        .from(table)
+                        .select("plan_id,revision,body_base64")
+                        .eq("user_id", value: userID)
+                        .order("plan_id")
+                        .range(from: offset, to: offset + pageSize - 1)
+                        .execute().value
+                    guard enabled, accountID == userID else { return }
+                    for row in page {
+                        guard let document = try decode(row.body_base64, owner: userID, id: row.plan_id),
+                              document.tags.contains("sync:standalone") == (table == Self.standaloneTable)
+                        else { throw NSError(domain: "ATHLTH.PlanSync", code: 5) }
+                    }
+                    remoteRows.append(contentsOf: page)
+                    offset += page.count
+                    if page.count < pageSize { break }
+                }
             }
 
             guard enabled, accountID == userID else { return }
 
-            let remoteByID = Dictionary(uniqueKeysWithValues: remoteRows.map {
-                ($0.plan_id, $0)
-            })
+            let remoteByID = Dictionary(remoteRows.map { ($0.plan_id, $0) },
+                                        uniquingKeysWith: { first, _ in first })
             var remoteIDs = Set(remoteByID.keys)
-            let localPlans = session.accountPlanDocuments.filter { $0.ownerID == userID }
+            let localPlans = session.accountSyncDocuments.filter { $0.ownerID == userID }
             // Corrupted/legacy duplicate local plan IDs must never crash sync.
             let localByID = Dictionary(
                 localPlans.map { ($0.id, $0) },
@@ -224,7 +243,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                 case let .upload(expected):
                     guard let local,
-                          session.accountPlanDocument(withID: planID) == local else {
+                          session.accountSyncDocument(withID: planID) == local else {
                         unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
                         continue
                     }
@@ -238,7 +257,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                                     fingerprint: localFingerprint ?? "", owner: userID)
                         if try Self.needsResyncAfterUpload(
                             uploadedFingerprint: localFingerprint ?? "",
-                            currentPlan: session.accountPlanDocument(withID: planID)
+                            currentPlan: session.accountSyncDocument(withID: planID)
                         ) {
                             hasNewLocalEdits = true
                         }
@@ -249,8 +268,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 case .download:
                     guard let remote, let remotePlan else { continue }
                     // Never replace a plan edited while the network call was pending.
-                    guard session.accountPlanDocument(withID: planID) == local,
-                          session.importAccountPlanDocument(
+                    guard session.accountSyncDocument(withID: planID) == local,
+                          session.importAccountSyncDocument(
                               Self.restoringDeviceOnlyFields(
                                   from: local, into: Self.accountCopy(of: remotePlan)
                               )
@@ -331,19 +350,35 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         isBusy = true
         defer {
             Self.accountsWithNetworkMutation.remove(userID)
-            isBusy = false
+            if accountID == userID {
+                isBusy = false
+                if pendingSync {
+                    pendingSync = false
+                    scheduleSync(session: session)
+                }
+            }
         }
         do {
             // Capture the exact document the athlete reviewed. A later
             // on-device edit must not be overwritten by a stale resolution.
-            let reviewedLocal = session.accountPlanDocument(withID: planID)
-            let rows: [RemotePlan] = try await client.from("studio_plan_documents")
+            let reviewedLocal = session.accountSyncDocument(withID: planID)
+            var table = reviewedLocal?.tags.contains("sync:standalone") == true
+                ? Self.standaloneTable : Self.planTable
+            var rows: [RemotePlan] = try await client.from(table)
                 .select("plan_id,revision,body_base64")
                 .eq("user_id", value: userID)
                 .eq("plan_id", value: planID)
                 .limit(1).execute().value
+            if rows.isEmpty && reviewedLocal == nil {
+                table = Self.standaloneTable
+                rows = try await client.from(table)
+                    .select("plan_id,revision,body_base64")
+                    .eq("user_id", value: userID)
+                    .eq("plan_id", value: planID)
+                    .limit(1).execute().value
+            }
             guard accountID == userID, enabled,
-                  session.accountPlanDocument(withID: planID) == reviewedLocal else {
+                  session.accountSyncDocument(withID: planID) == reviewedLocal else {
                 status = ATHLTHLocalization.choose(
                     english: "The plan changed while reviewing. Check the current version before deciding.",
                     norwegian: "Planen ble endret under gjennomgangen. Kontroller den oppdaterte versjonen før du velger."
@@ -353,9 +388,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             if let row = rows.first {
                 if preferRemote {
                     guard let decoded = try decode(row.body_base64, owner: userID, id: planID),
-                          session.importAccountPlanDocument(
+                          session.importAccountSyncDocument(
                               Self.restoringDeviceOnlyFields(
-                                  from: session.accountPlanDocument(withID: planID),
+                                  from: session.accountSyncDocument(withID: planID),
                                   into: Self.accountCopy(of: decoded)
                               )
                           ) else {
@@ -375,7 +410,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                                 fingerprint: uploadedFingerprint, owner: userID)
                     if try Self.needsResyncAfterUpload(
                         uploadedFingerprint: uploadedFingerprint,
-                        currentPlan: session.accountPlanDocument(withID: planID)
+                        currentPlan: session.accountSyncDocument(withID: planID)
                     ) {
                         status = ATHLTHLocalization.choose(
                             english: "Your newer local edit is waiting to sync.",
@@ -388,7 +423,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     // Explicitly keep the local deletion, but only if the
                     // remote revision still matches the one the user reviewed.
                     let removed: [DeletedPlan] = try await client
-                        .from("studio_plan_documents")
+                        .from(table)
                         .delete()
                         .eq("user_id", value: userID)
                         .eq("plan_id", value: planID)
@@ -405,8 +440,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             } else if preferRemote {
                 // Remote absence is meaningful only after explicit conflict
                 // review. Never delete local plans automatically in sync().
-                if session.accountPlanDocument(withID: planID) != nil {
-                    session.deleteAccountPlanDocument(planID)
+                if session.accountSyncDocument(withID: planID) != nil {
+                    session.deleteAccountSyncDocument(planID)
                 }
                 acknowledgements.removeValue(forKey: planID.uuidString)
                 persistAcknowledgements(for: userID)
@@ -420,7 +455,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                             fingerprint: uploadedFingerprint, owner: userID)
                 if try Self.needsResyncAfterUpload(
                     uploadedFingerprint: uploadedFingerprint,
-                    currentPlan: session.accountPlanDocument(withID: planID)
+                    currentPlan: session.accountSyncDocument(withID: planID)
                 ) {
                     status = ATHLTHLocalization.choose(
                         english: "Your newer local edit is waiting to sync.",
@@ -595,7 +630,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             p_body_base64: encoded.base64EncodedString()
         )
         let revision: Int64 = try await client
-            .rpc("studio_save_plan", params: params).execute().value
+            .rpc(plan.tags.contains("sync:standalone") ? "studio_save_standalone_workout" : "studio_save_plan",
+                 params: params).execute().value
         return revision
     }
 

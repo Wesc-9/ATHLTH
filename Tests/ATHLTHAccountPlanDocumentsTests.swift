@@ -62,6 +62,35 @@ final class ATHLTHAccountPlanDocumentsTests: XCTestCase {
         XCTAssertTrue(session.planTemplates.isEmpty)
     }
 
+    func testStandaloneWorkoutRoundTripAndDeletionNeverCreatesTrainingPlan() throws {
+        let suite = "AccountPlanDocuments.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let session = AppSessionStore(defaults: defaults)
+        let id = UUID()
+        let workout = PlannedSession(id: id, title: "Strength", kind: .strength,
+            scheduledStart: Date().addingTimeInterval(3600), durationMinutes: 15,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: "Private note")
+        session.addStandalonePlannedSession(workout)
+        let document = try XCTUnwrap(session.accountSyncDocument(withID: id))
+        XCTAssertEqual(document, session.accountSyncDocument(withID: id))
+        XCTAssertTrue(document.tags.contains("sync:standalone"))
+        XCTAssertNil(session.accountPlanDocument(withID: id))
+        let clean = ATHLTHStudioPlanSyncStore.accountCopy(of: document)
+        XCTAssertNil(clean.weeks.first?.days.first?.sessions.first?.notes)
+        XCTAssertTrue(session.importAccountSyncDocument(document))
+        XCTAssertEqual(session.standalonePlannedSessions.filter { $0.id == id }.count, 1)
+        XCTAssertTrue(session.trainingPlans.isEmpty)
+        XCTAssertTrue(session.planTemplates.isEmpty)
+        session.removeStandalonePlannedSession(id)
+        let deleted = try XCTUnwrap(session.accountSyncDocument(withID: id))
+        XCTAssertTrue(deleted.weeks.isEmpty)
+        XCTAssertTrue(session.importAccountSyncDocument(deleted))
+        XCTAssertFalse(session.standalonePlannedSessions.contains { $0.id == id })
+        XCTAssertTrue(session.trainingPlans.isEmpty)
+    }
+
     func testDifferentAccountDocumentIsRejected() throws {
         let suite = "AccountPlanDocuments.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

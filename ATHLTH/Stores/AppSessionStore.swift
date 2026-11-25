@@ -44,7 +44,7 @@ struct TrainingPlanProgressSnapshot {
 
 /// Actual recording times belong to a specific calendar session ID.
 /// The planned duration remains unchanged; finish is never inferred from it.
-struct ATHLTHPlannedWorkoutRecordedTimes: Codable, Equatable {
+struct ATHLTHPlannedWorkoutRecordedTimes: Codable, Hashable {
     var startedAt: Date
     var endedAt: Date?
     var startedOnWatch: Bool
@@ -59,6 +59,7 @@ struct AccountTrainingContent: Codable {
     var planTemplates: [TrainingPlan]
     var savedWorkoutTemplates: [PlannedSession]
     var standalonePlannedSessions: [PlannedSession]? = nil
+    var standaloneWorkoutTombstones: Set<UUID>? = nil
     // Optional for previously saved accounts.
     var recordedPlannedWorkoutTimes: [String: ATHLTHPlannedWorkoutRecordedTimes]? = nil
     var manuallyCompletedPlanSessions: Set<String>
@@ -115,6 +116,7 @@ final class AppSessionStore: ObservableObject {
     }
 
     @Published private(set) var standalonePlannedSessions: [PlannedSession]
+    private var standaloneWorkoutTombstones: Set<UUID> = []
     @Published private(set) var recordedPlannedWorkoutTimes:
         [String: ATHLTHPlannedWorkoutRecordedTimes]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
@@ -789,6 +791,7 @@ final class AppSessionStore: ObservableObject {
         planTemplates = []
         savedWorkoutTemplates = []
         standalonePlannedSessions = []
+        standaloneWorkoutTombstones = []
         recordedPlannedWorkoutTimes = [:]
         manuallyCompletedPlanSessions = []
         skippedPlanSessions = []
@@ -4047,6 +4050,7 @@ final class AppSessionStore: ObservableObject {
         standalonePlannedSessions.removeAll {
             $0.id == session.id
         }
+        standaloneWorkoutTombstones.remove(session.id)
         standalonePlannedSessions.append(session)
         PlannedWorkoutReminderScheduler.sync(session)
         standalonePlannedSessions.sort {
@@ -4270,6 +4274,9 @@ final class AppSessionStore: ObservableObject {
     func removeStandalonePlannedSession(
         _ sessionID: UUID
     ) {
+        if standalonePlannedSessions.contains(where: { $0.id == sessionID }) {
+            standaloneWorkoutTombstones.insert(sessionID)
+        }
         PlannedWorkoutReminderScheduler.cancel(sessionID)
         standalonePlannedSessions
             .removeAll {
@@ -5288,6 +5295,98 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+
+    /// A transport-only document per standalone workout, never a library plan.
+    /// Stable IDs and metadata keep repeated exports identical across devices.
+    var accountSyncDocuments: [TrainingPlan] {
+        accountPlanDocuments + standalonePlannedSessions.map {
+            standaloneSyncDocument(id: $0.id, workout: $0)
+        } + standaloneWorkoutTombstones.map {
+            standaloneSyncDocument(id: $0, workout: nil)
+        }
+    }
+
+    func accountSyncDocument(withID id: UUID) -> TrainingPlan? {
+        if let workout = standalonePlannedSessions.first(where: { $0.id == id }) {
+            return standaloneSyncDocument(id: id, workout: workout)
+        }
+        if standaloneWorkoutTombstones.contains(id) {
+            return standaloneSyncDocument(id: id, workout: nil)
+        }
+        return accountPlanDocument(withID: id)
+    }
+
+    private func standaloneSyncDocument(id: UUID, workout: PlannedSession?) -> TrainingPlan {
+        let epoch = Date(timeIntervalSince1970: 0)
+        var document = TrainingPlan(
+            id: id, ownerID: profile.userID, title: workout?.title ?? "Deleted workout",
+            summary: "", visibility: .privateOnly, version: 1,
+            weeks: workout.map { item in
+                [TrainingPlanWeek(id: id, weekNumber: 1, title: "",
+                    days: [TrainingPlanDay(id: id, dayIndex: 1, title: "", sessions: [item])])]
+            } ?? [],
+            tags: ["sync:standalone"], createdAt: epoch, updatedAt: epoch
+        )
+        document.standaloneCalendarTiming = workout == nil ? nil : recordedTimes(for: id)
+        return document
+    }
+
+    @discardableResult
+    func importAccountSyncDocument(_ source: TrainingPlan) -> Bool {
+        guard source.tags.contains("sync:standalone") else {
+            return importAccountPlanDocument(source)
+        }
+        guard source.ownerID == profile.userID,
+              accountPlanDocument(withID: source.id) == nil else { return false }
+        let workouts = source.weeks.flatMap(\.days).flatMap(\.sessions)
+        guard workouts.count <= 1,
+              workouts.allSatisfy({ $0.id == source.id && $0.scheduledStart != nil }),
+              !workouts.isEmpty || source.standaloneCalendarTiming == nil else { return false }
+        let oldWorkouts = standalonePlannedSessions
+        let oldTombstones = standaloneWorkoutTombstones
+        let oldTiming = recordedPlannedWorkoutTimes
+        // Never replace a confirmed execution with an unstarted/deleted copy.
+        if let existing = recordedTimes(for: source.id) {
+            guard let incoming = source.standaloneCalendarTiming,
+                  !workouts.isEmpty,
+                  existing.endedAt == nil || incoming == existing else { return false }
+        }
+        standalonePlannedSessions.removeAll { $0.id == source.id }
+        if let workout = workouts.first {
+            standaloneWorkoutTombstones.remove(source.id)
+            standalonePlannedSessions.append(workout)
+        } else {
+            standaloneWorkoutTombstones.insert(source.id)
+        }
+        recordedPlannedWorkoutTimes[source.id.uuidString] = source.standaloneCalendarTiming
+        standalonePlannedSessions.sort {
+            ($0.scheduledStart ?? .distantFuture) < ($1.scheduledStart ?? .distantFuture)
+        }
+        if !persistAccountContent(immediate: true) {
+            standalonePlannedSessions = oldWorkouts
+            standaloneWorkoutTombstones = oldTombstones
+            recordedPlannedWorkoutTimes = oldTiming
+            return false
+        }
+        if let workout = workouts.first,
+           workout.cancelledAt == nil, source.standaloneCalendarTiming == nil {
+            PlannedWorkoutReminderScheduler.sync(workout)
+        } else {
+            PlannedWorkoutReminderScheduler.cancel(source.id)
+        }
+        return true
+    }
+
+    func deleteAccountSyncDocument(_ id: UUID) {
+        if let document = accountSyncDocument(withID: id),
+           document.tags.contains("sync:standalone") {
+            guard recordedTimes(for: id) == nil else { return }
+            removeStandalonePlannedSession(id)
+        } else {
+            deleteAccountPlanDocument(id)
+        }
+    }
+
     func accountPlanDocument(withID id: UUID) -> TrainingPlan? {
         accountPlanDocuments.first { $0.id == id }
     }
@@ -5952,6 +6051,7 @@ final class AppSessionStore: ObservableObject {
             planTemplates: planTemplates,
             savedWorkoutTemplates: savedWorkoutTemplates,
             standalonePlannedSessions: standalonePlannedSessions,
+            standaloneWorkoutTombstones: standaloneWorkoutTombstones,
             recordedPlannedWorkoutTimes: recordedPlannedWorkoutTimes,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
             skippedPlanSessions: skippedPlanSessions,
@@ -6126,6 +6226,8 @@ final class AppSessionStore: ObservableObject {
                     ($0.scheduledStart ?? .distantFuture) <
                     ($1.scheduledStart ?? .distantFuture)
                 }
+        standaloneWorkoutTombstones = stored?.standaloneWorkoutTombstones ?? []
+        standaloneWorkoutTombstones.subtract(standalonePlannedSessions.map(\.id))
         recordedPlannedWorkoutTimes = stored?.recordedPlannedWorkoutTimes ?? [:]
         manuallyCompletedPlanSessions = stored?.manuallyCompletedPlanSessions ?? (mayMigrate && ownsUnlabelledLegacy ? Self.loadManuallyCompletedPlanSessions(from: defaults) : [])
         skippedPlanSessions = stored?.skippedPlanSessions ?? []

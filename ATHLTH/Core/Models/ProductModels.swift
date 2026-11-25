@@ -1657,6 +1657,8 @@ struct TrainingPlan: Identifiable, Codable, Hashable {
     var builderProfile: TrainingPlanBuilderProfile? = nil
     // Optional so plans saved before training blocks decode without migration.
     var trainingBlocks: [TrainingPlanBlock]? = nil
+    // Only populated in standalone workout transport documents, never visible plans.
+    var standaloneCalendarTiming: ATHLTHPlannedWorkoutRecordedTimes? = nil
 }
 
 struct RouteCoordinate: Codable, Hashable {
