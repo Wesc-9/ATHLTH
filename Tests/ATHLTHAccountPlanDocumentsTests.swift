@@ -66,7 +66,16 @@ final class ATHLTHAccountPlanDocumentsTests: XCTestCase {
         let suite = "AccountPlanDocuments.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
+        let owner = UUID()
+        defaults.set(true, forKey: "session.signedIn")
         let session = AppSessionStore(defaults: defaults)
+        XCTAssertTrue(session.restoreOfflineAccount(persistedAuthUserID: owner))
+        let otherSuite = suite + ".second"
+        let otherDefaults = try XCTUnwrap(UserDefaults(suiteName: otherSuite))
+        defer { otherDefaults.removePersistentDomain(forName: otherSuite) }
+        otherDefaults.set(true, forKey: "session.signedIn")
+        let other = AppSessionStore(defaults: otherDefaults)
+        XCTAssertTrue(other.restoreOfflineAccount(persistedAuthUserID: owner))
         let id = UUID()
         let workout = PlannedSession(id: id, title: "Strength", kind: .strength,
             scheduledStart: Date().addingTimeInterval(3600), durationMinutes: 15,
@@ -79,16 +88,32 @@ final class ATHLTHAccountPlanDocumentsTests: XCTestCase {
         XCTAssertNil(session.accountPlanDocument(withID: id))
         let clean = ATHLTHStudioPlanSyncStore.accountCopy(of: document)
         XCTAssertNil(clean.weeks.first?.days.first?.sessions.first?.notes)
-        XCTAssertTrue(session.importAccountSyncDocument(document))
-        XCTAssertEqual(session.standalonePlannedSessions.filter { $0.id == id }.count, 1)
-        XCTAssertTrue(session.trainingPlans.isEmpty)
-        XCTAssertTrue(session.planTemplates.isEmpty)
+        XCTAssertTrue(other.importAccountSyncDocument(clean))
+        XCTAssertTrue(other.importAccountSyncDocument(clean))
+        XCTAssertEqual(other.standalonePlannedSessions.filter { $0.id == id }.count, 1)
+        let day = try XCTUnwrap(workout.scheduledStart)
+        XCTAssertEqual(HomeTodayCalendarSchedule.workouts(
+            plan: nil, standalone: other.standalonePlannedSessions, on: day,
+            calendar: Calendar.current
+        ).map(\.id), [id])
+        XCTAssertTrue(other.trainingPlans.isEmpty)
+        XCTAssertTrue(other.planTemplates.isEmpty)
+        var updated = workout
+        updated.scheduledStart = day.addingTimeInterval(3600)
+        updated.cancelledAt = Date()
+        session.updateStandalonePlannedSession(updated)
+        let cancelled = try XCTUnwrap(session.accountSyncDocument(withID: id))
+        XCTAssertTrue(other.importAccountSyncDocument(ATHLTHStudioPlanSyncStore.accountCopy(of: cancelled)))
+        XCTAssertEqual(other.standalonePlannedSessions.first?.scheduledStart, updated.scheduledStart)
+        XCTAssertEqual(other.standalonePlannedSessions.first?.cancelledAt, updated.cancelledAt)
         session.removeStandalonePlannedSession(id)
         let deleted = try XCTUnwrap(session.accountSyncDocument(withID: id))
         XCTAssertTrue(deleted.weeks.isEmpty)
-        XCTAssertTrue(session.importAccountSyncDocument(deleted))
-        XCTAssertFalse(session.standalonePlannedSessions.contains { $0.id == id })
-        XCTAssertTrue(session.trainingPlans.isEmpty)
+        XCTAssertTrue(other.importAccountSyncDocument(deleted))
+        XCTAssertFalse(other.standalonePlannedSessions.contains { $0.id == id })
+        XCTAssertTrue(other.trainingPlans.isEmpty)
+        other.reloadTrainingContent()
+        XCTAssertEqual(other.accountSyncDocument(withID: id), deleted)
     }
 
     func testDifferentAccountDocumentIsRejected() throws {

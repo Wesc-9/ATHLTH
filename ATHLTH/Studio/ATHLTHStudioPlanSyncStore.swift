@@ -205,9 +205,14 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
 
             guard enabled, accountID == userID else { return }
 
-            let remoteByID = Dictionary(remoteRows.map { ($0.plan_id, $0) },
-                                        uniquingKeysWith: { first, _ in first })
+            guard Set(remoteRows.map(\.plan_id)).count == remoteRows.count else {
+                throw NSError(domain: "ATHLTH.PlanSync", code: 6)
+            }
+            let remoteByID = Dictionary(uniqueKeysWithValues: remoteRows.map { ($0.plan_id, $0) })
             var remoteIDs = Set(remoteByID.keys)
+            guard !session.trainingStorageRequiresRecovery else {
+                throw NSError(domain: "ATHLTH.PlanSync", code: 7)
+            }
             let localPlans = session.accountSyncDocuments.filter { $0.ownerID == userID }
             // Corrupted/legacy duplicate local plan IDs must never crash sync.
             let localByID = Dictionary(

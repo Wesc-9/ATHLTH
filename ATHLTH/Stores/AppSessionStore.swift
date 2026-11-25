@@ -5337,11 +5337,18 @@ final class AppSessionStore: ObservableObject {
             return importAccountPlanDocument(source)
         }
         guard source.ownerID == profile.userID,
+              localAccountID == source.ownerID,
+              !trainingStorageRequiresRecovery,
               accountPlanDocument(withID: source.id) == nil else { return false }
         let workouts = source.weeks.flatMap(\.days).flatMap(\.sessions)
         guard workouts.count <= 1,
               workouts.allSatisfy({ $0.id == source.id && $0.scheduledStart != nil }),
               !workouts.isEmpty || source.standaloneCalendarTiming == nil else { return false }
+        if let timing = source.standaloneCalendarTiming {
+            guard let workout = workouts.first, workout.cancelledAt == nil,
+                  workout.scheduledStart == timing.startedAt,
+                  timing.endedAt.map({ $0 >= timing.startedAt }) ?? true else { return false }
+        }
         let oldWorkouts = standalonePlannedSessions
         let oldTombstones = standaloneWorkoutTombstones
         let oldTiming = recordedPlannedWorkoutTimes
