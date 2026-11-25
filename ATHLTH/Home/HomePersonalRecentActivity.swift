@@ -1210,10 +1210,11 @@ struct HomePersonalRecentActivitySection:
 
     @State private var myWorkouts:
         [SocialPublishableWorkout] = []
-    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
     private var garminAccount: UUID? {
-        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled &&
+            session.currentRole.canAccessControlCenter
             ? session.profile.userID : nil
     }
     private var privateGarminItems: [HomeActivityStreamItem] {
@@ -1268,7 +1269,7 @@ struct HomePersonalRecentActivitySection:
     @State private var recentStrengthProfiles: [UUID: StrengthMuscleProfile] = [:]
 
     var body: some View {
-        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
         let garminItems = privateGarminItems
         let recent = garminItems.isEmpty ? visibleItems : HomeActivityStreamBuilder.recentPreview(
             mine: myWorkouts, social: social, feed: social.feed,
@@ -1557,7 +1558,7 @@ struct HomePersonalRecentActivitySection:
             .accessibilityIdentifier("athlth-home-recent-own-card")
 
         case .garmin(let account, let activity):
-            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
             if garminAccount == account {
                 NavigationLink {
                     GarminReadOnlyWorkoutDetail(accountID: account, activityID: activity.workout.id)
@@ -2725,12 +2726,13 @@ private struct HomeFollowingWorkoutArtwork:
 
 struct HomePersonalActivityHistoryView:
     View {
-    #if ATHLTH_GARMIN_PERSONAL && DEBUG
+    #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
     private var garminAccount: UUID? {
-        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled &&
+            session.currentRole.canAccessControlCenter
             ? session.profile.userID : nil
     }
     private var privateGarminItems: [HomeActivityStreamItem] {
@@ -2775,7 +2777,7 @@ struct HomePersonalActivityHistoryView:
             mine: myWorkouts,
             social: social
         )
-        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
         return (local + privateGarminItems).sorted { $0.date > $1.date }
         #else
         return local
@@ -2941,7 +2943,7 @@ struct HomePersonalActivityHistoryView:
             .buttonStyle(.plain)
 
         case .garmin(let account, let activity):
-            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
             if garminAccount == account {
                 NavigationLink {
                     GarminReadOnlyWorkoutDetail(accountID: account, activityID: activity.workout.id)
