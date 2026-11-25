@@ -578,8 +578,7 @@ struct ATHLTHTournamentCloudService {
             draft.participants.count >= (draft.singleEventMode ? 3 : draft.format == .cup ? 4 : 2)) else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
-        guard draft.competitionSettings.environment.canPublish,
-              draft.competitionSettings.environment.supports(Set(draft.allowedActivities)) else {
+        guard draft.competitionSettings.environmentsCanPublish(activities: Set(draft.allowedActivities)) else {
             throw NSError(domain: "ATHLTHCompetition", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "Valgt treningsmiljø kan ikke publiseres med disse aktivitetene ennå."])
         }
