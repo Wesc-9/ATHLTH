@@ -2826,6 +2826,13 @@ struct AppRootView: View {
                   scenePhase == .active,
                   !appSession.previewModeEnabled,
                   let signedInUserID else { return }
+            // Register the real authenticated session on foreground, not
+            // only when the user visits the device directory.
+            _ = try? await accountService.accountSessions(
+                deviceKind: ATHLTHAccountSession.currentDeviceKind
+            )
+            guard !Task.isCancelled, appSession.signedIn,
+                  appSession.profile.userID == signedInUserID else { return }
             guard let bootstrap = try? await accountService.loadCurrentUser(),
                   !Task.isCancelled,
                   appSession.signedIn,
