@@ -46,6 +46,7 @@ targets:
         CFBundleDisplayName: ATHLTH
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSFaceIDUsageDescription: "ATHLTH uses Face ID only to unlock the app when you enable the optional local app lock."
         NSCameraUsageDescription: "ATHLTH uses the camera only when you choose to photograph gym equipment to suggest compatible exercises. The photo is sent for AI analysis only after you confirm."
         NSMicrophoneUsageDescription: "ATHLTH uses the microphone only when you explicitly start an AI Coach conversation during a workout. Audio is sent to the selected AI voice provider while the conversation is active, and stops when you end it."
         NSHealthShareUsageDescription: "ATHLTH reads only the Apple Health measurements you allow, including activity, sleep, vital signs, nutrition, and additional health metrics, to show private history and personalized training insights."
