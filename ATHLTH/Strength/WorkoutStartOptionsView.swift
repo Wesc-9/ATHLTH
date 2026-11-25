@@ -64,7 +64,6 @@ struct WorkoutStartOptionsView: View {
     @State private var startType: ATHLTHQuickStartType = .free
     @State private var chosenStrengthTemplate: PlannedSession?
     @State private var showingStrengthWorkoutLibrary = false
-    @State private var showingCompetition = false
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var showOnIPad = false
     @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
@@ -183,7 +182,7 @@ struct WorkoutStartOptionsView: View {
                         activity: .strength,
                         advanced: trackingMode == .advanced,
                         selection: Binding(
-                            get: { showingCompetition ? .competition : startType },
+                            get: { startType },
                             set: { _ in }
                         )
                     ) { type in
@@ -196,9 +195,7 @@ struct WorkoutStartOptionsView: View {
                         case .exercises:
                             startType = .exercises
                             chosenStrengthTemplate = nil
-                        case .competition:
-                            showingCompetition = true
-                        case .route:
+                        case .competition, .route:
                             break
                         }
                     }
@@ -321,12 +318,6 @@ struct WorkoutStartOptionsView: View {
 
                 await registeredIPad.refresh(for: appSession.profile.userID)
                 await exerciseLibrary.refresh()
-            }
-            .sheet(isPresented: $showingCompetition) {
-                ATHLTHCompetitionCreationView(
-                    initialActivity: .strength,
-                    advanced: trackingMode == .advanced
-                )
             }
             .sheet(isPresented: $showingStrengthWorkoutLibrary) {
                 NavigationStack {
@@ -960,7 +951,7 @@ struct WorkoutStartOptionsView: View {
                 configured.runningWorkouts = nil
             }
         case .route, .competition:
-            // Competition configuration is handled by its dedicated sheet.
+            // Neither route nor competition is offered in strength Quick Train.
             break
         }
         configured.gearIDs = Array(selectedGearIDs)
