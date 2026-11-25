@@ -293,6 +293,11 @@ struct ActiveStrengthWorkoutView: View {
                             showingLiveExerciseHistory = false
                         }
                     }
+                    .onChange(of: strength.currentExercise?.exercise) { oldSnapshot, newSnapshot in
+                        if oldSnapshot != newSnapshot {
+                            showingLiveExerciseHistory = false
+                        }
+                    }
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {

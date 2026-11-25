@@ -273,7 +273,7 @@ final class StrengthWorkoutStore: ObservableObject {
     @discardableResult
     func pinGhostReference(workoutID: UUID, exerciseID: UUID, historicalWorkoutID: UUID) -> Bool {
         guard let workout = activeWorkout, workout.id == workoutID,
-              let exercise = workout.exercises.first(where: { $0.id == exerciseID }),
+              let exercise = currentExercise, exercise.id == exerciseID,
               exercise.isEmbeddedRunningInterval != true else { return false }
         let snapshot = exercise.exercise
         let summary = ATHLTHExerciseProgress.liveSummary(
