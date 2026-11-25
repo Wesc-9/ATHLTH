@@ -220,7 +220,11 @@ struct ATHLTHStorageImage<Content: View>: View {
     private func loadImage()
         async {
         let requested = requestID
-        if resolvedRequest == requested, resolutionError == nil,
+        // Private and mutable local media must be resolved again on remount.
+        // Do not retain an expired signed URL or skip its authorization check.
+        if let url, !url.isFileURL,
+           ATHLTHStorageImageURL.privateWorkoutPath(url) == nil,
+           resolvedRequest == requested, resolutionError == nil,
            (sizedImage != nil || resolvedURL != nil) { return }
         resolvedURL = nil
         resolutionError = nil

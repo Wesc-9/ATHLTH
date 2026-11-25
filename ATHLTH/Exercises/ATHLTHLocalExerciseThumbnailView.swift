@@ -37,8 +37,8 @@ actor ATHLTHLocalExerciseThumbnailLoader {
         if bundled {
             revision = 0
         } else {
-            revision = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))
-                ?.contentModificationDate?.timeIntervalSince1970 ?? 0
+            let metadata = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+            revision = metadata?.contentModificationDate?.timeIntervalSince1970 ?? 0
         }
         let key = "\(url.path)|\(pixels)|\(revision)" as NSString
         if let cached = thumbnails.object(forKey: key) {
