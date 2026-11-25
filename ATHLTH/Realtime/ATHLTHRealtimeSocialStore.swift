@@ -463,7 +463,7 @@ private struct BeginGhostLiveSessionParams: Encodable {
 final class ATHLTHRealtimeSocialStore: ObservableObject {
     @Published private(set) var onlineUserIDs: Set<UUID> = []
     @Published private(set) var trainingNowUserIDs: Set<UUID> = []
-    private var lastTrainingNowRefreshAt: Date?
+    private let trainingNowRefresh = ATHLTHRefreshCoalescer()
     @Published private(set) var visibleLiveSessions: [ATHLTHLiveWorkoutSession] = []
     @Published private(set) var currentSession: ATHLTHLiveWorkoutSession?
     private var liveGhostFinishGate = ATHLTHLiveGhostFinishGate()
@@ -489,8 +489,30 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     private var lastPublishedLocationAt: Date?
     private var lastPublishedDistanceMeters: Double?
     private var lastPublishedElapsedSeconds: TimeInterval?
-    private var lastOnlineRefreshAt: Date?
-    private var lastVisibleSessionsRefreshAt: Date?
+    private let onlineRefresh = ATHLTHRefreshCoalescer()
+    private let visibleSessionsRefresh = ATHLTHRefreshCoalescer()
+    private let expiredStateCleanup = ATHLTHRefreshCoalescer()
+    private var readAccountID: UUID?
+
+    // Never reuse another account's freshness or publish its pending read.
+    private func synchronizeReadAccount() -> UUID? {
+        let owner = currentUserID
+        if owner != readAccountID {
+            readAccountID = owner
+            trainingNowRefresh.reset()
+            onlineRefresh.reset()
+            visibleSessionsRefresh.reset()
+            expiredStateCleanup.reset()
+            if !trainingNowUserIDs.isEmpty { trainingNowUserIDs = [] }
+            if !onlineUserIDs.isEmpty { onlineUserIDs = [] }
+            if !visibleLiveSessions.isEmpty { visibleLiveSessions = [] }
+        }
+        return owner
+    }
+
+    private func ownsRead(_ owner: UUID) -> Bool {
+        !Task.isCancelled && readAccountID == owner && currentUserID == owner
+    }
 
     private let onlineHeartbeatInterval: Duration = .seconds(90)
     private let liveRefreshInterval: Duration = .seconds(3)
@@ -524,14 +546,15 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     /// A fresh server-authorized training session, independent of the green
     /// online indicator. Supabase RLS limits reads to mutual follows.
     func refreshTrainingNowUsers(force: Bool = false) async {
-        guard currentUserID != nil else {
-            trainingNowUserIDs.removeAll()
-            return
+        guard let owner = synchronizeReadAccount() else { return }
+        await trainingNowRefresh.run(maxAge: 35, force: force) {
+            await self.readTrainingNowUsers(owner: owner)
         }
-        if !force, let lastTrainingNowRefreshAt,
-           Date().timeIntervalSince(lastTrainingNowRefreshAt) < 35 {
-            return
-        }
+    }
+
+    private func readTrainingNowUsers(owner: UUID) async -> Bool {
+        let signpost = ATHLTHPerformance.begin("TrainingPresenceRead")
+        defer { ATHLTHPerformance.end("TrainingPresenceRead", id: signpost) }
         do {
             let rows: [SocialPresenceRecord] = try await client
                 .from("social_presence")
@@ -540,6 +563,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 .limit(500)
                 .execute()
                 .value
+            guard ownsRead(owner) else { return false }
             let cutoff = Date().addingTimeInterval(-180)
             let updated: Set<UUID> = Set(rows.compactMap { row -> UUID? in
                 guard row.state == "training",
@@ -550,13 +574,15 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             if trainingNowUserIDs != updated {
                 trainingNowUserIDs = updated
             }
-            lastTrainingNowRefreshAt = Date()
+            return true
         } catch is CancellationError {
-            return
+            return false
         } catch {
+            guard ownsRead(owner) else { return false }
             // Fail closed: never preserve potentially stale training signals.
-            trainingNowUserIDs.removeAll()
+            if !trainingNowUserIDs.isEmpty { trainingNowUserIDs = [] }
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -570,10 +596,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
         heartbeatTask?.cancel()
         heartbeatTask = nil
 
-        guard currentUserID != nil else {
-            onlineUserIDs.removeAll()
-            return
-        }
+        guard synchronizeReadAccount() != nil else { return }
 
         if appIsActive && enabled {
             await publishOnline(true)
@@ -605,29 +628,29 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
     func refreshOnlineUsers(
         force: Bool = false
     ) async {
+        guard let owner = synchronizeReadAccount() else { return }
         await refreshTrainingNowUsers(force: force)
-        guard currentUserID != nil else {
-            onlineUserIDs.removeAll()
-            return
+        guard ownsRead(owner) else { return }
+        await onlineRefresh.run(maxAge: 60, force: force) {
+            await self.readOnlineUsers(owner: owner)
         }
+    }
 
-        if !force,
-           let lastOnlineRefreshAt,
-           Date().timeIntervalSince(lastOnlineRefreshAt) < 60 {
-            return
-        }
-
+    private func readOnlineUsers(owner: UUID) async -> Bool {
+        let signpost = ATHLTHPerformance.begin("OnlinePresenceRead")
+        defer { ATHLTHPerformance.end("OnlinePresenceRead", id: signpost) }
         do {
             let rows: [ATHLTHOnlinePresenceRecord] =
                 try await client
                     .from("social_online_presence")
-                    .select()
+                    .select("user_id,is_online,device_session_id,updated_at")
                     .eq("is_online", value: true)
                     .order("updated_at", ascending: false)
                     .limit(500)
                     .execute()
                     .value
 
+            guard ownsRead(owner) else { return false }
             let cutoff = Date().addingTimeInterval(-210)
             let updated = Set(
                 rows
@@ -640,55 +663,54 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
             if onlineUserIDs != updated {
                 onlineUserIDs = updated
             }
-            lastOnlineRefreshAt = Date()
+            return true
         } catch is CancellationError {
-            return
+            return false
         } catch {
+            guard ownsRead(owner) else { return false }
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     func refreshVisibleLiveSessions(
         force: Bool = false
     ) async {
-        guard currentUserID != nil else {
-            visibleLiveSessions = []
-            return
+        guard let owner = synchronizeReadAccount() else { return }
+        await visibleSessionsRefresh.run(maxAge: 20, force: force) {
+            await self.readVisibleLiveSessions(owner: owner)
         }
+    }
 
-        if !force,
-           let lastVisibleSessionsRefreshAt,
-           Date().timeIntervalSince(
-                lastVisibleSessionsRefreshAt
-           ) < 20 {
-            return
+    private func readVisibleLiveSessions(owner: UUID) async -> Bool {
+        let signpost = ATHLTHPerformance.begin("VisibleLiveSessionsRead")
+        defer { ATHLTHPerformance.end("VisibleLiveSessionsRead", id: signpost) }
+        // Access policies already hide expired location samples and sessions.
+        // Physical cleanup need not run for every 20-second listing refresh.
+        await expiredStateCleanup.run(maxAge: 180) {
+            guard self.ownsRead(owner) else { return false }
+            do {
+                try await self.client.rpc("cleanup_expired_live_workout_state").execute()
+                return self.ownsRead(owner)
+            } catch { return false }
         }
-
+        guard ownsRead(owner) else { return false }
         do {
-            // Best-effort physical cleanup for crashed/stale live sessions.
-            // RLS already hides expired rows; this keeps retained coordinates
-            // bounded without adding a background polling loop.
-            _ = try? await client
-                .rpc(
-                    "cleanup_expired_live_workout_state"
-                )
-                .execute()
-
             let rows: [ATHLTHLiveWorkoutSession] =
                 try await client
                     .from("live_workout_sessions")
                     .select()
+                    .in("status", values: ["active", "paused"])
                     .order("started_at", ascending: false)
                     .limit(80)
                     .execute()
                     .value
 
+            guard ownsRead(owner) else { return false }
             let active = rows.filter(\.isActive)
             if visibleLiveSessions != active {
                 visibleLiveSessions = active
             }
-            lastVisibleSessionsRefreshAt = Date()
-
             if selectedLiveGhostSessionID == nil,
                let restoredID =
                     restoredLiveGhostSessionID(),
@@ -726,7 +748,7 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                 else {
                     clearSelectedLiveGhost()
                     stopWatching()
-                    return
+                    return true
                 }
 
                 // App relaunch, process suspension and transient connectivity
@@ -738,10 +760,13 @@ final class ATHLTHRealtimeSocialStore: ObservableObject {
                     )
                 }
             }
+            return true
         } catch is CancellationError {
-            return
+            return false
         } catch {
+            guard ownsRead(owner) else { return false }
             errorMessage = error.localizedDescription
+            return false
         }
     }
 

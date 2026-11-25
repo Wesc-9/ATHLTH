@@ -106,6 +106,20 @@ final class ATHLTHPlanRefreshPerformanceTests: XCTestCase {
         XCTAssertFalse(store.isPlanSessionCompleted(planID: plan.id, sessionID: workout.id, healthWorkouts: [], strengthHistory: []))
     }
 
+    func testRefreshCoalescerCachesSuccessButNotFailureAndResets() async {
+        let gate = ATHLTHRefreshCoalescer()
+        var reads = 0
+        await gate.run(maxAge: 60) { reads += 1; return false }
+        await gate.run(maxAge: 60) { reads += 1; return true }
+        await gate.run(maxAge: 60) { reads += 1; return true }
+        XCTAssertEqual(reads, 2)
+        await gate.run(maxAge: 60, force: true) { reads += 1; return true }
+        XCTAssertEqual(reads, 3)
+        gate.reset()
+        await gate.run(maxAge: 60) { reads += 1; return true }
+        XCTAssertEqual(reads, 4)
+    }
+
     func testEmptyPlansRefreshDoesNotPublish() throws {
         let suite = "ATHLTHNoPlansPerformance.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

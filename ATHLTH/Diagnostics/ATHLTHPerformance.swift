@@ -91,3 +91,43 @@ final class ATHLTHBoundedProjectionMemo<Key: Equatable, Value> {
 
     func clear() { entries.removeAll(keepingCapacity: true) }
 }
+
+
+/// One shared request per resource and account. Callers arriving during an
+/// in-flight read await that read, even when they request a forced refresh.
+/// Failed/cancelled reads never advance the successful freshness timestamp.
+/// The owning store must reset on account changes.
+@MainActor
+final class ATHLTHRefreshCoalescer {
+    private var pending: (id: UUID, task: Task<Bool, Never>)?
+    private var lastSuccess: Date?
+
+    func run(maxAge: TimeInterval, force: Bool = false,
+             work: @escaping @MainActor () async -> Bool) async {
+        guard !Task.isCancelled else { return }
+        if let pending {
+            _ = await pending.task.value
+            return
+        }
+        if !force, let lastSuccess {
+            let age = Date().timeIntervalSince(lastSuccess)
+            if age >= 0 && age < maxAge { return }
+        }
+        let id = UUID()
+        let task = Task { @MainActor in
+            guard !Task.isCancelled else { return false }
+            return await work()
+        }
+        pending = (id, task)
+        let succeeded = await task.value
+        guard pending?.id == id else { return }
+        pending = nil
+        if succeeded && !task.isCancelled { lastSuccess = Date() }
+    }
+
+    func reset() {
+        pending?.task.cancel()
+        pending = nil
+        lastSuccess = nil
+    }
+}
