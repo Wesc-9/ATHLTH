@@ -33,6 +33,21 @@ final class ATHLTHiPadLiveWorkoutTests: XCTestCase {
         )
     }
 
+    func testPresenceHeartbeatRefreshesOnSessionSourceAndExpiryWithoutSlowingMetrics() {
+        let id = UUID(), now = Date(timeIntervalSince1970: 1000)
+        func needs(_ candidate: UUID, _ source: String, _ last: Date?) -> Bool {
+            ATHLTHCrossDevicePresenceRefreshPolicy.needsWrite(sessionID: candidate, source: source,
+                previousSessionID: id, previousSource: "watch", previousWrite: last, now: now)
+        }
+        XCTAssertFalse(needs(id, "watch", now.addingTimeInterval(-4)))
+        XCTAssertFalse(needs(id, "watch", now.addingTimeInterval(-11)))
+        XCTAssertTrue(needs(id, "watch", now.addingTimeInterval(-12)))
+        XCTAssertTrue(needs(id, "watch", now.addingTimeInterval(1)))
+        XCTAssertTrue(needs(id, "watch", nil))
+        XCTAssertTrue(needs(UUID(), "watch", now))
+        XCTAssertTrue(needs(id, "iphone", now))
+    }
+
     func testStrengthSpectatorUsesActiveClockNotWallTime() {
         let started = Date(timeIntervalSince1970: 1_900_000_000)
         let id = UUID()
