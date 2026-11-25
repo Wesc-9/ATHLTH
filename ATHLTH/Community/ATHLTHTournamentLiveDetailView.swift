@@ -703,9 +703,7 @@ struct ATHLTHTournamentLiveDetailView: View {
         VStack(alignment: .leading, spacing: 11) {
             sectionTitle("Konkurranseregler")
             if current.requiredEnvironment != "any" {
-                Label(current.requiredEnvironment == "gym"
-                      ? "Kun på treningssenter"
-                      : "Kun utendørs", systemImage: "checkmark.shield")
+                Label(ATHLTHCompetitionEnvironment(rawValue: current.requiredEnvironment)?.title ?? "Ukjent treningsmiljø", systemImage: "checkmark.shield")
                     .font(.subheadline.weight(.medium))
             }
             if let place = current.meetingPlace, !place.isEmpty {
