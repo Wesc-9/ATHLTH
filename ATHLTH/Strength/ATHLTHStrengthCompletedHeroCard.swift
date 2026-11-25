@@ -35,6 +35,8 @@ struct ATHLTHStrengthCompletedHeroCard: View {
     var recentActivityStrip = false
     // Opt-in styling for strength details; Home and completion retain their look.
     var trainDetailStyle = false
+    // Feed artwork uses the shared activity overlay instead of a second title.
+    var feedBackgroundOnly = false
 
     private let ink = Color(red: 0.14, green: 0.15, blue: 0.16)
     private let secondaryInk = Color(red: 0.35, green: 0.38, blue: 0.42)
@@ -99,7 +101,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             let cardWidth = geometry.size.width
             let small = compact || cardHeight < 250
             let tight = cardHeight < 170
-            let displaysMetrics = showsMetrics && !tight
+            let displaysMetrics = showsMetrics && !tight && !feedBackgroundOnly
             let footerHeight: CGFloat = displaysMetrics ? (small ? 46 : 75) : 0
 
             ZStack(alignment: .topLeading) {
@@ -116,10 +118,12 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     // Keep the original photo, crop and geometry unchanged.
                     // Compact recent cards favor muscle readability over busy
                     // photographic detail; the original asset is unchanged.
-                    .saturation(recentActivityStrip ? 0.58 : (trainDetailStyle ? 0.95 : 0.75))
-                    .contrast(trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.83 : 0.88))
+                    .saturation(feedBackgroundOnly ? 1 : (recentActivityStrip ? 0.58 : (trainDetailStyle ? 0.95 : 0.75)))
+                    .contrast(feedBackgroundOnly ? 1 : (trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.83 : 0.88)))
 
-                if trainDetailStyle {
+                if feedBackgroundOnly {
+                    Color.clear
+                } else if trainDetailStyle {
                     // Preserve the clean studio image and darken only enough
                     // for the white title and gold caption to be readable.
                     LinearGradient(
@@ -157,7 +161,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
                 }
 
-                if recentActivityStrip {
+                if recentActivityStrip && !feedBackgroundOnly {
                     // Lighten the underlying gym details behind the black
                     // title without changing the title's size or position.
                     RadialGradient(
@@ -224,6 +228,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     .allowsHitTesting(false)
                 }
 
+                if !feedBackgroundOnly {
                 VStack(alignment: .leading, spacing: 0) {
                     if let detailMetadata {
                         VStack(alignment: .leading, spacing: 4) {
@@ -322,6 +327,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                 .padding(.horizontal, small ? 13 : 20)
                 .padding(.top, small ? 12 : 19)
                 .padding(.bottom, small ? 6 : 10)
+                }
             }
             .frame(width: cardWidth, height: cardHeight)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius ?? (compact ? 20 : 28),
