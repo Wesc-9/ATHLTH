@@ -1890,7 +1890,10 @@ private enum HealthProfileField: String, Identifiable {
 struct PersonalHealthProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var health: HealthKitManager
+    // The app injects this same shared manager. Profile editing only needs
+    // its narrow authorization flag, not every workout/recovery publication.
+    private var health: HealthKitManager { .shared }
+    @State private var healthAuthorizationRequested = false
     @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var includeDateOfBirth = false
@@ -1917,7 +1920,7 @@ struct PersonalHealthProfileView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 24) {
                 sourceSection
                 detailsSection
                 ATHLTHPrivateProfileDetailsView()
@@ -1945,7 +1948,10 @@ struct PersonalHealthProfileView: View {
             english: "Health & training profile", norwegian: "Helse- og treningsprofil"
         ))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: loadFromSession)
+        .onAppear {
+            healthAuthorizationRequested = health.hasRequestedAuthorization
+            loadFromSession()
+        }
         .sheet(item: $editingField) { field in
             healthEditor(for: field)
         }
@@ -1986,13 +1992,13 @@ struct PersonalHealthProfileView: View {
                             .tint(ATHLTHTheme.premiumGold)
                     } else {
                         Image(
-                            systemName: health.hasRequestedAuthorization
+                            systemName: healthAuthorizationRequested
                                 ? "checkmark.circle.fill"
                                 : "circle"
                         )
                         .font(.title3)
                         .foregroundStyle(
-                            health.hasRequestedAuthorization
+                            healthAuthorizationRequested
                                 ? ATHLTHTheme.premiumGold
                                 : Color.secondary.opacity(0.5)
                         )
@@ -2007,7 +2013,7 @@ struct PersonalHealthProfileView: View {
                 } label: {
                     HStack {
                         Label(
-                            health.hasRequestedAuthorization
+                            healthAuthorizationRequested
                                 ? ATHLTHLocalization.choose(english: "Refresh Apple Health", norwegian: "Oppdater Apple Health")
                                 : ATHLTHLocalization.choose(english: "Connect Apple Health", norwegian: "Koble til Apple Health"),
                             systemImage: "arrow.triangle.2.circlepath"
@@ -2537,7 +2543,7 @@ struct PersonalHealthProfileView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(ATHLTHTheme.premiumGold)
-                    .disabled(!health.hasRequestedAuthorization)
+                    .disabled(!healthAuthorizationRequested)
                     .accessibilityLabel(ATHLTHLocalization.choose(
                         english: "Refresh recorded pulse",
                         norwegian: "Oppdater registrert puls"
@@ -2777,18 +2783,26 @@ struct PersonalHealthProfileView: View {
 
     private func refreshFromAppleHealth() {
         guard !refreshingAppleHealth else { return }
+        refreshingAppleHealth = true
 
         Task {
-            refreshingAppleHealth = true
-            defer { refreshingAppleHealth = false }
+            defer {
+                refreshingAppleHealth = false
+                healthAuthorizationRequested = health.hasRequestedAuthorization
+            }
 
-            await health.requestAuthorization()
-            await health.completeAuthorizationSetup()
-            await health.configureBackgroundSync(
-                allowed: settings.backgroundHealthSyncEnabled
-            )
-            await health.refreshAll()
-            await health.refreshPersonalDetails()
+            // A profile-only refresh must not scan workouts, sleep or
+            // recovery. Request permissions only when setup/review needs it.
+            if !health.hasRequestedAuthorization || health.authorizationReviewNeeded {
+                await health.requestAuthorization()
+                guard health.authorizationError == nil else { return }
+                await health.completeAuthorizationSetup()
+                await health.configureBackgroundSync(
+                    allowed: settings.backgroundHealthSyncEnabled
+                )
+            } else {
+                await health.refreshPersonalDetails()
+            }
 
             if health.personalDetails.hasAnyValue {
                 session.mergePersonalDetailsFromAppleHealth(
