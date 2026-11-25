@@ -561,6 +561,7 @@ private struct ATHLTHSharedExerciseReportSheet: View {
     @State private var libraryExerciseID: UUID?
     @State private var suggestedID: UUID?
     @State private var didPrefill = false
+    @State private var personalBaseline: ATHLTHCompetitionLocalResult?
     @State private var busy = false
     @State private var errorMessage: String?
     private var parsed: Double? { Double(score.replacingOccurrences(of: ",", with: ".")) }
@@ -616,6 +617,25 @@ private struct ATHLTHSharedExerciseReportSheet: View {
                     }
                     if source == nil {
                         TextField(exercise.unit, text: $score).keyboardType(.decimalPad)
+                        if let baseline = personalBaseline, let value = parsed,
+                           exercise.accepts(value),
+                           let change = ATHLTHCompetitionLocalResult.improvementPercent(
+                            metric: exercise.metric, baseline: baseline.value, current: value
+                           ) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Label("Personlig forbedring", systemImage: "chart.line.uptrend.xyaxis")
+                                    .font(.subheadline.weight(.semibold))
+                                Text((change > 0 ? "+" : "") + change.formatted(.number.precision(.fractionLength(1))) + " %")
+                                    .font(.title2.weight(.semibold).monospacedDigit())
+                                Text("Mot din beste tilsvarende økt de siste 90 dagene før øvelsen åpnet: " +
+                                     baseline.value.formatted() + " " + exercise.unit)
+                                    .font(.caption)
+                                Text("Privat sammenligning – påvirker ikke konkurransens poeng.")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(ATHLTHArenaV3Style.ink)
+                            .accessibilityIdentifier("athlth-competition-personal-improvement")
+                        }
                     } else {
                         Text("Resultatet beregnes fra originaløkten på serveren.").font(.caption)
                     }
@@ -641,6 +661,10 @@ private struct ATHLTHSharedExerciseReportSheet: View {
             .task {
                 let candidates = try? await ATHLTHTournamentLobbyCloudService().candidates(tournamentID: tournamentID)
                 libraryExerciseID = candidates?.first(where: { $0.id == exercise.candidateID })?.exerciseID
+                personalBaseline = ATHLTHCompetitionLocalResult.personalBaseline(
+                    exercise: exercise, libraryExerciseID: libraryExerciseID,
+                    health: health.workouts, phone: phone.history, strength: strength.workoutHistory
+                )
                 if !didPrefill && score.isEmpty && note.isEmpty && suggestions.count == 1, let item = suggestions.first {
                     didPrefill = true
                     fill(item)
