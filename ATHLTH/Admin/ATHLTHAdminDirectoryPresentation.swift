@@ -47,7 +47,7 @@ enum ATHLTHAdminDirectoryPresentation {
 
     static func lastSignInLabel(_ date: Date?, norwegian: Bool) -> String {
         guard let date else { return norwegian ? "Ikke registrert" : "Not recorded" }
-        return date.formatted(date: .abbreviated, time: .shortened)
+        return date.formatted(date: .abbreviated, time: .omitted)
     }
 
     static func accountStatusTitle(
