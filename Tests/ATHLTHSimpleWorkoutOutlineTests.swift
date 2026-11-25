@@ -54,6 +54,32 @@ final class ATHLTHSimpleWorkoutOutlineTests: XCTestCase {
         XCTAssertEqual(recipe, untouched)
     }
 
+    func testQuickTrainBasicOverviewShowsFourByFourAsThreePartsAndExactTime() {
+        var recipe = [block("Oppvarming", phase: .warmup, index: 1, duration: 600)]
+        for index in 1...4 {
+            recipe.append(block("Intervall", phase: .main, index: recipe.count + 1, duration: 240, pace: 257))
+            if index < 4 {
+                recipe.append(block("Pause", kind: .rest, phase: .recovery, index: recipe.count + 1, duration: 120))
+            }
+        }
+        recipe.append(block("Nedjogging", phase: .cooldown, index: 9, duration: 600))
+        let original = recipe
+        let stages = ATHLTHSimpleWorkoutOutline.stages(for: recipe, workoutTitle: "4x4", maximumBPM: 190, includePace: true)
+        XCTAssertEqual(stages.flatMap(\.items).count, 3)
+        XCTAssertEqual(stages[1].items.first?.repetitions, 4)
+        XCTAssertTrue(stages[1].items.first?.detail.contains("4 × 4 min") == true)
+        XCTAssertTrue(stages[1].items.first?.detail.contains("4:17/km") == true)
+        XCTAssertTrue(stages[1].items.first?.detail.contains("152–171") == true)
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.previewSeconds(for: recipe), 2520)
+        XCTAssertEqual(original, recipe)
+        for index in recipe.indices where recipe[index].kind == .run {
+            recipe[index].isIndoor = true
+            recipe[index].treadmillInclinePercent = 0
+        }
+        let treadmill = ATHLTHSimpleWorkoutOutline.stages(for: recipe, includePace: true)
+        XCTAssertTrue(treadmill[1].items.first?.detail.contains("14.0 km/t") == true)
+    }
+
     func testPersonalTargetsMustNotBeHiddenByGroupingDistinctRepeats() {
         let recipe = [
             block("VO2", phase: .main, index: 1, pace: 300),
