@@ -343,6 +343,7 @@ private struct ATHLTHSharedEventProgressView: View {
     @State private var errorMessage: String?
     @State private var busy = false
     @State private var reportedCompletion = false
+    @State private var autoReporting = false
     private let cloud = ATHLTHTournamentSingleEventCloud()
 
     private var ownExercises: [ATHLTHSharedEventExerciseRow] {
@@ -372,6 +373,19 @@ private struct ATHLTHSharedEventProgressView: View {
                     .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
             }.padding(15).athlthTrainEditorialCard()
 
+            if ATHLTHCompetitionAutoReporting.supports(tournament) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Send resultater automatisk", isOn: Binding(
+                        get: { autoReporting },
+                        set: { value in
+                            ATHLTHCompetitionAutoReporting.setEnabled(value, tournamentID: tournament.id, userID: userID)
+                            autoReporting = value
+                        }))
+                        .tint(ATHLTHTrainDesign.bronze)
+                    Text("Gjelder nye økter på denne enheten etter aktivering. Entydige målinger sendes til godkjenning, ikke som serververifiserte resultater. Kun én konkurranse kan være aktiv om gangen.")
+                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                }.padding(15).athlthTrainEditorialCard()
+            }
             if tournament.status == "active" || tournament.status == "completed" {
                 ForEach(ownExercises) { exercise in exerciseCard(exercise) }
                 if tournament.status == "completed" {
@@ -397,6 +411,7 @@ private struct ATHLTHSharedEventProgressView: View {
             }.disabled(busy)
         }
         .task(id: tournament.id) {
+            autoReporting = ATHLTHCompetitionAutoReporting.enabled(tournamentID: tournament.id, userID: userID)
             await reload()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))

@@ -14,6 +14,7 @@ struct ATHLTHTournamentMyExercisesView: View {
     @State private var reportSlot: ATHLTHTournamentMatchExerciseRemote?
     @State private var errorMessage: String?
     @State private var loading = false
+    @State private var autoReporting = false
 
     private let cloud = ATHLTHTournamentLobbyCloudService()
 
@@ -53,6 +54,19 @@ struct ATHLTHTournamentMyExercisesView: View {
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 .fixedSize(horizontal: false,vertical: true)
 
+            if ATHLTHCompetitionAutoReporting.supports(tournament) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Send gjennomføring automatisk", isOn: Binding(
+                        get: { autoReporting },
+                        set: { value in
+                            ATHLTHCompetitionAutoReporting.setEnabled(value, tournamentID: tournament.id, userID: userID)
+                            autoReporting = value
+                        }))
+                        .tint(ATHLTHArenaV3Style.gold)
+                    Text("Entydige målinger fra nye økter på denne enheten sendes som gjennomføringsbevis til motstanderen. Kampresultatet følger konkurransens vanlige godkjenning. Kun én konkurranse om gangen.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }.padding(15).background(ATHLTHArenaV3Style.panel())
+            }
             if let errorMessage {
                 Label(errorMessage,systemImage: "exclamationmark.triangle")
                     .font(.caption)
@@ -89,7 +103,10 @@ struct ATHLTHTournamentMyExercisesView: View {
                 .background(ATHLTHArenaV3Style.panel())
             }
         }
-        .task(id: matches.map(\.id)) { await reload() }
+        .task(id: matches.map(\.id)) {
+            autoReporting = ATHLTHCompetitionAutoReporting.enabled(tournamentID: tournament.id, userID: userID)
+            await reload()
+        }
         .sheet(item: $reportSlot) { slot in
             ATHLTHTournamentExerciseEvidenceSheet(
                 requiresVerifiedWorkout: tournament.raceRules.discipline == .sprint,

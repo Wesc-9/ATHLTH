@@ -219,3 +219,53 @@ extension ATHLTHTournamentSingleEventCloud {
             p_approve: approve)).execute()
     }
 }
+
+struct ATHLTHCompetitionLocalTarget: Decodable, Identifiable {
+    let targetID: UUID
+    let candidateID: UUID
+    let libraryExerciseID: UUID?
+    let activity: String
+    let metric: String
+    let targetValue: Double?
+    let opensAt: Date
+    let deadlineAt: Date
+    let progress: String
+    var id: UUID { targetID }
+    enum CodingKeys: String, CodingKey {
+        case targetID = "target_id"
+        case candidateID = "candidate_id"
+        case libraryExerciseID = "library_exercise_id"
+        case activity, metric, progress
+        case targetValue = "target_value"
+        case opensAt = "opens_at"
+        case deadlineAt = "deadline_at"
+    }
+}
+private struct ATHLTHCompetitionLocalTargetsParams: Encodable {
+    let p_tournament: UUID
+    let p_user: UUID
+}
+private struct ATHLTHCompetitionLocalSubmitParams: Encodable {
+    let p_tournament: UUID
+    let p_user: UUID
+    let p_target: UUID
+    let p_workout: UUID
+    let p_score: Double
+    let p_started: String
+    let p_ended: String
+}
+extension ATHLTHTournamentSingleEventCloud {
+    func localTargets(tournamentID: UUID, userID: UUID) async throws -> [ATHLTHCompetitionLocalTarget] {
+        try await client.rpc("athlth_competition_local_targets", params: ATHLTHCompetitionLocalTargetsParams(
+            p_tournament: tournamentID, p_user: userID)).execute().value
+    }
+    func submitLocal(tournamentID: UUID, userID: UUID, targetID: UUID, workoutID: UUID,
+                     score: Double, started: Date, ended: Date) async throws -> Bool {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return try await client.rpc("athlth_competition_submit_local_measurement",
+            params: ATHLTHCompetitionLocalSubmitParams(p_tournament: tournamentID, p_user: userID,
+                p_target: targetID, p_workout: workoutID, p_score: score,
+                p_started: formatter.string(from: started), p_ended: formatter.string(from: ended))).execute().value
+    }
+}

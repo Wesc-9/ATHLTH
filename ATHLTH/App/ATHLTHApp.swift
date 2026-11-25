@@ -3994,6 +3994,15 @@ struct AppRootView: View {
         baselineKey: UUID? = nil,
         sourceIDs: Set<UUID>
     ) {
+        if appSession.signedIn {
+            let ownerID = appSession.profile.userID
+            let logs = workout.activity == .strength ? strengthWorkout.workoutHistory : []
+            Task { @MainActor in
+                guard appSession.signedIn, appSession.profile.userID == ownerID else { return }
+                await ATHLTHCompetitionAutoReporting.submitCompletedWorkout(workout,
+                    sourceIDs: sourceIDs, strengthLogs: logs, userID: ownerID)
+            }
+        }
         workoutCompletion.finalize(
             workout: workout,
             baselineKey: baselineKey,

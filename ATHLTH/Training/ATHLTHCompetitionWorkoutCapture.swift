@@ -218,3 +218,103 @@ struct ATHLTHCompetitionLocalResult: Identifiable {
         }
     }
 }
+
+
+/// One explicitly selected competition per account and device. A completed
+/// workout is never shared by this path until the athlete enables it.
+@MainActor
+enum ATHLTHCompetitionAutoReporting {
+    private struct Consent: Codable, Equatable {
+        let tournamentID: UUID
+        let enabledAt: Date
+    }
+    private static let storageName = "competitionAutoReporting"
+    private static var inFlight: Set<String> = []
+    private static func consent(userID: UUID) -> Consent? {
+        guard !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return nil }
+        return AccountLocalStorage.read([Consent].self, name: storageName,
+            userID: userID, defaults: .standard)?.first
+    }
+    static func enabled(tournamentID: UUID, userID: UUID) -> Bool {
+        consent(userID: userID)?.tournamentID == tournamentID
+    }
+    static func setEnabled(_ enabled: Bool, tournamentID: UUID, userID: UUID) {
+        guard !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return }
+        if !enabled && !Self.enabled(tournamentID: tournamentID, userID: userID) { return }
+        let records: [Consent] = enabled ? [Consent(tournamentID: tournamentID, enabledAt: Date())] : []
+        AccountLocalStorage.write(records, name: storageName, userID: userID, defaults: .standard)
+    }
+    static func supports(_ tournament: ATHLTHTournamentRemote) -> Bool {
+        tournament.status == "active" && tournament.proofMode == .opponent &&
+            tournament.requiredEnvironment == "any" && tournament.raceRules.discipline == .workout &&
+            tournament.raceRules.recordingDevice == .any &&
+            (!tournament.singleEventMode || tournament.raceRules.exerciseScoringVersion == 2)
+    }
+
+    private static func measurement(target: ATHLTHCompetitionLocalTarget,
+                                    workout: SocialPublishableWorkout,
+                                    strengthLog: StrengthWorkoutLog?) -> (key: String, value: Double)? {
+        guard workout.startDate >= target.opensAt, workout.endDate <= target.deadlineAt else { return nil }
+        if target.activity == "strength" {
+            guard workout.activity == .strength, let log = strengthLog, log.isFinished,
+                  let id = target.libraryExerciseID else { return nil }
+            let performed = log.exercises.filter { $0.exercise.libraryExerciseID == id }
+            guard performed.count == 1, let exercise = performed.first else { return nil }
+            let sets = exercise.sets.filter(\.countsTowardTrainingLoad)
+            guard !sets.isEmpty else { return nil }
+            let value: Double
+            if target.metric == "repetitions" {
+                let reps = sets.compactMap(\.resolvedCompletedReps)
+                guard reps.count == sets.count else { return nil }
+                value = Double(reps.reduce(0,+))
+            } else if target.metric == "time" {
+                guard let longest = sets.compactMap(\.resolvedCompletedDurationSeconds).max() else { return nil }
+                value = Double(longest)
+            } else { return nil }
+            guard value.isFinite, value > 0, value <= 100_000_000 else { return nil }
+            return ("strength:" + id.uuidString, value)
+        }
+        guard let value = ATHLTHCompetitionLocalResult.cardioValue(activity: target.activity,
+            metric: target.metric, target: target.targetValue, workoutActivity: workout.activity,
+            distance: workout.distanceMeters, duration: workout.duration),
+              value.isFinite, value > 0, value <= 100_000_000 else { return nil }
+        return ("cardio:" + target.activity, value)
+    }
+
+    static func submitCompletedWorkout(_ workout: SocialPublishableWorkout,
+                                       sourceIDs: Set<UUID>, strengthLogs: [StrengthWorkoutLog],
+                                       userID: UUID) async {
+        guard let selection = consent(userID: userID), workout.startDate >= selection.enabledAt,
+              workout.endDate > workout.startDate, workout.endDate <= Date() else { return }
+        let key = userID.uuidString + selection.tournamentID.uuidString + workout.id.uuidString
+        guard inFlight.insert(key).inserted else { return }
+        defer { inFlight.remove(key) }
+        let cloud = ATHLTHTournamentSingleEventCloud()
+        do {
+            let targets = try await cloud.localTargets(tournamentID: selection.tournamentID, userID: userID)
+            let ids = sourceIDs.union([workout.id])
+            let matchingLogs = strengthLogs.filter { log in
+                (ids.contains(log.id) || log.healthMetrics.healthKitWorkoutUUID.map { ids.contains($0) } == true) &&
+                log.isFinished && abs(log.startedAt.timeIntervalSince(workout.startDate)) <= 120 &&
+                log.endedAt.map { abs($0.timeIntervalSince(workout.endDate)) <= 120 } == true
+            }
+            let strengthLog = matchingLogs.count == 1 ? matchingLogs.first : nil
+            let values = targets.compactMap { target -> (ATHLTHCompetitionLocalTarget, String, Double)? in
+                guard let result = measurement(target: target, workout: workout, strengthLog: strengthLog) else { return nil }
+                return (target, result.key, result.value)
+            }
+            // Do not assign one measurement to multiple eligible exercises or
+            // overlapping fixtures, even if one has already been submitted.
+            for (target, metricKey, score) in values where target.progress == "pending" {
+                guard values.filter({ $0.1 == metricKey }).count == 1,
+                      consent(userID: userID) == selection else { continue }
+                _ = try await cloud.submitLocal(tournamentID: selection.tournamentID, userID: userID,
+                    targetID: target.id, workoutID: strengthLog?.id ?? workout.id,
+                    score: score, started: workout.startDate, ended: workout.endDate)
+            }
+        } catch {
+            // A failed sync never blocks workout saving. Manual reporting
+            // remains available, and a repeated completion may retry.
+        }
+    }
+}
