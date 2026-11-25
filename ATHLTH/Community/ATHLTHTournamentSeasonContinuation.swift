@@ -50,7 +50,7 @@ enum ATHLTHTournamentSeasonContinuation {
         }
     }
 
-    static func nextTitle(from previous: String) -> String {
+    static func nextTitle(from previous: String, seasonNumber: Int? = nil) -> String {
         let clean = previous.trimmingCharacters(in: .whitespacesAndNewlines)
         let pattern = #"(?i)(?:\s*[·—-]\s*)?sesong\s+([0-9]+)\s*$"#
         var base = clean
@@ -61,10 +61,12 @@ enum ATHLTHTournamentSeasonContinuation {
            ),
            let entire = Range(match.range, in: clean),
            let digits = Range(match.range(at: 1), in: clean) {
-            nextNumber = min(999, (Int(clean[digits]) ?? 1) + 1)
+            nextNumber = min(998, max(1, Int(clean[digits]) ?? 1)) + 1
             base = String(clean[..<entire.lowerBound])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        // The stored season lineage wins over a title edited by the organizer.
+        if let seasonNumber { nextNumber = min(998, max(1, seasonNumber)) + 1 }
         let suffix = " · Sesong \(nextNumber)"
         return String(base.prefix(max(0, 80 - suffix.count))) + suffix
     }
@@ -135,7 +137,9 @@ enum ATHLTHTournamentSeasonContinuation {
         )
         nextSettings.race = completed.raceRules
         nextSettings.race.previousCompetitionID = completed.id
-        nextSettings.race.seasonNumber = (completed.raceRules.seasonNumber ?? 1) + 1
+        let previousSeason = completed.raceRules.seasonNumber ?? 1
+        guard (1..<999).contains(previousSeason) else { return nil }
+        nextSettings.race.seasonNumber = previousSeason + 1
         nextSettings.race.duelMode = nil
         nextSettings.startsAt = nil
         nextSettings.endsAt = nil
@@ -151,6 +155,11 @@ enum ATHLTHTournamentSeasonContinuation {
         nextSettings.meetingLon = completed.meetingLon
         // A new season always gets a new, independently approved exercise list.
         nextSettings.coachExerciseIDs = []
+        // Old exercise-specific goals/weights cannot silently apply to a new list.
+        nextSettings.race.scoringGoals = nil
+        nextSettings.race.exerciseWeights = nil
+        let roster = Set(participants.map { ATHLTHCompetitionRaceRules.key($0.id) })
+        nextSettings.race.handicapPercentages = nextSettings.race.handicapPercentages?.filter { roster.contains($0.key) }
         nextSettings.invitationDays = completed.invitationDays
         nextSettings.unansweredPolicy =
             ATHLTHCompetitionUnansweredPolicy(rawValue:
@@ -164,7 +173,7 @@ enum ATHLTHTournamentSeasonContinuation {
             ownerID: completed.ownerID,
             clubID: completed.clubID,
             seasonID: nil,
-            title: nextTitle(from: completed.title),
+            title: nextTitle(from: completed.title, seasonNumber: previousSeason),
             format: completed.format,
             groupSize: completed.groupSize,
             qualifiersPerGroup: completed.qualifiersPerGroup,
@@ -225,6 +234,9 @@ enum ATHLTHDuelRematch {
         settings.environment = ATHLTHCompetitionEnvironment(rawValue: previous.requiredEnvironment) ?? .any
         settings.invitationDays = previous.invitationDays
         settings.selectedExerciseIDs = exerciseIDs
+        let selectedKeys = Set(exerciseIDs.map(ATHLTHCompetitionRaceRules.key))
+        settings.race.scoringGoals = settings.race.scoringGoals?.filter { selectedKeys.contains($0.key) }
+        settings.race.exerciseWeights = settings.race.exerciseWeights?.filter { selectedKeys.contains($0.key) }
         let base = previous.title.replacingOccurrences(of: #"(?i)\s*·\s*rematch$"#, with: "", options: .regularExpression)
         return ATHLTHTournamentDraft(ownerID: userID, clubID: nil, seasonID: nil,
             title: String(base.prefix(70)) + " · Rematch", format: .league, singleEventMode: true,
