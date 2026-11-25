@@ -2,6 +2,16 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAdminDirectoryPresentationTests: XCTestCase {
+    func testLastSignInUsesActualTimestampAndNoInventedFallback() {
+        let date = Date(timeIntervalSince1970: 1_795_000_000)
+        XCTAssertEqual(
+            ATHLTHAdminDirectoryPresentation.lastSignInLabel(date, norwegian: true),
+            date.formatted(date: .abbreviated, time: .shortened)
+        )
+        XCTAssertEqual(ATHLTHAdminDirectoryPresentation.lastSignInLabel(nil, norwegian: true), "Ikke registrert")
+        XCTAssertEqual(ATHLTHAdminDirectoryPresentation.lastSignInLabel(nil, norwegian: false), "Not recorded")
+    }
+
     func testPlusTierIsHumanReadableAndNotAValidationBadge() {
         XCTAssertEqual(
             ATHLTHAdminDirectoryPresentation.planTitle(
