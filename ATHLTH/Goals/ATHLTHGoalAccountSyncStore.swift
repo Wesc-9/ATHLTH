@@ -15,6 +15,12 @@ struct ATHLTHCloudGoal: Codable, Equatable, Identifiable {
 struct ATHLTHCloudGoalDocument: Codable, Equatable {
     let goals: [ATHLTHCloudGoal]
     let measurements: [ATHLTHBodyMeasurement]
+
+    // The only measurement input is the existing server document. Do not
+    // derive this value from local profile measurements.
+    func replacingGoals(_ next: [ATHLTHCloudGoal]) -> Self {
+        Self(goals: next, measurements: measurements)
+    }
 }
 
 /// Three-way reconciliation: independent edits on different devices merge.
@@ -235,9 +241,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
             var effectiveRevision = remoteRevision
             var didUpload = false
             if merged != remote {
-                let encoded = try Self.encode(ATHLTHCloudGoalDocument(
-                    goals: merged, measurements: mergedMeasurements
-                ))
+                let encoded = try Self.encode(document.replacingGoals(merged))
                 effectiveRevision = try await client
                     .rpc(
                         "athlth_save_goal_document",
