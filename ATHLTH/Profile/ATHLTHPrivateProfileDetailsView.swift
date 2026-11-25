@@ -1,14 +1,13 @@
 import Charts
+import Combine
 import SwiftUI
 
 /// One private place for reusable athlete context and dated body measurements.
 /// A changed reading does not silently overwrite Apple Health body mass.
 struct ATHLTHPrivateProfileDetailsView: View {
     @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var goalStore: GoalStore
     @StateObject private var checkInStore = RecoverySorenessStore()
     @State private var showingDailyCheckIn = false
-    @State private var showingGoalCreation = false
     @State private var profile = ATHLTHTrainingProfile()
     @State private var selectedMetric: ATHLTHBodyMetric = .weight
     @State private var measureDate = Date()
@@ -16,6 +15,8 @@ struct ATHLTHPrivateProfileDetailsView: View {
     @State private var errorText: String?
     @State private var showingMeasurementEditor = false
     @State private var profileLoadedFor: UUID?
+    @State private var persistedProfile: ATHLTHTrainingProfile?
+    @State private var visibleHistoryCount = 20
     @State private var savedNotice = false
 
     private func localized(_ english: String, _ norwegian: String) -> String {
@@ -23,8 +24,9 @@ struct ATHLTHPrivateProfileDetailsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 19) {
-            goalsCard
+        let readings = profile.readings(for: selectedMetric)
+        let latest = profile.latestByMetric()
+        return LazyVStack(alignment: .leading, spacing: 19) {
             checkInCard
             ATHLTHInjuryRestrictionsEditor(restrictions: Binding(
                 get: { profile.injuryRestrictions ?? [] },
@@ -34,10 +36,10 @@ struct ATHLTHPrivateProfileDetailsView: View {
                     persist()
                 }
             ))
-            metricsCard
-            if !profile.readings(for: selectedMetric).isEmpty {
-                trendCard
-                historyCard
+            metricsCard(latest: latest)
+            if !readings.isEmpty {
+                trendCard(readings: readings)
+                historyCard(readings: readings)
             }
             notesCard
             Text(localized(
@@ -66,117 +68,15 @@ struct ATHLTHPrivateProfileDetailsView: View {
         .sheet(isPresented: $showingDailyCheckIn) {
             RecoverySorenessLogView(store: checkInStore)
         }
-        .sheet(isPresented: $showingGoalCreation) {
-            GoalCreationView()
+        .onChange(of: selectedMetric) { _, _ in
+            visibleHistoryCount = 20
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .athlthTrainingDataDidChange
-        )) { _ in
-            profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+        ).debounce(for: .milliseconds(250), scheduler: RunLoop.main)) { _ in
+            reloadProfileIfChanged()
             checkInStore.reloadFromStorage()
         }
-    }
-
-    private var activeGoals: [ATHLTHGoal] {
-        goalStore.goals.filter { $0.status == .active }
-    }
-
-    private func goalProgress(_ goal: ATHLTHGoal) -> Double {
-        if goal.bodyMeasurementGoal != nil {
-            return min(max(ATHLTHBodyGoalCheckInPolicy.progress(goal, profile: profile), 0), 1)
-        }
-        return min(max(goal.progress, 0), 1)
-    }
-
-    private var goalsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center) {
-                Label(localized("My goals", "Mine mål"), systemImage: "target")
-                    .font(.headline)
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                Spacer()
-                Text(ATHLTHLocalization.counted(
-                    activeGoals.count,
-                    englishSingular: "active goal",
-                    englishPlural: "active goals",
-                    norwegianSingular: "aktivt mål",
-                    norwegianPlural: "aktive mål"
-                ))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            }
-
-            if let primary = goalStore.primaryGoal {
-                NavigationLink {
-                    GoalDetailView(goalID: primary.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 9) {
-                        Label(localized("MAIN GOAL", "HOVEDMÅL"), systemImage: "star.fill")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1)
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        HStack(alignment: .center, spacing: 9) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(primary.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    .lineLimit(2)
-                                Text(primary.deadline.map {
-                                    localized("Target ", "Måldato ") +
-                                        $0.formatted(date: .abbreviated, time: .omitted)
-                                } ?? localized("No deadline", "Ingen måldato"))
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            Spacer()
-                            Text("\(Int((goalProgress(primary) * 100).rounded()))%")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        }
-                        ProgressView(value: goalProgress(primary))
-                            .tint(ATHLTHPlanDesign.accentInk)
-                    }
-                    .padding(13)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 15))
-                }
-                .buttonStyle(.plain)
-            } else {
-                Text(goalStore.goals.isEmpty
-                     ? localized(
-                        "Set a goal for your training. You can track progress and milestones here.",
-                        "Sett deg et treningsmål. Her kan du følge fremgang og delmål."
-                     )
-                     : localized(
-                        "No active main goal. Manage your goals or choose a new priority.",
-                        "Du har ikke et aktivt hovedmål. Administrer målene eller velg en ny prioritet."
-                     ))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-
-            HStack(spacing: 9) {
-                NavigationLink {
-                    GoalsHubView()
-                } label: {
-                    Label(localized("View all goals", "Se alle mål"),
-                          systemImage: "list.bullet")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                Button {
-                    showingGoalCreation = true
-                } label: {
-                    Label(localized("New goal", "Nytt mål"), systemImage: "plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHPlanDesign.accentInk)
-            }
-            .font(.caption.weight(.semibold))
-        }
-        .padding(16)
-        .athlthPlanCard(radius: 19)
     }
 
     private var checkInCard: some View {
@@ -331,7 +231,7 @@ struct ATHLTHPrivateProfileDetailsView: View {
         .athlthPlanCard(radius: 19)
     }
 
-    private var metricsCard: some View {
+    private func metricsCard(latest: [ATHLTHBodyMetric: ATHLTHBodyMeasurement]) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
                 Text(localized("Body measurements", "Kroppsmål"))
@@ -365,7 +265,7 @@ struct ATHLTHPrivateProfileDetailsView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(metric.name).font(.caption.weight(.medium))
-                            if let latest = profile.latest(metric) {
+                            if let latest = latest[metric] {
                                 Text(String(format: "%.1f %@", latest.value, metric.unit))
                                     .font(.subheadline.weight(.bold))
                             } else {
@@ -397,9 +297,8 @@ struct ATHLTHPrivateProfileDetailsView: View {
         .athlthPlanCard(radius: 19)
     }
 
-    private var trendCard: some View {
-        let readings = profile.readings(for: selectedMetric)
-        return VStack(alignment: .leading, spacing: 12) {
+    private func trendCard(readings: [ATHLTHBodyMeasurement]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text(localized("Progress", "Utvikling") + " · " + selectedMetric.name)
                 .font(.headline)
             if readings.count > 1,
@@ -445,11 +344,12 @@ struct ATHLTHPrivateProfileDetailsView: View {
         .athlthPlanCard(radius: 19)
     }
 
-    private var historyCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func historyCard(readings: [ATHLTHBodyMeasurement]) -> some View {
+        let visible = Array(readings.reversed().prefix(visibleHistoryCount))
+        return LazyVStack(alignment: .leading, spacing: 10) {
             Text(localized("Measurement history", "Målehistorikk"))
                 .font(.headline)
-            ForEach(profile.readings(for: selectedMetric).reversed()) { reading in
+            ForEach(visible) { reading in
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(String(format: "%.1f %@", reading.value, selectedMetric.unit))
@@ -476,9 +376,21 @@ struct ATHLTHPrivateProfileDetailsView: View {
                     .accessibilityLabel(localized("Delete reading", "Slett måling"))
                 }
                 .padding(.vertical, 5)
-                if reading.id != profile.readings(for: selectedMetric).first?.id {
+                if reading.id != visible.last?.id {
                     Divider().opacity(0.5)
                 }
+            }
+            if visible.count < readings.count {
+                Button {
+                    visibleHistoryCount += 20
+                } label: {
+                    Label(localized("Show more", "Vis flere") + " (\(readings.count - visible.count))",
+                          systemImage: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
             }
         }
         .padding(16)
@@ -536,13 +448,41 @@ struct ATHLTHPrivateProfileDetailsView: View {
 
     private func loadProfile() {
         let id = session.profile.userID
-        guard profileLoadedFor != id else { return }
-        profile = ATHLTHTrainingProfile.load(userID: id)
+        guard profileLoadedFor != id else {
+            reloadProfileIfChanged()
+            return
+        }
+        let loaded = ATHLTHTrainingProfile.load(userID: id)
+        profile = loaded
+        persistedProfile = loaded
         profileLoadedFor = id
+        visibleHistoryCount = 20
+    }
+
+    private func reloadProfileIfChanged() {
+        let id = session.profile.userID
+        guard profileLoadedFor == id, let previous = persistedProfile else {
+            loadProfile()
+            return
+        }
+        let incoming = ATHLTHTrainingProfile.load(userID: id)
+        guard incoming != previous else { return }
+        // An unrelated workout/sync notification must not erase notes
+        // that the athlete is still editing.
+        var merged = incoming
+        if profile.trainingNotes != previous.trainingNotes {
+            merged.trainingNotes = profile.trainingNotes
+        }
+        if profile.injuryAndLimitations != previous.injuryAndLimitations {
+            merged.injuryAndLimitations = profile.injuryAndLimitations
+        }
+        persistedProfile = incoming
+        if merged != profile { profile = merged }
     }
 
     private func persist() {
         profile.save(userID: session.profile.userID)
+        persistedProfile = profile
         NotificationCenter.default.post(name: .athlthTrainingDataDidChange, object: nil)
     }
 }
