@@ -271,7 +271,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     var body: some View {
         studioNavigationContent
-        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
         .background { GarminPersonalAccountBoundary().frame(width: 0, height: 0) }
         #endif
         .inspector(isPresented: $showingInspector) {
