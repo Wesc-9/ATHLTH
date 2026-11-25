@@ -428,7 +428,7 @@ private struct ATHLTHSharedEventProgressView: View {
             if phase == .active { Task { await reload() } }
         }
         .sheet(item: $reporting) { item in
-            ATHLTHSharedExerciseReportSheet(exercise: item, tournamentID: tournament.id, userID: userID) { score, note, source in
+            ATHLTHSharedExerciseReportSheet(exercise: item, tournamentID: tournament.id, userID: userID, venue: ATHLTHCompetitionEnvironment(rawValue: tournament.requiredEnvironment) ?? .any) { score, note, source in
                 try await cloud.submitShared(tournamentID: tournament.id, candidateID: item.candidateID,
                     score: score, evidence: note, sourceWorkoutID: source)
                 await reload()
@@ -553,6 +553,7 @@ private struct ATHLTHSharedExerciseReportSheet: View {
     let exercise: ATHLTHSharedEventExerciseRow
     let tournamentID: UUID
     let userID: UUID
+    var venue: ATHLTHCompetitionEnvironment = .any
     let onSubmit: @MainActor (Double?, String, UUID?) async throws -> Void
     @State private var score = ""
     @State private var note = ""
@@ -567,7 +568,7 @@ private struct ATHLTHSharedExerciseReportSheet: View {
     private var parsed: Double? { Double(score.replacingOccurrences(of: ",", with: ".")) }
     private var suggestions: [ATHLTHCompetitionLocalResult] {
         ATHLTHCompetitionLocalResult.suggestions(exercise: exercise, libraryExerciseID: libraryExerciseID,
-            health: health.workouts, phone: phone.history, strength: strength.workoutHistory)
+            health: health.workouts, phone: phone.history, strength: strength.workoutHistory, venue: venue)
     }
     private func fill(_ suggestion: ATHLTHCompetitionLocalResult) {
         source = nil
@@ -576,7 +577,8 @@ private struct ATHLTHSharedExerciseReportSheet: View {
         note = "Måling hentet fra lokal økthistorikk: " + suggestion.title + " · " + suggestion.date.formatted(date: .abbreviated, time: .shortened)
     }
     private var eligible: [ATHLTHTournamentEligibleWorkout] {
-        workouts.filter { item in
+        guard venue == .any else { return [] } // Remote source rows lack venue provenance.
+        return workouts.filter { item in
             guard item.sourceWorkoutID != nil, let deadline = exercise.deadlineAt,
                   let end = item.endedAt, end <= deadline, let target = exercise.targetValue else { return false }
             if exercise.metric == "distance" {
@@ -590,6 +592,10 @@ private struct ATHLTHSharedExerciseReportSheet: View {
             Form {
                 Section(exercise.title) {
                     Text(exercise.instruction)
+                    if venue != .any {
+                        Label(venue.title, systemImage: "checkmark.shield")
+                        Text(venue.detail + " Dokumenter treningsmiljøet ved innsending.").font(.caption)
+                    }
                     if !suggestions.isEmpty {
                         Picker("Fra treningshistorikken", selection: Binding(
                             get: { suggestedID },
@@ -663,7 +669,7 @@ private struct ATHLTHSharedExerciseReportSheet: View {
                 libraryExerciseID = candidates?.first(where: { $0.id == exercise.candidateID })?.exerciseID
                 personalBaseline = ATHLTHCompetitionLocalResult.personalBaseline(
                     exercise: exercise, libraryExerciseID: libraryExerciseID,
-                    health: health.workouts, phone: phone.history, strength: strength.workoutHistory
+                    health: health.workouts, phone: phone.history, strength: strength.workoutHistory, venue: venue
                 )
                 if !didPrefill && score.isEmpty && note.isEmpty && suggestions.count == 1, let item = suggestions.first {
                     didPrefill = true
