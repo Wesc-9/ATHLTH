@@ -190,7 +190,7 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(workout.title)
-                            .font(.system(size: 15, weight: .semibold, design: .serif))
+                            .font(ATHLTHTrainDesign.rowTitle)
                             .foregroundStyle(ink)
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
@@ -198,7 +198,7 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                             ATHLTHPlannedWorkoutPresentation.duration(for: workout),
                             workout.kind.title
                         ].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: 11))
+                        .font(ATHLTHTrainDesign.cardDetail)
                         .foregroundStyle(secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.80)
@@ -219,8 +219,8 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-                .background(paper.opacity(0.68), in: RoundedRectangle(cornerRadius: 15))
-                .contentShape(RoundedRectangle(cornerRadius: 15))
+                .athlthTrainEditorialCard(compact: true)
+                .contentShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.compactCardRadius))
             }
             .buttonStyle(.plain)
             .accessibilityHint(tr(

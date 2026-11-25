@@ -10,6 +10,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let onReturnToToday: () -> Void
     let onOpenPlan: () -> Void
@@ -302,7 +303,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
+            LazyVStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
                 header
                 editorialHeading
                 editorialBanner
@@ -461,7 +462,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                          : area == .strength ? tr("Growing stronger", "Sterkere for hver økt")
                          : area == .walking ? tr("One step further", "Et steg videre")
                          : tr("Your training", "Treningen din"))
-                        .font(.system(size: 20, weight: .medium, design: .serif))
+                        .font(ATHLTHTrainDesign.cardTitle)
                         .foregroundStyle(ink).lineLimit(2)
                         .minimumScaleFactor(0.74)
                     Text(tr("One session at a time.", "Utvikling, økt for økt."))
@@ -489,11 +490,12 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             }
             .padding(.horizontal, 12)
         }
-        .frame(height: 109)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? 160 : 122)
+        .clipShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7)
+            RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius)
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.45), lineWidth: 0.7)
+                .allowsHitTesting(false)
         }
         .accessibilityElement(children: .combine)
     }
@@ -507,10 +509,10 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     }
                 } label: {
                     Text(item.label)
-                        .font(.system(size: 10, weight: progressTab == item ? .semibold : .medium))
+                        .font(.caption.weight(progressTab == item ? .semibold : .medium))
                         .foregroundStyle(progressTab == item ? ink : muted)
                         .lineLimit(1).minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity, minHeight: 37)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .background {
                             if progressTab == item {
                                 RoundedRectangle(cornerRadius: 10)
@@ -545,7 +547,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     }
 
     private var editorialOverview: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: ATHLTHTrainDesign.cardSpacing) {
             if isHistoryLoading {
                 section(title: tr("Training overview", "Treningen din")) {
                     ProgressView().frame(maxWidth: .infinity)
@@ -888,24 +890,25 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
-        private var editorialMetrics: some View {
-        HStack(alignment: .top, spacing: 6) {
+    private var editorialMetrics: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 9),
+                                 count: 2), spacing: 9) {
             ForEach(activeStats) { item in
                 VStack(alignment: .leading, spacing: 6) {
                     Image(systemName: item.icon)
-                        .font(.system(size: 13))
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 28, height: 28)
-                        .background(ATHLTHTrainDesign.paleGold.opacity(0.55),
-                                    in: Circle())
+                        .frame(width: 36, height: 36)
+                        .background(ATHLTHTrainDesign.paleGold.opacity(0.38),
+                                    in: RoundedRectangle(cornerRadius: ATHLTHTrainDesign.iconRadius))
                     Text(item.label)
-                        .font(.system(size: 10))
-                        .foregroundStyle(muted).lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .font(ATHLTHTrainDesign.cardDetail)
+                        .foregroundStyle(muted).lineLimit(2)
+                        .minimumScaleFactor(0.8)
                     Text(isHistoryLoading && area != .strength ? "—" : item.value)
-                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .font(ATHLTHTrainDesign.metricValue)
                         .foregroundStyle(ink).monospacedDigit()
-                        .lineLimit(1).minimumScaleFactor(0.56)
+                        .lineLimit(1).minimumScaleFactor(0.65)
                     if !isHistoryLoading, let change = item.change, change.isFinite {
                         Text(String(format: "%+.0f%%", change))
                             .font(.system(size: 9, weight: .medium))
@@ -931,12 +934,8 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8).padding(.vertical, 10)
-                .background(.white, in: RoundedRectangle(cornerRadius: 15))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 15)
-                        .stroke(ATHLTHTrainDesign.rule.opacity(0.35), lineWidth: 0.7)
-                }
+                .padding(12)
+                .athlthTrainEditorialCard(compact: true)
                 .accessibilityElement(children: .combine)
             }
         }
@@ -1128,12 +1127,8 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                              "Registrert utvikling vises her."))
             }
         }
-        .padding(13)
-        .background(.white, in: RoundedRectangle(cornerRadius: 17))
-        .overlay {
-            RoundedRectangle(cornerRadius: 17)
-                .stroke(ATHLTHTrainDesign.rule.opacity(0.4), lineWidth: 0.7)
-        }
+        .padding(ATHLTHTrainDesign.cardPadding)
+        .athlthTrainEditorialCard()
     }
 
     private func zoneColor(_ index: Int) -> Color {
@@ -1195,11 +1190,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
-            .background(.white, in: RoundedRectangle(cornerRadius: 15))
-            .overlay {
-                RoundedRectangle(cornerRadius: 15)
-                    .stroke(ATHLTHTrainDesign.rule.opacity(0.4), lineWidth: 0.7)
-            }
+            .athlthTrainEditorialCard(compact: true)
         }
         .buttonStyle(.plain)
     }
@@ -1248,11 +1239,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             }
             .frame(maxWidth: .infinity, minHeight: 164, alignment: .topLeading)
             .padding(10)
-            .background(.white, in: RoundedRectangle(cornerRadius: 15))
-            .overlay {
-                RoundedRectangle(cornerRadius: 15)
-                    .stroke(ATHLTHTrainDesign.rule.opacity(0.4), lineWidth: 0.7)
-            }
+            .athlthTrainEditorialCard(compact: true)
         }
         .buttonStyle(.plain)
     }
@@ -1909,7 +1896,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(ATHLTHTrainDesign.sectionTitle)
+                        .font(ATHLTHTrainDesign.sectionHeading)
                         .foregroundStyle(ink)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityAddTraits(.isHeader)
@@ -1932,7 +1919,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             }
             content()
         }
-        .padding(15)
+        .padding(ATHLTHTrainDesign.cardPadding)
         .referenceProgressCard()
     }
 
@@ -2096,6 +2083,6 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
 
 private extension View {
     func referenceProgressCard() -> some View {
-        athlthTrainPaper()
+        athlthTrainEditorialCard()
     }
 }

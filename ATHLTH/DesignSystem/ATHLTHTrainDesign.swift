@@ -15,6 +15,19 @@ enum ATHLTHTrainDesign {
     static let radius: CGFloat = 24
     static let readingWidth: CGFloat = 760
     static let sectionSpacing: CGFloat = 26
+    // Based on Today: white paper, quiet hairline and restrained depth.
+    static let cardSpacing: CGFloat = 16
+    static let cardPadding: CGFloat = 15
+    static let cardRadius: CGFloat = 23
+    static let compactCardRadius: CGFloat = 18
+    static let iconRadius: CGFloat = 11
+    static let cardTitle = Font.system(.title3, design: .serif).weight(.semibold)
+    static let rowTitle = Font.subheadline.weight(.semibold)
+    static let compactTitle = Font.caption.weight(.semibold)
+    static let cardDetail = Font.caption
+    static let metricValue = Font.system(.title2, design: .serif).weight(.medium)
+    static let cardEyebrow = Font.caption2.weight(.semibold)
+    static let sectionHeading = Font.system(.title2, design: .serif).weight(.semibold)
     static let title = Font.system(.largeTitle, design: .serif).weight(.regular)
     static let sectionTitle = Font.system(.title2, design: .serif).weight(.medium)
     static let pageSubtitle = Font.system(.title3, design: .serif)
@@ -37,6 +50,37 @@ struct ATHLTHTrainPageTitle: View {
             .minimumScaleFactor(0.8)
             .lineLimit(1)
             .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// The quiet card surface from Today. Compact cards have no stacked shadows.
+struct ATHLTHTrainEditorialCard: ViewModifier {
+    var compact = false
+    var selected = false
+    var enabled = true
+
+    func body(content: Content) -> some View {
+        let radius = compact ? ATHLTHTrainDesign.compactCardRadius : ATHLTHTrainDesign.cardRadius
+        return content
+            .background(Color.white.opacity(enabled ? 0.96 : 0.52),
+                        in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(
+                        selected ? ATHLTHTrainDesign.bronze.opacity(0.72) :
+                            ATHLTHTrainDesign.rule.opacity(enabled ? 0.45 : 0.21),
+                        lineWidth: selected ? 1.1 : 0.7
+                    )
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: ATHLTHTrainDesign.ink.opacity(compact ? 0 : 0.05),
+                    radius: compact ? 0 : 10, y: compact ? 0 : 4)
+    }
+}
+
+extension View {
+    func athlthTrainEditorialCard(compact: Bool = false, selected: Bool = false, enabled: Bool = true) -> some View {
+        modifier(ATHLTHTrainEditorialCard(compact: compact, selected: selected, enabled: enabled))
     }
 }
 

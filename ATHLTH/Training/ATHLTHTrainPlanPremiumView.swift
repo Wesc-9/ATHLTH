@@ -158,7 +158,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     // A single Plan Studio entry, backed by the existing plan records and editors.
     // Simple and advanced change the amount of visible detail, not the data.
     private var planContent: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
             referencePageIntro
             // Plan overview is the default; switch views from the compact header icon.
 
@@ -332,7 +332,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .background(soft, in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold, design: .serif))
+                        .font(ATHLTHTrainDesign.rowTitle)
                         .foregroundStyle(graphite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -350,12 +350,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
             .padding(11)
             .frame(maxWidth: .infinity, minHeight: 70)
-            .background(.white, in: RoundedRectangle(cornerRadius: 16))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(selected ? warmGold.opacity(0.72) : line,
-                                  lineWidth: selected ? 1.1 : 0.8)
-            }
+            .athlthTrainEditorialCard(compact: true, selected: selected)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -451,7 +446,7 @@ struct ATHLTHTrainPlanPremiumView: View {
 
             HStack {
                 Text(tr("Popular templates", "Populære maler"))
-                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                    .font(ATHLTHTrainDesign.cardTitle)
                 Spacer()
                 Button(tr("See all", "Vis alle")) { showingTemplates = true }
                     .font(.caption)
@@ -502,7 +497,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .foregroundStyle(warmGold)
                     .frame(height: 27)
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold, design: .serif))
+                    .font(ATHLTHTrainDesign.compactTitle)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Text(caption)
@@ -514,9 +509,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             .foregroundStyle(graphite)
             .frame(maxWidth: .infinity, minHeight: 88)
             .padding(.vertical, 9)
-            .background(.white, in: RoundedRectangle(cornerRadius: 13))
-            .overlay(RoundedRectangle(cornerRadius: 13)
-                .strokeBorder(line.opacity(0.55), lineWidth: 0.6))
+            .athlthTrainEditorialCard(compact: true)
         }
         .buttonStyle(.plain)
     }
@@ -770,19 +763,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(isActive ? tr("Active plan", "Aktiv plan")
-                                  : planLibraryStatus(plan))
-                        .font(.system(size: 10, weight: .semibold))
+                    Text(isActive ? tr("ACTIVE PLAN", "AKTIV PLAN")
+                                  : planLibraryStatus(plan).uppercased())
+                        .font(ATHLTHTrainDesign.cardEyebrow)
+                        .tracking(1.2)
                         .foregroundStyle(warmGold)
                     Text(plan.title)
-                        .font(.system(size: 18, weight: .semibold, design: .serif))
+                        .font(ATHLTHTrainDesign.cardTitle)
                         .foregroundStyle(graphite)
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
                     if isActive {
                         Text(tr("Week \(week + 1) of \(plan.weeks.count) · \(weeklyCount) workouts this week",
                                 "Uke \(week + 1) av \(plan.weeks.count) · \(weeklyCount) økter denne uken"))
-                            .font(.system(size: 10))
+                            .font(ATHLTHTrainDesign.cardDetail)
                             .foregroundStyle(secondaryInk)
                             .lineLimit(2)
                         ProgressView(value: fraction)
@@ -806,14 +800,9 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .foregroundStyle(secondaryInk)
                 }
             }
-            .padding(11)
+            .padding(ATHLTHTrainDesign.cardPadding)
             .frame(maxWidth: .infinity, minHeight: 93, alignment: .leading)
-            .background(.white.opacity(0.94),
-                        in: RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(line.opacity(0.6), lineWidth: 0.7)
-            }
+            .athlthTrainEditorialCard()
         }
         .buttonStyle(.plain)
         .accessibilityLabel(plan.title + " · " + planLibraryStatus(plan))
@@ -890,7 +879,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(planDayDate(day.dayIndex, plan: plan)
                             .formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                            .font(.system(size: 19, weight: .semibold, design: .serif))
+                            .font(ATHLTHTrainDesign.cardTitle)
                             .foregroundStyle(graphite)
                             .multilineTextAlignment(.leading)
                         Text("\(workouts.count) " + tr("workouts", "økter") +
@@ -969,13 +958,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
             }
         }
-        .padding(12)
-        .background(.white.opacity(0.96),
-                    in: RoundedRectangle(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(line.opacity(0.58), lineWidth: 0.7)
-        }
+        .padding(ATHLTHTrainDesign.cardPadding)
+        .athlthTrainEditorialCard()
     }
 
     private func referenceSessionCard(
@@ -1017,7 +1001,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         }.count
         let stats = VStack(alignment: .leading, spacing: 4) {
             Text("\(completed)/\(planned.count)")
-                .font(.system(size: 21, weight: .semibold, design: .serif))
+                .font(ATHLTHTrainDesign.metricValue)
             Text(tr("Workouts completed", "Økter fullført"))
                 .font(.system(size: 10))
                 .foregroundStyle(secondaryInk)
@@ -1044,7 +1028,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         return VStack(alignment: .leading, spacing: 13) {
             Text(tr("This week", "Denne uken"))
-                .font(.system(size: 17, weight: .semibold, design: .serif))
+                .font(ATHLTHTrainDesign.cardTitle)
                 .foregroundStyle(graphite)
 
             ViewThatFits(in: .horizontal) {
@@ -1060,8 +1044,8 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+        .padding(ATHLTHTrainDesign.cardPadding)
+        .athlthTrainEditorialCard()
     }
 
     // Removed old phase-only workout presentation. Both Plan and Day
@@ -1148,7 +1132,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 Image(systemName: workout.kind.systemImage)
                                     .foregroundStyle(warmGold)
                                 Text(workout.title)
-                                    .font(.system(size: 18, weight: .semibold, design: .serif))
+                                    .font(ATHLTHTrainDesign.cardTitle)
                                 Spacer()
                                 Menu {
                                     Button {
@@ -1352,7 +1336,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                  tr("Progress based on completed workouts",
                                     "Fremdrift basert på fullførte økter") :
                                  tr("Your plan at a glance", "Planen din i korte trekk"))
-                                .font(.system(size: 21, weight: .semibold, design: .serif))
+                                .font(ATHLTHTrainDesign.metricValue)
                             Text(tr("\(completed) of \(total) workouts completed across \(plan.weeks.count) weeks.",
                                     "\(completed) av \(total) økter fullført over \(plan.weeks.count) uker."))
                                 .font(.subheadline)
@@ -1717,15 +1701,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(warmGold)
             Text(title)
-                .font(.system(size: 21, weight: .semibold, design: .serif))
+                .font(ATHLTHTrainDesign.metricValue)
             Text(explanation)
                 .font(.subheadline)
                 .foregroundStyle(secondaryInk)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, minHeight: 160)
-        .padding(16)
-        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .padding(ATHLTHTrainDesign.cardPadding)
+        .athlthTrainEditorialCard()
     }
 
     // Compact seven-day navigator from the approved Plan reference.

@@ -4,6 +4,38 @@ import XCTest
 
 final class ATHLTHTrainDesignLayoutTests: XCTestCase {
     @MainActor
+    func testSharedEditorialTypographyAndCardsFitPhoneAndTablet() {
+        for width in [320.0, 390.0, 768.0] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                for title in ["I dag", "Plan", "Fremdrift"] {
+                    let content = VStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
+                        ATHLTHTrainPageTitle(title: title)
+                        Text("Utvikling, økt for økt.").font(ATHLTHTrainDesign.pageSubtitle)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Aktiv treningsplan").font(ATHLTHTrainDesign.cardTitle)
+                            Text("Planlagt og gjennomført trening").font(ATHLTHTrainDesign.cardDetail)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(ATHLTHTrainDesign.cardPadding)
+                        .athlthTrainEditorialCard()
+                        Text("18/20").font(ATHLTHTrainDesign.metricValue)
+                            .frame(maxWidth: .infinity)
+                            .padding(12)
+                            .athlthTrainEditorialCard(compact: true)
+                    }
+                    .padding(16)
+                    .environment(\.dynamicTypeSize, size)
+                    let host = UIHostingController(rootView: content)
+                    host.loadViewIfNeeded()
+                    let measured = host.sizeThatFits(in: CGSize(width: width, height: 2_000))
+                    XCTAssertLessThanOrEqual(measured.width, width + 1)
+                    XCTAssertGreaterThan(measured.height, 0)
+                }
+            }
+        }
+    }
+
+    @MainActor
     func testProgressPaceChartUsesStableIDsAndFitsCompactScreens() {
         let day = Date(timeIntervalSince1970: 1_800_000_000)
         // Multiple HealthKit workouts can share a displayed timestamp. The

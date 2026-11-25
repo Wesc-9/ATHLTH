@@ -189,7 +189,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
             if diagnosticStage >= 2 {
                 ATHLTHTrainDeferredContent { AnyView(goalAndPlanCards) }
             }
@@ -673,7 +673,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(tr("Popular from the library", "Populært fra biblioteket"))
-                        .font(.system(size: 22, weight: .regular, design: .serif))
+                        .font(ATHLTHTrainDesign.sectionHeading)
                         .foregroundStyle(ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.80)
@@ -720,13 +720,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                             .padding(7)
                             .frame(maxWidth: .infinity, minHeight: 90,
                                    alignment: .leading)
-                            .background(.white,
-                                in: RoundedRectangle(cornerRadius: 16))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(hairline.opacity(0.8),
-                                                  lineWidth: 0.65)
-                            }
+                            .athlthTrainEditorialCard(compact: true)
                             .contentShape(RoundedRectangle(cornerRadius: 16))
                         }
                         .buttonStyle(.plain)
@@ -993,15 +987,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 6)
-            .background(
-                Color.white.opacity(0.96),
-                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
-                    .allowsHitTesting(false)
-            }
+            .athlthTrainEditorialCard(compact: true)
             .frame(maxWidth: .infinity)
         } else {
             NavigationLink {
@@ -1033,16 +1019,8 @@ struct ATHLTHTrainTodayPremiumView: View {
                 .frame(minHeight: 48)
                 .padding(.horizontal, 13)
                 .padding(.vertical, 6)
-                .background(
-                    Color.white.opacity(0.96),
-                    in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
-                        .allowsHitTesting(false)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 17))
+                .athlthTrainEditorialCard(compact: true)
+                .contentShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.compactCardRadius))
             }
             .buttonStyle(.plain)
         }
@@ -1122,7 +1100,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(tr("Start a workout", "Start en økt"))
-                    .font(.system(.title2, design: .serif).weight(.semibold))
+                    .font(ATHLTHTrainDesign.sectionHeading)
                     .foregroundStyle(ink)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 3)
@@ -1189,18 +1167,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 activity.isAvailable ? ink : muted.opacity(0.58)
             )
             .padding(.horizontal, 8)
-            .background(
-                Color.white.opacity(activity.isAvailable ? 0.94 : 0.52),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(
-                        hairline.opacity(activity.isAvailable ? 0.38 : 0.21),
-                        lineWidth: 0.7
-                    )
-                    .allowsHitTesting(false)
-            }
+            .athlthTrainEditorialCard(compact: true, enabled: activity.isAvailable)
             .contentShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
@@ -1297,7 +1264,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                             .foregroundStyle(champagne)
 
                         Text(plan.title)
-                            .font(.system(.title3, design: .serif).weight(.semibold))
+                            .font(ATHLTHTrainDesign.cardTitle)
                             .foregroundStyle(ink)
                             .fixedSize(horizontal: false, vertical: true)
                             .lineLimit(2)
@@ -1334,17 +1301,8 @@ struct ATHLTHTrainTodayPremiumView: View {
                 .padding(.leading, 99)
             }
             .padding(15)
-            .background(
-                Color.white.opacity(0.96),
-                in: RoundedRectangle(cornerRadius: 23, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
-                    .strokeBorder(hairline.opacity(0.45), lineWidth: 0.7)
-                    .allowsHitTesting(false)
-            }
-            .shadow(color: ATHLTHTrainDesign.ink.opacity(0.05), radius: 10, y: 4)
-            .contentShape(RoundedRectangle(cornerRadius: 23))
+            .athlthTrainEditorialCard()
+            .contentShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tr("Active plan", "Aktiv plan") +
