@@ -2721,6 +2721,16 @@ final class IPhoneWorkoutStore:
     func checkpoint(force: Bool = true) {
         guard var workout = active else { return }
 
+        // Lifecycle refreshes must not make an old recovered session look
+        // newly recorded. Keep the durable suspension point until resume.
+        if let recoveredWorkoutLastCheckpoint, workout.resumedAt == nil {
+            workout.lastCheckpoint = recoveredWorkoutLastCheckpoint
+            active = workout
+            persistActiveCheckpoint(force: force)
+            syncLiveActivity()
+            return
+        }
+
         let now = Date()
         workout.advanceTreadmillDistance(at: now)
         workout.lastCheckpoint = now
