@@ -3603,160 +3603,63 @@ private struct ATHLTHTrainingSettingsView: View {
     }
 }
 
-private struct ATHLTHAchievementSettingsView:
-    View
-{
-    @EnvironmentObject private var settings:
-        AppSettingsStore
-    @Environment(
-        \.accessibilityReduceMotion
-    ) private var reduceMotion
-    @Environment(
-        \.accessibilityReduceTransparency
-    ) private var reduceTransparency
+private struct ATHLTHAchievementSettingsView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
     var body: some View {
-        Form {
-            Section {
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Visual effects",
-                        norwegian:
-                            "Visuelle effekter"
-                    ),
-                    selection:
-                        $settings
-                            .achievementEffects
-                ) {
-                    ForEach(
-                        AchievementEffectPreference
-                            .allCases
-                    ) {
-                        preference in
-                        Text(
-                            preference.title
-                        )
-                        .tag(preference)
-                    }
+        ATHLTHSettingsScreen(title: tr("Achievements", "Prestasjoner"),
+                             subtitle: tr("Celebrate your progress your way.", "Feir fremgangen på din måte.")) {
+            ATHLTHSettingsGroup(title: tr("Visual effects", "Visuelle effekter")) {
+                PremiumSettingsCard {
+                    NavigationLink {
+                        ATHLTHPremiumSettingsChoices(title: tr("Visual effects", "Visuelle effekter"),
+                            subtitle: tr("Choose your celebration style.", "Velg hvordan prestasjoner feires."),
+                            options: AchievementEffectPreference.allCases, selection: $settings.achievementEffects,
+                            optionTitle: { $0.title }, optionDetail: { $0.subtitle })
+                    } label: {
+                        PremiumSettingsRow(icon: "sparkles", iconTint: ATHLTHTheme.accentDeep,
+                            iconBackground: ATHLTHTheme.premiumGoldSoft,
+                            title: tr("Effects", "Effekter"), subtitle: settings.achievementEffects.title) {
+                            Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                    }.buttonStyle(.plain)
                 }
-                .pickerStyle(
-                    .segmented
-                )
-
-                Text(
-                    settings
-                        .achievementEffects
-                        .subtitle
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    .secondary
-                )
-            } header: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Achievement effects",
-                        norwegian:
-                            "Achievement-effekter"
-                    )
-                )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "iOS Reduce Motion and Reduce Transparency always take priority over this setting.",
-                        norwegian:
-                            "iOS Reduser bevegelse og Reduser gjennomsiktighet har alltid prioritet over denne innstillingen."
-                    )
-                )
             }
-
-            Section(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Unlock feedback",
-                    norwegian:
-                        "Unlock-feedback"
-                )
-            ) {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Unlock sounds",
-                        norwegian:
-                            "Unlock-lyder"
-                    ),
-                    isOn:
-                        $settings
-                            .achievementUnlockSoundsEnabled
-                )
-
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Unlock haptics",
-                        norwegian:
-                            "Unlock-haptikk"
-                    ),
-                    isOn:
-                        $settings
-                            .achievementUnlockHapticsEnabled
-                )
+            ATHLTHSettingsGroup(title: tr("Feedback", "Tilbakemelding")) {
+                PremiumSettingsCard {
+                    feedback("speaker.wave.2", tr("Celebration sounds", "Lyd ved prestasjoner"),
+                             $settings.achievementUnlockSoundsEnabled)
+                    SettingsDivider()
+                    feedback("waveform.path", tr("Celebration haptics", "Vibrasjon ved prestasjoner"),
+                             $settings.achievementUnlockHapticsEnabled)
+                }
             }
-
-            if reduceMotion ||
-               reduceTransparency {
-                Section(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Accessibility",
-                        norwegian:
-                            "Tilgjengelighet"
-                    )
-                ) {
+            ATHLTHSettingsGroup(title: tr("Accessibility", "Tilgjengelighet")) {
+                PremiumSettingsCard {
+                    Text(tr("iOS Reduce Motion and Reduce Transparency take priority.", "iOS-innstillingene Reduser bevegelse og Reduser gjennomsiktighet har alltid prioritet."))
+                        .font(.caption).foregroundStyle(ATHLTHTheme.mutedText).padding(16)
                     if reduceMotion {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Reduce Motion is active. Tilt, particle movement and large reveal transitions are reduced.",
-                                norwegian:
-                                    "Reduser bevegelse er aktivert. Tilt, partikkelbevegelse og store reveal-animasjoner reduseres."
-                            ),
-                            systemImage:
-                                "figure.walk.motion"
-                        )
+                        PremiumSettingsRow(icon: "figure.walk.motion", title: tr("Reduce Motion is active", "Reduser bevegelse er aktivert")) { EmptyView() }
                     }
-
                     if reduceTransparency {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Reduce Transparency is active. Holographic and glass effects use solid alternatives.",
-                                norwegian:
-                                    "Reduser gjennomsiktighet er aktivert. Holografiske effekter og glassflater bruker solide alternativer."
-                            ),
-                            systemImage:
-                                "circle.lefthalf.filled"
-                        )
+                        PremiumSettingsRow(icon: "circle.lefthalf.filled", title: tr("Reduce Transparency is active", "Reduser gjennomsiktighet er aktivert")) { EmptyView() }
                     }
                 }
-                .font(.caption)
             }
         }
-        .athlthBrandedForm()
-        .navigationTitle(
-            ATHLTHLocalization.choose(
-                english:
-                    "Achievements",
-                norwegian:
-                    "Achievements"
-            )
-        )
-        .navigationBarTitleDisplayMode(
-            .inline
-        )
+    }
+
+    private func feedback(_ icon: String, _ title: String, _ value: Binding<Bool>) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep,
+            iconBackground: ATHLTHTheme.premiumGoldSoft, title: title) {
+            Toggle(title, isOn: value).labelsHidden().tint(ATHLTHTheme.premiumGold).fixedSize()
+        }
     }
 }
 
