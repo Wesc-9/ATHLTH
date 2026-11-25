@@ -195,6 +195,7 @@ struct ATHLTHWorkoutStepDetails: View {
     let displayTitle: String
     let maximumHeartRateBPM: Double?
     let suggestion: String?
+    var suggestedZones: ClosedRange<Int>? = nil
 
     private var ink: Color { ATHLTHPlanDesign.ink }
     private var accent: Color { ATHLTHPlanDesign.accentInk }
@@ -219,7 +220,7 @@ struct ATHLTHWorkoutStepDetails: View {
     private var bpmRange: ClosedRange<Int>? {
         ATHLTHPlannedHeartRatePreview.expectedBPM(
             for: block,
-            maximumBPM: maximumHeartRateBPM
+            maximumBPM: maximumHeartRateBPM, suggestedZones: suggestedZones
         )
     }
 
@@ -277,9 +278,10 @@ struct ATHLTHWorkoutStepDetails: View {
                 if let pace = block.targetPaceSecondsPerKilometer,
                    pace.isFinite, pace > 0 {
                     let seconds = Int(pace.rounded())
+                    let treadmill = block.isIndoor == true && block.treadmillInclinePercent != nil
                     targetTile(
-                        tr("Target pace", "Måltempo"),
-                        String(format: "%d:%02d /km", seconds / 60, seconds % 60),
+                        treadmill ? tr("Target speed", "Målfart") : tr("Target pace", "Måltempo"),
+                        treadmill ? String(format: "%.1f km/t", 3600 / pace) : String(format: "%d:%02d /km", seconds / 60, seconds % 60),
                         symbol: "speedometer"
                     )
                 }
@@ -436,6 +438,11 @@ struct ATHLTHWorkoutStepDetails: View {
                 )
                 .accessibilityIdentifier("athlth-workout-step-structured-zone")
             } else if let suggestion {
+                if let bpmRange {
+                    Label(tr("Estimated target", "Estimert pulsmål") + " · \(bpmRange.lowerBound)–\(bpmRange.upperBound) bpm", systemImage: "heart")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(accent)
+                }
                 Label(suggestion, systemImage: "heart")
                     .font(.subheadline)
                     .foregroundStyle(accent)
