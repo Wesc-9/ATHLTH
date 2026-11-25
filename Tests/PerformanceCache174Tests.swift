@@ -78,6 +78,37 @@ final class PerformanceCache174Tests: XCTestCase {
     }
 
     @MainActor
+    func testIndependentLibraryStoresReusePublicCatalogWithoutSharingPrivateEntries() {
+        let owner = UUID()
+        defer { UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key("exerciseLibrary", userID: owner)) }
+        let first = ExerciseLibraryStore()
+        first.switchAccount(owner)
+        let privateEntry = first.createCustomExercise(
+            ownerID: owner, name: "Private performance fixture", instructions: [],
+            primaryMuscles: ["Chest"], secondaryMuscles: [], equipment: ["Dumbbell"],
+            isVisibleOutsideOwnerLibrary: false
+        )
+        let second = ExerciseLibraryStore()
+        XCTAssertEqual(first.repDBExercises.map(\.id), second.repDBExercises.map(\.id))
+        XCTAssertEqual(first.repDBExpectedCount, second.repDBExpectedCount)
+        XCTAssertFalse(second.allExercises.contains { $0.id == privateEntry.id })
+        XCTAssertTrue(first.allExercises.contains { $0.id == privateEntry.id })
+    }
+
+    @MainActor
+    func testIncrementalSearchMatchesIndependentFullSearchIncludingBackspace() {
+        let library = ExerciseLibraryStore()
+        let fresh = ExerciseLibraryStore()
+        for query in ["b", "be", "bench", "bench press", "bench", "barbell bench", "", "knebøy"] {
+            let actual = library.search(query: query).map(\.id)
+            // Force a different filter before the comparison, so the reference
+            // cannot reuse the previous query's subset.
+            _ = fresh.search(query: "", equipment: "not-real-equipment")
+            XCTAssertEqual(actual, fresh.search(query: query).map(\.id), query)
+        }
+    }
+
+    @MainActor
     func testSearchPreservesNorwegianNamesTokensAndFilters() {
         let library = ExerciseLibraryStore()
         let expected = library.search(query: "knebøy").map(\.id)

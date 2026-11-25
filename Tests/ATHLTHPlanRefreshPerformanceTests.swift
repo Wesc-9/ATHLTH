@@ -74,6 +74,18 @@ final class ATHLTHPlanRefreshPerformanceTests: XCTestCase {
         XCTAssertEqual(computations, 4)
     }
 
+    func testBoundedProjectionMemoReusesAndEvictsLeastRecentlyUsedValues() {
+        let memo = ATHLTHBoundedProjectionMemo<Int, String>(capacity: 2)
+        memo.insert("one", for: 1)
+        memo.insert("two", for: 2)
+        XCTAssertEqual(memo.cachedValue(for: 1), "one")
+        memo.insert("three", for: 3)
+        XCTAssertNil(memo.cachedValue(for: 2))
+        XCTAssertEqual(memo.value(for: 1) { XCTFail("Recomputed"); return "" }, "one")
+        memo.clear()
+        XCTAssertNil(memo.cachedValue(for: 1))
+    }
+
     func testEmptyPlansRefreshDoesNotPublish() throws {
         let suite = "ATHLTHNoPlansPerformance.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

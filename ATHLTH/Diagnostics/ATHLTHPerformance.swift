@@ -59,3 +59,35 @@ final class ATHLTHProjectionMemo<Key: Equatable, Value> {
 
     func clear() { entry = nil }
 }
+
+/// Small, owner-local LRU for pure UI projections. No published state,
+/// no task scheduling, no global account data. Call on the owning actor.
+/// Keys must capture all inputs; clear on account/data revision changes.
+final class ATHLTHBoundedProjectionMemo<Key: Equatable, Value> {
+    private let capacity: Int
+    private var entries: [(key: Key, value: Value)] = []
+
+    init(capacity: Int) { self.capacity = max(1, capacity) }
+
+    func cachedValue(for key: Key) -> Value? {
+        guard let index = entries.firstIndex(where: { $0.key == key }) else { return nil }
+        let entry = entries.remove(at: index)
+        entries.append(entry)
+        return entry.value
+    }
+
+    func insert(_ value: Value, for key: Key) {
+        entries.removeAll { $0.key == key }
+        entries.append((key, value))
+        if entries.count > capacity { entries.removeFirst(entries.count - capacity) }
+    }
+
+    func value(for key: Key, compute: () -> Value) -> Value {
+        if let value = cachedValue(for: key) { return value }
+        let value = compute()
+        insert(value, for: key)
+        return value
+    }
+
+    func clear() { entries.removeAll(keepingCapacity: true) }
+}

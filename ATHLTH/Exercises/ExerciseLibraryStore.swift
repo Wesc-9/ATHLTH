@@ -208,6 +208,23 @@ final class ExerciseLibraryStore: ObservableObject {
         Bundle.main.url(forResource: "RepDBOffline", withExtension: "bundle")
     }
 
+    // The licensed dataset is public and immutable within a revision.
+    // Temporary workout binders must not repeat disk reads, decoding and
+    // thousands of bundled image checks. Never share account-owned entries.
+    private struct PublicSnapshot {
+        let entries: [ExerciseLibraryEntry]
+        let expectedCount: Int?
+        let updated: Date?
+    }
+    private static var sharedPublicSnapshot: PublicSnapshot?
+
+    private func publishPublicSnapshot() {
+        guard !repDBExercises.isEmpty else { return }
+        Self.sharedPublicSnapshot = PublicSnapshot(
+            entries: repDBExercises, expectedCount: repDBExpectedCount, updated: lastUpdated
+        )
+    }
+
     private var accountID: UUID?
     private(set) var catalogRevision = 0
     private var cachedAllExercises: [ExerciseLibraryEntry]?
@@ -235,6 +252,9 @@ final class ExerciseLibraryStore: ObservableObject {
     private var lastSearchTranslationRevision = -1
     private var lastSearchLanguageIsNorwegian: Bool?
     private var lastSearchResults: [ExerciseLibraryEntry] = []
+    private let searchMemo = ATHLTHBoundedProjectionMemo<SearchRequest, [ExerciseLibraryEntry]>(capacity: 12)
+    private var orderedSelectable: [ExerciseLibraryEntry]?
+    private var alphabetTranslationRevision = -1
 
     // The user may change the app language without changing the translation
     // dataset revision. Cached display names and result order must follow.
@@ -246,6 +266,19 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedTranslatedSearchNames = [:]
         lastSearchRequest = nil
         lastSearchResults = []
+        orderedSelectable = nil
+        searchMemo.clear()
+    }
+
+    private func synchronizeAlphabetTranslation() {
+        let revision = NorwegianExerciseAutoTranslation.shared.revision
+        guard alphabetTranslationRevision != revision else { return }
+        alphabetTranslationRevision = revision
+        cachedAlphabetSortKeys = [:]
+        cachedTranslatedSearchNames = [:]
+        orderedSelectable = nil
+        searchMemo.clear()
+        lastSearchRequest = nil
     }
 
     init() {
@@ -253,8 +286,15 @@ final class ExerciseLibraryStore: ObservableObject {
         defer { ATHLTHPerformance.end("ExerciseLibraryStartup", id: signpost) }
         // Prefer a valid persisted snapshot; fall back to the bundled offline catalog.
         // This avoids decoding the same large exercise dataset twice at startup.
-        loadCachedRepDB()
-        if repDBExercises.isEmpty { loadBundledRepDB() }
+        if let shared = Self.sharedPublicSnapshot {
+            repDBExercises = shared.entries
+            repDBExpectedCount = shared.expectedCount
+            lastUpdated = shared.updated
+        } else {
+            loadCachedRepDB()
+            if repDBExercises.isEmpty { loadBundledRepDB() }
+            publishPublicSnapshot()
+        }
     }
 
     func switchAccount(_ userID: UUID?) {
@@ -836,6 +876,9 @@ final class ExerciseLibraryStore: ObservableObject {
         lastSearchTranslationRevision = -1
         lastSearchLanguageIsNorwegian = nil
         lastSearchResults = []
+        orderedSelectable = nil
+        alphabetTranslationRevision = -1
+        searchMemo.clear()
     }
 
     /// Fetch only when needed. An existing on-device RepDB snapshot is never
@@ -890,10 +933,14 @@ final class ExerciseLibraryStore: ObservableObject {
             }
 
             // Only switch the visible library after a complete validated decode.
-            repDBExercises = mapped
-            repDBExpectedCount = dataset.count ?? mapped.count
+            if repDBExercises != mapped {
+                repDBExercises = mapped
+                invalidateDerivedCaches()
+            }
+            let expected = dataset.count ?? mapped.count
+            if repDBExpectedCount != expected { repDBExpectedCount = expected }
             lastUpdated = Date()
-            invalidateDerivedCaches()
+            publishPublicSnapshot()
             await persistRepDBCache(data)
         } catch is CancellationError {
             // Switching away from Train cancels optional downloads; that is
@@ -901,7 +948,10 @@ final class ExerciseLibraryStore: ObservableObject {
             return
         } catch {
             errorMessage = error.localizedDescription
-            if repDBExercises.isEmpty { loadCachedRepDB() }
+            if repDBExercises.isEmpty {
+                loadCachedRepDB()
+                publishPublicSnapshot()
+            }
         }
     }
 
@@ -996,11 +1046,44 @@ final class ExerciseLibraryStore: ObservableObject {
             // A hidden native exercise must never resolve to itself when a
             // unique, selectable RepDB equivalent exists.
             let completeLibrary = allExercises
-            let repDBIDs = Set(repDBExercises.compactMap(\.sourceIdentifier))
+            let signpost = ATHLTHPerformance.begin("ExerciseCatalogProjection")
+            defer { ATHLTHPerformance.end("ExerciseCatalogProjection", id: signpost) }
+            let repDBBySlug = Dictionary(grouping: repDBExercises, by: { $0.sourceIdentifier ?? "" })
+            let repDBByName = Dictionary(grouping: repDBExercises, by: {
+                ATHLTHExerciseReferenceResolver.key($0.canonicalName)
+            })
+            func equivalent(_ entry: ExerciseLibraryEntry) -> ExerciseLibraryEntry {
+                let slug = entry.sourceIdentifier ?? ""
+                var candidates = repDBByName[ATHLTHExerciseReferenceResolver.key(entry.canonicalName)] ?? []
+                if let target = ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: nil, slug: slug) {
+                    candidates += repDBBySlug[target] ?? []
+                }
+                // The original resolver has three reviewed name exceptions.
+                // Include those candidates, then let it decide equivalence.
+                switch slug {
+                case "athlth-native-incline-dumbbell-bench-press":
+                    candidates += repDBByName["incline dumbbell press"] ?? []
+                    candidates += repDBByName["incline dumbbell bench press"] ?? []
+                    candidates += repDBBySlug["incline-dumbbell-bench-press"] ?? []
+                case "athlth-native-hollow-body-hold":
+                    candidates += repDBByName["hollow body hold"] ?? []
+                    candidates += repDBBySlug["hollow-body-hold"] ?? []
+                case "athlth-native-bench-press":
+                    candidates += repDBByName["bench press"] ?? []
+                    candidates += repDBBySlug["bench-press"] ?? []
+                case "athlth:rowing":
+                    candidates += repDBByName["rowing machine"] ?? []
+                default: break
+                }
+                var seen = Set<UUID>()
+                return ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                    of: entry, in: candidates.filter { seen.insert($0.id).inserted }
+                )
+            }
             resolved = completeLibrary.filter { entry in
                 if entry.source == .athlthCatalog,
                    let replacement = ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: nil, slug: entry.sourceIdentifier),
-                   repDBIDs.contains(replacement) {
+                   repDBBySlug[replacement]?.count == 1 {
                     return false
                 }
                 guard !Self.isRetiredNativeDuplicate(entry) else {
@@ -1016,16 +1099,12 @@ final class ExerciseLibraryStore: ObservableObject {
                 }
                 guard let slug = entry.sourceIdentifier else { return false }
                 if Self.featuredNativeExerciseSlugs.contains(slug) {
-                    return ATHLTHExerciseReferenceResolver.visibleEquivalent(
-                        of: entry, in: completeLibrary
-                    ).id == entry.id
+                    return equivalent(entry).id == entry.id
                 }
                 guard Self.referencedNativeExerciseSlugs.contains(slug) ||
                       Self.referencedFallbackExerciseSlugs.contains(slug)
                 else { return false }
-                return ATHLTHExerciseReferenceResolver.visibleEquivalent(
-                    of: entry, in: completeLibrary
-                ).id == entry.id
+                return equivalent(entry).id == entry.id
             }
         }
         cachedSelectableExercises = resolved
@@ -1040,6 +1119,7 @@ final class ExerciseLibraryStore: ObservableObject {
         _ entries: [ExerciseLibraryEntry]
     ) -> [ExerciseLibraryEntry] {
         synchronizeSearchLanguage()
+        synchronizeAlphabetTranslation()
         guard entries.count > 1 else { return entries }
         let locale = ATHLTHExerciseAlphabet.locale
         for entry in entries where cachedAlphabetSortKeys[entry.id] == nil {
@@ -1064,6 +1144,7 @@ final class ExerciseLibraryStore: ObservableObject {
         for entries: [ExerciseLibraryEntry]
     ) -> [String: UUID] {
         synchronizeSearchLanguage()
+        synchronizeAlphabetTranslation()
         var result: [String: UUID] = [:]
         for entry in entries {
             let name: String
@@ -1087,22 +1168,38 @@ final class ExerciseLibraryStore: ObservableObject {
         equipment: String? = nil
     ) -> [ExerciseLibraryEntry] {
         synchronizeSearchLanguage()
+        synchronizeAlphabetTranslation()
         let cleanQuery = ATHLTHWorkoutLibraryExerciseIndex.normalize(query)
 
         let request = SearchRequest(query: cleanQuery, bodyPart: bodyPart, equipment: equipment)
         let translationRevision = NorwegianExerciseAutoTranslation.shared.revision
-        if lastSearchTranslationRevision != translationRevision {
-            cachedAlphabetSortKeys = [:]
-            cachedTranslatedSearchNames = [:]
+        if let cached = searchMemo.cachedValue(for: request) {
+            lastSearchRequest = request
+            lastSearchTranslationRevision = translationRevision
+            lastSearchResults = cached
+            return cached
         }
-        if lastSearchRequest == request &&
-           lastSearchTranslationRevision == translationRevision {
-            return lastSearchResults
-        }
+        let signpost = ATHLTHPerformance.begin("ExerciseSearchProjection")
+        defer { ATHLTHPerformance.end("ExerciseSearchProjection", id: signpost) }
         let queryTokens = cleanQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
 
         let selectedBodyPart = bodyPart.flatMap { $0 == "All" ? nil : Self.canonicalMuscleFilter($0) }
-        let matches = selectableExercises.filter { entry in
+        if orderedSelectable == nil { orderedSelectable = alphabetized(selectableExercises) }
+        // Filtering a stable alphabetized list preserves order without sorting
+        // each keystroke. A stricter token query may reuse the previous subset.
+        let candidates: [ExerciseLibraryEntry]
+        if let previous = lastSearchRequest,
+           previous.bodyPart == bodyPart, previous.equipment == equipment,
+           lastSearchTranslationRevision == translationRevision,
+           !previous.query.isEmpty,
+           previous.query.split(whereSeparator: { $0.isWhitespace }).allSatisfy({ token in
+               queryTokens.contains { $0.contains(token) }
+           }) {
+            candidates = lastSearchResults
+        } else {
+            candidates = orderedSelectable ?? []
+        }
+        let matches = candidates.filter { entry in
             let matchesBodyPart: Bool
             if let selected = selectedBodyPart {
                 matchesBodyPart =
@@ -1187,9 +1284,9 @@ final class ExerciseLibraryStore: ObservableObject {
         }
         lastSearchRequest = request
         lastSearchTranslationRevision = translationRevision
-        let ordered = alphabetized(matches)
-        lastSearchResults = ordered
-        return ordered
+        lastSearchResults = matches
+        searchMemo.insert(matches, for: request)
+        return matches
     }
 
     func createCustomExercise(
