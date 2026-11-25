@@ -169,8 +169,10 @@ enum RouteMapSnapshotCache {
     private static var generation: UInt64 = 0
 
     static func clearCache() {
-        traces.removeAllObjects()
         generation &+= 1
+        for render in pending.values { render.task.cancel() }
+        pending.removeAll()
+        traces.removeAllObjects()
         images.removeAllObjects()
     }
 
@@ -232,9 +234,8 @@ enum RouteMapSnapshotCache {
             let snapshot = try await MKMapSnapshotter(options: options).start()
             guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
             let rendered = drawRoute(coordinates, on: snapshot, size: size)
-            if requestedGeneration == generation {
-                cacheImage(rendered, key: requestID as NSString)
-            }
+            guard requestedGeneration == generation else { return nil }
+            cacheImage(rendered, key: requestID as NSString)
             return rendered
         } catch {
             return nil
@@ -249,6 +250,19 @@ enum RouteMapSnapshotCache {
         let key = requestID as NSString
         if let cached = images.object(forKey: key) { return cached }
         guard coordinates.count >= 2, scrollingOwners.isEmpty else { return nil }
+        if let running = pending[requestID] { return await running.task.value }
+        let token = UUID()
+        let task = Task { await renderCoordinates(coordinates, size: size, requestID: requestID) }
+        pending[requestID] = PendingRender(token: token, task: task)
+        let result = await task.value
+        if pending[requestID]?.token == token { pending.removeValue(forKey: requestID) }
+        return result
+    }
+
+    private static func renderCoordinates(
+        _ coordinates: [CLLocationCoordinate2D], size: CGSize, requestID: String
+    ) async -> UIImage? {
+        let key = requestID as NSString
         // Coordinate-only thumbnails share the same two-render budget.
         while activeRenders >= 2 {
             if Task.isCancelled || !scrollingOwners.isEmpty { return nil }
@@ -257,6 +271,9 @@ enum RouteMapSnapshotCache {
         guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
         activeRenders += 1
         defer { activeRenders -= 1 }
+        if let cached = images.object(forKey: key) { return cached }
+        let signpost = ATHLTHPerformance.begin("CoordinateThumbnailRender")
+        defer { ATHLTHPerformance.end("CoordinateThumbnailRender", id: signpost) }
         let currentGeneration = generation
         let options = MKMapSnapshotter.Options()
         options.region = region(for: coordinates)
@@ -269,9 +286,8 @@ enum RouteMapSnapshotCache {
             let snapshot = try await MKMapSnapshotter(options: options).start()
             guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
             let rendered = drawRoute(coordinates, on: snapshot, size: size)
-            if currentGeneration == generation {
-                cacheImage(rendered, key: key)
-            }
+            guard currentGeneration == generation else { return nil }
+            cacheImage(rendered, key: key)
             return rendered
         } catch { return nil }
     }
