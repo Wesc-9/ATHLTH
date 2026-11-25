@@ -354,3 +354,4 @@ ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry 2026-11-24: one chec
 
 ATHLTH 3.0.1 build 141 — user-authorized TestFlight retry 2026-11-24. Reuse one verified installed-app data container, force fresh preview processes, check PID before/after screenshots, require distinct final native transition and actual Today dashboard evidence after 100 cycles, separate screenshots and distinguish simulator transport/lifecycle/render/process failures. All five exact-commit gates mandatory; no bypass.
 v3.0.2-build142-2026-11-25-quality-hardening-account-isolation-score-preview-garmin-explore-goals
+v3.0.2-build142-2026-11-25-recovery-drafts-season-rematch-garmin-history-review-hardening
