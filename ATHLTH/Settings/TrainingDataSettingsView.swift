@@ -85,16 +85,12 @@ struct TrainingDataSettingsView: View {
 
     @MainActor private func syncNow() async {
         guard !anySyncBusy, session.signedIn else { return }
-        let owner = session.profile.userID
         syncing = true
         defer { syncing = false }
-        await studioPlanSync.sync(session: session)
-        guard session.signedIn, session.profile.userID == owner else { return }
-        await strengthAccountSync.sync(session: session, strength: strength, force: true)
-        guard session.signedIn, session.profile.userID == owner else { return }
-        await goalSync.sync(session: session, goals: goals)
-        guard session.signedIn, session.profile.userID == owner else { return }
-        await audioSync.sync(session: session, settings: settings)
+        await ATHLTHAccountTrainingSyncCoordinator.synchronize(
+            session: session, settings: settings, goals: goals, strength: strength,
+            plans: studioPlanSync, goalSync: goalSync, audio: audioSync, history: strengthAccountSync
+        )
     }
 
     private func detail(_ text: String) -> some View {
