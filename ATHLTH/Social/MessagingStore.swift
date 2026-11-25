@@ -470,34 +470,29 @@ final class MessagingStore: ObservableObject {
 
     func refreshConversation(_ conversationID: UUID) async {
         do {
-            let messages = try await service.loadMessages(
-                conversationID: conversationID
-            )
-            messagesByConversation[conversationID] = messages
+            let owner = currentUserID
+            let messages = try await service.loadMessages(conversationID: conversationID)
+            guard !Task.isCancelled, currentUserID == owner else { return }
 
             if let currentUserID {
-                let hasUnread =
-                    messages.contains {
-                        $0.recipientID ==
-                            currentUserID &&
-                        $0.readAt == nil
+                let unread = messages.filter {
+                    $0.recipientID == currentUserID && $0.readAt == nil && $0.deletedAt == nil
+                }.map(\.id)
+
+                if !unread.isEmpty {
+                    // Commit actual read state before publishing the text. A
+                    // concurrent successful retraction must not appear here.
+                    try await service.markConversationRead(conversationID, messageIDs: unread)
+                    let confirmed = try await service.loadMessages(conversationID: conversationID)
+                    guard !Task.isCancelled, self.currentUserID == owner else { return }
+                    let loadedIDs = Set(messages.map(\.id))
+                    messagesByConversation[conversationID] = confirmed.filter {
+                        loadedIDs.contains($0.id) || $0.senderID == currentUserID
                     }
-
-                if hasUnread {
-                    try await service
-                        .markConversationRead(
-                            conversationID
-                        )
-
-                    let markedAt = Date()
-                    markConversationReadLocally(
-                        conversationID:
-                            conversationID,
-                        currentUserID:
-                            currentUserID,
-                        markedAt:
-                            markedAt
-                    )
+                    markConversationReadLocally(conversationID: conversationID,
+                                                currentUserID: currentUserID, markedAt: Date())
+                } else {
+                    messagesByConversation[conversationID] = messages
                 }
 
                 await clearDeliveredNotifications(
@@ -658,6 +653,33 @@ final class MessagingStore: ObservableObject {
                 withIdentifiers:
                     identifiers
             )
+    }
+
+    func retractTextMessage(_ message: DirectMessageRecord) async -> Bool {
+        guard let owner = currentUserID, message.senderID == owner,
+              message.attachmentKindRaw == nil, message.readAt == nil,
+              message.deletedAt == nil, !withdrawalsInFlight.contains(message.id) else { return false }
+        withdrawalsInFlight.insert(message.id)
+        defer { withdrawalsInFlight.remove(message.id) }
+        do {
+            let removed = try await service.retractUnreadMessage(message.id)
+            guard currentUserID == owner else { return false }
+            if removed {
+                recentMessages.removeAll { $0.id == message.id }
+                messagesByConversation[message.conversationID]?.removeAll { $0.id == message.id }
+            }
+            await refreshConversation(message.conversationID)
+            if !removed {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "The message can no longer be withdrawn.",
+                    norwegian: "Meldingen kan ikke lenger trekkes tilbake.")
+            }
+            return removed
+        } catch {
+            guard currentUserID == owner else { return false }
+            errorMessage = ATHLTHLocalization.choose(english: "Could not withdraw the message.", norwegian: "Kunne ikke trekke tilbake meldingen.")
+            return false
+        }
     }
 
     func messages(in conversationID: UUID) -> [DirectMessageRecord] {
