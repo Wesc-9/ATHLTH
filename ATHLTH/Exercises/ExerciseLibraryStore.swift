@@ -615,6 +615,9 @@ final class ExerciseLibraryStore: ObservableObject {
         // Search synonyms for confirmed barbell deadlift identities. Exact
         // movement variants remain separate: Romanian is never "Markløft".
         let sourceName = ATHLTHExerciseReferenceResolver.key(englishName)
+        if sourceName == "rowing machine" {
+            words.append("Romaskin Roing RowErg Rowing Erg")
+        }
         if ["deadlift", "conventional deadlift", "barbell deadlift"]
             .contains(sourceName) {
             words.append("Markløft")
@@ -975,7 +978,12 @@ final class ExerciseLibraryStore: ObservableObject {
             // A hidden native exercise must never resolve to itself when a
             // unique, selectable RepDB equivalent exists.
             let completeLibrary = allExercises
+            let hasCanonicalRower = ATHLTHExerciseReferenceResolver.rowingMachine(in: completeLibrary) != nil
             resolved = completeLibrary.filter { entry in
+                if hasCanonicalRower && entry.source == .athlthCatalog &&
+                    entry.id == ATHLTHExerciseReferenceResolver.retiredRowingID {
+                    return false
+                }
                 guard !Self.isRetiredNativeDuplicate(entry) else {
                     return false
                 }

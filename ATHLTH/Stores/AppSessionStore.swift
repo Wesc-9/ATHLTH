@@ -6233,6 +6233,23 @@ final class AppSessionStore: ObservableObject {
                     ($0.scheduledStart ?? .distantFuture) <
                     ($1.scheduledStart ?? .distantFuture)
                 }
+        // Account-scoped, idempotent upgrade of the retired RowErg movement.
+        // Do not decode a second RepDB catalog on ordinary launches without
+        // legacy references; leave data intact if the canonical rower is absent.
+        let loadedPlans = [activePlan].compactMap { $0 } + scheduledPlans + planTemplates
+        if loadedPlans.contains(where: { ATHLTHWorkoutExerciseBinding.needsRowingMigration($0) }) ||
+            (savedWorkoutTemplates + standalonePlannedSessions).contains(where: {
+                ATHLTHWorkoutExerciseBinding.needsRowingMigration($0)
+            }) {
+            let library = ExerciseLibraryStore().allExercises
+            if let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: library) {
+                activePlan = activePlan.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
+                scheduledPlans = scheduledPlans.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
+                planTemplates = planTemplates.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
+                savedWorkoutTemplates = savedWorkoutTemplates.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
+                standalonePlannedSessions = standalonePlannedSessions.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
+            }
+        }
         standaloneWorkoutTombstones = stored?.standaloneWorkoutTombstones ?? []
         standaloneWorkoutTombstones.subtract(standalonePlannedSessions.map(\.id))
         recordedPlannedWorkoutTimes = stored?.recordedPlannedWorkoutTimes ?? [:]

@@ -18,6 +18,25 @@ enum ATHLTHExerciseReferenceResolver {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // The old HYROX RowErg and the illustrated RepDB Rowing Machine are
+    // the same indoor cardio movement. Never match resistance row variants.
+    static let retiredRowingID = UUID(uuidString: "C2000000-0000-0000-0000-000000000005")!
+    private static let rowingSlugs: Set<String> = ["athlth rowing", "rowing erg", "rowing machine"]
+    private static let rowingNames: Set<String> = ["rowing", "roing", "rowing machine", "romaskin", "rowerg", "rowing erg", "row erg"]
+
+    static func rowingMachine(in library: [ExerciseLibraryEntry]) -> ExerciseLibraryEntry? {
+        let matches = library.filter {
+            $0.source == .repDB && key($0.canonicalName) == "rowing machine"
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    static func isLegacyRowingReference(id: UUID?, slug: String?, name: String) -> Bool {
+        if let id { return id == retiredRowingID }
+        if let slug { return rowingSlugs.contains(key(slug)) }
+        return rowingNames.contains(key(name))
+    }
+
     /// Reviewed equivalent names, not generic similarity heuristics.
     /// A missing dictionary key is deliberately unresolved.
     private static let nativeAliases: [String: String] = [
@@ -290,6 +309,12 @@ enum ATHLTHExerciseReferenceResolver {
     ) -> ExerciseLibraryEntry? {
         guard block.kind == .exercise || block.exerciseID != nil ||
               block.exerciseSlug != nil else { return nil }
+        if isLegacyRowingReference(id: block.exerciseID, slug: block.exerciseSlug, name: block.title),
+           (block.exerciseID != nil || block.exerciseSlug != nil ||
+            block.exerciseSnapshot == nil || block.exerciseSnapshot?.instructions.isEmpty == true),
+           let rower = rowingMachine(in: library) {
+            return rower
+        }
         if let id = block.exerciseID {
             if let exact = library.first(where: { $0.id == id }) {
                 return exact
@@ -381,6 +406,9 @@ enum ATHLTHExerciseReferenceResolver {
     ) -> ExerciseLibraryEntry? {
         let clean = key(name)
         guard !clean.isEmpty else { return nil }
+        if rowingNames.contains(clean), let rower = rowingMachine(in: library) {
+            return rower
+        }
         // Reviewed legacy bodyweight prescription; never replace it with
         // walking, reverse or loaded lunges simply because the name overlaps.
         if clean == "lunges each leg" {
@@ -424,6 +452,10 @@ enum ATHLTHExerciseReferenceResolver {
         of source: ExerciseLibraryEntry,
         in library: [ExerciseLibraryEntry]
     ) -> ExerciseLibraryEntry {
+        if source.source == .athlthCatalog, source.id == retiredRowingID,
+           let rower = rowingMachine(in: library) {
+            return rower
+        }
         guard source.source == .athlthCatalog,
               source.sourceIdentifier?.hasPrefix("athlth-native-") == true
         else { return source }

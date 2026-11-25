@@ -30,6 +30,77 @@ enum ATHLTHWorkoutExerciseBinding {
         }
     }
 
+    /// Only migrate the reviewed rowing identity; leave all other exercise
+    /// IDs, user-created movements and workout prescriptions untouched.
+    private static func legacyRowing(_ block: WorkoutTemplateBlock) -> Bool {
+        guard block.kind == .exercise || block.exerciseID != nil || block.exerciseSlug != nil else { return false }
+        if block.exerciseID == nil && block.exerciseSlug == nil,
+           let snapshot = block.exerciseSnapshot, !snapshot.instructions.isEmpty {
+            return false
+        }
+        return ATHLTHExerciseReferenceResolver.isLegacyRowingReference(
+            id: block.exerciseID, slug: block.exerciseSlug, name: block.title
+        )
+    }
+
+    private static func legacyRowing(_ exercise: PlannedExercise) -> Bool {
+        guard exercise.exerciseID != nil || exercise.embeddedExercise.instructions.isEmpty else { return false }
+        return ATHLTHExerciseReferenceResolver.isLegacyRowingReference(
+            id: exercise.exerciseID, slug: nil, name: exercise.embeddedExercise.name
+        )
+    }
+
+    static func needsRowingMigration(_ workout: PlannedSession) -> Bool {
+        (workout.workoutBlocks ?? []).contains(where: { legacyRowing($0) }) ||
+            workout.exercises.contains(where: { legacyRowing($0) })
+    }
+
+    static func needsRowingMigration(_ plan: TrainingPlan) -> Bool {
+        plan.weeks.contains { week in
+            week.days.contains { day in day.sessions.contains(where: { needsRowingMigration($0) }) }
+        }
+    }
+
+    private static func replaceRowing(_ block: inout WorkoutTemplateBlock, with rower: ExerciseLibraryEntry) {
+        if ATHLTHExerciseReferenceResolver.key(block.title) == "row run" {
+            block.title = ATHLTHLocalization.choose(english: "Rowing Machine / Run", norwegian: "Romaskin / løping")
+        } else {
+            block.title = ATHLTHLocalization.choose(english: "Rowing Machine", norwegian: "Romaskin")
+        }
+        block.exerciseID = rower.id
+        block.exerciseSlug = rower.sourceIdentifier
+        block.exerciseSnapshot = rower.exercise.snapshot
+    }
+
+    static func migrateRowing(_ source: PlannedSession, to rower: ExerciseLibraryEntry) -> PlannedSession {
+        guard needsRowingMigration(source) else { return source }
+        var copy = source
+        if var blocks = copy.workoutBlocks {
+            for i in blocks.indices where legacyRowing(blocks[i]) {
+                replaceRowing(&blocks[i], with: rower)
+            }
+            copy.workoutBlocks = blocks
+        }
+        for i in copy.exercises.indices where legacyRowing(copy.exercises[i]) {
+            copy.exercises[i].exerciseID = rower.id
+            copy.exercises[i].embeddedExercise = rower.exercise.snapshot
+        }
+        return copy
+    }
+
+    static func migrateRowing(_ source: TrainingPlan, to rower: ExerciseLibraryEntry) -> TrainingPlan {
+        guard needsRowingMigration(source) else { return source }
+        var copy = source
+        for w in copy.weeks.indices {
+            for d in copy.weeks[w].days.indices {
+                copy.weeks[w].days[d].sessions = copy.weeks[w].days[d].sessions.map {
+                    migrateRowing($0, to: rower)
+                }
+            }
+        }
+        return copy
+    }
+
     @discardableResult
     static func bind(
         _ workout: inout PlannedSession,
@@ -49,6 +120,10 @@ enum ATHLTHWorkoutExerciseBinding {
         misses: inout Set<LookupKey>
     ) -> Report {
         var report = Report()
+        if needsRowingMigration(workout),
+           let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: library) {
+            workout = migrateRowing(workout, to: rower)
+        }
 
         if var blocks = workout.workoutBlocks {
             // Adapted running/cardio exercises retain their library ID or slug.

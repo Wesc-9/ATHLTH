@@ -37,6 +37,38 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         return block
     }
 
+    func testRetiredRowErgMigratesToIllustratedRowingMachineWithoutChangingTargets() throws {
+        let store = ExerciseLibraryStore()
+        let library = store.allExercises
+        let rower = try XCTUnwrap(ATHLTHExerciseReferenceResolver.rowingMachine(in: library))
+        let legacyID = ATHLTHExerciseReferenceResolver.retiredRowingID
+        XCTAssertFalse(store.selectableExercises.contains { $0.id == legacyID })
+        XCTAssertTrue(store.selectableExercises.contains { $0.id == rower.id })
+        var old = strengthBlock(title: "Row", slug: "rowing-erg")
+        old.exerciseID = legacyID
+        old.distanceMeters = 1_000
+        old.durationSeconds = 240
+        var foreign = strengthBlock(title: "Roing", slug: nil)
+        foreign.exerciseID = UUID()
+        let resistance = strengthBlock(title: "Seated Cable Row", slug: nil)
+        let original = workout(blocks: [old, foreign, resistance])
+        let migrated = ATHLTHWorkoutExerciseBinding.migrateRowing(original, to: rower)
+        let blocks = try XCTUnwrap(migrated.workoutBlocks)
+        XCTAssertEqual(blocks[0].exerciseID, rower.id)
+        XCTAssertEqual(blocks[0].exerciseSlug, rower.sourceIdentifier)
+        XCTAssertEqual(blocks[0].exerciseSnapshot?.name, rower.canonicalName)
+        XCTAssertEqual(blocks[0].distanceMeters, old.distanceMeters)
+        XCTAssertEqual(blocks[0].durationSeconds, old.durationSeconds)
+        XCTAssertEqual(blocks[0].restBetweenSetsSeconds, old.restBetweenSetsSeconds)
+        XCTAssertEqual(blocks[0].setCount, old.setCount)
+        XCTAssertEqual(blocks[0].notes, old.notes)
+        XCTAssertEqual(blocks[1], foreign)
+        XCTAssertEqual(blocks[2], resistance)
+        XCTAssertEqual(ATHLTHWorkoutExerciseBinding.migrateRowing(migrated, to: rower), migrated)
+        XCTAssertEqual(ATHLTHExerciseReferenceResolver.resolve(old, in: library)?.id, rower.id)
+        XCTAssertEqual(ATHLTHExerciseReferenceResolver.resolvePublicName("Roing", in: library)?.id, rower.id)
+    }
+
     func testPlanWideLookupCachesRepeatedMovementWithoutReplacingForeignUUID() throws {
         let suite = "CatalogLookupCache.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
