@@ -4893,6 +4893,7 @@ struct WorkoutTemplateBuilderView: View {
     // Dismissing both presentations in one update can strand the old host.
     @State private var closeAfterDraftDecision = false
     @State private var manualDurationMinutes: Int?
+    @State private var durationMemo = ATHLTHProjectionMemo<DurationProjectionKey, Int?>()
     @State private var durationInputText = ""
     @State private var allRoundsExpandedIDs: Set<UUID> = []
     @State private var draftRestored = false
@@ -5757,14 +5758,24 @@ struct WorkoutTemplateBuilderView: View {
         return Array(start..<index)
     }
 
+    private struct DurationProjectionKey: Equatable {
+        let blocks: [WorkoutTemplateBlock]
+        let planned: Bool
+        let walking: Bool
+    }
+
     private var knownDurationMinutes: Int? {
-        if isPlannedWorkout {
-            return ATHLTHWorkoutDurationEstimator.previewMinutes(
-                for: blocks,
-                defaultActivity: initialActivity == .walking ? .walking : .running
-            )
+        let key = DurationProjectionKey(blocks: blocks, planned: isPlannedWorkout,
+                                        walking: initialActivity == .walking)
+        return durationMemo.value(for: key) {
+            let signpost = ATHLTHPerformance.begin("WorkoutDurationProjection")
+            defer { ATHLTHPerformance.end("WorkoutDurationProjection", id: signpost) }
+            if key.planned {
+                return ATHLTHWorkoutDurationEstimator.previewMinutes(
+                    for: key.blocks, defaultActivity: key.walking ? .walking : .running)
+            }
+            return ATHLTHWorkoutDurationEstimator.minutes(for: key.blocks)
         }
-        return ATHLTHWorkoutDurationEstimator.minutes(for: blocks)
     }
 
     private var activeRouteID: UUID? {
