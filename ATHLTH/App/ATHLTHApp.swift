@@ -418,11 +418,10 @@ private struct ATHLTHSceneRootView: View {
                 // One foreground cadence owns all low-priority account
                 // reconciliation. Goal edits still schedule an immediate
                 // debounced sync from their existing change observers.
-                goalAccountSync.scheduleSync(session: appSession, goals: goals)
-                studioPlanSync.scheduleSync(session: appSession)
-                audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
-                strengthAccountSync.scheduleSync(
-                    session: appSession, strength: strengthWorkout
+                ATHLTHAccountTrainingSyncCoordinator.schedule(
+                    session: appSession, settings: settings, goals: goals, strength: strengthWorkout,
+                    plans: studioPlanSync, goalSync: goalAccountSync,
+                    audio: audioCoachAccountSync, history: strengthAccountSync
                 )
                 await notifications.refreshAccountNotifications()
                 await messaging.refreshPreferences()
