@@ -1017,6 +1017,14 @@ settingsSection(ATHLTHLocalization.choose(
         var id: String { rawValue }
     }
 
+    private var canUsePersonalGarmin: Bool {
+        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+        session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
+        #else
+        false
+        #endif
+    }
+
     private func connectionIsActive(_ item: ConnectionItem) -> Bool {
         switch item {
         case .health: return settings.appleHealthIntegrationEnabled && health.hasRequestedAuthorization && health.hasReadableHealthData
@@ -1026,7 +1034,7 @@ settingsSection(ATHLTHLocalization.choose(
         case .homeAssistant: return homeAssistant.isConnected
         case .garmin:
             #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-            return session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter &&
+            return canUsePersonalGarmin &&
                 garminConnectionStore.isConnected(to: session.profile.userID)
             #else
             return false
@@ -1192,12 +1200,12 @@ settingsSection(ATHLTHLocalization.choose(
                     iconTint: ATHLTHTheme.accentDeep,
                     iconBackground: ATHLTHTheme.premiumGoldSoft,
                     title: "Garmin",
-                    subtitle: session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
+                    subtitle: canUsePersonalGarmin
                         ? ATHLTHLocalization.choose(english: "Developer testing · connection and status", norwegian: "Utviklertest · tilkobling og status")
                         : ATHLTHLocalization.choose(english: "Garmin Connect integration", norwegian: "Garmin Connect-integrasjon")
                 ) {
                     connectionTrailing(
-                        session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
+                        canUsePersonalGarmin
                             ? (connectionIsActive(.garmin) ? ATHLTHLocalization.choose(english: "Connected", norwegian: "Tilkoblet") : ATHLTHLocalization.choose(english: "Test", norwegian: "Test"))
                             : ATHLTHLocalization.choose(english: "Coming soon", norwegian: "Kommer snart"),
                         showChevron: true
@@ -1256,7 +1264,7 @@ settingsSection(ATHLTHLocalization.choose(
         case .homeAssistant: HomeAssistantSettingsView()
         case .garmin:
                 #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-                if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
+                if canUsePersonalGarmin {
                     GarminPersonalSettingsView(accountID: session.profile.userID)
                         .id(session.profile.userID)
                 } else {
