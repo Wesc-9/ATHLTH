@@ -37,6 +37,14 @@ final class MessagingStore: ObservableObject {
     @Published private(set) var messageWindowLimits: [UUID: Int] = [:]
     private var conversationRefreshInFlight: Set<UUID> = []
 
+    func observeThreadChanges(owner: UUID, conversation: UUID,
+                              onChange: @MainActor @Sendable () -> Void,
+                              onStatus: @MainActor @Sendable (Bool) -> Void) async {
+        guard preferenceAccountID == owner, currentUserID == owner else { return }
+        await service.observeThreadChanges(owner: owner, conversation: conversation,
+                                           onChange: onChange, onStatus: onStatus)
+    }
+
     func canLoadOlderMessages(in conversationID: UUID) -> Bool {
         let limit = messageWindowLimits[conversationID] ?? Self.messagePageSize
         return limit < Self.maximumMessageWindow &&
