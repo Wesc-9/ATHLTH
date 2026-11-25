@@ -134,11 +134,23 @@ enum ATHLTHExerciseReferenceResolver {
         lhs != rhs && canonicalReviewedID(lhs) == canonicalReviewedID(rhs)
     }
 
-    static func reviewedReplacementSlug(id: UUID?, slug: String?) -> String? {
+    static func reviewedReplacementSlug(id: UUID?, slug: String?, legacyName: String? = nil) -> String? {
         if let id { return reviewedLegacyIDs[id] }
-        guard let slug else { return nil }
-        return reviewedNativeDuplicates[slug] ?? reviewedStationDuplicates[slug] ??
-            reviewedStationRecipeAliases[slug]
+        if let slug {
+            return reviewedNativeDuplicates[slug] ?? reviewedStationDuplicates[slug] ??
+                reviewedStationRecipeAliases[slug]
+        }
+        // Only called for old title-only rows with no private identity or
+        // technique snapshot. Do not infer equipment for generic variants.
+        guard let legacyName else { return nil }
+        if let native = nativeSourceIdentifier(for: legacyName),
+           let target = reviewedNativeDuplicates[native] { return target }
+        switch key(legacyName) {
+        case "skierg", "ski erg": return "ski-erg"
+        case "sled push": return "sled-push"
+        case "wall ball": return "wall-ball"
+        default: return nil
+        }
     }
 
     static func reviewedReplacement(for source: ExerciseLibraryEntry, in library: [ExerciseLibraryEntry]) -> ExerciseLibraryEntry? {

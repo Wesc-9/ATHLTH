@@ -100,7 +100,7 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         let foreign = UUID()
         var custom = block
         custom.exerciseID = foreign
-        let session = workout(blocks: [block, custom, strengthBlock(title: "SkiErg", slug: "athlth:skierg")])
+        let session = workout(blocks: [block, custom, strengthBlock(title: "SkiErg", slug: "athlth:skierg"), strengthBlock(title: "Markløft", slug: nil)])
         let index = ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: library)
         let migrated = index.migrate(session)
         let blocks = try XCTUnwrap(migrated.workoutBlocks)
@@ -109,6 +109,7 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         XCTAssertEqual(blocks[0].restBetweenSetsSeconds, block.restBetweenSetsSeconds)
         XCTAssertEqual(blocks[1].exerciseID, foreign)
         XCTAssertEqual(blocks[2].exerciseSlug, "ski-erg")
+        XCTAssertEqual(blocks[3].exerciseSlug, "deadlift")
         XCTAssertEqual(index.migrate(migrated), migrated)
         XCTAssertEqual(ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: []).migrate(session), session)
     }

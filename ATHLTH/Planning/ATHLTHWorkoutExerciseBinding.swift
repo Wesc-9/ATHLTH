@@ -101,6 +101,29 @@ enum ATHLTHWorkoutExerciseBinding {
         return copy
     }
 
+    private static func reviewedTarget(_ block: WorkoutTemplateBlock) -> String? {
+        guard block.kind == .exercise || block.exerciseID != nil || block.exerciseSlug != nil else { return nil }
+        let name: String?
+        if let snapshot = block.exerciseSnapshot {
+            name = snapshot.instructions.isEmpty && snapshot.imageURL == nil && snapshot.videoURL == nil
+                ? snapshot.name : nil
+        } else {
+            name = block.title
+        }
+        return ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(
+            id: block.exerciseID, slug: block.exerciseSlug, legacyName: name
+        )
+    }
+
+    private static func reviewedTarget(_ exercise: PlannedExercise) -> String? {
+        let snapshot = exercise.embeddedExercise
+        let name = snapshot.instructions.isEmpty && snapshot.imageURL == nil && snapshot.videoURL == nil
+            ? snapshot.name : nil
+        return ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(
+            id: exercise.exerciseID, slug: nil, legacyName: name
+        )
+    }
+
     /// Build once per batch. Migration preserves every prescription and all
     /// private/custom IDs; missing RepDB targets leave the old record intact.
     struct DuplicateIndex {
@@ -115,8 +138,8 @@ enum ATHLTHWorkoutExerciseBinding {
             }
         }
 
-        private func replacement(id: UUID?, slug: String?) -> ExerciseLibraryEntry? {
-            guard let target = ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: id, slug: slug) else { return nil }
+        private func replacement(_ target: String?) -> ExerciseLibraryEntry? {
+            guard let target else { return nil }
             return repDB[target]
         }
 
@@ -124,8 +147,7 @@ enum ATHLTHWorkoutExerciseBinding {
             var copy = source
             if var blocks = copy.workoutBlocks {
                 for i in blocks.indices {
-                    guard blocks[i].kind == .exercise || blocks[i].exerciseID != nil || blocks[i].exerciseSlug != nil,
-                          let match = replacement(id: blocks[i].exerciseID, slug: blocks[i].exerciseSlug) else { continue }
+                    guard let match = replacement(ATHLTHWorkoutExerciseBinding.reviewedTarget(blocks[i])) else { continue }
                     if match.sourceIdentifier == "rowing-machine" {
                         ATHLTHWorkoutExerciseBinding.replaceRowing(&blocks[i], with: match)
                     } else {
@@ -137,7 +159,7 @@ enum ATHLTHWorkoutExerciseBinding {
                 copy.workoutBlocks = blocks
             }
             for i in copy.exercises.indices {
-                guard let match = replacement(id: copy.exercises[i].exerciseID, slug: nil) else { continue }
+                guard let match = replacement(ATHLTHWorkoutExerciseBinding.reviewedTarget(copy.exercises[i])) else { continue }
                 copy.exercises[i].exerciseID = match.id
                 copy.exercises[i].embeddedExercise = match.exercise.snapshot
             }
@@ -161,9 +183,9 @@ enum ATHLTHWorkoutExerciseBinding {
     static func needsDuplicateMigration(_ workout: PlannedSession) -> Bool {
         needsRowingMigration(workout) ||
             (workout.workoutBlocks ?? []).contains {
-                ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: $0.exerciseID, slug: $0.exerciseSlug) != nil
+                reviewedTarget($0) != nil
             } || workout.exercises.contains {
-                ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: $0.exerciseID, slug: nil) != nil
+                reviewedTarget($0) != nil
             }
     }
 

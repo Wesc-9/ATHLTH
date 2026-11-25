@@ -4,7 +4,7 @@ import XCTest
 
 final class LibraryFavoriteExerciseArtworkTests: XCTestCase {
     @MainActor
-    func testLegacyAndCanonicalExerciseFavoritesCollapseWithoutDroppingOtherKinds() throws {
+    func testLegacyAndCanonicalExerciseFavoritesCollapse() throws {
         let library = ExerciseLibraryStore().allExercises
         let old = try XCTUnwrap(library.first { $0.sourceIdentifier == "athlth-native-cable-curl" })
         let new = try XCTUnwrap(library.first { $0.source == .repDB && $0.sourceIdentifier == "cable-curl" })
