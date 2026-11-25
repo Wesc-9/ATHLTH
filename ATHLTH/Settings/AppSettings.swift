@@ -95,8 +95,8 @@ enum TimeFormatPreference: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .twentyFourHour: return "24-hour"
-        case .twelveHour: return "12-hour"
+        case .twentyFourHour: return ATHLTHLocalization.choose(english: "24-hour", norwegian: "24 timer")
+        case .twelveHour: return ATHLTHLocalization.choose(english: "12-hour", norwegian: "12 timer")
         }
     }
 
