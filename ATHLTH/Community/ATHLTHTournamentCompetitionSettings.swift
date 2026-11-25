@@ -130,13 +130,28 @@ enum ATHLTHCompetitionEnvironment: String, Codable, CaseIterable, Identifiable {
     var canPublish: Bool { self == .any || self == .outdoor || self == .gym }
 
     func supports(_ activities: Set<ATHLTHTournamentActivity>) -> Bool {
-        let cardio = activities.contains(.running) || activities.contains(.walking)
+        !activities.isEmpty && activities.allSatisfy { activity in
+            switch self {
+            case .any, .outdoor: return true
+            case .indoor, .gym: return activity != .hiking
+            case .treadmill: return activity == .running || activity == .walking
+            }
+        }
+    }
+
+    /// A child can narrow a parent, never relax it or contradict it.
+    func permits(_ child: Self) -> Bool {
+        if self == .any || self == child { return true }
+        return self == .indoor && (child == .treadmill || child == .gym)
+    }
+
+    /// Keep the existing server contract in addition to local compatibility.
+    func canPublish(for activities: Set<ATHLTHTournamentActivity>) -> Bool {
+        guard canPublish, supports(activities) else { return false }
         switch self {
-        case .any: return true
-        case .outdoor: return cardio || activities.contains(.hiking)
-        case .indoor: return cardio || activities.contains(.strength)
-        case .treadmill: return cardio && activities.allSatisfy { $0 == .running || $0 == .walking }
+        case .outdoor: return activities.contains(.running) || activities.contains(.walking) || activities.contains(.hiking)
         case .gym: return activities.contains(.strength)
+        default: return true
         }
     }
 
@@ -168,6 +183,46 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var endsAt: Date? = nil
     var startMode: ATHLTHCompetitionStartMode = .manual
     var environment: ATHLTHCompetitionEnvironment = .any
+    /// Stable keys are activity raw values and library/template UUIDs.
+    /// Absence means inherit; explicit `any` cannot relax a restricted parent.
+    var activityEnvironments: [String: ATHLTHCompetitionEnvironment] = [:]
+    var exerciseEnvironments: [UUID: ATHLTHCompetitionEnvironment] = [:]
+
+    func effectiveEnvironment(activity: ATHLTHTournamentActivity, exerciseID: UUID? = nil) -> ATHLTHCompetitionEnvironment {
+        if let exerciseID, let specific = exerciseEnvironments[exerciseID] { return specific }
+        return activityEnvironments[activity.rawValue] ?? environment
+    }
+
+    func allowedEnvironments(activity: ATHLTHTournamentActivity, exerciseID: UUID? = nil) -> [ATHLTHCompetitionEnvironment] {
+        let parent = exerciseID == nil ? environment : effectiveEnvironment(activity: activity)
+        return ATHLTHCompetitionEnvironment.allCases.filter {
+            parent.permits($0) && $0.supports(Set([activity])) && $0.supports(race)
+        }
+    }
+
+    /// Never silently ignore stale overrides, unknown activities or an
+    /// exercise whose real catalog activity has not yet been resolved.
+    func environmentsValid(activities: Set<ATHLTHTournamentActivity>,
+                           exerciseActivities: [UUID: ATHLTHTournamentActivity]) -> Bool {
+        guard environment.supports(activities), environment.supports(race),
+              activityEnvironments.allSatisfy({ key, value in
+                  guard let activity = ATHLTHTournamentActivity(rawValue: key), activities.contains(activity) else { return false }
+                  return allowedEnvironments(activity: activity).contains(value)
+              }) else { return false }
+        let selected = Set(selectedExerciseIDs ?? [])
+        return exerciseEnvironments.allSatisfy { id, value in
+            guard selected.contains(id), let activity = exerciseActivities[id],
+                  activities.contains(activity) else { return false }
+            return allowedEnvironments(activity: activity, exerciseID: id).contains(value)
+        }
+    }
+
+    /// Hierarchical rules may be saved as recipes, but must never be
+    /// published with a server that would discard their restrictions.
+    func environmentsCanPublish(activities: Set<ATHLTHTournamentActivity>) -> Bool {
+        activityEnvironments.isEmpty && exerciseEnvironments.isEmpty && environment.canPublish(for: activities)
+    }
+
     var meetingPlace: String = ""
     var meetingLat: Double? = nil
     var meetingLon: Double? = nil
@@ -197,6 +252,9 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
               meetingLon.map { (-180...180).contains($0) } == true))
         let validEnd = endsAt.map { $0 > max(now, startsAt ?? now) && $0 <= now.addingTimeInterval(366 * 86_400) } ?? true
         return validStart && validEnd && validVenue && race.isValid && environment.supports(race) &&
+            activityEnvironments.count <= ATHLTHTournamentActivity.allCases.count &&
+            exerciseEnvironments.count <= 12 &&
+            Set(exerciseEnvironments.keys).isSubset(of: Set(selectedExerciseIDs ?? [])) &&
             (1...30).contains(invitationDays) &&
             (selectedExerciseIDs.map { (1...12).contains($0.count) && Set($0).count == $0.count && coachExerciseIDs.isEmpty } ?? true) &&
             coachExerciseIDs.count <= 12 &&
@@ -219,7 +277,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     // Decode missing fields to safe defaults instead of discarding a draft.
     init() {}
     private enum CodingKeys: String, CodingKey {
-        case startsAt, endsAt, startMode, environment, meetingPlace, meetingLat,
+        case startsAt, endsAt, startMode, environment, activityEnvironments, exerciseEnvironments, meetingPlace, meetingLat,
              meetingLon, coachExerciseIDs, selectedExerciseIDs, race, invitationDays, unansweredPolicy,
              allowFeedPost, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
@@ -232,6 +290,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
                                           forKey: .startMode) ?? .manual
         environment = try c.decodeIfPresent(ATHLTHCompetitionEnvironment.self,
                                             forKey: .environment) ?? .any
+        activityEnvironments = try c.decodeIfPresent([String: ATHLTHCompetitionEnvironment].self, forKey: .activityEnvironments) ?? [:]
+        exerciseEnvironments = try c.decodeIfPresent([UUID: ATHLTHCompetitionEnvironment].self, forKey: .exerciseEnvironments) ?? [:]
         meetingPlace = try c.decodeIfPresent(String.self,
                                              forKey: .meetingPlace) ?? ""
         meetingLat = try c.decodeIfPresent(Double.self, forKey: .meetingLat)
