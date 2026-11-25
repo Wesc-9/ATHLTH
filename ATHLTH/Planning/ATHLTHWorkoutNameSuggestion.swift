@@ -65,6 +65,20 @@ enum ATHLTHWorkoutNameSuggestion {
         return label
     }
 
+    /// Phase headers describe when; generic endurance rows describe the actual activity.
+    /// Preserve named drills, routes, explicit walking and non-cardio warm-ups.
+    static func cardioPhaseTitle(_ block: WorkoutTemplateBlock) -> String? {
+        guard block.kind == .run,
+              block.resolvedPhase == .warmup || block.resolvedPhase == .cooldown,
+              block.routeID == nil else { return nil }
+        let title = block.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let generic = ["oppvarming", "warm-up", "warm up", "warmup",
+                       "nedjogging", "nedjogg", "nedtrapping", "cool-down", "cool down", "cooldown",
+                       "jogging", "jogg", "easy jog", "rolig jogg", "running", "run", "løping"]
+        guard generic.contains(title) else { return nil }
+        return (block.cardioActivity ?? .running).title
+    }
+
     static func displayStepTitle(_ source: WorkoutTemplateBlock) -> String {
         let block = ATHLTHZonedLocalization.normalizeLegacyImportedStep(source)
         if ATHLTHFreeStrengthRecipePolicy.isFreeStrength(block) {
@@ -72,6 +86,7 @@ enum ATHLTHWorkoutNameSuggestion {
                 english: "Free strength training", norwegian: "Fri styrketrening"
             )
         }
+        if let activityTitle = cardioPhaseTitle(block) { return activityTitle }
         // Older imported/existing recipes can contain an English default,
         // even when the app is now displayed in Norwegian.
         switch block.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
