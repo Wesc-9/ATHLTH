@@ -47,8 +47,8 @@ final class MessagingStore: ObservableObject {
         guard !conversationRefreshInFlight.contains(conversationID),
               canLoadOlderMessages(in: conversationID) else { return }
         let current = messageWindowLimits[conversationID] ?? Self.messagePageSize
-        messageWindowLimits[conversationID] = min(Self.maximumMessageWindow, current + Self.messagePageSize)
-        await refreshConversation(conversationID)
+        await refreshConversation(conversationID,
+            requestedLimit: min(Self.maximumMessageWindow, current + Self.messagePageSize))
     }
 
     func textDraft(for recipient: UUID, owner: UUID) -> String {
@@ -542,14 +542,14 @@ final class MessagingStore: ObservableObject {
         }
     }
 
-    func refreshConversation(_ conversationID: UUID) async {
+    func refreshConversation(_ conversationID: UUID, requestedLimit: Int? = nil) async {
         guard let owner = currentUserID, preferenceAccountID == owner else { return }
         let generation = accountGeneration
         guard conversationRefreshInFlight.insert(conversationID).inserted else { return }
         defer {
             if accountGeneration == generation { conversationRefreshInFlight.remove(conversationID) }
         }
-        let limit = messageWindowLimits[conversationID] ?? Self.messagePageSize
+        let limit = requestedLimit ?? messageWindowLimits[conversationID] ?? Self.messagePageSize
         do {
             let messages = try await service.loadMessages(conversationID: conversationID, limit: limit)
             guard ownsRequest(owner, generation: generation) else { return }
@@ -575,6 +575,7 @@ final class MessagingStore: ObservableObject {
                     messagesByConversation[conversationID] = messages
                 }
 
+                messageWindowLimits[conversationID] = limit
                 await clearDeliveredNotifications(
                     for:
                         conversationID
