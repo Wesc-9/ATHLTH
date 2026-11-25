@@ -112,7 +112,7 @@ struct ATHLTHTournamentMyExercisesView: View {
             autoReporting = ATHLTHCompetitionAutoReporting.enabled(tournamentID: tournament.id, userID: userID)
             await reload()
         }
-        .sheet(item: $reportSlot) { slot in
+        .fullScreenCover(item: $reportSlot) { slot in
             ATHLTHTournamentExerciseEvidenceSheet(
                 requiresVerifiedWorkout: tournament.raceRules.discipline == .sprint,
                 measuredMetric: tournament.raceRules.scoringMode == nil ? nil : candidates.first(where: { $0.id == slot.candidateID }).map { exerciseMetrics[$0.lookupID] ?? "repetitions" },

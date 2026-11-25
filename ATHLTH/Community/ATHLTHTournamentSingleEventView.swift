@@ -427,7 +427,7 @@ private struct ATHLTHSharedEventProgressView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
-        .sheet(item: $reporting) { item in
+        .fullScreenCover(item: $reporting) { item in
             ATHLTHSharedExerciseReportSheet(exercise: item, tournamentID: tournament.id, userID: userID, venue: ATHLTHCompetitionEnvironment(rawValue: tournament.requiredEnvironment) ?? .any) { score, note, source in
                 try await cloud.submitShared(tournamentID: tournament.id, candidateID: item.candidateID,
                     score: score, evidence: note, sourceWorkoutID: source)

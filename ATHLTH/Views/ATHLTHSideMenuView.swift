@@ -179,8 +179,8 @@ struct ATHLTHSideMenuView: View {
                                 )
                                 menuRow(
                                     .arena,
-                                    english: "Arena",
-                                    norwegian: "Arena",
+                                    english: "Competition",
+                                    norwegian: "Konkurranse",
                                     icon: "trophy"
                                 )
                                 menuRow(

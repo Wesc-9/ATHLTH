@@ -194,6 +194,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var chosenIDs: Set<UUID> = []
     @State private var showingParticipantChoices = false
     @State private var showingRules = false
+    @State private var finishAfterRules = false
     @State private var ruleDraft: ATHLTHTournamentDraft?
     @State private var didInitialize = false
 
@@ -275,7 +276,9 @@ struct ATHLTHCompetitionCreationView: View {
                 .accessibilityIdentifier("athlth-competition-publish")
             }
         }
-        .sheet(isPresented: $showingRules) {
+        .fullScreenCover(isPresented: $showingRules, onDismiss: {
+            if finishAfterRules { dismiss() }
+        }) {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : format == .league ? leagueStyle : .league,
                 fixedClubID: nil,
@@ -287,13 +290,13 @@ struct ATHLTHCompetitionCreationView: View {
                 initialActivity: choosesActivityInRules ? nil :
                     ATHLTHCompetitionCreationPolicy.tournamentActivity(initialActivity),
                 onBack: { ruleDraft = $0 },
-                onPublished: { _ in showingRules = false; dismiss() },
+                onPublished: { _ in finishAfterRules = true },
                 onSave: { draft in
                     var saved = ATHLTHTournamentDraftStore.load(session.profile.userID)
+                    saved.removeAll { $0.id == draft.id }
                     saved.append(draft)
                     ATHLTHTournamentDraftStore.save(saved, owner: session.profile.userID)
-                    showingRules = false
-                    dismiss()
+                    finishAfterRules = true
                 }
             )
         }

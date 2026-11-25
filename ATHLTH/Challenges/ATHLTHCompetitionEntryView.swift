@@ -79,14 +79,14 @@ struct ATHLTHCompetitionEntryView: View {
                 }
             }
         }
-        .sheet(item: $selectedFormat) { format in
+        .fullScreenCover(item: $selectedFormat) { format in
             AnyView(ATHLTHCompetitionCreationView(
                 initialActivity: .running, advanced: true,
                 initialFormat: format, preselectedFriend: preselectedFriend,
                 choosesActivityInRules: true
             ))
         }
-        .sheet(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
+        .fullScreenCover(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
             NavigationStack {
                 ATHLTHTournamentLiveDetailView(tournament: item)
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { selectedTournament = nil } } }

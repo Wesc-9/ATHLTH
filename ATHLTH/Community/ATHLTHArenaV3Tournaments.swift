@@ -453,7 +453,7 @@ struct ATHLTHTournamentCreator: View {
                 clubSeasons = []
             }
         }
-        .sheet(isPresented: $showingTemplatePicker) {
+        .fullScreenCover(isPresented: $showingTemplatePicker) {
             ATHLTHTournamentTemplatePicker { saved in
                 applyTemplate(saved)
             }
@@ -467,7 +467,7 @@ struct ATHLTHTournamentCreator: View {
         } message: {
             Text("Malen lagrer regler og øvelser, men ingen venner, invitasjoner eller gamle startdatoer.")
         }
-        .sheet(isPresented: $showingCompetitionCoach) {
+        .fullScreenCover(isPresented: $showingCompetitionCoach) {
             ATHLTHTournamentCoachWizard(
                 format: format,
                 activities: fixedActivity.map { [$0] } ??
@@ -501,7 +501,7 @@ struct ATHLTHTournamentCreator: View {
                 coachNames = proposal.exerciseNames
             }
         }
-        .sheet(isPresented: $showingSeasonCreation) {
+        .fullScreenCover(isPresented: $showingSeasonCreation) {
             if let clubID = activeClubID {
                 ATHLTHArenaSeasonCreateView(
                     clubs: clubs.filter { $0.id == clubID },

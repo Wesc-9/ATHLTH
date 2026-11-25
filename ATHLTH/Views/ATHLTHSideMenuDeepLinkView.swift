@@ -96,7 +96,7 @@ struct ATHLTHSideMenuDeepLinkView: View {
         case .challenges:
             return ATHLTHLocalization.choose(english: "Challenges", norwegian: "Utfordringer")
         case .arena:
-            return "Arena"
+            return ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse")
         case .clubs:
             return ATHLTHLocalization.choose(
                 english: "Clubs", norwegian: "Klubber"

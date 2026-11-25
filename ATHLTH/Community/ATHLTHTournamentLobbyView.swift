@@ -168,7 +168,7 @@ struct ATHLTHTournamentLobbyView: View {
                 try? await Task.sleep(for: .seconds(15))
             }
         }
-        .sheet(item: $replacementSelection) { selected in
+        .fullScreenCover(item: $replacementSelection) { selected in
             ATHLTHTournamentReplacementPicker(
                 personToReplace: selected.name
             ) { replacement in

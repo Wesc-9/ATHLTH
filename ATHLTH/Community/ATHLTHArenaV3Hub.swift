@@ -478,8 +478,8 @@ struct ATHLTHArenaV3HomeView: View {
     @State private var myTournamentIDs: Set<UUID> = []
     @State private var tournamentError: String?
     @State private var selectedFilter: ATHLTHArenaV3Filter = .active
-    @State private var showCreatePicker = false
-    @State private var creation: ATHLTHArenaV3CreateAction?
+    @State private var showingCompetitionCreation = false
+    @State private var refreshing = false
     @State private var loadError: String?
     @State private var loadedID: UUID?
     private let cloud = ATHLTHArenaCloudService()
@@ -521,7 +521,8 @@ struct ATHLTHArenaV3HomeView: View {
 
     private var visibleOfficialTournaments: [ATHLTHTournamentRemote] {
         officialTournaments.filter { item in
-            guard myTournamentIDs.contains(item.id) else { return false }
+            guard loadedID == session.profile.userID,
+                  myTournamentIDs.contains(item.id) || pendingTournamentIDs.contains(item.id) else { return false }
             switch selectedFilter {
             case .active:
                 return item.status != "completed" &&
@@ -610,24 +611,20 @@ struct ATHLTHArenaV3HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
-        .navigationTitle("Arena")
+        .navigationTitle(ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse"))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: session.profile.userID) { await reload() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
-        .confirmationDialog("Ny konkurranse", isPresented: $showCreatePicker) {
-            Button("Duell") { creation = .duel }
-            Button("Liga eller grupper") { creation = .league }
-            Button("Cup") { creation = .cup }
-            Button("Avbryt", role: .cancel) {}
-        }
-        .sheet(item: $creation, onDismiss: {
+        .refreshable { await reload() }
+        .onAppear { Task { await reload() } }
+        .fullScreenCover(isPresented: $showingCompetitionCreation, onDismiss: {
             Task { await reload() }
-        }) { action in
-            ATHLTHCompetitionEntryView(initialFormat:
-                action == .cup ? .cup :
-                action == .league ? .league : .duel
+        }) {
+            ATHLTHCompetitionCreationView(
+                initialActivity: .running, advanced: true,
+                choosesActivityInRules: true
             )
         }
     }
@@ -675,6 +672,7 @@ struct ATHLTHArenaV3HomeView: View {
                         status: pendingTournamentIDs.contains(tournament.id)
                             ? "Svar på invitasjon" :
                             tournament.status == "completed" ? "Fullført" :
+                            tournament.status == "cancelled" ? "Avlyst" :
                             tournament.status == "inviting" ? "Invitert" : "Pågår",
                         symbol: tournament.displayFormatSymbol
                     )
@@ -764,7 +762,7 @@ struct ATHLTHArenaV3HomeView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(2.2)
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
-                Text("Arena")
+                Text(ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse"))
                     .font(.system(size: 43, weight: .regular, design: .serif))
                     .foregroundStyle(ATHLTHArenaV3Style.ink)
                 Text("Alt du deltar i. På ett sted.")
@@ -781,7 +779,7 @@ struct ATHLTHArenaV3HomeView: View {
     }
 
     private var createEntry: some View {
-        Button { showCreatePicker = true } label: {
+        Button { showingCompetitionCreation = true } label: {
             HStack(spacing: 15) {
                 Image(systemName: "plus")
                     .font(.title3.weight(.medium))
@@ -790,7 +788,7 @@ struct ATHLTHArenaV3HomeView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Opprett konkurranse")
                         .font(.headline)
-                    Text("Duell, liga eller cup")
+                    Text("Duell, enkeltkonkurranse, liga eller cup")
                         .font(.caption)
                         .opacity(0.76)
                 }
@@ -866,30 +864,48 @@ struct ATHLTHArenaV3HomeView: View {
 
     @MainActor
     private func reload() async {
-        tournaments = ATHLTHTournamentDraftStore.load(session.profile.userID)
-        legacyDrafts = ATHLTHArenaDraftStorage.load(for: session.profile.userID)
+        let owner = session.profile.userID
+        guard !refreshing, session.signedIn else { return }
+        refreshing = true
+        defer {
+            refreshing = false
+            if session.signedIn && session.profile.userID != owner {
+                Task { await reload() }
+            }
+        }
+        if loadedID != owner {
+            officialTournaments = []
+            pendingTournamentIDs = []
+            myTournamentIDs = []
+            remoteSeries = []
+            tournaments = []
+            legacyDrafts = []
+            loadedID = owner
+        }
+        tournaments = ATHLTHTournamentDraftStore.load(owner)
+        legacyDrafts = ATHLTHArenaDraftStorage.load(for: owner)
         do {
             async let official = tournamentCloud.visibleTournaments()
-            async let pending = tournamentCloud.pendingInvitationIDs(
-                userID: session.profile.userID
-            )
-            async let membership = tournamentCloud.myTournamentIDs(
-                userID: session.profile.userID
-            )
-            officialTournaments = try await official
-            pendingTournamentIDs = try await pending
-            myTournamentIDs = try await membership
+            async let pending = tournamentCloud.pendingInvitationIDs(userID: owner)
+            async let membership = tournamentCloud.myTournamentIDs(userID: owner)
+            let (records, invited, memberIDs) = try await (official, pending, membership)
+            guard !Task.isCancelled, session.signedIn, session.profile.userID == owner else { return }
+            officialTournaments = records
+            pendingTournamentIDs = invited
+            myTournamentIDs = memberIDs
             tournamentError = nil
         } catch {
+            guard session.signedIn, session.profile.userID == owner else { return }
             tournamentError = "Turneringer kunne ikke oppdateres: " +
                 error.localizedDescription
         }
         do {
             let loaded = try await cloud.loadSeries()
+            guard !Task.isCancelled, session.signedIn, session.profile.userID == owner else { return }
             remoteSeries = loaded
-            loadedID = session.profile.userID
             loadError = nil
         } catch {
+            guard session.signedIn, session.profile.userID == owner else { return }
             loadError = ATHLTHLocalization.choose(
                 english: "Could not refresh the Arena competitions.",
                 norwegian: "Kunne ikke oppdatere Arena-konkurransene."
@@ -1099,7 +1115,7 @@ struct ATHLTHArenaClubTournamentSection: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
-        .sheet(isPresented: $showingCreate) {
+        .fullScreenCover(isPresented: $showingCreate) {
             ATHLTHTournamentCreator(
                 preset: .league, fixedClubID: clubID,
                 onPublished: { _ in Task { await reload() } }
@@ -1111,7 +1127,7 @@ struct ATHLTHArenaClubTournamentSection: View {
                 drafts = all.filter { $0.clubID == clubID }
             }
         }
-        .sheet(isPresented: $showingCreateSeason) {
+        .fullScreenCover(isPresented: $showingCreateSeason) {
             ATHLTHArenaSeasonCreateView(
                 clubs: manageableClubs.filter { $0.id == clubID },
                 preselectedClubID: clubID

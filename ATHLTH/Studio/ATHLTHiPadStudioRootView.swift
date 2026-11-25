@@ -813,7 +813,7 @@ struct ATHLTHiPadStudioRootView: View {
                     }
 
                     sidebarAction(
-                        "Arena", symbol: "trophy",
+                        ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse"), symbol: "trophy",
                         selected: sidebarPage == .arena
                     ) {
                         openSidebarPage(.arena)

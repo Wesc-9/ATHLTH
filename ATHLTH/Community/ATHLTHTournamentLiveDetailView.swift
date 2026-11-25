@@ -203,7 +203,7 @@ struct ATHLTHTournamentLiveDetailView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
-        .sheet(item: $nextSeasonDraft) { draft in
+        .fullScreenCover(item: $nextSeasonDraft) { draft in
             ATHLTHTournamentCreator(
                 preset: draft.format,
                 fixedClubID: draft.clubID,
@@ -232,12 +232,12 @@ struct ATHLTHTournamentLiveDetailView: View {
         } message: {
             Text(seasonNotice ?? "")
         }
-        .sheet(item: $editingExerciseDeadlines) { match in
+        .fullScreenCover(item: $editingExerciseDeadlines) { match in
             ATHLTHTournamentExerciseDeadlineEditor(match: match) {
                 await reload()
             }
         }
-        .sheet(item: $showingMatchReport) { match in
+        .fullScreenCover(item: $showingMatchReport) { match in
             ATHLTHTournamentMatchReportView(match: match, names: names) {
                 home, away, note in
                 try await cloud.propose(

@@ -79,7 +79,7 @@ struct ATHLTHiPadSidebarPageView: View {
                 english: "Train Together", norwegian: "Tren sammen"
             )
         case .arena:
-            return "Arena"
+            return ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse")
         case .ghostRace:
             return "Ghost Race"
         case .profile:
