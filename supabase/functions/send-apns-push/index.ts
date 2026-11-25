@@ -179,6 +179,12 @@ function localizedAlert(
   actorName?: string | null,
   actorUnreadCount = 1,
 ): { title: string; body: string } {
+  if (event.kind === "account_new_sign_in") {
+    return languageCode === "nb" ? {
+      title: "Ny innlogging i ATHLTH",
+      body: "Hvis det ikke var deg, sjekk innloggede enheter under Konto og sikkerhet.",
+    } : { title: event.title, body: event.message };
+  }
   const isPlusGrant = event.kind === "athlth_plus_granted";
   if (isPlusGrant) {
     if (languageCode !== "nb") {
@@ -673,7 +679,8 @@ Deno.serve(async (req: Request) => {
     event.title === "Event cancelled";
   // A paid feature access change is an account notice, not social activity.
   // Friend, message and challenge notification mutes must not suppress it.
-  const mandatoryPlusGrant = event.kind === "athlth_plus_granted";
+  const mandatoryPlusGrant = event.kind === "athlth_plus_granted" ||
+    event.kind === "account_new_sign_in";
 
   if (
     !mandatoryCommunityEventCancellation &&
