@@ -89,6 +89,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
     @State private var showingSpotifyControls = false
+    @State private var showingLiveAddActions = false
     @State private var showingStrengthAudioCoachSettings = false
     @State private var showingNextExerciseDetails = false
     @State private var showingOmitRemainingSetsConfirmation = false
@@ -807,6 +808,8 @@ struct ActiveStrengthWorkoutView: View {
                         spotifyExpanded: showingSpotifyControls,
                         addEnabled: !finishInProgress,
                         finishDisabled: finishInProgress,
+                        anchorsLiveAddMenu: true,
+                        liveAddMenuExpanded: showingLiveAddActions,
                         onOverview: { showingExerciseQueue = true },
                         onMinimize: {
                             strength.checkpoint()
@@ -818,8 +821,9 @@ struct ActiveStrengthWorkoutView: View {
                             }
                         },
                         onAdd: {
-                            guard strength.activeWorkout?.id == workout.id, !finishInProgress else { return }
-                            showingAppendWorkout = true
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+                                showingLiveAddActions.toggle()
+                            }
                         },
                         onFinish: { showingFinishConfirmation = true }
                     )
@@ -867,8 +871,46 @@ struct ActiveStrengthWorkoutView: View {
                 strengthLiveDock(workout: workout)
             }
         }
+        .overlayPreferenceValue(ATHLTHLiveAddMenuAnchor.self) { anchor in
+            if showingLiveAddActions, let anchor, let workoutID = strength.activeWorkout?.id {
+                GeometryReader { geometry in
+                    let frame = ATHLTHLiveAddMenuLayout.frame(
+                        anchor: geometry[anchor], container: geometry.size)
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { closeLiveAddMenu() }
+                            .accessibilityHidden(true)
+                        ATHLTHLiveAddMenu(
+                            actions: [.exercise, .workout],
+                            onSelect: { action in
+                                showingLiveAddActions = false
+                                guard strength.activeWorkout?.id == workoutID,
+                                      !finishInProgress else { return }
+                                switch action {
+                                case .exercise: showingExerciseLibrary = true
+                                case .workout: showingAppendWorkout = true
+                                case .reorder: return
+                                }
+                            },
+                            onClose: { closeLiveAddMenu() }
+                        )
+                        .frame(width: frame.width)
+                        .frame(maxHeight: frame.height, alignment: .top)
+                        .offset(x: frame.minX, y: frame.minY)
+                        .transition(.opacity)
+                    }
+                }
+            }
+        }
+        .onChange(of: strength.activeWorkout?.id) { _, _ in
+            showingLiveAddActions = false
+        }
         .onChange(of: finishInProgress) { _, finishing in
-            if finishing { showingSpotifyControls = false }
+            if finishing {
+                showingLiveAddActions = false
+                showingSpotifyControls = false
+            }
         }
         // A strength workout is a true full-screen surface. Spotify can
         // temporarily move ATHLTH to the background while App Remote wakes the
@@ -894,6 +936,12 @@ struct ActiveStrengthWorkoutView: View {
         .presentationBackground(
             ATHLTHTheme.canvasTop
         )
+    }
+
+    private func closeLiveAddMenu() {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+            showingLiveAddActions = false
+        }
     }
 
     @MainActor
