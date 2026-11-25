@@ -219,16 +219,16 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
                 // Do not claim an incomplete upload is fully synchronized.
                 lastSuccessfulSync = nil
                 lastSyncedLocalCount = -1
-                status = "\(pendingUploads) completed workouts will retry sync. " +
+                status = ATHLTHLocalization.choose(english: "\(pendingUploads) completed workouts will retry sync. ", norwegian: "\(pendingUploads) fullførte økter venter på nytt synkroniseringsforsøk. ") +
                     "\(added) received."
             } else {
                 lastSuccessfulSync = Date()
                 lastSyncedLocalCount = strength.workoutHistory.count
-                status = "Training history synced. \(added) new workouts received."
+                status = ATHLTHLocalization.choose(english: "Training history synced. \(added) new workouts received.", norwegian: "Treningshistorikk synkronisert. \(added) nye økter mottatt.")
             }
         } catch {
             if accountID == session.profile.userID {
-                status = "Offline or sync unavailable; local workouts remain safe. " +
+                status = ATHLTHLocalization.choose(english: "Offline or sync unavailable; local workouts remain safe. ", norwegian: "Synkronisering er utilgjengelig. Lokale økter er bevart. ") +
                     error.localizedDescription
             }
         }
