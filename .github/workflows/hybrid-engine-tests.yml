@@ -383,6 +383,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHPlannedHeartRatePreviewTests \
             -only-testing:ATHLTHTests/ATHLTHQuickRunTimelineAdapterTests \
             -only-testing:ATHLTHTests/ATHLTHPlanWorkoutCardPresentationTests \
+            -only-testing:ATHLTHTests/ATHLTHSimpleWorkoutOutlineTests \
             -only-testing:ATHLTHTests/ATHLTHHomeWorkoutComposerRecoveryTests \
             CODE_SIGNING_ALLOWED=NO \
             test
