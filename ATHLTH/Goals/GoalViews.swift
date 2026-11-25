@@ -616,8 +616,8 @@ private struct GoalAchievementBanner: View {
 private struct GoalFollowUpSheet: View {
     let goal: ATHLTHGoal
     var body: some View {
-        if goal.bodyMeasurementGoal != nil {
-            ATHLTHBodyGoalCreationView()
+        if let measurement = goal.bodyMeasurementGoal {
+            ATHLTHBodyGoalCreationView(previousMeasurement: measurement)
         } else {
             GoalCreationView(initialCategory: goal.category, initialTitle: goal.title, previousGoal: goal)
         }
@@ -742,6 +742,9 @@ struct GoalDetailView: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingAddMilestone = false
     @State private var showingEditGoal = false
+    @State private var showAchievementCelebration = false
+    @State private var detailFollowUpGoal: ATHLTHGoal?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var measurementProfile = ATHLTHTrainingProfile()
 
     private var goal: ATHLTHGoal? {
@@ -806,6 +809,23 @@ struct GoalDetailView: View {
                     .padding(.bottom, 30)
                 }
                 .scrollIndicators(.hidden)
+                .onChange(of: goal.status) { old, new in
+                    if old != .completed && new == .completed {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { showAchievementCelebration = true }
+                    }
+                }
+                .overlay(alignment: .top) {
+                    if showAchievementCelebration {
+                        GoalAchievementBanner(goal: goal) { showAchievementCelebration = false }
+                            .padding(16)
+                            .transition(.opacity)
+                            .task {
+                                try? await Task.sleep(for: .seconds(4))
+                                guard !Task.isCancelled else { return }
+                                withAnimation(reduceMotion ? nil : .easeOut) { showAchievementCelebration = false }
+                            }
+                    }
+                }
                 .contentMargins(
                     .top,
                     0,
@@ -856,6 +876,15 @@ struct GoalDetailView: View {
                                 showingAddMilestone = true
                             }
                             }
+                            if goal.isAchievement {
+                                Button(ATHLTHLocalization.choose(english: "Build on this goal", norwegian: "Bygg videre på målet"), systemImage: "arrow.up.right.circle") { detailFollowUpGoal = goal }
+                                ShareLink(item: ATHLTHLocalization.choose(english: "I achieved a goal in ATHLTH!", norwegian: "Jeg nådde et mål i ATHLTH!")) {
+                                    Label(ATHLTHLocalization.choose(english: "Share achievement", norwegian: "Del prestasjon"), systemImage: "square.and.arrow.up")
+                                }
+                                if goal.status == .completed {
+                                    Button(ATHLTHLocalization.choose(english: "Archive", norwegian: "Arkiver"), systemImage: "archivebox") { goalStore.setStatus(.abandoned, for: goal.id) }
+                                }
+                            }
 
                             Divider()
 
@@ -881,10 +910,11 @@ struct GoalDetailView: View {
                     )
                 }
                 .onAppear {
-                    if openMeasurementCheckIn && goal.bodyMeasurementGoal != nil {
+                    if openMeasurementCheckIn && !goal.isAchievement && goal.status != .abandoned && goal.bodyMeasurementGoal != nil {
                         showingMeasurementCheckIn = true
                     }
                 }
+                .sheet(item: $detailFollowUpGoal) { GoalFollowUpSheet(goal: $0) }
                 .sheet(isPresented: $showingMeasurementCheckIn) {
                     ATHLTHBodyGoalCheckInView(goal: goal)
                 }
@@ -1041,7 +1071,10 @@ struct GoalDetailView: View {
                         alignment: .leading
                     )
 
-                if let deadline =
+                if goal.isAchievement {
+                    Label(ATHLTHLocalization.choose(english: "Goal achieved", norwegian: "Mål oppnådd"), systemImage: "trophy.fill")
+                        .font(.subheadline.weight(.semibold))
+                } else if let deadline =
                     goal.deadline {
                     HStack(spacing: 6) {
                         Image(

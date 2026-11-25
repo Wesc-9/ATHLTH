@@ -20,6 +20,16 @@ struct ATHLTHBodyGoalCreationView: View {
     @State private var enableNotifications = true
     @State private var errorMessage: String?
 
+    init(onCreated: (() -> Void)? = nil, previousMeasurement: ATHLTHBodyGoalConfiguration? = nil) {
+        self.onCreated = onCreated
+        if let previousMeasurement {
+            _metric = State(initialValue: previousMeasurement.metric)
+            _baselineText = State(initialValue: String(previousMeasurement.target))
+            _interval = State(initialValue: previousMeasurement.checkInIntervalDays)
+            _enableNotifications = State(initialValue: previousMeasurement.notificationsEnabled)
+        }
+    }
+
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
