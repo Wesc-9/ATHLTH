@@ -5587,6 +5587,7 @@ struct ATHLTHTrainView: View {
     @State private var selectedStructuredWorkout:
         PlannedSession?
     @State private var showingGhostHub = false
+    @State private var showingCompetitionHub = false
     @State private var showingLibrary = false
     @State private var showingAllWorkoutCategories = false
     @State private var pendingWorkoutCategoryAction: ATHLTHTrainAllWorkoutCategoriesSheet.Action?
@@ -5779,6 +5780,10 @@ struct ATHLTHTrainView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
         }
+        .sheet(isPresented: $showingCompetitionHub.keepingPresentedWhenInactive(scenePhase)) {
+            AnyView(ATHLTHCompetitionEntryView())
+        }
+        .athlthStablePresentationBoundary()
         .sheet(item: $selectedTrainCompetitionActivity.keepingPresentedItemWhenInactive(scenePhase)) { activity in
             switch activity {
             case .running:
@@ -7570,7 +7575,8 @@ struct ATHLTHTrainView: View {
             onQuickCycling: { startCyclingQuick() },
             onQuickCustom: { activity in startCustomQuick(as: activity) },
             onQuickFreeTraining: { startFreeTrainingQuick() },
-            onGhostRace: { showingGhostHub = true }
+            onGhostRace: { showingGhostHub = true },
+            onCompetition: { showingCompetitionHub = true }
             )
             .onAppear {
                 recordTrainDashboardSmokeReadiness()

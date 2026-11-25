@@ -25,9 +25,9 @@ enum ATHLTHQuickStartActivity: Hashable, Identifiable {
 
     var types: [ATHLTHQuickStartType] {
         switch self {
-        case .running: return [.free, .route, .workout, .competition]
-        case .walking: return [.free, .route, .competition]
-        case .strength: return [.free, .workout, .exercises, .competition]
+        case .running: return [.free, .route, .workout]
+        case .walking: return [.free, .route]
+        case .strength: return [.free, .workout, .exercises]
         }
     }
 

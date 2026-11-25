@@ -4,11 +4,11 @@ import XCTest
 final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
     func testActivityTypeChoicesAreSharedAcrossBasicAndAdvanced() {
         XCTAssertEqual(ATHLTHQuickStartActivity.running.types,
-                       [.free, .route, .workout, .competition])
+                       [.free, .route, .workout])
         XCTAssertEqual(ATHLTHQuickStartActivity.walking.types,
-                       [.free, .route, .competition])
+                       [.free, .route])
         XCTAssertEqual(ATHLTHQuickStartActivity.strength.types,
-                       [.free, .workout, .exercises, .competition])
+                       [.free, .workout, .exercises])
     }
 
     func testStrengthNeverOffersWalkingCompanion() {

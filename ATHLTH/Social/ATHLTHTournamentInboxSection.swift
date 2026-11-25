@@ -54,7 +54,7 @@ struct ATHLTHTournamentInboxSection: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                             Text(pendingIDs.contains(tournament.id)
-                                 ? "Invitasjon · Godta eller avslå"
+                                 ? "Invitasjon · " + tournament.selectedBranchesLabel
                                  : recentText[tournament.id] ??
                                    "Konkurransechat · \(tournament.displayFormatTitle)")
                                 .font(.caption)

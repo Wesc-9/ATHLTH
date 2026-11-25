@@ -102,6 +102,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onQuickCustom: (CustomQuickWorkoutActivity) -> Void
     let onQuickFreeTraining: () -> Void
     let onGhostRace: () -> Void
+    let onCompetition: () -> Void
 
     @State private var quickActivityTapCounts: [String: Int] = [:]
     @State private var temporarilyFeaturedGoalID: UUID?
@@ -200,6 +201,8 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
             ATHLTHTrainDeferredContent { AnyView(quickTrainSection) }
             if diagnosticStage >= 4 {
+                ATHLTHTrainDeferredContent { AnyView(competitionSection) }
+                    .frame(maxWidth: .infinity)
                 ATHLTHTrainDeferredContent { AnyView(ghostRaceSection) }
                     .frame(maxWidth: .infinity)
                 ATHLTHTrainDeferredContent { AnyView(additionalWorkoutOptions) }
@@ -1191,6 +1194,58 @@ struct ATHLTHTrainTodayPremiumView: View {
                 in: Circle()
             )
             .accessibilityHidden(true)
+    }
+
+    private var competitionSection: some View {
+        Button(action: onCompetition) {
+            ZStack(alignment: .leading) {
+                GeometryReader { imageGeometry in
+                    Image("ATHLTHTrackRace")
+                        .resizable()
+                        .scaledToFill()
+                        .saturation(0.25)
+                        .frame(
+                            width: imageGeometry.size.width,
+                            height: 79
+                        )
+                        .clipped()
+                        .allowsHitTesting(false)
+                }
+                .frame(height: 79)
+                .allowsHitTesting(false)
+                LinearGradient(
+                    colors: [
+                        ATHLTHTrainDesign.bronze.opacity(0.95),
+                        Color.black.opacity(0.35)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .allowsHitTesting(false)
+                HStack(spacing: 13) {
+                    Image(systemName: "trophy")
+                        .font(.system(size: 19, weight: .medium))
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Competition", "Konkurranse"))
+                            .font(.system(size: 17, weight: .medium, design: .serif))
+                        Text(tr("Challenge friends. Compete together.", "Utfordre venner. Konkurrer sammen."))
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(15)
+            }
+            .frame(height: 79)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-train-competition-entry")
     }
 
     private var ghostRaceSection: some View {

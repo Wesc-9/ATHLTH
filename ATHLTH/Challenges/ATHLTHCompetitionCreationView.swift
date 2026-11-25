@@ -180,6 +180,10 @@ struct ATHLTHCompetitionCreationView: View {
     var preselectedFriend: SocialProfileCard? = nil
     var preselectedRoute: TrainingRoute? = nil
     var preselectedDistanceKM: Double? = nil
+    var choosesActivityInRules = false
+
+    @State private var selectedDuelActivity: ATHLTHQuickStartActivity?
+    private var activeActivity: ATHLTHQuickStartActivity { selectedDuelActivity ?? initialActivity }
 
     @State private var format: ATHLTHCompetitionFormat = .duel
     @State private var leagueStyle: ATHLTHTournamentFormat = .league
@@ -306,13 +310,14 @@ struct ATHLTHCompetitionCreationView: View {
     }
 
     private var isValid: Bool {
+        (!choosesActivityInRules || format != .duel || selectedDuelActivity != nil) &&
         ATHLTHCompetitionCreationPolicy.canPublish(
             name: competitionTitle,
             ownerID: session.profile.userID,
             opponents: chosenIDs,
             format: format,
             metric: effectiveDuelMetric,
-            activity: initialActivity,
+            activity: activeActivity,
             distanceKM: effectiveDuelDistance,
             durationMinutes: effectiveDuelMinutes,
             exerciseName: exerciseName,
@@ -335,14 +340,16 @@ struct ATHLTHCompetitionCreationView: View {
                         competitionRules.id("rules")
                     } else {
                         competitionDetails.id("details")
-                        titleBlock(tr("Competition format", "Konkurranseform"))
-                            .id("format-heading")
-                        VStack(spacing: 9) {
-                            ForEach(ATHLTHCompetitionFormat.allCases) { option in
-                                formatOption(option)
+                        if !choosesActivityInRules {
+                            titleBlock(tr("Competition format", "Konkurranseform"))
+                                .id("format-heading")
+                            VStack(spacing: 9) {
+                                ForEach(ATHLTHCompetitionFormat.allCases) { option in
+                                    formatOption(option)
+                                }
                             }
+                            .id("formats")
                         }
-                        .id("formats")
                     if initialFormat == nil || initialFormat != .duel {
                         Button {
                             showingSavedCompetitionTemplates = true
@@ -368,7 +375,7 @@ struct ATHLTHCompetitionCreationView: View {
                         .accessibilityIdentifier("athlth-competition-load-template")
                         .id("template")
                     }
-                        if initialActivity == .running && format == .duel && !advanced {
+                        if activeActivity == .running && format == .duel && !advanced {
                             sprintSection.id("sprint")
                         }
                         if !advanced {
@@ -470,8 +477,8 @@ struct ATHLTHCompetitionCreationView: View {
         .sheet(isPresented: $showingSavedCompetitionTemplates) {
             ATHLTHTournamentTemplatePicker { selected in
                 let fixedSport = ATHLTHCompetitionCreationPolicy
-                    .tournamentActivity(initialActivity)
-                guard selected.allowedActivities.contains(fixedSport) else {
+                    .tournamentActivity(activeActivity)
+                guard choosesActivityInRules || selected.allowedActivities.contains(fixedSport) else {
                     errorMessage = "Denne malen gjelder en annen treningsform."
                     restoredCompetitionTemplate = nil
                     return
@@ -497,8 +504,8 @@ struct ATHLTHCompetitionCreationView: View {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : leagueStyle,
                 fixedClubID: nil,
-                fixedActivity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
-                    initialActivity
+                fixedActivity: choosesActivityInRules ? nil : ATHLTHCompetitionCreationPolicy.tournamentActivity(
+                    activeActivity
                 ),
                 singleEventMode: format == .single,
                 initialTitle: competitionTitle,
@@ -533,7 +540,7 @@ struct ATHLTHCompetitionCreationView: View {
             didInitialize = true
             format = initialFormat ?? .duel
             scoring = ATHLTHCompetitionCreationPolicy.defaultScoring(
-                for: initialActivity
+                for: activeActivity
             )
             if let preselectedDistanceKM,
                preselectedDistanceKM.isFinite,
@@ -548,17 +555,17 @@ struct ATHLTHCompetitionCreationView: View {
             if let preselectedFriend, preselectedFriend.userID != session.profile.userID {
                 chosenIDs.insert(preselectedFriend.userID)
             }
-            if advanced && initialActivity != .strength {
+            if advanced && !choosesActivityInRules && activeActivity != .strength {
                 duelRaceSettings.race.discipline = .distance
                 duelRaceSettings.race.targetDistanceMeters =
                     Int(max(100, distanceKM * 1_000))
-                if let route = preselectedRoute, initialActivity == .running {
+                if let route = preselectedRoute, activeActivity == .running {
                     duelRaceSettings.race.discipline = .workout
                     chosenRoute = route
                 }
             }
             if competitionTitle.isEmpty {
-                competitionTitle = "\(format.title) · \(initialActivity.title)"
+                competitionTitle = choosesActivityInRules ? format.title : "\(format.title) · \(activeActivity.title)"
             }
         }
         .task {
@@ -584,7 +591,7 @@ struct ATHLTHCompetitionCreationView: View {
             chosenIDs = ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
                 chosenIDs, format: option, preferred: preselectedFriend?.userID
             )
-            competitionTitle = "\(option.title) · \(initialActivity.title)"
+            competitionTitle = "\(option.title) · \(activeActivity.title)"
             errorMessage = nil
         } label: {
             HStack(spacing: 13) {
@@ -709,8 +716,8 @@ struct ATHLTHCompetitionCreationView: View {
 
     private var competitionDetails: some View {
         ATHLTHWorkoutDetailsCard(
-            activityTitle: initialActivity.title,
-            symbol: initialActivity.symbol,
+            activityTitle: choosesActivityInRules ? format.title : activeActivity.title,
+            symbol: choosesActivityInRules ? format.symbol : activeActivity.symbol,
             showsTimingLabel: false
         ) {
             Label(format.title, systemImage: format.symbol)
@@ -888,20 +895,20 @@ struct ATHLTHCompetitionCreationView: View {
             titleBlock(tr("The challenge", "Konkurransen"))
             let preset: String = {
                 if format == .duel {
-                    switch initialActivity {
+                    switch activeActivity {
                     case .running: return "Løp 5 km"
                     case .walking: return "Gå lengst"
                     case .strength: return "Størst treningsvolum"
                     }
                 }
-                switch initialActivity {
+                switch activeActivity {
                 case .running: return "Løp 5 km"
                 case .walking: return "Gå 5 km"
                 case .strength: return "Knebøy · flest repetisjoner"
                 }
             }()
             HStack(spacing: 10) {
-                Image(systemName: initialActivity.symbol)
+                Image(systemName: activeActivity.symbol)
                     .font(.system(size: 22, weight: .light))
                     .foregroundStyle(bronze)
                 VStack(alignment: .leading, spacing: 4) {
@@ -937,12 +944,15 @@ struct ATHLTHCompetitionCreationView: View {
     private var competitionRules: some View {
         VStack(alignment: .leading, spacing: 13) {
             titleBlock(tr("Rules", "Regler"))
-            if format == .duel && advanced {
+            if choosesActivityInRules && format == .duel {
+                duelActivityPicker
+            }
+            if format == .duel && advanced && (!choosesActivityInRules || selectedDuelActivity != nil) {
                 ATHLTHCompetitionRaceRulesSection(
                     settings: $duelRaceSettings,
                     activities: Set([
                         ATHLTHCompetitionCreationPolicy.tournamentActivity(
-                            initialActivity
+                            activeActivity
                         )
                     ])
                 )
@@ -1000,7 +1010,7 @@ struct ATHLTHCompetitionCreationView: View {
                         value: $durationMinutes, in: 1...240, step: 5
                     )
                     .font(.subheadline)
-                } else if initialActivity == .strength &&
+                } else if activeActivity == .strength &&
                             scoring != .workoutVolume {
                     TextField(tr("Which exercise?", "Hvilken øvelse?"),
                               text: $exerciseName)
@@ -1044,7 +1054,7 @@ struct ATHLTHCompetitionCreationView: View {
             }
 
             if advanced {
-                if format == .duel && initialActivity != .strength {
+                if format == .duel && activeActivity != .strength {
                     HStack(spacing: 8) {
                         Text(tr("Race route", "Konkurranserute"))
                             .font(.subheadline)
@@ -1125,6 +1135,35 @@ struct ATHLTHCompetitionCreationView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
+    private var duelActivityPicker: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Velg gren").font(ATHLTHTrainDesign.cardTitle)
+            Text("En duell har én resultatmåling. Velg én gren.")
+                .font(.caption).foregroundStyle(muted)
+            ForEach([ATHLTHQuickStartActivity.running, .walking, .strength]) { activity in
+                Button {
+                    selectedDuelActivity = activity
+                    scoring = ATHLTHCompetitionCreationPolicy.defaultScoring(for: activity)
+                    runningBranch = .running
+                    chosenRoute = nil
+                    exerciseName = ""
+                    duelRaceSettings.race = .init()
+                    duelRaceSettings.race.discipline = activity == .strength ? .workout : .distance
+                    competitionTitle = "Duell · " + activity.title
+                } label: {
+                    HStack {
+                        Label(activity.title, systemImage: activity.symbol)
+                        Spacer()
+                        Image(systemName: selectedDuelActivity == activity ? "checkmark.circle.fill" : "circle")
+                    }
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(bronze)
+                    .padding(12).athlthTrainEditorialCard(compact: true, selected: selectedDuelActivity == activity)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var duelAgreementEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Hva er lov og ikke lov?")
@@ -1149,7 +1188,7 @@ struct ATHLTHCompetitionCreationView: View {
     }
 
     private var duelMetrics: [ATHLTHChallengeScoring] {
-        switch initialActivity {
+        switch activeActivity {
         case .running, .walking:
             [.fastestDistance, .mostDistance, .farthestInTime] +
                 (chosenRoute == nil ? [] : [.fastestRoute])
@@ -1190,7 +1229,7 @@ struct ATHLTHCompetitionCreationView: View {
         if challenges.visibleChallenges.contains(where: {
             $0.creatorID == session.profile.userID &&
             $0.status != .completed && $0.status != .cancelled &&
-            $0.sport == ATHLTHCompetitionCreationPolicy.sport(initialActivity) &&
+            $0.sport == ATHLTHCompetitionCreationPolicy.sport(activeActivity) &&
             $0.title.localizedCaseInsensitiveCompare(competitionTitle)
                 == .orderedSame &&
             $0.participants.contains { $0.userID == rival.userID }
@@ -1208,7 +1247,7 @@ struct ATHLTHCompetitionCreationView: View {
             } : nil
         var rules = ATHLTHChallengeRules(
             scoring: duelMetric,
-            verificationPolicy: initialActivity == .strength
+            verificationPolicy: activeActivity == .strength
                 ? .manualAllowed : .verifiedRequired,
             targetDistanceMeters: duelMetric == .fastestDistance
                 ? effectiveDuelDistance * 1_000 : nil,
@@ -1216,9 +1255,9 @@ struct ATHLTHCompetitionCreationView: View {
                 ? effectiveDuelMinutes * 60 : nil,
             timeBasis: .elapsed,
             route: routeSnapshot,
-            gpsRequired: initialActivity != .strength,
+            gpsRequired: activeActivity != .strength,
             minimumRouteMatchPercent: routeSnapshot == nil ? nil : 90,
-            exerciseName: initialActivity == .strength &&
+            exerciseName: activeActivity == .strength &&
                 scoring != .workoutVolume ? exerciseName : nil,
             fixedWeightKilograms: nil,
             allowedActions: duelAgreement.allowed.isEmpty
@@ -1237,7 +1276,7 @@ struct ATHLTHCompetitionCreationView: View {
         )
         if advanced {
             rules.competitionRace = duelRaceSettings.race
-        } else if initialActivity == .running && runningBranch == .sprint {
+        } else if activeActivity == .running && runningBranch == .sprint {
             var quickSprint = ATHLTHCompetitionRaceRules()
             quickSprint.discipline = .sprint
             quickSprint.sprintTarget =
@@ -1265,7 +1304,7 @@ struct ATHLTHCompetitionCreationView: View {
             creatorID: session.profile.userID,
             title: String(competitionTitle.trimmingCharacters(
                 in: .whitespacesAndNewlines).prefix(80)),
-            sport: ATHLTHCompetitionCreationPolicy.sport(initialActivity),
+            sport: ATHLTHCompetitionCreationPolicy.sport(activeActivity),
             participants: [creator, opponent],
             rules: rules,
             visibility: .privateOnly
@@ -1297,7 +1336,7 @@ struct ATHLTHCompetitionCreationView: View {
             let attachment = try MessageShareDraft(
                 kind: .challenge,
                 title: challenge.title,
-                subtitle: "Duell · \(initialActivity.title)",
+                subtitle: "Duell · Valgt gren: \(activeActivity.title)",
                 snapshot: challenge,
                 sourceObjectID: challenge.id,
                 sourceOwnerID: session.profile.userID,
@@ -1305,7 +1344,7 @@ struct ATHLTHCompetitionCreationView: View {
             )
             _ = await messaging.send(
                 to: rival.userID, conversationID: conversationID,
-                body: "Invitasjon til duell: \(challenge.title)",
+                body: "Invitasjon til duell: \(challenge.title)\nValgt gren: \(activeActivity.title)",
                 attachment: attachment
             )
         } catch {
@@ -1326,7 +1365,7 @@ struct ATHLTHCompetitionCreationView: View {
                 _ = try await ATHLTHTournamentCloudService().createSimpleSingleEvent(
                     title: competitionTitle,
                     activity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
-                        initialActivity
+                        activeActivity
                     ),
                     invitees: selectedPeople.map(\.userID),
                     startsAt: simpleStartLater ? startsAt : nil
@@ -1337,7 +1376,7 @@ struct ATHLTHCompetitionCreationView: View {
                 title: competitionTitle,
                 format: format == .cup ? .cup : .league,
                 activity: ATHLTHCompetitionCreationPolicy.tournamentActivity(
-                    initialActivity
+                    activeActivity
                 ),
                 invitees: selectedPeople.map(\.userID),
                 startsAt: simpleStartLater ? startsAt : nil
@@ -1367,7 +1406,7 @@ struct ATHLTHCompetitionCreationView: View {
             participants: athletes,
             allowedActivities: [
                 ATHLTHCompetitionCreationPolicy.tournamentActivity(
-                    initialActivity
+                    activeActivity
                 )
             ],
             cadenceDays: roundsPerWeek,

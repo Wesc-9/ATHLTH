@@ -74,11 +74,11 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         XCTAssertNil(ATHLTHCompetitionCreationPolicy.quickStartActivity(for: .custom))
     }
 
-    func testCompetitionWorkoutTypeIsAlwaysAvailable() {
+    func testCompetitionHasOwnEntryInsteadOfQuickStart() {
         for sport in [
             ATHLTHQuickStartActivity.running, .walking, .strength
         ] {
-            XCTAssertTrue(sport.types.contains(.competition))
+            XCTAssertFalse(sport.types.contains(.competition))
         }
         XCTAssertEqual(ATHLTHCompetitionFormat.allCases.count, 4)
     }

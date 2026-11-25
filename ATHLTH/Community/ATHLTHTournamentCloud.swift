@@ -63,6 +63,12 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let prizeThird: String
     let loserConsequence: String
 
+    var selectedBranchesLabel: String {
+        let titles = ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title)
+        guard !titles.isEmpty else { return "Gren ikke angitt" }
+        return "Valgt gren: " + titles.joined(separator: " og ")
+    }
+
     var displayFormatTitle: String {
         singleEventMode ? "Enkeltkonkurranse" : format.title
     }
