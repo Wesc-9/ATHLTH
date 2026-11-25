@@ -342,6 +342,11 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
+        // Flush an outstanding set/exercise edit before changing ownership.
+        // Otherwise the 350 ms debounce can discard the athlete's last set.
+        if activeWorkout != nil, checkpointSaveTask != nil {
+            persistCheckpointNow()
+        }
         checkpointSaveTask?.cancel()
         checkpointSaveTask = nil
         loadingAccount = true
@@ -404,8 +409,16 @@ final class StrengthWorkoutStore: ObservableObject {
                     checkpoint?.savedAt ??
                     activeWorkout?.startedAt
                 )
-        currentExerciseIndex = checkpoint?.exerciseIndex ?? 0
-        currentSetIndex = checkpoint?.setIndex ?? 0
+        // Bound restored indices to the actual recovered exercise list. A
+        // stale index after editing/deleting an exercise must not strand Train.
+        if let workout = activeWorkout, !workout.exercises.isEmpty {
+            currentExerciseIndex = min(max(0, checkpoint?.exerciseIndex ?? 0), workout.exercises.count - 1)
+            let sets = workout.exercises[currentExerciseIndex].sets
+            currentSetIndex = min(max(0, checkpoint?.setIndex ?? 0), max(0, sets.count - 1))
+        } else {
+            currentExerciseIndex = 0
+            currentSetIndex = 0
+        }
         restEndsAt = checkpoint?.restEndsAt
         restStartedAt =
             checkpoint?.restStartedAt
@@ -555,7 +568,8 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     private func persistCheckpointNow() {
-        guard let accountID, !loadingAccount else { return }
+        guard let accountID, !loadingAccount,
+              !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: accountID)) else { return }
 
         checkpointSaveTask?.cancel()
         checkpointSaveTask = nil
