@@ -12075,6 +12075,146 @@ private struct StrengthActiveExerciseQueueView: View {
     }
 }
 
+private struct StrengthQueueSetEdit: Identifiable {
+    let exerciseID: UUID
+    let set: StrengthSetLog
+    var id: UUID { set.id }
+}
+
+private struct StrengthQueueBatchPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let exercise: StrengthExerciseLog
+    let onSave: (Set<UUID>) -> Void
+    @State private var selection: Set<UUID> = []
+
+    var body: some View {
+        NavigationStack {
+            List(exercise.sets.filter { !$0.isResolved }) { set in
+                Button {
+                    if selection.contains(set.id) { selection.remove(set.id) }
+                    else { selection.insert(set.id) }
+                } label: {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(english: "Set \(set.setNumber)", norwegian: "Sett \(set.setNumber)"))
+                        Spacer()
+                        Text(set.resolvedTargetKind == .time
+                             ? TimeInterval(set.plannedDurationSeconds ?? 0).clockDuration
+                             : "\(set.plannedReps ?? 0) reps")
+                            .foregroundStyle(.secondary)
+                        Image(systemName: selection.contains(set.id) ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                .buttonStyle(.plain)
+            }
+            .navigationTitle(exercise.exercise.displayName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Queue (\(selection.count))", norwegian: "Legg i kø (\(selection.count))")) {
+                        onSave(selection)
+                    }
+                    .disabled(selection.isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+private struct StrengthQueueSetEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let target: StrengthQueueSetEdit
+    let onSave: (Int?, Int?, Double?, Int, Int?) -> Void
+    @State private var reps: Int
+    @State private var duration: Int
+    @State private var weight: Double
+    @State private var rest: Int
+    @State private var resistance: Int
+
+    init(target: StrengthQueueSetEdit, onSave: @escaping (Int?, Int?, Double?, Int, Int?) -> Void) {
+        self.target = target
+        self.onSave = onSave
+        _reps = State(initialValue: min(max(target.set.plannedReps ?? 8, 1), 1000))
+        _duration = State(initialValue: min(max(target.set.plannedDurationSeconds ?? 60, 1), 7200))
+        _weight = State(initialValue: min(max(target.set.plannedWeightKilograms ?? 0, 0), 999.5))
+        _rest = State(initialValue: min(max(target.set.restSeconds ?? 90, 0), 600))
+        _resistance = State(initialValue: min(max(target.set.plannedResistanceLevel ?? 5, 1), 10))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if target.set.resolvedTargetKind == .reps {
+                    Stepper(ATHLTHLocalization.choose(english: "\(reps) repetitions", norwegian: "\(reps) repetisjoner"), value: $reps, in: 1...1000)
+                } else {
+                    Stepper(ATHLTHLocalization.choose(english: "Duration: \(duration) sec", norwegian: "Varighet: \(duration) sek"), value: $duration, in: 1...7200)
+                }
+                if target.set.resolvedLoadKind == .weightKilograms {
+                    Stepper(value: $weight, in: 0...999.5, step: 0.5) {
+                        Text(String(format: "%.1f kg", weight))
+                    }
+                } else if target.set.resolvedLoadKind == .resistanceLevel {
+                    Stepper(ATHLTHLocalization.choose(english: "Resistance: \(resistance)", norwegian: "Motstand: \(resistance)"), value: $resistance, in: 1...10)
+                }
+                Stepper(ATHLTHLocalization.choose(english: "Rest: \(rest) sec", norwegian: "Pause: \(rest) sek"), value: $rest, in: 0...600)
+            }
+            .navigationTitle(ATHLTHLocalization.choose(english: "Edit set", norwegian: "Rediger sett"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
+                        onSave(reps, duration, weight, rest, resistance)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+private struct StrengthQueueGroupRestEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let exercise: StrengthExerciseLog
+    let onSave: (Int, Int) -> Void
+    @State private var station: Int
+    @State private var round: Int
+
+    init(exercise: StrengthExerciseLog, onSave: @escaping (Int, Int) -> Void) {
+        self.exercise = exercise
+        self.onSave = onSave
+        _station = State(initialValue: min(max(exercise.groupStationRestSeconds ?? 0, 0), 600))
+        _round = State(initialValue: min(max(exercise.groupRoundRestSeconds ?? exercise.restSecondsOverride ?? exercise.sets.first?.restSeconds ?? 90, 0), 600))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Stepper(ATHLTHLocalization.choose(english: "Between stations: \(station) sec", norwegian: "Mellom øvelser: \(station) sek"), value: $station, in: 0...600)
+                Stepper(ATHLTHLocalization.choose(english: "Between rounds: \(round) sec", norwegian: "Mellom runder: \(round) sek"), value: $round, in: 0...600)
+            }
+            .navigationTitle(exercise.groupStyle?.title ?? "")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) { onSave(station, round) }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
 private struct StrengthBarMassEditTarget: Identifiable {
     let exerciseID: UUID
     let kilograms: Double
