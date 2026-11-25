@@ -2871,3 +2871,22 @@ enum ATHLTHAIWatchCoachRequestPolicy {
         return age >= 0 && age <= 20
     }
 }
+
+
+/// Interactive diagnostic messages are deliberately separate from real workout
+/// commands. Never enqueue them or interpret them as recording authorization.
+struct ATHLTHWatchDeviceDiagnostics: Codable, Equatable, Sendable {
+    let model: String
+    let systemVersion: String
+    let appVersion: String
+}
+
+enum ATHLTHWatchDiagnosticTransport {
+    static let kind = "athlthDeviceDiagnostic.v1"
+    static let acknowledgement = "athlthDeviceDiagnosticAck.v1"
+    static let action = "diagnosticAction"
+    static let result = "diagnosticResult"
+    enum Action: String, CaseIterable, Sendable {
+        case haptic, speech, workoutPackage
+    }
+}

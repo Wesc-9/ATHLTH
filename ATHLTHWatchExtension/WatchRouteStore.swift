@@ -1,6 +1,8 @@
 import Combine
 import Foundation
 import WatchConnectivity
+import WatchKit
+import AVFoundation
 
 // A WatchConnectivity reply block can outlive its caller. Transport it
 // explicitly across the MainActor hop without capturing the delegate closure
@@ -46,8 +48,15 @@ private final class WatchRemoteLaunchIdentityReply: @unchecked Sendable {
     }
 }
 
+private final class ATHLTHWatchDiagnosticReply: @unchecked Sendable {
+    private let callback: ([String: Any]) -> Void
+    init(_ callback: @escaping ([String: Any]) -> Void) { self.callback = callback }
+    func send(_ value: [String: Any]) { callback(value) }
+}
+
 @MainActor
 final class WatchRouteStore: NSObject, ObservableObject {
+    private let diagnosticSpeech = AVSpeechSynthesizer()
     // One WCSession delegate and prepared-workout cache shared by the Watch
     // SwiftUI root and the HealthKit remote-launch delegate.
     static let shared = WatchRouteStore()
@@ -246,17 +255,47 @@ final class WatchRouteStore: NSObject, ObservableObject {
         session.activate()
     }
 
-    nonisolated private static func connectivityAck(
-        probeID: String
-    ) -> [String: Any] {
-        [
-            WatchTransferMetadataKey.kind:
-                WatchTransferKind.connectivityAck.rawValue,
-            WatchTransferMetadataKey.probeID:
-                probeID,
-            WatchTransferMetadataKey.sentAt:
-                Date().timeIntervalSince1970
+    private static func connectivityAck(probeID: String) -> [String: Any] {
+        let device = WKInterfaceDevice.current()
+        let diagnostics = ATHLTHWatchDeviceDiagnostics(
+            model: device.model,
+            systemVersion: device.systemVersion,
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        )
+        var result: [String: Any] = [
+            WatchTransferMetadataKey.kind: WatchTransferKind.connectivityAck.rawValue,
+            WatchTransferMetadataKey.probeID: probeID,
+            WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
         ]
+        if let data = try? JSONEncoder().encode(diagnostics) {
+            result[WatchTransferMetadataKey.payload] = data
+        }
+        return result
+    }
+
+    private func performDiagnostic(_ action: ATHLTHWatchDiagnosticTransport.Action, data: Data?) -> Bool {
+        switch action {
+        case .haptic, .speech:
+            // Do not disrupt an active recording or an active coach message.
+            guard WatchWorkoutManager.shared.state == .idle else { return false }
+            if action == .haptic {
+                WKInterfaceDevice.current().play(.notification)
+            } else {
+                guard !diagnosticSpeech.isSpeaking else { return false }
+                let utterance = AVSpeechUtterance(string: "ATHLTH. Audio test.")
+                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                diagnosticSpeech.speak(utterance)
+            }
+            return true
+        case .workoutPackage:
+            // Decode and validate only. Never stage or launch a test workout.
+            guard let data,
+                  let workout = try? JSONDecoder().decode(WatchPreparedWorkoutTransfer.self, from: data),
+                  workout.kind == .running,
+                  ATHLTHWatchPreparedPlanIdentityPolicy.allows(planID: workout.plannedPlanID, sessionID: workout.plannedSessionID)
+            else { return false }
+            return workout.title == "ATHLTH diagnostic"
+        }
     }
 
     nonisolated private static func makeTransferFallbackErrorHandler(
@@ -1156,6 +1195,27 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return
         }
 
+        if rawKind == ATHLTHWatchDiagnosticTransport.kind {
+            // Reject background or replayed commands: tests must be requested
+            // interactively while both apps are reachable.
+            guard let replyHandler,
+                  let raw = payload[ATHLTHWatchDiagnosticTransport.action] as? String,
+                  let action = ATHLTHWatchDiagnosticTransport.Action(rawValue: raw),
+                  let sentAt = payload[WatchTransferMetadataKey.sentAt] as? TimeInterval,
+                  ATHLTHAIWatchCoachRequestPolicy.accepts(sentAt: sentAt)
+            else { replyHandler?([:]); return }
+            let reply = ATHLTHWatchDiagnosticReply(replyHandler)
+            let data = payload[WatchTransferMetadataKey.payload] as? Data
+            Task { @MainActor [weak self] in
+                let ok = self?.performDiagnostic(action, data: data) ?? false
+                reply.send([
+                    WatchTransferMetadataKey.kind: ATHLTHWatchDiagnosticTransport.acknowledgement,
+                    ATHLTHWatchDiagnosticTransport.result: ok
+                ])
+            }
+            return
+        }
+
         if rawKind ==
             WatchTransferKind
                 .connectivityProbe.rawValue {
@@ -1164,20 +1224,13 @@ final class WatchRouteStore: NSObject, ObservableObject {
                     WatchTransferMetadataKey.probeID
                 ] as? String
                 ?? UUID().uuidString
-            let ack =
-                Self.connectivityAck(
-                    probeID: probeID
-                )
-
-            if let replyHandler {
-                replyHandler(ack)
-            } else if WCSession.default
-                .activationState == .activated {
-                WCSession.default
-                    .transferUserInfo(ack)
-            }
-
+            let reply = replyHandler.map(ATHLTHWatchDiagnosticReply.init)
             Task { @MainActor [weak self] in
+                let ack = Self.connectivityAck(probeID: probeID)
+                if let reply { reply.send(ack) }
+                else if WCSession.default.activationState == .activated {
+                    WCSession.default.transferUserInfo(ack)
+                }
                 self?.markCompanionConnected()
             }
             return
@@ -1369,13 +1422,8 @@ extension WatchRouteStore:
             if !context.isEmpty {
                 receive(context)
             }
-            session.transferUserInfo(
-                Self.connectivityAck(
-                    probeID: "watch-launch"
-                )
-            )
-
             Task { @MainActor [weak self] in
+                WCSession.default.transferUserInfo(Self.connectivityAck(probeID: "watch-launch"))
                 self?.requestTodayWorkoutSnapshot()
                 self?.requestSpotifyPlaybackState()
                 WatchWorkoutManager.shared

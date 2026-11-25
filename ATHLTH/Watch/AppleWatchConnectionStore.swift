@@ -296,6 +296,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var reachable = false
     @Published private(set) var activationStateText = "Not activated"
     @Published private(set) var lastVerifiedAt: Date?
+    @Published private(set) var deviceDiagnostics: ATHLTHWatchDeviceDiagnostics?
+    @Published private(set) var diagnosticMessage: String?
+    @Published private(set) var diagnosticInProgress = false
     @Published private(set) var verificationInProgress = false
     @Published private(set) var connectivityError: String?
 
@@ -1560,6 +1563,57 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
     }
 
+    func runDiagnostic(_ action: ATHLTHWatchDiagnosticTransport.Action) {
+        guard !diagnosticInProgress, state == .ready,
+              let session, session.activationState == .activated, session.isReachable else { return }
+        var payload: [String: Any] = [
+            WatchTransferMetadataKey.kind: ATHLTHWatchDiagnosticTransport.kind,
+            ATHLTHWatchDiagnosticTransport.action: action.rawValue,
+            WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
+        ]
+        if action == .workoutPackage {
+            let workout = WatchPreparedWorkoutTransfer(
+                id: UUID(), title: "ATHLTH diagnostic", summary: "Decode only",
+                kind: .running, routeID: nil, runningWorkout: nil, audioCoach: nil,
+                updatedAt: Date()
+            )
+            guard let data = try? JSONEncoder().encode(workout) else { return }
+            payload[WatchTransferMetadataKey.payload] = data
+        }
+        diagnosticInProgress = true
+        diagnosticMessage = nil
+        session.sendMessage(payload,
+            replyHandler: Self.diagnosticReply(store: self, action: action),
+            errorHandler: Self.diagnosticFailure(store: self))
+    }
+
+    nonisolated private static func diagnosticReply(
+        store: AppleWatchConnectionStore, action: ATHLTHWatchDiagnosticTransport.Action
+    ) -> ([String: Any]) -> Void {
+        { [weak store] reply in
+            let ok = reply[WatchTransferMetadataKey.kind] as? String == ATHLTHWatchDiagnosticTransport.acknowledgement &&
+                reply[ATHLTHWatchDiagnosticTransport.result] as? Bool == true
+            Task { @MainActor [weak store] in
+                store?.diagnosticInProgress = false
+                store?.diagnosticMessage = ok
+                    ? (action == .workoutPackage
+                       ? "Klokken bekreftet mottak og dekoding av testpakken."
+                       : "Klokken bekreftet testkommandoen. Bekreft selv at lyd eller vibrasjon ble registrert.")
+                    : "Testen ble ikke bekreftet. Kontroller at klokken er oppdatert og ikke i en økt."
+            }
+        }
+    }
+
+    nonisolated private static func diagnosticFailure(store: AppleWatchConnectionStore) -> (Error) -> Void {
+        { [weak store] error in
+            let message = error.localizedDescription
+            Task { @MainActor [weak store] in
+                store?.diagnosticInProgress = false
+                store?.diagnosticMessage = message
+            }
+        }
+    }
+
     private func connectivityProbePayload(
         probeID: String
     ) -> [String: Any] {
@@ -1605,6 +1659,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
 
         lastVerifiedAt = Date()
+        if let data = payload.data,
+           let decoded = try? JSONDecoder().decode(ATHLTHWatchDeviceDiagnostics.self, from: data) {
+            deviceDiagnostics = decoded
+        }
         verificationInProgress = false
         connectivityError = nil
     }
@@ -1624,6 +1682,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
         if newState != .ready {
             verificationInProgress = false
+            deviceDiagnostics = nil
         }
     }
 

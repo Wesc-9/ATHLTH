@@ -31,6 +31,16 @@ struct AppleWatchConnectionView: View {
                 }
             }
 
+            ATHLTHSettingsGroup(title: tr("Device", "Enhet")) {
+                PremiumSettingsCard {
+                    statusRow("applewatch", tr("Model", "Modell"), watchConnection.deviceDiagnostics?.model ?? "—")
+                    SettingsDivider()
+                    statusRow("gearshape", "watchOS", watchConnection.deviceDiagnostics?.systemVersion ?? "—")
+                    SettingsDivider()
+                    statusRow("app", tr("App version", "Appversjon"), watchConnection.deviceDiagnostics?.appVersion ?? "—")
+                }
+            }
+
             ATHLTHSettingsGroup(title: tr("Actions", "Handlinger")) {
                 PremiumSettingsCard {
                     if watchConnection.state == .appNotInstalled {
@@ -74,6 +84,21 @@ struct AppleWatchConnectionView: View {
                 }
             }
             if watchConnection.isReady {
+                ATHLTHSettingsGroup(title: tr("Interactive tests", "Interaktive tester")) {
+                    PremiumSettingsCard {
+                        diagnosticButton(.haptic, "waveform.path", tr("Test vibration", "Test vibrasjon"))
+                        SettingsDivider()
+                        diagnosticButton(.speech, "speaker.wave.2", tr("Test speech output", "Test tale"))
+                        SettingsDivider()
+                        diagnosticButton(.workoutPackage, "figure.run", tr("Test workout package", "Test øktpakke"))
+                        if let message = watchConnection.diagnosticMessage {
+                            Text(message).font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                                .padding(16)
+                        }
+                        Text(tr("Open ATHLTH on the watch. Tests do not start a workout.", "Åpne ATHLTH på klokken. Testene starter ingen treningsøkt."))
+                            .font(.caption).foregroundStyle(ATHLTHTheme.mutedText).padding(16)
+                    }
+                }
                 ATHLTHSettingsGroup(title: tr("Transfer test", "Testoverføring")) {
                     PremiumSettingsCard {
                         VStack(alignment: .leading, spacing: 12) {
@@ -130,6 +155,17 @@ struct AppleWatchConnectionView: View {
                 }
             }
         }
+    }
+
+    private func diagnosticButton(_ action: ATHLTHWatchDiagnosticTransport.Action,
+                                  _ icon: String, _ title: String) -> some View {
+        Button { watchConnection.runDiagnostic(action) } label: {
+            PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep, title: title) {
+                Image(systemName: "play.circle").foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!watchConnection.reachable || watchConnection.diagnosticInProgress)
     }
 
     private func statusRow(_ icon: String, _ title: String, _ value: String) -> some View {
