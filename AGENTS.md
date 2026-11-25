@@ -1,3 +1,9 @@
+# ACTIVE ATHLTH DEVELOPMENT (2026-11-25 — 3.0.3)
+
+- **CURRENT ACTIVE DEVELOPMENT: `release/v3.0.3` (build 143).** All new code, fixes, tests and workflows belong directly on this branch. This section supersedes older active-version guidance below.
+- **VERSION 3.0.2 (build 142) SOURCE FROZEN:** Exact source snapshot `9ee67fd9f48170125de32d69386f833cd8ea57e6`. Preserved in `release/v3.0.2`, `locked/v3.0.2`, and `backup/v3.0.2-locked-before-v3.0.3`. Do not modify or move these refs. Freeze is by independent preserved refs and project policy, not administrator-enforced branch protection.
+- **RELEASE SAFETY:** Preserve the 3.0.2 CI and release gates, shared iPhone/iPad/watchOS workout engine and single recording owner. Routine builds and tests may run; do not trigger a 3.0.3 TestFlight upload without new explicit user authorization. Verify CI and App Store Connect acceptance separately before claiming release success.
+
 # ACTIVE ATHLTH DEVELOPMENT (2026-11-22 — 2.2.8)
 
 - **CURRENT ACTIVE DEVELOPMENT: `release/v2.2.8` (build 137).** All new code, tests, fixes and workflows belong directly on this branch, not the frozen 2.2.7 branch or a parallel feature branch. This section supersedes historical active-version instructions below.

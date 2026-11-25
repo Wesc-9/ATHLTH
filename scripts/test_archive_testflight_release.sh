@@ -23,7 +23,7 @@ bash -n "$script"
 for mode in 0 1; do
   export RUNNER_TEMP="$tmp/run$mode"
   export ATHLTH_GARMIN_INTERNAL_TEST="$mode"
-  export GITHUB_REF=refs/heads/release/v3.0.2
+  export GITHUB_REF=refs/heads/release/v3.0.3
   mkdir "$RUNNER_TEMP"
   bash "$script"
   grep -Fx 'archive' "$RUNNER_TEMP/args"
@@ -44,7 +44,7 @@ test ! -f "$RUNNER_TEMP/args"
 echo "PASS Garmin internal archive rejected on wrong branch"
 
 export RUNNER_TEMP="$tmp/failure"
-export GITHUB_REF=refs/heads/release/v3.0.2 ATHLTH_GARMIN_INTERNAL_TEST=0 MOCK_ARCHIVE_FAIL=1
+export GITHUB_REF=refs/heads/release/v3.0.3 ATHLTH_GARMIN_INTERNAL_TEST=0 MOCK_ARCHIVE_FAIL=1
 mkdir "$RUNNER_TEMP"
 status=0
 bash "$script" || status=$?

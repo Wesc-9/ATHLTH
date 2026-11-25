@@ -2,7 +2,7 @@ name: Garmin private code compile check
 on:
   workflow_dispatch:
   push:
-    branches: [release/v3.0.1, release/v3.0.2]
+    branches: [release/v3.0.1, release/v3.0.2, release/v3.0.3]
     paths:
       - 'ATHLTH/Wearables/**'
       - 'ATHLTH/Views/ProductRootTabView.swift'

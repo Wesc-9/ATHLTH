@@ -25,7 +25,7 @@ ARCHIVE_ARGS=(
   DEVELOPMENT_TEAM="${APPLE_TEAM_ID:-D3AX7B6RMW}"
 )
 if [ "${ATHLTH_GARMIN_INTERNAL_TEST:-0}" = "1" ]; then
-  test "${GITHUB_REF:-}" = "refs/heads/release/v3.0.2"
+  test "${GITHUB_REF:-}" = "refs/heads/release/v3.0.3"
   ARCHIVE_ARGS+=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ATHLTH_GARMIN_PERSONAL ATHLTH_GARMIN_INTERNAL_TEST')
 fi
 xcodebuild "${ARCHIVE_ARGS[@]}" archive > "$LOG" 2>&1 &
