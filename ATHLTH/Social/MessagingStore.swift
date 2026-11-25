@@ -741,7 +741,8 @@ final class MessagingStore: ObservableObject {
         to recipientID: UUID,
         conversationID: UUID,
         body: String?,
-        attachment: MessageShareDraft? = nil
+        attachment: MessageShareDraft? = nil,
+        clearMatchingTextDraft: Bool = false
     ) async -> Bool {
         guard let owner = currentUserID, preferenceAccountID == owner else { return false }
         let generation = accountGeneration
@@ -761,9 +762,15 @@ final class MessagingStore: ObservableObject {
                 body: cleanBody,
                 attachment: attachment
             )
-            guard ownsRequest(owner, generation: generation) else { return false }
-            await refreshConversation(conversationID)
-            return ownsRequest(owner, generation: generation)
+            // Once the server confirms the insert, a cancelled view refresh
+            // must not turn it into an apparent failed send and leave a duplicate draft.
+            guard accountGeneration == generation, preferenceAccountID == owner,
+                  currentUserID == owner else { return false }
+            if clearMatchingTextDraft, let body, textDrafts[recipientID] == body {
+                textDrafts.removeValue(forKey: recipientID)
+            }
+            if !Task.isCancelled { await refreshConversation(conversationID) }
+            return accountGeneration == generation && preferenceAccountID == owner && currentUserID == owner
         } catch {
             guard ownsRequest(owner, generation: generation) else { return false }
             errorMessage = error.localizedDescription
