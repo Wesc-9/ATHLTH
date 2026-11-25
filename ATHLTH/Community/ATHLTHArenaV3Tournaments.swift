@@ -34,6 +34,18 @@ struct ATHLTHTournamentCreator: View {
     @State private var rematchSearch = ""
     @State private var rematchResults: [ATHLTHTournamentExerciseSearchResult] = []
     @State private var rematchNames: [UUID: String] = [:]
+    @State private var exerciseMetrics: [UUID: String] = [:]
+    private var usesExplicitExercises: Bool { isRematch || competitionSettings.selectedExerciseIDs != nil || competitionSettings.race.effectiveScoringMode.needsGoal }
+    private var scoringValid: Bool {
+        guard competitionSettings.race.discipline == .workout else { return true }
+        guard proofMode == .opponent else { return false }
+        let ids = competitionSettings.selectedExerciseIDs ?? []
+        if usesExplicitExercises && (ids.isEmpty || exerciseMode != .owner || ids.count != exerciseCount) { return false }
+        if competitionSettings.race.effectiveScoringMode.needsGoal {
+            return ids.allSatisfy { competitionSettings.race.goal(for: $0).map { $0.isFinite && $0 > 0 } == true }
+        }
+        return true
+    }
     @State private var rematchSearchError: String?
     /// Sports chosen from Quick Train cannot silently change to another mode.
     let fixedActivity: ATHLTHTournamentActivity?
@@ -232,7 +244,7 @@ struct ATHLTHTournamentCreator: View {
         (!isSingleEvent || competitionSettings.race.discipline == .workout ||
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
-        competitionSettings.race.isOperational &&
+        competitionSettings.race.isOperational && scoringValid &&
         (!isRematch || (exerciseMode == .owner && competitionSettings.selectedExerciseIDs?.count == exerciseCount && exerciseCount > 0)) &&
         (!(isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified)) &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
@@ -266,8 +278,10 @@ struct ATHLTHTournamentCreator: View {
                             },
                             set: { newValue in
                                 if fixedActivity == nil {
-                                    if isRematch && newValue != allowedActivities {
+                                    if usesExplicitExercises && newValue != allowedActivities {
                                         competitionSettings.selectedExerciseIDs = []
+                                        competitionSettings.race.scoringGoals = nil
+                                        competitionSettings.race.exerciseWeights = nil
                                     }
                                     allowedActivities = newValue
                                 }
@@ -307,7 +321,8 @@ struct ATHLTHTournamentCreator: View {
                             .padding(13)
                             .background(ATHLTHArenaV3Style.panel())
                     }
-                    if isRematch {
+                    if competitionSettings.race.discipline == .workout { scoringSettingsSection }
+                    if competitionSettings.race.discipline == .workout && usesExplicitExercises {
                         rematchExerciseSection
                     } else {
                         coachEntry
@@ -502,6 +517,22 @@ struct ATHLTHTournamentCreator: View {
 
     private func makeDraft() -> ATHLTHTournamentDraft {
         var configured = competitionSettings
+        if configured.race.discipline == .workout {
+            configured.race.scoringMode = configured.race.effectiveScoringMode
+            configured.race.pointsPerExercise = configured.race.pointsPerExercise ?? 1
+            let keys = Set((configured.selectedExerciseIDs ?? []).map(ATHLTHCompetitionRaceRules.key))
+            let roster = Set(athletes.map { ATHLTHCompetitionRaceRules.key($0.id) })
+            configured.race.scoringGoals = configured.race.effectiveScoringMode.needsGoal
+                ? configured.race.scoringGoals?.filter { keys.contains($0.key) } : nil
+            configured.race.exerciseWeights = configured.race.exerciseWeights?.filter { keys.contains($0.key) }
+            configured.race.handicapPercentages = configured.race.handicapPercentages?.filter { roster.contains($0.key) && $0.value > 0 }
+        } else {
+            configured.race.scoringMode = nil
+            configured.race.pointsPerExercise = nil
+            configured.race.scoringGoals = nil
+            configured.race.exerciseWeights = nil
+            configured.race.handicapPercentages = nil
+        }
         configured.race.exerciseScoringVersion = isSingleEvent && configured.race.discipline == .workout ? 2 : nil
         configured.race.competitionEndsAt = configured.endsAt.map { ISO8601DateFormatter().string(from: $0) }
         configured.race.duelMode = isDuel ? true : nil
@@ -754,20 +785,110 @@ struct ATHLTHTournamentCreator: View {
         }
     }
 
+    private var scoringSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            sectionTitle("Resultater og poeng")
+            Picker("Poengmetode", selection: Binding(
+                get: { competitionSettings.race.effectiveScoringMode },
+                set: { mode in
+                    competitionSettings.race.scoringMode = mode
+                    if mode.needsGoal {
+                        exerciseMode = .owner
+                        competitionSettings.coachExerciseIDs = []
+                        if competitionSettings.selectedExerciseIDs == nil {
+                            competitionSettings.selectedExerciseIDs = []
+                            exerciseCount = 0
+                        }
+                    }
+                })) {
+                ForEach(ATHLTHCompetitionScoringMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }.pickerStyle(.menu)
+            Text(competitionSettings.race.effectiveScoringMode.detail)
+                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            Stepper(value: Binding(get: { competitionSettings.race.pointsPerExercise ?? 1 },
+                set: { competitionSettings.race.pointsPerExercise = $0 }), in: 1...10) {
+                Text("Grunnpoeng: \(competitionSettings.race.pointsPerExercise ?? 1)")
+            }.font(.subheadline)
+            if !isRematch && !competitionSettings.race.effectiveScoringMode.needsGoal {
+                Toggle("Velg konkrete øvelser nå", isOn: Binding(
+                    get: { competitionSettings.selectedExerciseIDs != nil },
+                    set: { enabled in
+                        competitionSettings.selectedExerciseIDs = enabled ? [] : nil
+                        competitionSettings.coachExerciseIDs = []
+                        competitionSettings.race.scoringGoals = nil
+                        competitionSettings.race.exerciseWeights = nil
+                        exerciseCount = enabled ? 0 : 3
+                        exerciseMode = .owner
+                    }))
+            }
+            Divider()
+            Text("Handicap").font(.subheadline.weight(.semibold))
+            Toggle("Bruk handicap", isOn: Binding(
+                get: { competitionSettings.race.handicapPercentages != nil },
+                set: { competitionSettings.race.handicapPercentages = $0 ? [:] : nil }))
+            if competitionSettings.race.handicapPercentages != nil {
+                Text("Avtal en fordel på 0–30 % per deltaker. Tiden reduseres ved tidskonkurranse; andre målinger økes. Originalmålingen endres ikke. Alle må godkjenne.")
+                    .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                ForEach(athletes, id: \.id) { athlete in
+                    Stepper(value: Binding(
+                        get: { competitionSettings.race.handicap(for: athlete.id) },
+                        set: { competitionSettings.race.handicapPercentages?[ATHLTHCompetitionRaceRules.key(athlete.id)] = $0 }),
+                        in: 0...30) {
+                        Text(athlete.username + " · " + String(competitionSettings.race.handicap(for: athlete.id)) + " %")
+                    }.font(.subheadline)
+                }
+            }
+            if proofMode != .opponent {
+                Text("Velg godkjenning fra deltaker eller arrangør. Full sensorverifisering er foreløpig ikke tilgjengelig for alle måletyper.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }.padding(15).background(ATHLTHArenaV3Style.panel())
+        .tint(ATHLTHArenaV3Style.gold)
+    }
+
     private var rematchExerciseSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Velg øvelser til rematch")
-            Text("Behold øvelsene fra forrige duell, eller fjern dem og velg nye. Motstanderen får en ny invitasjon med hele oppsettet.")
+            sectionTitle(isRematch ? "Velg øvelser til rematch" : "Konkurranseøvelser")
+            Text(isRematch ? "Behold øvelsene fra forrige duell, eller velg nye." : "Velg øvelser og eventuelle mål og poengvekter før invitasjonen sendes.")
                 .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
             ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
+                VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(rematchNames[id] ?? "Valgt øvelse").font(.subheadline)
                     Spacer()
                     Button {
                         competitionSettings.selectedExerciseIDs?.removeAll { $0 == id }
+                        competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+                        competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
                         exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
                     } label: { Image(systemName: "minus.circle").frame(width: 44, height: 44) }
                     .buttonStyle(.plain)
+                }
+                if competitionSettings.race.effectiveScoringMode.needsGoal {
+                    let metric = exerciseMetrics[id] ?? "repetitions"
+                    let unit = metric == "duration" ? "meter" : metric == "distance" || metric == "time" ? "sekunder" : "repetisjoner"
+                    TextField("Mål i " + unit, value: Binding<Double?>(
+                        get: { competitionSettings.race.goal(for: id) },
+                        set: { value in
+                            var goals = competitionSettings.race.scoringGoals ?? [:]
+                            goals[ATHLTHCompetitionRaceRules.key(id)] = value
+                            competitionSettings.race.scoringGoals = goals
+                        }), format: .number)
+                        .keyboardType(.decimalPad)
+                        .padding(9).background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 10))
+                }
+                Stepper(value: Binding(
+                    get: { competitionSettings.race.weight(for: id) },
+                    set: { value in
+                        var weights = competitionSettings.race.exerciseWeights ?? [:]
+                        weights[ATHLTHCompetitionRaceRules.key(id)] = value
+                        competitionSettings.race.exerciseWeights = weights
+                    }), in: 1...5) {
+                    Text("Poengvekt: \(competitionSettings.race.weight(for: id))×").font(.caption)
+                }
+                Divider()
                 }
             }
             TextField("Søk etter ny øvelse", text: $rematchSearch)
@@ -778,6 +899,7 @@ struct ATHLTHTournamentCreator: View {
                     guard ids.count < 12, !ids.contains(item.id) else { return }
                     ids.append(item.id)
                     rematchNames[item.id] = item.name
+                    exerciseMetrics[item.id] = item.metric
                     competitionSettings.selectedExerciseIDs = ids
                     exerciseCount = ids.count
                 } label: {
@@ -801,6 +923,7 @@ struct ATHLTHTournamentCreator: View {
                 let candidates = try await service.candidates(tournamentID: parentID)
                 let titles = try await service.candidateNames(candidates)
                 for (id, name) in titles { rematchNames[id] = name }
+                exerciseMetrics = try await service.exerciseMetrics(ids: candidates.map(\.lookupID))
             } catch { rematchSearchError = error.localizedDescription }
         }
         .task(id: rematchSearch + allowedActivities.map(\.rawValue).sorted().joined(separator: ",")) {
@@ -1168,6 +1291,12 @@ struct ATHLTHTournamentCreator: View {
             Label(exerciseMode == .open ? "Åpen øvelsesliste" : "\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
             Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
             Label(competitionSettings.unlock.title, systemImage: "list.bullet").font(.subheadline)
+            if competitionSettings.race.discipline == .workout {
+                Label(competitionSettings.race.scoringSummary, systemImage: "chart.bar").font(.subheadline)
+                ForEach(athletes.filter { competitionSettings.race.handicap(for: $0.id) > 0 }, id: \.id) { athlete in
+                    Text("Handicap: " + athlete.username + " · " + String(competitionSettings.race.handicap(for: athlete.id)) + " %").font(.caption)
+                }
+            }
             if !isSingleEvent {
                 Label("Sesong \(continuationSeasonNumber ?? 1)", systemImage: "calendar").font(.subheadline)
             }

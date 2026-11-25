@@ -369,7 +369,7 @@ private struct ATHLTHSharedEventProgressView: View {
                     Label("Slutt: " + end.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar.badge.clock")
                         .font(.caption)
                 }
-                Text("Hver øvelse rangeres for seg. Uteblitt øvelse gir 0 poeng. Sammenlagtresultatet vises når alle øvelser er avgjort.")
+                Text(tournament.raceRules.scoringSummary + ". Uteblitt øvelse gir 0 poeng. Sammenlagtresultatet vises når alle øvelser er avgjort.")
                     .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
             }.padding(15).athlthTrainEditorialCard()
 

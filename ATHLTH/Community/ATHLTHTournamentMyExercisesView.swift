@@ -9,6 +9,7 @@ struct ATHLTHTournamentMyExercisesView: View {
 
     @State private var candidates: [ATHLTHTournamentExerciseCandidateRemote] = []
     @State private var exerciseNames: [UUID: String] = [:]
+    @State private var exerciseMetrics: [UUID: String] = [:]
     @State private var slots: [ATHLTHTournamentMatchExerciseRemote] = []
     @State private var completions: [ATHLTHTournamentExerciseCompletionRemote] = []
     @State private var reportSlot: ATHLTHTournamentMatchExerciseRemote?
@@ -110,6 +111,7 @@ struct ATHLTHTournamentMyExercisesView: View {
         .sheet(item: $reportSlot) { slot in
             ATHLTHTournamentExerciseEvidenceSheet(
                 requiresVerifiedWorkout: tournament.raceRules.discipline == .sprint,
+                measuredMetric: tournament.raceRules.scoringMode == nil ? nil : candidates.first(where: { $0.id == slot.candidateID }).map { exerciseMetrics[$0.lookupID] ?? "repetitions" },
                 userID: userID,
                 earliestStart: slot.scheduledAt.addingTimeInterval(
                     tournament.raceRules.discipline == .sprint ? TimeInterval(tournament.raceRules.countdownSeconds) : 0),
@@ -117,11 +119,12 @@ struct ATHLTHTournamentMyExercisesView: View {
                     $0.id == slot.candidateID
                 }).flatMap { exerciseNames[$0.lookupID] } ?? "Øvelse",
                 deadline: slot.deadlineAt
-            ) { note, sourceWorkoutID in
-                try await cloud.completeExercise(
-                    slotID: slot.id,evidence: note,
-                    sourceWorkoutID: sourceWorkoutID
-                )
+            ) { note, sourceWorkoutID, score in
+                if let score {
+                    try await cloud.submitMeasuredExercise(slotID: slot.id, score: score, evidence: note)
+                } else {
+                    try await cloud.completeExercise(slotID: slot.id, evidence: note, sourceWorkoutID: sourceWorkoutID)
+                }
                 await reload()
             }
         }
@@ -136,7 +139,7 @@ struct ATHLTHTournamentMyExercisesView: View {
         let ownCompletion = completions.first {
             $0.matchExerciseID == slot.id && $0.userID == userID
         }
-        let recorded = ownCompletion != nil
+        let recorded = ownCompletion != nil && !(ownCompletion?.reviewStatus == "disputed" && tournament.raceRules.scoringMode != nil)
         let opponentID = match.homeID == userID
             ? match.awayID : match.homeID
         let unreviewedOpponent = completions.first {
@@ -232,7 +235,7 @@ struct ATHLTHTournamentMyExercisesView: View {
             if let opponent = unreviewedOpponent,
                slot.state == "pending" {
                 VStack(alignment: .leading,spacing: 7) {
-                    Text("Motstanderen har registrert øvelsen.")
+                    Text(unreviewedOpponent?.measuredScore.map { "Motstanderens måling: " + $0.formatted() } ?? "Motstanderen har registrert øvelsen.")
                         .font(.caption)
                     HStack(spacing: 15) {
                         Button("Godkjenn") {
@@ -292,6 +295,9 @@ struct ATHLTHTournamentMyExercisesView: View {
             slots = newSlots
             completions = try await recorded
             exerciseNames = try await exerciseNamesTask
+            if tournament.raceRules.scoringMode != nil {
+                exerciseMetrics = try await cloud.exerciseMetrics(ids: newCandidates.map(\.lookupID))
+            }
             errorMessage = nil
         } catch {
             errorMessage = "Kunne ikke hente øvelsesfrister: " +
@@ -306,13 +312,21 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
     @EnvironmentObject private var phone: IPhoneWorkoutStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
     let requiresVerifiedWorkout: Bool
+    let measuredMetric: String?
     let userID: UUID
     let earliestStart: Date
     let exerciseName: String
     let deadline: Date
-    let onSubmit: @MainActor (String, UUID?) async throws -> Void
+    let onSubmit: @MainActor (String, UUID?, Double?) async throws -> Void
 
     @State private var evidence = ""
+    @State private var measuredText = ""
+    private var measuredValue: Double? { Double(measuredText.replacingOccurrences(of: ",", with: ".")) }
+    private var measuredValid: Bool {
+        guard let metric = measuredMetric else { return true }
+        guard let value = measuredValue, value.isFinite, (0...100_000_000).contains(value) else { return false }
+        return (metric != "distance" || value > 0) && (metric != "repetitions" || value.rounded(.towardZero) == value)
+    }
     @State private var verifiedWorkouts: [ATHLTHTournamentEligibleWorkout] = []
     @State private var selectedWorkoutID: UUID?
     @State private var selectedLocalID: UUID?
@@ -368,6 +382,10 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                     Text("Kontroller at den valgte økten gjelder konkurranseøvelsen. Lokal historikk er ikke serververifisering.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                if let metric = measuredMetric {
+                    TextField(metric == "duration" ? "Resultat i meter" : metric == "distance" || metric == "time" ? "Resultat i sekunder" : "Antall repetisjoner", text: $measuredText)
+                        .keyboardType(.decimalPad).padding(12).background(ATHLTHArenaV3Style.panel())
+                }
                 TextField("Beskriv gjennomføringen",text: $evidence,axis: .vertical)
                     .lineLimit(3...6)
                     .padding(15)
@@ -402,7 +420,7 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                         do {
                             try await onSubmit(evidence.trimmingCharacters(
                                 in: .whitespacesAndNewlines),
-                                selectedWorkoutID)
+                                selectedWorkoutID, measuredMetric == nil ? nil : measuredValue)
                             dismiss()
                         } catch { errorMessage=error.localizedDescription }
                     }
@@ -416,7 +434,7 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                     .frame(maxWidth: .infinity,minHeight: 52)
                     .background(ATHLTHArenaV3Style.ink,in: Capsule())
                 }
-                .disabled(submitting || evidence.trimmingCharacters(
+                .disabled(submitting || !measuredValid || evidence.trimmingCharacters(
                     in: .whitespacesAndNewlines).count<3 || evidence.count>500 ||
                     deadline<=Date() ||
                     (requiresVerifiedWorkout && selectedWorkoutID == nil))

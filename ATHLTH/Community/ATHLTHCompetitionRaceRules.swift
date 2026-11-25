@@ -65,7 +65,44 @@ enum ATHLTHCompetitionLapVerification: String, Codable, CaseIterable, Identifiab
     }
 }
 
+enum ATHLTHCompetitionScoringMode: String, Codable, CaseIterable, Identifiable {
+    case ranking, winner, target, closest, completion
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .ranking: "Poeng etter plassering"
+        case .winner: "Poeng til vinneren"
+        case .target: "Poeng for å nå målet"
+        case .closest: "Nærmest målet"
+        case .completion: "Poeng for gjennomføring"
+        }
+    }
+    var detail: String {
+        switch self {
+        case .ranking: "Plasseringen avgjør poengene per øvelse."
+        case .winner: "Beste måling får poeng. Ved likt resultat deler vinnerne poengene likt i betydningen samme poengsum."
+        case .target: "Alle som når det avtalte målet får poeng."
+        case .closest: "Målingen nærmest det avtalte målet får poeng."
+        case .completion: "Alle godkjente gjennomføringer får poeng."
+        }
+    }
+    var needsGoal: Bool { self == .target || self == .closest }
+}
+
 struct ATHLTHCompetitionRaceRules: Codable, Hashable {
+    var scoringMode: ATHLTHCompetitionScoringMode? = nil
+    var pointsPerExercise: Int? = nil
+    var scoringGoals: [String: Double]? = nil
+    var exerciseWeights: [String: Int]? = nil
+    var handicapPercentages: [String: Int]? = nil
+    var effectiveScoringMode: ATHLTHCompetitionScoringMode { scoringMode ?? .ranking }
+    var scoringSummary: String {
+        effectiveScoringMode.title + " · " + String(pointsPerExercise ?? 1) + " grunnpoeng"
+    }
+    static func key(_ id: UUID) -> String { id.uuidString.lowercased() }
+    func handicap(for id: UUID) -> Int { handicapPercentages?[Self.key(id)] ?? 0 }
+    func goal(for id: UUID) -> Double? { scoringGoals?[Self.key(id)] }
+    func weight(for id: UUID) -> Int { exerciseWeights?[Self.key(id)] ?? 1 }
     var discipline: ATHLTHCompetitionDiscipline = .workout
     // Absent in legacy events: only new exercise-scored events opt in.
     var exerciseScoringVersion: Int? = nil
@@ -101,11 +138,17 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
              recordingDevice, targetDistanceMeters, targetDurationSeconds,
              lapCount, lapVerification, lapCourseName, lapCourseLatitude,
              lapCourseLongitude, countdownSeconds, allowOptInLiveLocation,
-             equipmentRules, exerciseScoringVersion, duelMode, competitionEndsAt, previousCompetitionID, seasonNumber
+             equipmentRules, exerciseScoringVersion, duelMode, competitionEndsAt, previousCompetitionID, seasonNumber,
+             scoringMode, pointsPerExercise, scoringGoals, exerciseWeights, handicapPercentages
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        scoringMode = try c.decodeIfPresent(ATHLTHCompetitionScoringMode.self, forKey: .scoringMode)
+        pointsPerExercise = try c.decodeIfPresent(Int.self, forKey: .pointsPerExercise)
+        scoringGoals = try c.decodeIfPresent([String: Double].self, forKey: .scoringGoals)
+        exerciseWeights = try c.decodeIfPresent([String: Int].self, forKey: .exerciseWeights)
+        handicapPercentages = try c.decodeIfPresent([String: Int].self, forKey: .handicapPercentages)
         exerciseScoringVersion = try c.decodeIfPresent(Int.self, forKey: .exerciseScoringVersion)
         duelMode = try c.decodeIfPresent(Bool.self, forKey: .duelMode)
         previousCompetitionID = try c.decodeIfPresent(UUID.self, forKey: .previousCompetitionID)
@@ -156,7 +199,11 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     }
 
     var isValid: Bool {
-        guard (100...100_000).contains(targetDistanceMeters),
+        guard (1...10).contains(pointsPerExercise ?? 1),
+              (scoringGoals ?? [:]).values.allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000_000 }),
+              (exerciseWeights ?? [:]).values.allSatisfy({ (1...5).contains($0) }),
+              (handicapPercentages ?? [:]).values.allSatisfy({ (0...30).contains($0) }),
+              (100...100_000).contains(targetDistanceMeters),
               (10...86_400).contains(targetDurationSeconds),
               (1...500).contains(lapCount),
               (5...30).contains(countdownSeconds),

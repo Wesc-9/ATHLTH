@@ -73,6 +73,12 @@ struct ATHLTHTournamentLobbyRulesView: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 FlowLayoutActivityBadges(activities: tournament.allowedActivities)
+                if tournament.raceRules.scoringMode != nil {
+                    Label(tournament.raceRules.scoringSummary, systemImage: "chart.bar").font(.subheadline.weight(.medium))
+                    if let handicaps = tournament.raceRules.handicapPercentages, !handicaps.isEmpty {
+                        Text("Handicap er avtalt per deltaker. Originalmålinger endres ikke.").font(.caption)
+                    }
+                }
 
                 Divider().opacity(0.5)
                 HStack(spacing: 12) {

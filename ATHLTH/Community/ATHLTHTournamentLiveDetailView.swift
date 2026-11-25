@@ -971,7 +971,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                } else if match.status == "scheduled" || match.status == "disputed" {
+                } else if (match.status == "scheduled" || match.status == "disputed") && (current.raceRules.scoringMode == nil || match.isWarmup) {
                     Button("Foreslå resultat") { showingMatchReport = match }
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.gold)

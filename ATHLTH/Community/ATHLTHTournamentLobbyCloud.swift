@@ -25,8 +25,9 @@ struct ATHLTHTournamentActivityTemplateRemote: Decodable, Identifiable {
     let id: UUID
     let title: String
     let activityType: ATHLTHTournamentActivity
+    let metric: String?
     enum CodingKeys: String, CodingKey {
-        case id,title
+        case id,title,metric
         case activityType = "activity_type"
     }
 }
@@ -35,6 +36,7 @@ struct ATHLTHTournamentExerciseSearchResult: Identifiable {
     let id: UUID
     let name: String
     let isActivityTemplate: Bool
+    var metric: String = "repetitions"
 }
 
 struct ATHLTHTournamentRuleProposalRemote: Decodable, Identifiable {
@@ -189,8 +191,10 @@ struct ATHLTHTournamentExerciseCompletionRemote: Decodable {
     let userID: UUID
     let submittedAt: Date
     let reviewStatus: String
+    let measuredScore: Double?
     enum CodingKeys: String, CodingKey {
         case reviewStatus = "review_status"
+        case measuredScore = "measured_score"
         case matchExerciseID = "match_exercise_id"
         case userID = "user_id"
         case submittedAt = "submitted_at"
@@ -363,14 +367,15 @@ struct ATHLTHTournamentLobbyCloudService {
 
         let presets: [ATHLTHTournamentActivityTemplateRemote] = try await client
             .from("athlth_tournament_activity_templates")
-            .select("id,title,activity_type")
+            .select("id,title,activity_type,metric")
+            .eq("is_active", value: true)
             .in("activity_type", values: allowed.map(\.rawValue))
             .ilike("title", pattern: "%\(clean)%")
             .order("title")
             .limit(40).execute().value
         var result = presets.map {
             ATHLTHTournamentExerciseSearchResult(
-                id: $0.id,name: $0.title,isActivityTemplate: true
+                id: $0.id,name: $0.title,isActivityTemplate: true,metric: $0.metric ?? "repetitions"
             )
         }
         if allowed.contains(.strength) {
@@ -382,6 +387,14 @@ struct ATHLTHTournamentLobbyCloudService {
             }
         }
         return result
+    }
+
+    func exerciseMetrics(ids: [UUID]) async throws -> [UUID: String] {
+        guard !ids.isEmpty else { return [:] }
+        let list: [ATHLTHTournamentActivityTemplateRemote] = try await client
+            .from("athlth_tournament_activity_templates").select("id,title,activity_type,metric")
+            .in("id", values: ids).limit(500).execute().value
+        return Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0.metric ?? "repetitions") })
     }
 
     func candidateNames(
@@ -602,7 +615,7 @@ struct ATHLTHTournamentLobbyCloudService {
             let end = min(start + 150,slotIDs.count)
             let batch: [ATHLTHTournamentExerciseCompletionRemote] = try await client
               .from("athlth_tournament_exercise_completions")
-              .select("match_exercise_id,user_id,submitted_at,review_status")
+              .select("match_exercise_id,user_id,submitted_at,review_status,measured_score")
               .in("match_exercise_id",values: Array(slotIDs[start..<end]))
               .limit(1000).execute().value
             all.append(contentsOf: batch)
@@ -632,6 +645,16 @@ struct ATHLTHTournamentLobbyCloudService {
                 p_approve: approve
             )
         ).execute()
+    }
+
+    func submitMeasuredExercise(slotID: UUID, score: Double, evidence: String) async throws {
+        struct Params: Encodable {
+            let p_match_exercise: UUID
+            let p_score: Double
+            let p_evidence_note: String
+        }
+        try await client.rpc("athlth_tournament_submit_measured_exercise", params: Params(
+            p_match_exercise: slotID, p_score: score, p_evidence_note: evidence)).execute()
     }
 
     func completeExercise(
