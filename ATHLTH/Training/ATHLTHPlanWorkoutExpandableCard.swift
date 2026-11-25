@@ -100,9 +100,13 @@ enum ATHLTHPlanWorkoutCardPresentation {
         if let pace = block.targetPaceSecondsPerKilometer,
            pace.isFinite, pace > 0 {
             let seconds = Int(pace.rounded())
-            facts.append(ATHLTHLocalization.choose(
-                english: "Pace ", norwegian: "Tempo "
-            ) + String(format: "%d:%02d/km", seconds / 60, seconds % 60))
+            if block.isIndoor == true && block.treadmillInclinePercent != nil {
+                facts.append(ATHLTHLocalization.choose(english: "Speed ", norwegian: "Fart ") + String(format: "%.1f km/t", 3600 / pace))
+            } else {
+                facts.append(ATHLTHLocalization.choose(
+                    english: "Pace ", norwegian: "Tempo "
+                ) + String(format: "%d:%02d/km", seconds / 60, seconds % 60))
+            }
         }
         if let incline = block.treadmillInclinePercent,
            incline.isFinite, (0...20).contains(incline) {
