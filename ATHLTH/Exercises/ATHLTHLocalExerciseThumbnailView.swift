@@ -27,6 +27,10 @@ actor ATHLTHLocalExerciseThumbnailLoader {
         return cache
     }()
 
+    func clearCache() {
+        thumbnails.removeAllObjects()
+    }
+
     func thumbnail(for url: URL, maxPixels: Int) -> ATHLTHPreparedExerciseThumbnail? {
         guard url.isFileURL, !Task.isCancelled else { return nil }
         let pixels = max(64, min(maxPixels, 640))

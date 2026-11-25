@@ -174,9 +174,9 @@ final class ATHLTHAudioCoachAccountSyncStore: ObservableObject {
                 try await upload(local, expected: 0, userID: userID)
             }
             guard accountID == userID else { return }
-            UserDefaults.standard.set(
-                userID.uuidString, forKey: "settings.audioCoach.accountOwner.v1"
-            )
+            if UserDefaults.standard.string(forKey: "settings.audioCoach.accountOwner.v1") != userID.uuidString {
+                UserDefaults.standard.set(userID.uuidString, forKey: "settings.audioCoach.accountOwner.v1")
+            }
             lastSuccessfulSync = Date()
             status = ATHLTHLocalization.choose(
                 english: "Audio Coach is synchronized.",
@@ -213,6 +213,9 @@ final class ATHLTHAudioCoachAccountSyncStore: ObservableObject {
     }
 
     private func acknowledge(_ fingerprint: String, userID: UUID) {
+        guard AccountLocalStorage.read(
+            String.self, name: "audioCoachSyncAcknowledgement", userID: userID
+        ) != fingerprint else { return }
         AccountLocalStorage.write(
             fingerprint, name: "audioCoachSyncAcknowledgement", userID: userID
         )

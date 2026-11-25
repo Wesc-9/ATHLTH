@@ -1884,6 +1884,8 @@ struct AppRootView: View {
                 .shared
                 .clearCache()
             RouteMapSnapshotCache.clearCache()
+            ATHLTHSizedStorageImageCache.shared.clear()
+            Task { await ATHLTHLocalExerciseThumbnailLoader.shared.clearCache() }
         }
         )
     }
@@ -2666,6 +2668,8 @@ struct AppRootView: View {
             ATHLTHSurfaceCoordinator.clearAccountSurfaces()
             ATHLTHArtworkImage.clearRemoteCache()
             RouteMapSnapshotCache.clearCache()
+            ATHLTHSizedStorageImageCache.shared.clear()
+            Task { await ATHLTHLocalExerciseThumbnailLoader.shared.clearCache() }
             workoutCompletion.switchAccount(userID)
             phoneWorkout.switchAccount(userID)
             trainingBackups.switchAccount(userID)

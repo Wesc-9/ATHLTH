@@ -102,16 +102,25 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
     private let client = SupabaseEnvironment.client
     private var accountID: UUID?
     private var task: Task<Void, Never>?
-    private var lastSyncedLocalCount = -1
+    private var lastSyncedLocalIDs: Set<UUID>?
+    private var accountGeneration = UUID()
+
+    // Append-only synchronization: identity, rather than count, determines
+    // whether a completed recording has been considered by the last read.
+    static func consideredLocalIDs(captured: Set<UUID>, remote: Set<UUID>,
+                                   current: Set<UUID>) -> Set<UUID> {
+        current.intersection(captured.union(remote))
+    }
 
     func switchAccount(_ id: UUID?) {
         guard accountID != id else { return }
         task?.cancel()
         task = nil
         accountID = id
+        accountGeneration = UUID()
         isBusy = false
         lastSuccessfulSync = nil
-        lastSyncedLocalCount = -1
+        lastSyncedLocalIDs = nil
         status = id == nil ? ATHLTHLocalization.choose(english: "Sign in to sync training history.", norwegian: "Logg inn for å synkronisere treningshistorikken.") :
             ATHLTHLocalization.choose(english: "Strength training history syncs automatically with your account.", norwegian: "Styrkehistorikken synkroniseres automatisk med kontoen din.")
     }
@@ -141,15 +150,22 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
         // completed workouts bypass this delay and publish promptly.
         if !force, let lastSuccessfulSync,
            Date().timeIntervalSince(lastSuccessfulSync) < 60,
-           lastSyncedLocalCount == strength.workoutHistory.count {
+           lastSyncedLocalIDs == Set(strength.workoutHistory.map(\.id)) {
             return
         }
 
+        let generation = accountGeneration
         Self.syncingAccounts.insert(owner)
         isBusy = true
         defer {
             Self.syncingAccounts.remove(owner)
-            isBusy = false
+            if accountGeneration == generation { isBusy = false }
+        }
+
+        func ownsSync() -> Bool {
+            !Task.isCancelled && accountGeneration == generation &&
+                accountID == owner && session.signedIn &&
+                session.profile.userID == owner && client.auth.currentUser?.id == owner
         }
 
         do {
@@ -165,9 +181,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
                     .order("ended_at", ascending: false)
                     .range(from: remote.count, to: remote.count + pageSize - 1)
                     .execute().value
-                guard accountID == owner,
-                      session.signedIn,
-                      session.profile.userID == owner else { return }
+                guard ownsSync() else { return }
                 remote.append(contentsOf: page)
                 if page.count < pageSize { break }
             }
@@ -190,10 +204,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
             // for the same workout ID, without losing other pending records.
             var pendingUploads = 0
             for row in missing {
-                guard accountID == owner,
-                      session.signedIn,
-                      session.profile.userID == owner,
-                      client.auth.currentUser?.id == owner else { return }
+                guard ownsSync() else { return }
                 do {
                     try await client.from("account_strength_workout_sync")
                         .insert(row).execute()
@@ -204,13 +215,12 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
                 }
             }
 
-            guard accountID == owner,
-                  session.signedIn,
-                  session.profile.userID == owner else { return }
+            guard ownsSync() else { return }
             // Local records always win for the same ID: they may contain
             // private HealthKit associations not sent to the server.
-            let downloads = remote.compactMap {
-                $0.validatedWorkout(owner: owner)
+            let currentIDs = Set(strength.workoutHistory.map(\.id))
+            let downloads = remote.compactMap { row in
+                currentIDs.contains(row.workout_id) ? nil : row.validatedWorkout(owner: owner)
             }
             let added = try strength.mergeAccountSyncedWorkouts(
                 downloads, for: owner
@@ -218,16 +228,19 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
             if pendingUploads > 0 {
                 // Do not claim an incomplete upload is fully synchronized.
                 lastSuccessfulSync = nil
-                lastSyncedLocalCount = -1
+                lastSyncedLocalIDs = nil
                 status = ATHLTHLocalization.choose(english: "\(pendingUploads) completed workouts will retry sync. ", norwegian: "\(pendingUploads) fullførte økter venter på nytt synkroniseringsforsøk. ") +
                     "\(added) received."
             } else {
                 lastSuccessfulSync = Date()
-                lastSyncedLocalCount = strength.workoutHistory.count
+                lastSyncedLocalIDs = Self.consideredLocalIDs(
+                    captured: Set(local.map(\.id)), remote: remoteIDs,
+                    current: Set(strength.workoutHistory.map(\.id))
+                )
                 status = ATHLTHLocalization.choose(english: "Training history synced. \(added) new workouts received.", norwegian: "Treningshistorikk synkronisert. \(added) nye økter mottatt.")
             }
         } catch {
-            if accountID == session.profile.userID {
+            if ownsSync() {
                 status = ATHLTHLocalization.choose(english: "Offline or sync unavailable; local workouts remain safe. ", norwegian: "Synkronisering er utilgjengelig. Lokale økter er bevart. ") +
                     error.localizedDescription
             }

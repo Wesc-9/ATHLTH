@@ -59,6 +59,17 @@ final class ATHLTHStrengthAccountSyncTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testCompletedHistorySyncDoesNotAcknowledgeNewConcurrentWorkout() {
+        let first = UUID(), downloaded = UUID(), new = UUID()
+        let considered = ATHLTHStrengthAccountSyncStore.consideredLocalIDs(
+            captured: [first], remote: [downloaded], current: [first, downloaded, new]
+        )
+        XCTAssertEqual(considered, [first, downloaded])
+        XCTAssertFalse(considered.contains(new))
+        XCTAssertNotEqual(considered, Set([first, new]))
+    }
+
     func testAutomaticSyncDocumentExcludesRawSensorAndHealthFields() throws {
         let workout = makeWorkout()
         let document = try XCTUnwrap(

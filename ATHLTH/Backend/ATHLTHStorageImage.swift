@@ -89,12 +89,18 @@ private enum ATHLTHStorageImageDecoder {
 }
 
 @MainActor
-private final class ATHLTHSizedStorageImageCache {
+final class ATHLTHSizedStorageImageCache {
     static let shared =
         ATHLTHSizedStorageImageCache()
 
     private let images =
         NSCache<NSString, UIImage>()
+    private(set) var generation: UInt64 = 0
+
+    func clear() {
+        generation &+= 1
+        images.removeAllObjects()
+    }
 
     private init() {
         images.countLimit = 24
@@ -114,14 +120,8 @@ private final class ATHLTHSizedStorageImageCache {
         _ image: UIImage,
         for key: String
     ) {
-        let cost =
-            Int(
-                image.size.width *
-                image.size.height *
-                image.scale *
-                image.scale *
-                4
-            )
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height }
+            ?? Int(image.size.width * image.size.height * image.scale * image.scale * 4)
 
         images.setObject(
             image,
@@ -236,6 +236,7 @@ struct ATHLTHStorageImage<Content: View>: View {
         // Public thumbnails can be served immediately from memory, without
         // resolving a URL or starting a download. Private media remains uncached.
         let isPrivate = ATHLTHStorageImageURL.privateWorkoutPath(url) != nil
+        let cacheGeneration = ATHLTHSizedStorageImageCache.shared.generation
         let cacheKey: String? = maxPixelSize.map {
             [accountID?.uuidString ?? "anonymous", String($0), url.absoluteString]
                 .joined(separator: "|")
@@ -302,7 +303,8 @@ struct ATHLTHStorageImage<Content: View>: View {
             guard !Task.isCancelled, requestID == requested else { return }
             guard let prepared else { throw URLError(.cannotDecodeContentData) }
 
-            if !isPrivate, !url.isFileURL, let cacheKey {
+            if !isPrivate, !url.isFileURL, let cacheKey,
+               ATHLTHSizedStorageImageCache.shared.generation == cacheGeneration {
                 ATHLTHSizedStorageImageCache.shared.store(
                     prepared.image,
                     for: cacheKey
