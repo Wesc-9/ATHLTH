@@ -169,11 +169,20 @@ struct GarminPersonalSettingsView: View {
             }
         }
         .task(id: accountMatches) {
-            guard accountMatches else { key = ""; return }
+            guard accountMatches else {
+                key = ""
+                if store.accountID == accountID { store.activate(account: nil) }
+                return
+            }
             store.activate(account: accountID)
             store.refresh(account: accountID)
         }
-        .onDisappear { key = "" }
+        .onDisappear {
+            key = ""
+            #if ATHLTH_GARMIN_INTERNAL_TEST
+            if store.accountID == accountID { store.activate(account: nil) }
+            #endif
+        }
     }
 
     private func preferredReading(_ metric: WearableDisplayMetric, snapshot: GarminPersonalPreview) -> String {

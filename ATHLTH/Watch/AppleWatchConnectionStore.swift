@@ -299,6 +299,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     @Published private(set) var deviceDiagnostics: ATHLTHWatchDeviceDiagnostics?
     @Published private(set) var diagnosticMessage: String?
     @Published private(set) var diagnosticInProgress = false
+    struct LinkCheckEvent: Identifiable {
+        let id = UUID()
+        let date = Date()
+        let message: String
+    }
+    @Published private(set) var linkCheckHistory: [LinkCheckEvent] = []
     @Published private(set) var verificationInProgress = false
     @Published private(set) var connectivityError: String?
 
@@ -1464,6 +1470,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 guard let store else { return }
 
                 store.connectivityError = message
+                store.recordLinkCheck(ATHLTHLocalization.choose(english: "Direct connection failed; retry via background", norwegian: "Direkte tilkobling feilet; prøver i bakgrunnen"))
 
                 guard let currentSession = store.session,
                       currentSession.activationState == .activated
@@ -1659,12 +1666,18 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
 
         lastVerifiedAt = Date()
+        recordLinkCheck(ATHLTHLocalization.choose(english: "Watch connection verified", norwegian: "Klokkeforbindelse verifisert"))
         if let data = payload.data,
            let decoded = try? JSONDecoder().decode(ATHLTHWatchDeviceDiagnostics.self, from: data) {
             deviceDiagnostics = decoded
         }
         verificationInProgress = false
         connectivityError = nil
+    }
+
+    private func recordLinkCheck(_ message: String) {
+        linkCheckHistory.insert(.init(message: message), at: 0)
+        if linkCheckHistory.count > 20 { linkCheckHistory.removeLast(linkCheckHistory.count - 20) }
     }
 
     private func publishSnapshot(
@@ -1683,6 +1696,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         if newState != .ready {
             verificationInProgress = false
             deviceDiagnostics = nil
+            if newState == .notPaired || newState == .unsupported { linkCheckHistory = [] }
         }
     }
 

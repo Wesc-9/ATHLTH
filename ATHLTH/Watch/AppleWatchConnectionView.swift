@@ -128,6 +128,16 @@ struct AppleWatchConnectionView: View {
                     }
                 }
             }
+            if !watchConnection.linkCheckHistory.isEmpty {
+                ATHLTHSettingsGroup(title: tr("Connection history · this session", "Tilkoblingshistorikk · denne økten")) {
+                    PremiumSettingsCard {
+                        ForEach(watchConnection.linkCheckHistory) { event in
+                            PremiumSettingsRow(icon: "clock.arrow.circlepath", iconTint: ATHLTHTheme.accentDeep,
+                                title: event.message, subtitle: event.date.formatted(date: .abbreviated, time: .shortened)) { EmptyView() }
+                        }
+                    }
+                }
+            }
             ATHLTHSettingsGroup(title: tr("Workout readiness", "Klar for trening")) {
                 PremiumSettingsCard {
                     VStack(alignment: .leading, spacing: 10) {
