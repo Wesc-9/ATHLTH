@@ -216,8 +216,7 @@ struct ATHLTHTournamentCreator: View {
 
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        // Two athletes belong in a private duel. Group competitions
-        // require the organizer plus at least two invitees.
+        // The shared event engine has distinct roster limits for duel and single event.
         (isDuel ? athletes.count == 2 : athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
         !busy && !allowedActivities.isEmpty &&
         (!isDuel || competitionSettings.race.discipline == .workout) &&
@@ -1075,7 +1074,7 @@ struct ATHLTHTournamentCreator: View {
             Text(title).font(ATHLTHTrainDesign.cardTitle)
             Label("Valgt gren: " + allowedActivities.sorted { $0.rawValue < $1.rawValue }.map(\.title).joined(separator: " og "), systemImage: "figure.mixed.cardio")
                 .font(.subheadline)
-            Label("\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
+            Label(exerciseMode == .open ? "Åpen øvelsesliste" : "\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
             Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
             if let start = competitionSettings.startsAt {
                 Text(start.formatted(date: .abbreviated, time: .shortened)).font(.caption)

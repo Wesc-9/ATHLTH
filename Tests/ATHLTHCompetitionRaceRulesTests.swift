@@ -3,6 +3,19 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHCompetitionRaceRulesTests: XCTestCase {
+    func testUnifiedDuelModeRoundTripsThroughSharedRaceRules() throws {
+        var rules = ATHLTHCompetitionRaceRules()
+        rules.duelMode = true
+        rules.exerciseScoringVersion = 1
+        rules.discipline = .workout
+        let decoded = try JSONDecoder().decode(ATHLTHCompetitionRaceRules.self,
+            from: JSONEncoder().encode(rules))
+        XCTAssertEqual(decoded.duelMode, true)
+        XCTAssertEqual(decoded.exerciseScoringVersion, 1)
+        XCTAssertEqual(decoded.discipline, .workout)
+        XCTAssertNil(ATHLTHCompetitionRaceRules().duelMode)
+    }
+
     func testOneRaceDisciplineCanBeReusedForEachCompetitionFormat() {
         XCTAssertEqual(ATHLTHCompetitionDiscipline.allCases.count, 5)
         XCTAssertEqual(ATHLTHCompetitionSprintMode.allCases.count, 3)

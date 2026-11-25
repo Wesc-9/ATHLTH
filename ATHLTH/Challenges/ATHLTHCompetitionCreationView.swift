@@ -107,6 +107,14 @@ enum ATHLTHCompetitionCreationPolicy {
         }
     }
 
+    static func canContinueToRules(name: String, ownerID: UUID, opponents: Set<UUID>,
+                                   format: ATHLTHCompetitionFormat) -> Bool {
+        let length = name.trimmingCharacters(in: .whitespacesAndNewlines).count
+        return (3...80).contains(length) && !opponents.contains(ownerID) &&
+            opponents.count >= minOpponents(format) &&
+            opponents.count <= (format == .duel ? 1 : 20)
+    }
+
     static func opponentsAfterFormatChange(
         _ chosen: Set<UUID>, format: ATHLTHCompetitionFormat, preferred: UUID?
     ) -> Set<UUID> {
@@ -194,11 +202,9 @@ struct ATHLTHCompetitionCreationView: View {
     }
 
     private var readyForRules: Bool {
-        let length = competitionTitle.trimmingCharacters(in: .whitespacesAndNewlines).count
-        return (3...80).contains(length) &&
-            !chosenIDs.contains(session.profile.userID) &&
-            chosenIDs.count >= ATHLTHCompetitionCreationPolicy.minOpponents(format) &&
-            chosenIDs.count <= (format == .duel ? 1 : 20) &&
+        ATHLTHCompetitionCreationPolicy.canContinueToRules(
+            name: competitionTitle, ownerID: session.profile.userID,
+            opponents: chosenIDs, format: format) &&
             selectedPeople.count == chosenIDs.count
     }
 

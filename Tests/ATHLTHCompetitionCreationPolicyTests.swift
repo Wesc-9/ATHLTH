@@ -5,6 +5,24 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
     private let owner = UUID()
     private let rival = UUID()
 
+    func testUniversalFirstStepOnlyNeedsNameAndValidRoster() {
+        let others = [rival, UUID(), UUID(), UUID()]
+        for format in ATHLTHCompetitionFormat.allCases {
+            let min = ATHLTHCompetitionCreationPolicy.minOpponents(format)
+            let valid = Set(others.prefix(min))
+            XCTAssertTrue(ATHLTHCompetitionCreationPolicy.canContinueToRules(
+                name: format.title, ownerID: owner, opponents: valid, format: format))
+            XCTAssertFalse(ATHLTHCompetitionCreationPolicy.canContinueToRules(
+                name: format.title, ownerID: owner, opponents: Set(others.prefix(min - 1)), format: format))
+            XCTAssertFalse(ATHLTHCompetitionCreationPolicy.canContinueToRules(
+                name: " ", ownerID: owner, opponents: valid, format: format))
+            XCTAssertFalse(ATHLTHCompetitionCreationPolicy.canContinueToRules(
+                name: format.title, ownerID: owner, opponents: valid.union([owner]), format: format))
+        }
+        XCTAssertFalse(ATHLTHCompetitionCreationPolicy.canContinueToRules(
+            name: "Duell", ownerID: owner, opponents: Set(others.prefix(2)), format: .duel))
+    }
+
     func testChangingCompetitionFormatPreservesSelectedFriend() {
         let other = UUID()
         let roster: Set<UUID> = [rival, other]

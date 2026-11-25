@@ -570,8 +570,8 @@ struct ATHLTHTournamentCloudService {
 
     func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
         let duel = draft.competitionSettings.race.duelMode == true
-        guard duel ? (draft.singleEventMode && draft.participants.count == 2) :
-            draft.participants.count >= (draft.singleEventMode ? 3 : draft.format == .cup ? 4 : 2) else {
+        guard (duel ? (draft.singleEventMode && draft.participants.count == 2) :
+            draft.participants.count >= (draft.singleEventMode ? 3 : draft.format == .cup ? 4 : 2)) else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
         guard draft.competitionSettings.isValid else {
