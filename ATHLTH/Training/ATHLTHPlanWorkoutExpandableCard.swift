@@ -75,7 +75,7 @@ enum ATHLTHPlanWorkoutCardPresentation {
     }
 
     /// Show explicit targets only; never synthesize a zero incline/pace.
-    static func facts(for block: WorkoutTemplateBlock, workoutTitle: String? = nil) -> [String] {
+    static func facts(for block: WorkoutTemplateBlock, workoutTitle: String? = nil, maximumBPM: Double? = nil) -> [String] {
         var facts: [String] = []
         if let seconds = block.durationSeconds, seconds.isFinite, seconds > 0 {
             let whole = Int(seconds.rounded())
@@ -114,15 +114,24 @@ enum ATHLTHPlanWorkoutCardPresentation {
                 english: "Incline ", norwegian: "Stigning "
             ) + String(format: "%.1f %%", incline))
         }
+        let pulse = ATHLTHPlannedHeartRatePreview.inlineRangeText(
+            for: block, maximumBPM: maximumBPM,
+            suggestedZones: workoutTitle.flatMap { ATHLTHWorkoutStepCopy.suggestedZones(for: block, workoutTitle: $0) }
+        )
         if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
             facts.append(ATHLTHLocalization.choose(
                 english: "HR zone Z", norwegian: "Pulssone S"
-            ) + "\(zone)")
+            ) + "\(zone)" + (pulse ?? ""))
         } else if let workoutTitle,
                   let suggestion = ATHLTHWorkoutStepCopy.suggestedZone(
                     for: block, workoutTitle: workoutTitle
                   ) {
-            facts.append(suggestion)
+            facts.append(suggestion + (pulse ?? ""))
+        } else if let pulse {
+            let zone = ATHLTHWorkoutStepTargetSummary.zoneLabel(for: block)
+                .map { ATHLTHLocalization.isNorwegian ? $0.replacingOccurrences(of: "Z", with: "S") : $0 }
+            facts.append((zone.map { ATHLTHLocalization.choose(english: "HR zone ", norwegian: "Pulssone ") + $0 }
+                ?? ATHLTHLocalization.choose(english: "Estimated HR", norwegian: "Estimert puls")) + pulse)
         }
         if let rpe = block.targetEffortRPE, (1...10).contains(rpe) {
             facts.append("RPE \(rpe)/10")
