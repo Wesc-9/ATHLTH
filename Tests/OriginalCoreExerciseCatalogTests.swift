@@ -129,9 +129,11 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
             "athlth-native-hollow-body-hold"
         ]))
         XCTAssertTrue(featured.allSatisfy { slug in
-            library.selectableExercises.contains {
+            guard let native = library.allExercises.first(where: {
                 $0.source == .athlthCatalog && $0.sourceIdentifier == slug
-            }
+            }) else { return false }
+            let preferred = ATHLTHExerciseReferenceResolver.reviewedReplacement(of: native, in: library.allExercises) ?? native
+            return library.selectableExercises.contains { $0.id == preferred.id }
         })
         for phrase in [
             "Skråbenk med manualer",

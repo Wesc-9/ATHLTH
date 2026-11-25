@@ -417,9 +417,9 @@ enum ATHLTHExerciseReferenceResolver {
            let rower = rowingMachine(in: library) {
             return rower
         }
-        if let target = reviewedReplacementSlug(id: block.exerciseID, slug: block.exerciseSlug),
-           let entry = library.first(where: { $0.source == .repDB && $0.sourceIdentifier == target }) {
-            return entry
+        if let target = reviewedReplacementSlug(id: block.exerciseID, slug: block.exerciseSlug) {
+            let matches = library.filter { $0.source == .repDB && $0.sourceIdentifier == target }
+            if matches.count == 1 { return matches[0] }
         }
         if let id = block.exerciseID {
             if let exact = library.first(where: { $0.id == id }) {
@@ -545,7 +545,12 @@ enum ATHLTHExerciseReferenceResolver {
         if matches.count == 1 {
             return visibleEquivalent(of: matches[0], in: library)
         }
-        // Two public entries with the same title are ambiguous, so stop.
+        // Multiple names are acceptable only when every record resolves to
+        // the exact same reviewed public identity. Distinct variants stay ambiguous.
+        let equivalent = Set(matches.map { visibleEquivalent(of: $0, in: library).id })
+        if equivalent.count == 1, let id = equivalent.first {
+            return library.first { $0.id == id }
+        }
         return nil
     }
 

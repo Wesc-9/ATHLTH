@@ -923,17 +923,20 @@ struct LibraryFavoriteRecord: Codable, Hashable, Identifiable {
 final class LibraryFavoritesStore: ObservableObject {
     // Keep remote IDs and pending mutations intact. Expose a canonical,
     // deduplicated favorite list without deleting server rows during upgrade.
-    @Published private var storedFavorites: [LibraryFavoriteRecord] = []
+    private var storedFavorites: [LibraryFavoriteRecord] = [] {
+        didSet { favorites = Self.canonicalFavorites(storedFavorites) }
+    }
+    @Published private(set) var favorites: [LibraryFavoriteRecord] = []
 
     private static func canonicalItemID(_ kind: LibraryFavoriteKind, _ itemID: String) -> String {
         guard kind == .exercise, let id = UUID(uuidString: itemID) else { return itemID }
         return ATHLTHExerciseReferenceResolver.canonicalReviewedID(id).uuidString
     }
 
-    var favorites: [LibraryFavoriteRecord] {
+    static func canonicalFavorites(_ rows: [LibraryFavoriteRecord]) -> [LibraryFavoriteRecord] {
         var seen = Set<String>()
         // Prefer existing canonical metadata when both records are saved.
-        return storedFavorites.sorted { lhs, rhs in
+        return rows.sorted { lhs, rhs in
             let left = Self.canonicalItemID(lhs.itemType, lhs.itemID) == lhs.itemID
             let right = Self.canonicalItemID(rhs.itemType, rhs.itemID) == rhs.itemID
             if left != right { return left }

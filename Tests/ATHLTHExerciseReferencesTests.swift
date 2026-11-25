@@ -93,12 +93,14 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
                 block("Bench Press"), in: catalog
             )?.id, reviewed.id
         )
-        // A stored UUID is historical identity, not a fuzzy title search.
+        // A known, reviewed public UUID migrates; arbitrary foreign UUIDs do not.
         saved.exerciseID = legacy.id
         XCTAssertEqual(
             ATHLTHExerciseReferenceResolver.resolve(saved, in: catalog)?.id,
-            legacy.id
+            reviewed.id
         )
+        saved.exerciseID = UUID()
+        XCTAssertNil(ATHLTHExerciseReferenceResolver.resolve(saved, in: catalog))
     }
 
     func testAmbiguousRepDBBenchPressNeverSilentlyReplacesNativeIdentity() {

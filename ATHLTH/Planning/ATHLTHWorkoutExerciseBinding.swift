@@ -107,9 +107,12 @@ enum ATHLTHWorkoutExerciseBinding {
         private let repDB: [String: ExerciseLibraryEntry]
 
         init(library: [ExerciseLibraryEntry]) {
-            repDB = Dictionary(library.filter { $0.source == .repDB }.compactMap { entry in
-                entry.sourceIdentifier.map { ($0, entry) }
-            }, uniquingKeysWith: { first, _ in first })
+            let grouped = Dictionary(grouping: library.filter {
+                $0.source == .repDB && $0.sourceIdentifier != nil
+            }, by: { $0.sourceIdentifier ?? "" })
+            repDB = grouped.compactMapValues { entries in
+                entries.count == 1 ? entries[0] : nil
+            }
         }
 
         private func replacement(id: UUID?, slug: String?) -> ExerciseLibraryEntry? {
