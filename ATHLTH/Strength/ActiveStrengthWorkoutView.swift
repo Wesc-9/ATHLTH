@@ -40,6 +40,14 @@ struct ActiveStrengthWorkoutView: View {
         SocialWorkoutCompanionStore()
     @State private var showingFinishConfirmation = false
     @State private var finishInProgress = false
+    @State private var presentedCompletedWorkoutID: UUID?
+    @State private var finishRequestedAt: Date?
+
+    private var presentedCompletedWorkout: StrengthWorkoutLog? {
+        guard appSession.signedIn, strength.isLoaded(for: appSession.profile.userID),
+              let id = presentedCompletedWorkoutID else { return nil }
+        return strength.workoutHistory.first { $0.id == id && $0.isFinished }
+    }
     @State private var watchFinishTimeoutTask:
         Task<Void, Never>?
     @State private var watchFinishError: String?
@@ -91,7 +99,9 @@ struct ActiveStrengthWorkoutView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let workout = strength.activeWorkout {
+                if let workout = presentedCompletedWorkout {
+                    strengthResultCard(workout, awaitingWatch: false)
+                } else if let workout = strength.activeWorkout {
                     if finishInProgress && workout.captureDevice == .appleWatch {
                         awaitingWatchFinishPreview(workout)
                     } else if workout.exercises.isEmpty {
@@ -632,7 +642,13 @@ struct ActiveStrengthWorkoutView: View {
                 finishInProgress = false
                 spotify.endLinkedWorkoutPlaybackSession()
                 appSession.endTrainingStatus()
-                dismiss()
+                if let oldValue, appSession.signedIn,
+                   strength.isLoaded(for: appSession.profile.userID),
+                   strength.workoutHistory.contains(where: { $0.id == oldValue && $0.isFinished }) {
+                    presentedCompletedWorkoutID = oldValue
+                } else {
+                    dismiss()
+                }
             }
             .onChange(
                 of: scenePhase
@@ -781,7 +797,8 @@ struct ActiveStrengthWorkoutView: View {
         // The current set is a stable bottom surface. Scrolling exercise
         // media/instructions never scrolls away load, reps or the main action.
         .safeAreaInset(edge: .top, spacing: 0) {
-            if let workout = strength.activeWorkout {
+            if let workout = strength.activeWorkout, !finishInProgress,
+               presentedCompletedWorkoutID == nil {
                 VStack(spacing: 6) {
                     ATHLTHLiveWorkoutTopStrip(
                         title: ATHLTHLocalization.choose(
@@ -849,7 +866,8 @@ struct ActiveStrengthWorkoutView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let workout = strength.activeWorkout, canLogOnIPhone(workout) {
+            if let workout = strength.activeWorkout, !finishInProgress,
+               presentedCompletedWorkoutID == nil, canLogOnIPhone(workout) {
                 strengthLiveDock(workout: workout)
             }
         }
@@ -888,7 +906,10 @@ struct ActiveStrengthWorkoutView: View {
             showingLiveAddActions = false
         }
         .onChange(of: finishInProgress) { _, finishing in
-            if finishing { showingLiveAddActions = false }
+            if finishing {
+                showingLiveAddActions = false
+                showingSpotifyControls = false
+            }
         }
         // A strength workout is a true full-screen surface. Spotify can
         // temporarily move ATHLTH to the background while App Remote wakes the
@@ -1883,6 +1904,7 @@ struct ActiveStrengthWorkoutView: View {
         }
 
         finishInProgress = true
+        finishRequestedAt = Date()
 
         switch workout.captureDevice {
         case .appleWatch:
@@ -1949,8 +1971,8 @@ struct ActiveStrengthWorkoutView: View {
             }
 
             appSession.endTrainingStatus()
+            presentedCompletedWorkoutID = workout.id
             finishInProgress = false
-            dismiss()
             // The app-level completion observer creates exactly one
             // HealthKit workout and backfills its UUID after durable save.
             // This view deliberately does not start another HKWorkoutBuilder.
@@ -2027,106 +2049,99 @@ struct ActiveStrengthWorkoutView: View {
         )
     }
 
-    @ViewBuilder
-    /// This is a live preview, NOT a false completed workout. The Watch
-    /// still owns HealthKit recording until it reports a confirmed finish.
-    /// The athlete sees useful results immediately rather than a blank
-    /// spinner while durable HealthKit and connectivity finish their work.
-    private func awaitingWatchFinishPreview(
-        _ workout: StrengthWorkoutLog
+    /// Reuse the detailed strength review for the pending and saved result.
+    private func awaitingWatchFinishPreview(_ workout: StrengthWorkoutLog) -> some View {
+        strengthResultCard(workout, awaitingWatch: true)
+            .accessibilityIdentifier("athlth-watch-finish-pending-summary")
+    }
+
+    private func strengthResultCard(
+        _ workout: StrengthWorkoutLog, awaitingWatch: Bool
     ) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 21) {
-                HStack(spacing: 12) {
-                    Image(systemName: "checkmark.shield")
-                        .font(.title2)
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .frame(width: 52, height: 52)
-                        .background(
-                            ATHLTHTrainDesign.paleGold,
-                            in: RoundedRectangle(cornerRadius: 16)
-                        )
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Workout summary",
-                            norwegian: "Øktoppsummering"
-                        ))
-                        .font(.system(.largeTitle, design: .serif))
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        Text(workout.title)
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    }
-                }
+            VStack(alignment: .leading, spacing: 16) {
+                Label(
+                    awaitingWatch
+                        ? ATHLTHLocalization.choose(english: "Workout summary", norwegian: "Øktoppsummering")
+                        : ATHLTHLocalization.choose(english: "Workout completed", norwegian: "Økt fullført"),
+                    systemImage: awaitingWatch ? "list.bullet.rectangle" : "checkmark.seal.fill"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(workout.title)
+                    .font(.title.bold())
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
 
-                HStack(spacing: 15) {
-                    finishMetric(
-                        title: ATHLTHLocalization.choose(
-                            english: "Sets recorded", norwegian: "Sett registrert"
-                        ),
-                        value: "\(workout.totalCompletedSets)",
-                        symbol: "dumbbell"
-                    )
-                    finishMetric(
-                        title: ATHLTHLocalization.choose(
-                            english: "Training volume", norwegian: "Treningsvolum"
-                        ),
-                        value: String(format: "%.1f kg",
-                                      workout.totalVolumeKilograms),
-                        symbol: "scalemass"
-                    )
-                }
-                .padding(18)
-                .athlthTrainPaper()
-
-                HStack(spacing: 14) {
-                    ProgressView()
-                        .tint(ATHLTHTrainDesign.ink)
-                    VStack(alignment: .leading, spacing: 6) {
+                if awaitingWatch {
+                    HStack(spacing: 10) {
+                        ProgressView()
                         Text(ATHLTHLocalization.choose(
-                            english: "Confirming finish with Apple Watch",
-                            norwegian: "Bekrefter avslutning fra Apple Watch"
+                            english: "Waiting for Apple Watch to confirm the end. Your recorded sets are preserved.",
+                            norwegian: "Venter på bekreftelse fra Apple Watch. De registrerte settene er bevart."
                         ))
-                        .font(.headline)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your recorded sets are safe. The completed workout will appear as soon as Watch confirms the HealthKit recording. This preview does not claim the Watch has stopped.",
-                            norwegian: "De registrerte settene er bevart. Ferdig økt vises når klokken bekrefter HealthKit-registreringen. Denne forhåndsvisningen betyr ikke at klokken allerede er stoppet."
-                        ))
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                     }
+                    .accessibilityElement(children: .combine)
                 }
-                .padding(18)
-                .athlthTrainPaper()
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Exercises",
-                        norwegian: "Øvelser"
-                    ))
-                    .font(.headline)
-                    ForEach(workout.exercises) { item in
-                        HStack {
-                            Text(item.exercise.name)
-                                .font(.subheadline)
-                            Spacer(minLength: 6)
-                            Text("\(item.sets.filter(\.isCompleted).count) " +
-                                 ATHLTHLocalization.choose(
-                                    english: "sets", norwegian: "sett"
-                                 ))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHTrainDesign.secondary)
-                        }
-                    }
+                Divider()
+                focusedWorkoutSummaryMetricGrid(
+                    workout, metrics: SummaryStaticMetrics(workout),
+                    at: workout.endedAt ?? finishRequestedAt ?? Date()
+                )
+                HStack(spacing: 12) {
+                    finishMetric(
+                        title: ATHLTHLocalization.choose(english: "Completed sets", norwegian: "Fullførte sett"),
+                        value: "\(workout.totalCompletedSets)", symbol: "dumbbell"
+                    )
+                    finishMetric(
+                        title: ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser"),
+                        value: "\(workout.exercises.filter { $0.sets.contains(where: \.isCompleted) }.count)",
+                        symbol: "list.bullet"
+                    )
                 }
-                .padding(18)
-                .athlthTrainPaper()
+
+                if let calories = workout.healthMetrics.activeCalories, calories.isFinite {
+                    finishMetric(title: ATHLTHLocalization.choose(english: "Active calories", norwegian: "Aktive kalorier"),
+                                 value: String(format: "%.0f kcal", calories), symbol: "flame")
+                }
+                if let average = workout.healthMetrics.averageHeartRate, average.isFinite {
+                    finishMetric(title: ATHLTHLocalization.choose(english: "Average heart rate", norwegian: "Snittpuls"),
+                                 value: String(format: "%.0f bpm", average), symbol: "heart")
+                }
+                if let maximum = workout.healthMetrics.maxHeartRate, maximum.isFinite {
+                    finishMetric(title: ATHLTHLocalization.choose(english: "Max heart rate", norwegian: "Makspuls"),
+                                 value: String(format: "%.0f bpm", maximum), symbol: "heart.fill")
+                }
+
+                Divider()
+                focusedWorkoutPRSummary(workout)
+                focusedWorkoutSegmentResults(workout)
+                focusedStrengthModeSummary(workout)
+                focusedWorkoutRestSummary(workout)
+                focusedWorkoutExerciseReview(workout, readOnly: true)
+
+                if !awaitingWatch {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig"))
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
             }
-            .padding(20)
+            .padding(18)
+            .athlthTrainPaper()
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+            .padding(16)
         }
+        .scrollIndicators(.hidden)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
-        .accessibilityIdentifier("athlth-watch-finish-pending-summary")
     }
 
     @ViewBuilder
@@ -3948,7 +3963,7 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     private func focusedWorkoutExerciseReview(
-        _ workout: StrengthWorkoutLog
+        _ workout: StrengthWorkoutLog, readOnly: Bool = false
     ) -> some View {
         let workoutPRs =
             strength
@@ -3975,6 +3990,7 @@ struct ActiveStrengthWorkoutView: View {
                     )
                     .font(.headline)
 
+                    if !readOnly {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
@@ -3987,6 +4003,7 @@ struct ActiveStrengthWorkoutView: View {
                     .foregroundStyle(
                         ATHLTHTheme.mutedText
                     )
+                    }
                 }
 
                 Spacer()
@@ -4001,7 +4018,8 @@ struct ActiveStrengthWorkoutView: View {
                         workoutPRs.filter {
                             $0.exerciseID ==
                                 exercise.id
-                        }
+                        },
+                    readOnly: readOnly
                 )
             }
         }
@@ -4011,7 +4029,8 @@ struct ActiveStrengthWorkoutView: View {
         _ exercise:
             StrengthExerciseLog,
         records:
-            [StrengthWorkoutPersonalRecord]
+            [StrengthWorkoutPersonalRecord],
+        readOnly: Bool = false
     ) -> some View {
         VStack(
             alignment: .leading,
@@ -4232,6 +4251,7 @@ struct ActiveStrengthWorkoutView: View {
                                 )
                         }
 
+                        if !readOnly {
                         Image(
                             systemName:
                                 "pencil"
@@ -4250,12 +4270,14 @@ struct ActiveStrengthWorkoutView: View {
                                 .opacity(0.62),
                             in: Circle()
                         )
+                        }
                     }
                     .contentShape(
                         Rectangle()
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(readOnly)
 
                 if set.id !=
                     exercise.sets
