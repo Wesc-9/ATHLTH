@@ -185,6 +185,20 @@ enum TrainingDeviceProvider: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum ATHLTHQuickRunCountdownPreference: Int, CaseIterable, Identifiable {
+    case immediate = 0
+    case five = 5
+    case ten = 10
+    case thirty = 30
+    var id: Int { rawValue }
+    var title: String {
+        if self == .immediate {
+            return ATHLTHLocalization.choose(english: "Start immediately", norwegian: "Start med en gang")
+        }
+        return ATHLTHLocalization.choose(english: "\(rawValue) seconds", norwegian: "\(rawValue) sekunder")
+    }
+}
+
 enum WorkoutCapturePreference: String, CaseIterable, Identifiable, Codable {
     case automatic
     case iPhone
@@ -491,6 +505,14 @@ final class AppSettingsStore: ObservableObject {
     @Published private(set) var lastStrengthAdvancedSetup:
         Bool { didSet { persist() } }
     @Published var autoPauseOutdoorWorkouts: Bool { didSet { persist() } }
+    @Published var defaultFreeRunEnvironment: RunEnvironment { didSet { persist() } }
+    @Published var keepWorkoutScreenAwake: Bool {
+        didSet {
+            persist()
+            ATHLTHWorkoutScreenAwake.refresh()
+        }
+    }
+    @Published var quickRunStartCountdown: ATHLTHQuickRunCountdownPreference { didSet { persist() } }
     @Published var appleHealthIntegrationEnabled: Bool { didSet { persist() } }
     @Published var backgroundHealthSyncEnabled: Bool { didSet { persist() } }
     @Published var externalWorkoutImportMode: ExternalWorkoutImportMode { didSet { persist() } }
@@ -898,6 +920,9 @@ final class AppSettingsStore: ObservableObject {
         }
 
         autoPauseOutdoorWorkouts = defaults.object(forKey: "settings.autoPauseOutdoor") as? Bool ?? false
+        defaultFreeRunEnvironment = RunEnvironment(rawValue: defaults.string(forKey: "settings.defaultFreeRunEnvironment") ?? "") ?? .outdoor
+        keepWorkoutScreenAwake = defaults.object(forKey: "settings.keepWorkoutScreenAwake") as? Bool ?? true
+        quickRunStartCountdown = ATHLTHQuickRunCountdownPreference(rawValue: defaults.integer(forKey: "settings.quickRunStartCountdown")) ?? .immediate
         appleHealthIntegrationEnabled = defaults.object(forKey: "settings.appleHealthIntegrationEnabled") as? Bool ?? true
         backgroundHealthSyncEnabled = defaults.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
         externalWorkoutImportMode = ExternalWorkoutImportMode(
@@ -1300,6 +1325,9 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.lastStrengthAdvancedSetup"
         )
         defaults.set(autoPauseOutdoorWorkouts, forKey: "settings.autoPauseOutdoor")
+        defaults.set(defaultFreeRunEnvironment.rawValue, forKey: "settings.defaultFreeRunEnvironment")
+        defaults.set(keepWorkoutScreenAwake, forKey: "settings.keepWorkoutScreenAwake")
+        defaults.set(quickRunStartCountdown.rawValue, forKey: "settings.quickRunStartCountdown")
         defaults.set(appleHealthIntegrationEnabled, forKey: "settings.appleHealthIntegrationEnabled")
         defaults.set(backgroundHealthSyncEnabled, forKey: "settings.backgroundHealthSyncEnabled")
         defaults.set(externalWorkoutImportMode.rawValue, forKey: "settings.externalWorkoutImportMode")
