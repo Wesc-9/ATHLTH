@@ -6894,10 +6894,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let confirmedOvertake = ghostOvertakeTracker.observe(
+        _ = ghostOvertakeTracker.observe(
             signedGapMeters: distanceDelta,
             elapsedSeconds: ghostRouteElapsedSeconds
         )
+        // Keep the last communicated leader until a stable reversal is
+        // eligible for delivery. A cooldown must defer, not lose, the event.
+        if lastGhostLeadSign == 0 {
+            lastGhostLeadSign = ghostOvertakeTracker.confirmedSign
+        }
 
         var periodicAnnouncement = false
 
@@ -6994,10 +6999,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 distanceDelta
             // Periodic kilometre/time status must not consume the cooldown
             // for a real overtake or meaningful race event.
-            lastGhostLeadSign =
-                ghostLeadSign(
-                    distanceDelta
-                )
+            if ghostOvertakeTracker.confirmedSign == ghostLeadSign(distanceDelta) {
+                lastGhostLeadSign = ghostOvertakeTracker.confirmedSign
+            }
             return
         }
 
@@ -7017,7 +7021,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 distanceDelta
             )
         let signChanged =
-            confirmedOvertake &&
+            ghostOvertakeTracker.confirmedSign == currentSign &&
             currentSign != 0 &&
             lastGhostLeadSign != 0 &&
             currentSign !=
@@ -7075,8 +7079,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             if lastGhostAnnouncedLeadMeters == nil {
                 lastGhostAnnouncedLeadMeters =
                     distanceDelta
-                lastGhostLeadSign =
-                    currentSign
             }
             return
         }
@@ -7105,8 +7107,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         lastGhostAnnouncedLeadMeters =
             distanceDelta
         lastGhostLeadAlertAt = Date()
-        lastGhostLeadSign =
-            currentSign
+        if ghostOvertakeTracker.confirmedSign == currentSign {
+            lastGhostLeadSign = currentSign
+        }
     }
 
     private func announceGhostRaceLead(
