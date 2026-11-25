@@ -411,6 +411,7 @@ private struct ATHLTHSharedEventProgressView: View {
     @State private var reporting: ATHLTHSharedEventExerciseRow?
     @State private var errorMessage: String?
     @State private var busy = false
+    @State private var reportedCompletion = false
     private let cloud = ATHLTHTournamentSingleEventCloud()
 
     private var ownExercises: [ATHLTHSharedEventExerciseRow] {
@@ -472,7 +473,7 @@ private struct ATHLTHSharedEventProgressView: View {
             if phase == .active { Task { await reload() } }
         }
         .sheet(item: $reporting) { item in
-            ATHLTHSharedExerciseReportSheet(exercise: item, userID: userID) { score, note, source in
+            ATHLTHSharedExerciseReportSheet(exercise: item, tournamentID: tournament.id, userID: userID) { score, note, source in
                 try await cloud.submitShared(tournamentID: tournament.id, candidateID: item.candidateID,
                     score: score, evidence: note, sourceWorkoutID: source)
                 await reload()
@@ -541,6 +542,10 @@ private struct ATHLTHSharedEventProgressView: View {
         do {
             rows = try await cloud.sharedState(tournamentID: tournament.id)
             standings = try await cloud.statuses(tournamentID: tournament.id)
+            if !reportedCompletion && tournament.status == "active" && standings.contains(where: { $0.rank != nil }) {
+                reportedCompletion = true
+                await onChanged()
+            }
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
     }
@@ -557,16 +562,33 @@ private struct ATHLTHSharedEventProgressView: View {
 
 private struct ATHLTHSharedExerciseReportSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var phone: IPhoneWorkoutStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     let exercise: ATHLTHSharedEventExerciseRow
+    let tournamentID: UUID
     let userID: UUID
     let onSubmit: @MainActor (Double?, String, UUID?) async throws -> Void
     @State private var score = ""
     @State private var note = ""
     @State private var source: UUID?
     @State private var workouts: [ATHLTHTournamentEligibleWorkout] = []
+    @State private var libraryExerciseID: UUID?
+    @State private var suggestedID: UUID?
+    @State private var didPrefill = false
     @State private var busy = false
     @State private var errorMessage: String?
     private var parsed: Double? { Double(score.replacingOccurrences(of: ",", with: ".")) }
+    private var suggestions: [ATHLTHCompetitionLocalResult] {
+        ATHLTHCompetitionLocalResult.suggestions(exercise: exercise, libraryExerciseID: libraryExerciseID,
+            health: health.workouts, phone: phone.history, strength: strength.workoutHistory)
+    }
+    private func fill(_ suggestion: ATHLTHCompetitionLocalResult) {
+        source = nil
+        suggestedID = suggestion.id
+        score = String(suggestion.value)
+        note = "Måling hentet fra lokal økthistorikk: " + suggestion.title + " · " + suggestion.date.formatted(date: .abbreviated, time: .shortened)
+    }
     private var eligible: [ATHLTHTournamentEligibleWorkout] {
         workouts.filter { item in
             guard item.sourceWorkoutID != nil, let deadline = exercise.deadlineAt,
@@ -582,6 +604,22 @@ private struct ATHLTHSharedExerciseReportSheet: View {
             Form {
                 Section(exercise.title) {
                     Text(exercise.instruction)
+                    if !suggestions.isEmpty {
+                        Picker("Fra treningshistorikken", selection: Binding(
+                            get: { suggestedID },
+                            set: { id in
+                                if let item = suggestions.first(where: { $0.id == id }) { fill(item) }
+                                else { suggestedID = nil; score = ""; note = "" }
+                            })) {
+                            Text("Manuelt").tag(UUID?.none)
+                            ForEach(suggestions) { item in
+                                Text(item.title + " · " + item.date.formatted(date: .abbreviated, time: .shortened))
+                                    .tag(Optional(item.id))
+                            }
+                        }
+                        Text("Forslag fra økthistorikken. Deltakeren kontrollerer målingen før innsending. Dette er ikke serververifisert dokumentasjon.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     if (exercise.activity == "running" || exercise.activity == "walking") && !eligible.isEmpty {
                         Picker("Hent fra registrert økt", selection: $source) {
                             Text("Manuelt resultat").tag(UUID?.none)
@@ -616,6 +654,12 @@ private struct ATHLTHSharedExerciseReportSheet: View {
             .navigationTitle("Registrer resultat").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { dismiss() } } }
             .task {
+                let candidates = try? await ATHLTHTournamentLobbyCloudService().candidates(tournamentID: tournamentID)
+                libraryExerciseID = candidates?.first(where: { $0.id == exercise.candidateID })?.exerciseID
+                if !didPrefill && score.isEmpty && note.isEmpty && suggestions.count == 1, let item = suggestions.first {
+                    didPrefill = true
+                    fill(item)
+                }
                 if let start = exercise.opensAt, exercise.activity == "running" || exercise.activity == "walking" {
                     workouts = (try? await ATHLTHTournamentSingleEventCloud().eligibleWorkouts(userID: userID, after: start)) ?? []
                 }

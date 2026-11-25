@@ -3,6 +3,17 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHCompetitionGPSLapCounterTests: XCTestCase {
+    func testCompetitionPrefillNeverInventsSplitsOrMixesSports() {
+        XCTAssertEqual(ATHLTHCompetitionLocalResult.cardioValue(activity: "running", metric: "distance", target: 5000,
+            workoutActivity: .running, distance: 5010, duration: 1234), 1234)
+        XCTAssertNil(ATHLTHCompetitionLocalResult.cardioValue(activity: "running", metric: "distance", target: 5000,
+            workoutActivity: .running, distance: 10000, duration: 2400))
+        XCTAssertNil(ATHLTHCompetitionLocalResult.cardioValue(activity: "running", metric: "distance", target: 5000,
+            workoutActivity: .walking, distance: 5000, duration: 2400))
+        XCTAssertEqual(ATHLTHCompetitionLocalResult.cardioValue(activity: "walking", metric: "duration", target: 600,
+            workoutActivity: .walking, distance: 1000, duration: 603), 1000)
+    }
+
     private let start = Date().addingTimeInterval(-130)
 
     private func fix(

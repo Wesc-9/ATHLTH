@@ -93,7 +93,7 @@ struct ATHLTHTournamentMyExercisesView: View {
                 requiresVerifiedWorkout: tournament.raceRules.discipline == .sprint,
                 userID: userID,
                 earliestStart: slot.scheduledAt.addingTimeInterval(
-                    TimeInterval(tournament.raceRules.countdownSeconds)),
+                    tournament.raceRules.discipline == .sprint ? TimeInterval(tournament.raceRules.countdownSeconds) : 0),
                 exerciseName: candidates.first(where: {
                     $0.id == slot.candidateID
                 }).flatMap { exerciseNames[$0.lookupID] } ?? "Øvelse",
@@ -283,6 +283,9 @@ struct ATHLTHTournamentMyExercisesView: View {
 
 private struct ATHLTHTournamentExerciseEvidenceSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var phone: IPhoneWorkoutStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     let requiresVerifiedWorkout: Bool
     let userID: UUID
     let earliestStart: Date
@@ -293,11 +296,24 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
     @State private var evidence = ""
     @State private var verifiedWorkouts: [ATHLTHTournamentEligibleWorkout] = []
     @State private var selectedWorkoutID: UUID?
+    @State private var selectedLocalID: UUID?
     @State private var submitting = false
     @State private var errorMessage: String?
 
+    private var localWorkouts: [SocialPublishableWorkout] {
+        ATHLTHArenaWorkoutIdentity.distinct(
+            (phone.history.filter { $0.end != nil }.map(SocialPublishableWorkout.init(phoneWorkout:)) +
+             strength.workoutHistory.filter(\.isFinished).map(SocialPublishableWorkout.init(strengthWorkout:)) +
+             health.workouts.map(SocialPublishableWorkout.init(summary:)))
+                .filter { $0.startDate >= earliestStart && $0.endDate <= deadline && $0.endDate <= Date() &&
+                    ATHLTHArenaLocalEvidenceCheck.verify($0, health: health.workouts,
+                        phone: phone.history, strength: strength.workoutHistory).isUsable }
+                .sorted { $0.endDate > $1.endDate })
+    }
+
     var body: some View {
         NavigationStack {
+            ScrollView {
             VStack(alignment: .leading,spacing: 17) {
                 Text(exerciseName)
                     .font(.system(size: 28,design: .serif))
@@ -310,6 +326,29 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                 Text("Beskriv hva du gjennomførte. Registreringen er tidsstemplet og synlig i konkurransen. Korrekt treningsresultat må fortsatt godkjennes etter konkurransereglene.")
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                if !requiresVerifiedWorkout && !localWorkouts.isEmpty {
+                    Picker("Hent fra treningshistorikken", selection: Binding(
+                        get: { selectedLocalID },
+                        set: { id in
+                            selectedLocalID = id
+                            if let workout = localWorkouts.first(where: { $0.id == id }) {
+                                evidence = "Fra lokal økthistorikk: " + workout.title + " · " +
+                                    workout.endDate.formatted(date: .abbreviated, time: .shortened)
+                                if let distance = workout.distanceMeters {
+                                    evidence += " · " + (distance/1000).formatted() + " km"
+                                }
+                                evidence += " · " + (workout.duration/60).formatted(.number.precision(.fractionLength(0...1))) + " min"
+                            }
+                        })) {
+                        Text("Manuelt").tag(UUID?.none)
+                        ForEach(localWorkouts) { workout in
+                            Text(workout.title + " · " + workout.endDate.formatted(date: .abbreviated, time: .shortened))
+                                .tag(Optional(workout.id))
+                        }
+                    }
+                    Text("Kontroller at den valgte økten gjelder konkurranseøvelsen. Lokal historikk er ikke serververifisering.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 TextField("Beskriv gjennomføringen",text: $evidence,axis: .vertical)
                     .lineLimit(3...6)
                     .padding(15)
@@ -365,6 +404,7 @@ private struct ATHLTHTournamentExerciseEvidenceSheet: View {
                 Spacer()
             }
             .padding(18)
+            }
             .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
             .navigationTitle("Gjennomføring")
             .navigationBarTitleDisplayMode(.inline)

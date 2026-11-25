@@ -149,3 +149,72 @@ struct ATHLTHCompetitionCaptureContext: Codable, Equatable {
 
     var isRaceArmed: Bool { Date() >= startSignalAt }
 }
+
+
+/// Local measurements prefill a competition report, but never attest the
+/// source to the server or submit health information without the athlete.
+struct ATHLTHCompetitionLocalResult: Identifiable {
+    let id: UUID
+    let title: String
+    let date: Date
+    let value: Double
+
+    static func cardioValue(activity: String, metric: String, target: Double?,
+                            workoutActivity: WorkoutActivity, distance: Double?,
+                            duration: Double) -> Double? {
+        guard (activity == "running" && workoutActivity == .running) ||
+              (activity == "walking" && workoutActivity == .walking),
+              let target, target.isFinite, target > 0,
+              let distance, distance.isFinite, distance > 0,
+              duration.isFinite, duration > 0 else { return nil }
+        // Never extrapolate a 5 km split from a longer workout.
+        if metric == "distance", abs(distance-target) <= target*0.02 { return duration }
+        if metric == "duration", abs(duration-target) <= 5 { return distance }
+        return nil
+    }
+
+    static func suggestions(exercise: ATHLTHSharedEventExerciseRow, libraryExerciseID: UUID?,
+                            health: [WorkoutSummary], phone: [PhoneWorkout],
+                            strength: [StrengthWorkoutLog]) -> [Self] {
+        guard let start = exercise.opensAt, let end = exercise.deadlineAt else { return [] }
+        if exercise.activity == "strength" {
+            // Match the actual library exercise identity, not just a name.
+            // Templates without a stable identity require manual entry.
+            guard let libraryExerciseID else { return [] }
+            return strength.compactMap { log in
+                guard log.isFinished, let finished = log.endedAt,
+                      log.startedAt >= start, finished <= end, finished <= Date(),
+                      finished > log.startedAt else { return nil }
+                let performed = log.exercises.filter { $0.exercise.libraryExerciseID == libraryExerciseID }
+                guard performed.count == 1, let movement = performed.first else { return nil }
+                let sets = movement.sets.filter(\.countsTowardTrainingLoad)
+                guard !sets.isEmpty else { return nil }
+                let measured: Double
+                if exercise.metric == "repetitions" {
+                    let values = sets.compactMap(\.resolvedCompletedReps)
+                    guard values.count == sets.count else { return nil }
+                    measured = Double(values.reduce(0,+))
+                } else if exercise.metric == "time" {
+                    let values = sets.compactMap(\.resolvedCompletedDurationSeconds)
+                    guard let longest = values.max() else { return nil }
+                    measured = Double(longest)
+                } else { return nil }
+                guard exercise.accepts(measured), measured > 0 else { return nil }
+                return Self(id: log.id, title: log.title, date: finished, value: measured)
+            }.sorted { $0.date > $1.date }
+        }
+        let history = ATHLTHArenaWorkoutIdentity.distinct(
+            (phone.filter { $0.end != nil }.map(SocialPublishableWorkout.init(phoneWorkout:)) +
+             health.map(SocialPublishableWorkout.init(summary:))).sorted { $0.endDate > $1.endDate })
+        return history.compactMap { workout in
+            guard workout.startDate >= start, workout.endDate <= end, workout.endDate <= Date(),
+                  workout.endDate > workout.startDate,
+                  ATHLTHArenaLocalEvidenceCheck.verify(workout, health: health, phone: phone, strength: strength).isUsable,
+                  let value = cardioValue(activity: exercise.activity, metric: exercise.metric,
+                     target: exercise.targetValue, workoutActivity: workout.activity,
+                     distance: workout.distanceMeters, duration: workout.duration),
+                  exercise.accepts(value) else { return nil }
+            return Self(id: workout.id, title: workout.title, date: workout.endDate, value: value)
+        }
+    }
+}
