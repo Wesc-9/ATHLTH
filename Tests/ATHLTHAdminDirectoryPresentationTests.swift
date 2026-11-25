@@ -6,7 +6,7 @@ final class ATHLTHAdminDirectoryPresentationTests: XCTestCase {
         let date = Date(timeIntervalSince1970: 1_795_000_000)
         XCTAssertEqual(
             ATHLTHAdminDirectoryPresentation.lastSignInLabel(date, norwegian: true),
-            date.formatted(date: .abbreviated, time: .shortened)
+            date.formatted(date: .abbreviated, time: .omitted)
         )
         XCTAssertEqual(ATHLTHAdminDirectoryPresentation.lastSignInLabel(nil, norwegian: true), "Ikke registrert")
         XCTAssertEqual(ATHLTHAdminDirectoryPresentation.lastSignInLabel(nil, norwegian: false), "Not recorded")
