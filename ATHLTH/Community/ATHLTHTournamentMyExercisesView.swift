@@ -44,7 +44,9 @@ struct ATHLTHTournamentMyExercisesView: View {
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
             }
-            Text(tournament.releaseMode == "everyone_finished"
+            Text(tournament.releaseMode == "all_at_start"
+                ? "Alle øvelser i oppgjøret er tilgjengelige fra samme starttidspunkt. Gjennomfør i valgfri rekkefølge."
+                : tournament.releaseMode == "everyone_finished"
                 ? "Neste øvelse åpnes når alle har godkjent forrige resultat, eller når den forrige fristen er behandlet. Uteblitt øvelse gir 0 poeng."
                 : "Hver øvelse har en egen gjennomføringsfrist. Uteblitt øvelse gir 0 poeng; oppgjøret avgjøres først når alle øvelser er vurdert.")
                 .font(.caption)

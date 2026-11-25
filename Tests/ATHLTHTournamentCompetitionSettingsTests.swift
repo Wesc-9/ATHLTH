@@ -30,9 +30,19 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         )
         XCTAssertEqual(
             Set(ATHLTHCompetitionUnlock.allCases),
-            Set([.interval, .everyoneFinished])
+            Set([.interval, .everyoneFinished, .allAtStart])
         )
         XCTAssertEqual(ATHLTHTournamentCompetitionSettings().missedExercisePoints, 0)
+    }
+
+    func testAllAtStartSurvivesDraftRoundTrip() throws {
+        var options = ATHLTHTournamentCompetitionSettings()
+        options.unlock = .allAtStart
+        let restored = try JSONDecoder().decode(ATHLTHTournamentCompetitionSettings.self,
+            from: JSONEncoder().encode(options))
+        XCTAssertEqual(restored.unlock, .allAtStart)
+        XCTAssertTrue(restored.isValid)
+        XCTAssertEqual(restored.unlock.rawValue, "all_at_start")
     }
 
     func testInvalidStartDateCannotBePublished() {

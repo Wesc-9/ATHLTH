@@ -1085,6 +1085,7 @@ struct ATHLTHTournamentCreator: View {
                 .font(.subheadline)
             Label(exerciseMode == .open ? "Åpen øvelsesliste" : "\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
             Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
+            Label(competitionSettings.unlock.title, systemImage: "list.bullet").font(.subheadline)
             if let start = competitionSettings.startsAt {
                 Text(start.formatted(date: .abbreviated, time: .shortened)).font(.caption)
             }

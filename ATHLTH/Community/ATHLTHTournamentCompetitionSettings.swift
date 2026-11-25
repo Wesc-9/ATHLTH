@@ -4,11 +4,13 @@ import Foundation
 /// Old locally saved drafts decode with conservative defaults.
 enum ATHLTHCompetitionUnlock: String, Codable, CaseIterable, Identifiable {
     case interval, everyoneFinished
+    case allAtStart = "all_at_start"
     var id: String { rawValue }
     var title: String {
         switch self {
         case .interval: return "Etter valgt tidsrom"
         case .everyoneFinished: return "Når alle har gjennomført"
+        case .allAtStart: return "Alle øvelser tilgjengelig fra start"
         }
     }
 }

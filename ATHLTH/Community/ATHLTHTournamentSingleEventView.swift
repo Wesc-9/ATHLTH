@@ -355,6 +355,10 @@ private struct ATHLTHSharedEventProgressView: View {
             VStack(alignment: .leading, spacing: 9) {
                 Text(tournament.displayFormatTitle).font(ATHLTHTrainDesign.sectionHeading)
                 Text(tournament.selectedBranchesLabel).font(.subheadline)
+                if tournament.releaseMode == "all_at_start" {
+                    Label("Alle øvelser tilgjengelig fra start", systemImage: "square.stack")
+                        .font(.caption.weight(.medium)).foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
                 Text("\(decided) av \(ownExercises.count) øvelser avgjort").font(.caption.weight(.medium))
                 if !ownExercises.isEmpty {
                     ProgressView(value: Double(decided), total: Double(ownExercises.count))

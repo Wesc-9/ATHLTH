@@ -68,9 +68,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 }
                 Divider()
                 if !isSharedEvent || usesIndividualExerciseDeadlines {
-                Text("Når åpner neste øvelse?")
+                Text("Når er øvelsene tilgjengelige?")
                     .font(.subheadline.weight(.semibold))
-                Picker("Neste øvelse", selection: $settings.unlock) {
+                Picker("Progresjon", selection: $settings.unlock) {
                     ForEach(ATHLTHCompetitionUnlock.allCases) { type in
                         Text(type.title).tag(type)
                     }
@@ -91,6 +91,10 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                         .pickerStyle(.menu)
                     }
                     .font(.subheadline)
+                } else if settings.unlock == .allAtStart {
+                    Text("Alle øvelser i konkurransen eller oppgjøret åpner samtidig. Gjennomfør dem i valgfri rekkefølge, gjerne i samme treningsøkt. Hver øvelse må fortsatt ha sitt eget resultat.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 } else {
                     Text("Neste øvelse åpnes når alle deltakere har fullført, eller den forrige fristen er utløpt. Fraværende deltakere får 0.")
                         .font(.caption)

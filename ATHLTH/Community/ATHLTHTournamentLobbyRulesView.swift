@@ -130,7 +130,9 @@ struct ATHLTHTournamentLobbyRulesView: View {
                     }
                     if !tournament.singleEventMode || tournament.raceRules.exerciseScoringVersion == 2 {
                     Label(
-                        tournament.releaseMode == "everyone_finished"
+                        tournament.releaseMode == "all_at_start"
+                            ? "Alle øvelser tilgjengelig fra start"
+                            : tournament.releaseMode == "everyone_finished"
                             ? "Neste øvelse: når alle er ferdige"
                             : "Neste øvelse: hver \(tournament.releaseEvery) " +
                                 (tournament.releaseUnit == "month" ? "måned(er)"
