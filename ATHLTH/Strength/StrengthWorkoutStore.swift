@@ -596,7 +596,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 timedSetCountdown: timedSetCountdown,
                 setEffortClock: setEffortClock,
                 cardioWatchCaptures: cardioWatchCaptures,
-                savedAt: Date(),
+                // Backgrounding a recovered but unacknowledged workout must
+                // not move the downtime boundary forward to the current time.
+                savedAt: recoveredCheckpointSavedAt ?? Date(),
                 ghostReferences: activeWorkout.map { workout in
                     activeGhostReferences.filter { $0.value.workoutID == workout.id }
                 }
