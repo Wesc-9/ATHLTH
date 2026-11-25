@@ -21,6 +21,23 @@ final class ATHLTHDirectMessageDeliveryTests: XCTestCase {
         XCTAssertEqual(json["body"] as? String, "Hei")
     }
 
+    func testPushInvalidatesOnlyTheExactAccountAndConversation() {
+        let owner = UUID(), thread = UUID()
+        var payload: [AnyHashable: Any] = [
+            "athlth_entity_type": "direct_conversation",
+            "athlth_recipient_id": owner.uuidString.lowercased(),
+            "athlth_entity_id": thread.uuidString
+        ]
+        XCTAssertTrue(ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: owner, conversation: thread))
+        XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: UUID(), conversation: thread))
+        XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: owner, conversation: UUID()))
+        payload["athlth_entity_type"] = "community_group"
+        XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: owner, conversation: thread))
+        payload["athlth_entity_type"] = "direct_conversation"
+        payload.removeValue(forKey: "athlth_recipient_id")
+        XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: owner, conversation: thread))
+    }
+
     func testIndependentMessageInsertsDoNotShareIdentity() {
         XCTAssertNotEqual(message().id, message().id)
     }
