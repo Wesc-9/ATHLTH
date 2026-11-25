@@ -3996,136 +3996,142 @@ private struct ATHLTHNotificationSettingsView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @ObservedObject private var push = APNsPushManager.shared
 
-    var body: some View {
-        Form {
-            Section {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Daily check-in",
-                        norwegian: "Daglig innsjekk"
-                    ),
-                    isOn: $settings.dailyCheckInRemindersEnabled
-                )
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
 
-                if settings.dailyCheckInRemindersEnabled {
-                    DatePicker(
-                        ATHLTHLocalization.choose(
-                            english: "Reminder time",
-                            norwegian: "Klokkeslett"
-                        ),
-                        selection: $settings.dailyCheckInReminderTime,
-                        displayedComponents: .hourAndMinute
-                    )
-                    .datePickerStyle(.compact)
-                    .tint(ATHLTHTheme.premiumGold)
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(tr("Notifications", "Varsler"))
+                        .font(.system(size: 32, weight: .regular, design: .serif))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(tr("Choose what ATHLTH notifies you about.", "Velg hva ATHLTH skal varsle deg om."))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
-                // Permission is only surfaced when the user needs to act.
-                // Keep APNs registration/repair running independently.
-                if hasEnabledAlerts {
-                    if notifications.authorizationStatus == .notDetermined {
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english: "Enable iPhone notifications",
-                                norwegian: "Aktiver iPhone-varsler"
-                            )
-                        ) {
-                            Task {
-                                await notifications.requestSystemNotificationPermission()
+                notificationSection(tr("Reminders", "Påminnelser")) {
+                    PremiumSettingsCard {
+                        notificationToggle(
+                            icon: "checkmark.circle",
+                            title: tr("Daily check-in", "Daglig innsjekk"),
+                            subtitle: tr("Reminder if you have not checked in", "Påminnelse hvis du ikke har sjekket inn"),
+                            isOn: $settings.dailyCheckInRemindersEnabled
+                        )
+                        if settings.dailyCheckInRemindersEnabled {
+                            SettingsDivider()
+                            PremiumSettingsRow(
+                                icon: "clock",
+                                iconTint: ATHLTHTheme.accentDeep,
+                                iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                title: tr("Reminder time", "Klokkeslett"),
+                                subtitle: tr("Your daily reminder", "Din daglige påminnelse")
+                            ) {
+                                DatePicker(
+                                    tr("Reminder time", "Klokkeslett"),
+                                    selection: $settings.dailyCheckInReminderTime,
+                                    displayedComponents: .hourAndMinute
+                                )
+                                .labelsHidden()
+                                .datePickerStyle(.compact)
+                                .tint(ATHLTHTheme.premiumGold)
+                                .fixedSize()
                             }
                         }
-                    } else if notifications.authorizationStatus == .denied {
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english: "Enable notifications in iOS Settings",
-                                norwegian: "Aktiver varsler i iOS-innstillinger"
-                            )
-                        ) {
-                            if let url = URL(
-                                string: UIApplication.openNotificationSettingsURLString
+                    }
+                    if hasEnabledAlerts {
+                        if notifications.authorizationStatus == .notDetermined {
+                            permissionButton(
+                                title: tr("Enable iPhone notifications", "Aktiver iPhone-varsler"),
+                                subtitle: tr("Allow notifications from ATHLTH", "Tillat varsler fra ATHLTH")
                             ) {
-                                openURL(url)
+                                Task { await notifications.requestSystemNotificationPermission() }
+                            }
+                        } else if notifications.authorizationStatus == .denied {
+                            permissionButton(
+                                title: tr("Enable notifications in iOS Settings", "Aktiver varsler i iOS-innstillinger"),
+                                subtitle: tr("Notifications are disabled in iOS", "Varsler er deaktivert i iOS")
+                            ) {
+                                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                                    openURL(url)
+                                }
                             }
                         }
                     }
                 }
-            } header: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Reminders",
-                        norwegian: "Påminnelser"
-                    )
-                )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "A daily reminder at your chosen local time if you have not checked in. It can also appear in Activity.",
-                        norwegian: "Daglig påminnelse på valgt klokkeslett hvis du ikke har sjekket inn. Den kan også vises i Aktivitet."
-                    )
-                )
-            }
 
-            Section(
-                ATHLTHLocalization.choose(
-                    english: "Training",
-                    norwegian: "Trening"
-                )
-            ) {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Workout updates",
-                        norwegian: "Øktoppdateringer"
-                    ),
-                    isOn: $settings.workoutRemindersEnabled
-                )
-            }
+                notificationSection(tr("Training", "Trening")) {
+                    PremiumSettingsCard {
+                        notificationToggle(
+                            icon: "figure.run",
+                            title: tr("Workout updates", "Øktoppdateringer"),
+                            subtitle: tr("Notifications related to your workouts", "Varsler knyttet til treningsøktene dine"),
+                            isOn: $settings.workoutRemindersEnabled
+                        )
+                    }
+                }
 
-            Section {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Friend activity",
-                        norwegian: "Venneaktivitet"
-                    ),
-                    isOn: $settings.friendActivityNotificationsEnabled
+                notificationSection(tr("Community", "Fellesskap")) {
+                    PremiumSettingsCard {
+                        notificationToggle(
+                            icon: "person.2",
+                            title: tr("Friend activity", "Venneaktivitet"),
+                            subtitle: tr("Activity from your friends", "Aktivitet fra vennene dine"),
+                            isOn: $settings.friendActivityNotificationsEnabled
+                        )
+                        SettingsDivider()
+                        notificationToggle(
+                            icon: "trophy",
+                            title: tr("Challenges", "Utfordringer"),
+                            subtitle: tr("Updates about challenges", "Oppdateringer om utfordringer"),
+                            isOn: $settings.challengeNotificationsEnabled
+                        )
+                        SettingsDivider()
+                        notificationToggle(
+                            icon: "bubble.left.and.bubble.right",
+                            title: tr("Messages", "Meldinger"),
+                            subtitle: tr("New messages in your inbox", "Nye meldinger i innboksen"),
+                            isOn: $settings.messageNotificationsEnabled
+                        )
+                        SettingsDivider()
+                        notificationToggle(
+                            icon: "at",
+                            title: tr("Mentions", "Omtaler"),
+                            subtitle: tr("When someone mentions you", "Når noen omtaler deg"),
+                            isOn: $settings.mentionNotificationsEnabled
+                        )
+                    }
+                }
+
+                Label(
+                    tr("Choose which alerts appear on your iPhone. Activity remains available in ATHLTH.", "Velg hvilke varsler du får på iPhone. Aktiviteten er fortsatt tilgjengelig i ATHLTH."),
+                    systemImage: "info.circle"
                 )
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Challenges",
-                        norwegian: "Utfordringer"
-                    ),
-                    isOn: $settings.challengeNotificationsEnabled
-                )
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Messages",
-                        norwegian: "Meldinger"
-                    ),
-                    isOn: $settings.messageNotificationsEnabled
-                )
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Mentions",
-                        norwegian: "Omtaler"
-                    ),
-                    isOn: $settings.mentionNotificationsEnabled
-                )
-            } header: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Community",
-                        norwegian: "Fellesskap"
-                    )
-                )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Choose which alerts appear on your iPhone. Activity remains available in ATHLTH.",
-                        norwegian: "Velg hvilke varsler du får på iPhone. Aktiviteten er fortsatt tilgjengelig i ATHLTH."
-                    )
-                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .padding(.horizontal, 8)
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+            .padding(.bottom, 32)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
         }
-        .athlthBrandedForm()
+        .background {
+            ZStack {
+                LinearGradient(
+                    colors: [ATHLTHTheme.canvasTop, .white, ATHLTHTheme.canvasBottom],
+                    startPoint: .top, endPoint: .bottomTrailing
+                )
+                RadialGradient(
+                    colors: [ATHLTHTheme.premiumGold.opacity(0.055), .clear],
+                    center: .topTrailing, startRadius: 20, endRadius: 420
+                )
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english: "Notifications",
@@ -4153,6 +4159,55 @@ private struct ATHLTHNotificationSettingsView: View {
             Task {
                 await notifications.reconcileSystemPreferences()
             }
+        }
+    }
+
+    private func notificationSection<Content: View>(
+        _ title: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title.uppercased())
+                .font(.caption.weight(.semibold))
+                .tracking(2.8)
+                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                .padding(.leading, 16)
+            content()
+        }
+    }
+
+    private func notificationToggle(
+        icon: String, title: String, subtitle: String, isOn: Binding<Bool>
+    ) -> some View {
+        PremiumSettingsRow(
+            icon: icon,
+            iconTint: ATHLTHTheme.accentDeep,
+            iconBackground: ATHLTHTheme.premiumGoldSoft,
+            title: title, subtitle: subtitle
+        ) {
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .tint(ATHLTHTheme.premiumGold)
+                .fixedSize()
+                .accessibilityLabel(Text(title))
+        }
+    }
+
+    private func permissionButton(
+        title: String, subtitle: String, action: @escaping () -> Void
+    ) -> some View {
+        PremiumSettingsCard {
+            Button(action: action) {
+                PremiumSettingsRow(
+                    icon: "bell.badge",
+                    iconTint: ATHLTHTheme.accentDeep,
+                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                    title: title, subtitle: subtitle
+                ) {
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 
