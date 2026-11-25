@@ -6195,15 +6195,21 @@ struct ActiveStrengthWorkoutView: View {
                 let needsStart = strength.currentSetEffortClock == nil ||
                     (currentStrengthTargetKind == .time &&
                      strength.currentTimedSetCountdown?.isRunning != true)
+                let selectedSetID = strength.currentSet?.id
+                let retainedSkips = exercise.sets.filter { $0.skippedAt != nil }.count
+                let originalSetCount = exercise.sets.count +
+                    max(0, (exercise.skippedPlannedSetCount ?? 0) - retainedSkips)
                 ATHLTHLiveWorkoutBottomDock(
                     mode: needsStart ? .strengthReady : .strengthWorking,
                     subtitle: ATHLTHLocalization.format(
                         english: "Set %d of %d",
                         norwegian: "Sett %d av %d",
                         strength.currentSet?.setNumber ?? 1,
-                        max(exercise.sets.count, 1)
+                        max(originalSetCount, 1)
                     ),
                     primaryDisabled: strength.currentSet == nil,
+                    secondaryDisabled: selectedSetID == nil || finishInProgress,
+                    skipsCurrentSet: true,
                     onPrimary: {
                         if needsStart {
                             if currentStrengthTargetKind == .time {
@@ -6215,7 +6221,19 @@ struct ActiveStrengthWorkoutView: View {
                             strength.completeCurrentDraftSet()
                         }
                     },
-                    onSecondary: { showingExerciseQueue = true },
+                    onSecondary: {
+                        // A delayed tap must never skip a different set
+                        // after Watch or the group clock advances the workout.
+                        guard let selectedSetID,
+                              let active = strength.activeWorkout,
+                              active.id == workout.id,
+                              canLogOnIPhone(active),
+                              !finishInProgress,
+                              strength.currentExercise?.id == exercise.id,
+                              strength.currentSet?.id == selectedSetID,
+                              !strength.isResting else { return }
+                        _ = strength.skipCurrentSet()
+                    },
                     detailsCollapsed: hiddenStrengthDockWorkoutID == workout.id,
                     onCollapse: { toggleStrengthDockDetails(for: workout.id) }
                 ) {

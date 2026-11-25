@@ -87,6 +87,26 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
         }
     }
 
+    func testActiveSetCanReplaceOverviewWithSkipWithoutChangingOtherModes() {
+        for mode: ATHLTHLiveWorkoutBottomMode in [.strengthReady, .strengthWorking] {
+            let dock = ATHLTHLiveWorkoutBottomDock(
+                mode: mode, skipsCurrentSet: true,
+                onPrimary: {}, onSecondary: {},
+                detailsCollapsed: true, onCollapse: {}
+            ) { EmptyView() }
+            XCTAssertEqual(dock.resolvedSecondarySymbol, "forward.end")
+            XCTAssertNotEqual(dock.resolvedSecondaryTitle, mode.secondaryTitle)
+            XCTAssertFalse(dock.showsDetails)
+        }
+        for mode: ATHLTHLiveWorkoutBottomMode in [.strengthRest, .strengthExerciseRest, .strengthNextExercise, .strengthFinish] {
+            let dock = ATHLTHLiveWorkoutBottomDock(
+                mode: mode, skipsCurrentSet: true, onPrimary: {}, onSecondary: {}
+            ) { EmptyView() }
+            XCTAssertEqual(dock.resolvedSecondaryTitle, mode.secondaryTitle)
+            XCTAssertEqual(dock.resolvedSecondarySymbol, mode.secondarySymbol)
+        }
+    }
+
     func testStrengthDockCollapseIsSeparateFromRecordingActions() {
         var primaryCalls = 0
         var secondaryCalls = 0

@@ -37,6 +37,25 @@ final class StrengthSkipSetWatchTests: XCTestCase {
     }
 
     @MainActor
+    func testSkippingCurrentSetPreservesCompletedAndRemainingSetIdentities() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        store.appendExercise(exercise(), sets: 4, reps: 8, restSeconds: 0)
+        let before = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets)
+        store.completeCurrentDraftSet()
+        XCTAssertEqual(store.currentSet?.id, before[1].id)
+        XCTAssertTrue(store.skipCurrentSet())
+        let after = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets)
+        XCTAssertEqual(after.map(\.id), [before[0].id, before[2].id, before[3].id])
+        XCTAssertTrue(after[0].isCompleted)
+        XCTAssertFalse(after[1].isResolved)
+        XCTAssertFalse(after[2].isResolved)
+        XCTAssertEqual(store.currentSet?.id, before[2].id)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.skippedPlannedSetCount, 1)
+    }
+
+    @MainActor
     func testSkippingTheOnlySetFinishesExerciseButDoesNotRecordASet() {
         let store = StrengthWorkoutStore()
         store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)

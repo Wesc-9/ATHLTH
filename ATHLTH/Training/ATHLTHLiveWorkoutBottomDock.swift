@@ -10,6 +10,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
     let subtitle: String?
     let primaryDisabled: Bool
     let secondaryDisabled: Bool
+    let skipsCurrentSet: Bool
     let onPrimary: () -> Void
     let onSecondary: (() -> Void)?
     let detailsCollapsed: Bool
@@ -22,6 +23,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         subtitle: String? = nil,
         primaryDisabled: Bool = false,
         secondaryDisabled: Bool = false,
+        skipsCurrentSet: Bool = false,
         onPrimary: @escaping () -> Void,
         onSecondary: (() -> Void)? = nil,
         detailsCollapsed: Bool = false,
@@ -32,6 +34,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         self.subtitle = subtitle
         self.primaryDisabled = primaryDisabled
         self.secondaryDisabled = secondaryDisabled
+        self.skipsCurrentSet = skipsCurrentSet
         self.onPrimary = onPrimary
         self.onSecondary = onSecondary
         self.detailsCollapsed = detailsCollapsed
@@ -142,10 +145,23 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         .accessibilityIdentifier("athlth-shared-live-primary-action")
     }
 
+    // Only the active strength set opts into skipping. Other shared
+    // workout surfaces retain their original mode-specific secondary action.
+    var resolvedSecondaryTitle: String? {
+        skipsCurrentSet && (mode == .strengthReady || mode == .strengthWorking)
+            ? ATHLTHLocalization.choose(english: "Skip set", norwegian: "Hopp over")
+            : mode.secondaryTitle
+    }
+
+    var resolvedSecondarySymbol: String? {
+        skipsCurrentSet && (mode == .strengthReady || mode == .strengthWorking)
+            ? "forward.end" : mode.secondarySymbol
+    }
+
     @ViewBuilder
     private var secondaryButton: some View {
-        if let onSecondary, let title = mode.secondaryTitle,
-           let symbol = mode.secondarySymbol {
+        if let onSecondary, let title = resolvedSecondaryTitle,
+           let symbol = resolvedSecondarySymbol {
             Button(action: onSecondary) {
                 Label(title, systemImage: symbol)
                     .font(.caption.weight(.semibold))
