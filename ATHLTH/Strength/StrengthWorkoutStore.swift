@@ -1648,9 +1648,12 @@ final class StrengthWorkoutStore: ObservableObject {
         if setID == nil {
             entries.removeAll { $0.exerciseID == exerciseID }
         } else {
-            guard !entries.contains(where: {
+            if let existing = entries.firstIndex(where: {
                 $0.exerciseID == exerciseID && ($0.setID == nil || $0.setID == setID)
-            }) else { return false }
+            }) {
+                guard next, entries[existing].setID == setID else { return false }
+                entries.remove(at: existing)
+            }
         }
         if next { entries.insert(entry, at: 0) } else { entries.append(entry) }
         workout.liveExecutionQueue = entries
@@ -5555,6 +5558,8 @@ final class StrengthWorkoutStore: ObservableObject {
             currentSetIndex = max(exercise.sets.count - 1, 0)
         }
         workout.exercises[currentExerciseIndex] = exercise
+        _ = advanceLiveExecutionQueue(workout: &workout, automaticRestTimer: false,
+                                      restSeconds: 0, at: Date())
         activeWorkout = workout
         reloadDraftFromCurrentSet()
         persistCheckpointNow()
@@ -5607,6 +5612,22 @@ final class StrengthWorkoutStore: ObservableObject {
             currentExerciseAllSetsCompleted,
             hasNextExercise
         else {
+            return
+        }
+
+        let previousIndex = currentExerciseIndex
+        if advanceLiveExecutionQueue(workout: &workout, automaticRestTimer: false,
+                                     restSeconds: 0, at: date) {
+            if let completedAt = workout.exercises[previousIndex].completedAt {
+                workout.exercises[previousIndex].transitionToNextExerciseSeconds =
+                    max(date.timeIntervalSince(completedAt), 0)
+            }
+            activeWorkout = workout
+            reloadDraftFromCurrentSet()
+            if currentSet?.resolvedTargetKind == .time {
+                startOrResumeTimedSet(at: date)
+            }
+            persistCheckpointNow()
             return
         }
 
