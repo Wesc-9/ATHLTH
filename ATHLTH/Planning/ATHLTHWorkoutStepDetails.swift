@@ -196,6 +196,7 @@ struct ATHLTHWorkoutStepDetails: View {
     let maximumHeartRateBPM: Double?
     let suggestion: String?
     var suggestedZones: ClosedRange<Int>? = nil
+    var showMissingHeartRateHint = true
 
     private var ink: Color { ATHLTHPlanDesign.ink }
     private var accent: Color { ATHLTHPlanDesign.accentInk }
@@ -422,7 +423,7 @@ struct ATHLTHWorkoutStepDetails: View {
                         )
                         .font(.caption)
                         .foregroundStyle(muted)
-                    } else {
+                    } else if showMissingHeartRateHint {
                         Text(tr(
                             "Set your maximum heart rate in your profile to see an estimated bpm range.",
                             "Legg inn makspuls i profilen for å se beregnet pulsområde i slag/min."
