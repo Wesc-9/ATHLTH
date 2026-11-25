@@ -446,6 +446,7 @@ final class SocialWorkoutCompanionStore:
             return
         }
 
+        let owner = client.auth.currentUser?.id
         isRefreshing = true
         defer {
             isRefreshing = false
@@ -492,17 +493,14 @@ final class SocialWorkoutCompanionStore:
                     .execute()
                     .value
 
-            let loaded =
-                try await (
-                    states,
-                    chat
-                )
-            liveStates = loaded.0
-            messages = loaded.1
-            errorMessage = nil
+            let loaded = try await (states, chat)
+            guard !Task.isCancelled, client.auth.currentUser?.id == owner else { return }
+            if liveStates != loaded.0 { liveStates = loaded.0 }
+            if messages != loaded.1 { messages = loaded.1 }
+            if errorMessage != nil { errorMessage = nil }
         } catch {
-            errorMessage =
-                error.localizedDescription
+            guard !Task.isCancelled, client.auth.currentUser?.id == owner else { return }
+            if errorMessage != error.localizedDescription { errorMessage = error.localizedDescription }
         }
     }
 

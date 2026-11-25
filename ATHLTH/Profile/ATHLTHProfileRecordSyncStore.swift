@@ -159,12 +159,13 @@ final class ATHLTHProfileRecordSyncStore: ObservableObject {
             let fetched = Dictionary(
                 uniqueKeysWithValues: rows.map { ($0.record_key, $0) }
             )
-            if fetched != values {
-                // A missing/empty cloud result must never erase locally
-                // captured records if an upload has not yet succeeded.
-                values.merge(fetched) { _, remote in remote }
+            // Merge before comparing: a partial/empty response must not
+            // trigger a publication or disk write if local values are intact.
+            let merged = values.merging(fetched) { _, remote in remote }
+            if merged != values {
+                values = merged
                 AccountLocalStorage.write(
-                    values, name: "profileRecordDisplayCache", userID: userID
+                    merged, name: "profileRecordDisplayCache", userID: userID
                 )
             }
             let preferences: [ATHLTHProfileRecordSelectionRow] = try await client
@@ -180,10 +181,12 @@ final class ATHLTHProfileRecordSyncStore: ObservableObject {
                         ProfileFeaturedRecordKind.init(rawValue:)
                     )
                 )
-                selectionRaw = raw
-                AccountLocalStorage.write(
-                    raw, name: "featuredProfileRecords", userID: userID
-                )
+                if selectionRaw != raw {
+                    selectionRaw = raw
+                    AccountLocalStorage.write(
+                        raw, name: "featuredProfileRecords", userID: userID
+                    )
+                }
             } else if preferences.isEmpty, !selectionRaw.isEmpty {
                 selectionIsPending = true
                 await uploadSelection(userID: userID)
@@ -206,15 +209,18 @@ final class ATHLTHProfileRecordSyncStore: ObservableObject {
         guard ATHLTHDeviceRole.isIPhone,
               accountID == userID,
               client.auth.currentUser?.id == userID else { return }
+        let records = strength.personalRecords
+        let repRecords = strength.repPersonalRecords
+        let history = strength.workoutHistory
         let writes: [ATHLTHSyncedProfileRecord] = ProfileFeaturedRecordKind.allCases
             .compactMap { kind in
                 let display = kind.displayValue(
                     healthRecords: healthRecords,
                     stats: stats,
-                    strengthRecords: strength.personalRecords,
-                    strengthRepRecords: strength.repPersonalRecords,
+                    strengthRecords: records,
+                    strengthRepRecords: repRecords,
                     performanceWorkouts: performanceWorkouts,
-                    strengthWorkouts: strength.workoutHistory
+                    strengthWorkouts: history
                 ).trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !display.isEmpty, display != "—", display.count <= 140
                 else { return nil }
@@ -233,10 +239,14 @@ final class ATHLTHProfileRecordSyncStore: ObservableObject {
                 .upsert(writes, onConflict: "user_id,record_key")
                 .execute()
             guard accountID == userID else { return }
-            for row in writes { values[row.record_key] = row }
-            AccountLocalStorage.write(
-                values, name: "profileRecordDisplayCache", userID: userID
-            )
+            var merged = values
+            for row in writes { merged[row.record_key] = row }
+            if merged != values {
+                values = merged
+                AccountLocalStorage.write(
+                    merged, name: "profileRecordDisplayCache", userID: userID
+                )
+            }
             lastSyncError = nil
         } catch {
             if accountID == userID { lastSyncError = error.localizedDescription }

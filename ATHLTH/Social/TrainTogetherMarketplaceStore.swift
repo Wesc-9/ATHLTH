@@ -21,7 +21,16 @@ final class TrainTogetherMarketplaceStore:
     @Published private(set) var posts:
         [TrainTogetherPost] = []
     @Published private(set) var requests:
-        [TrainTogetherRequest] = []
+        [TrainTogetherRequest] = [] {
+        didSet { requestIndex.clear() }
+    }
+    private let requestIndex = ATHLTHProjectionMemo<Bool, [UUID: [TrainTogetherRequest]]>()
+
+    private func requestsForPost(_ postID: UUID) -> [TrainTogetherRequest] {
+        requestIndex.value(for: true) {
+            Dictionary(grouping: requests, by: { $0.postID })
+        }[postID] ?? []
+    }
     @Published private(set) var meetups:
         [UUID: TrainTogetherMeetup] = [:]
     @Published private(set) var isLoading =
@@ -57,8 +66,9 @@ final class TrainTogetherMarketplaceStore:
             return
         }
 
+        let owner = client.auth.currentUser?.id
         isLoading = true
-        refreshErrorMessage = nil
+        if refreshErrorMessage != nil { refreshErrorMessage = nil }
         defer {
             isLoading = false
             if refreshNeededAfterCurrentLoad {
@@ -134,17 +144,19 @@ final class TrainTogetherMarketplaceStore:
                 archiveQuery
             )
 
+            guard !Task.isCancelled, client.auth.currentUser?.id == owner else { return }
             var unique: [UUID: TrainTogetherPost] = [:]
             for post in archives + loadedPosts {
                 unique[post.id] = post
             }
-            posts = unique.values.sorted {
+            let updatedPosts = unique.values.sorted {
                 $0.scheduledStart < $1.scheduledStart
             }
-            requests = loadedRequests
+            if posts != updatedPosts { posts = updatedPosts }
+            if requests != loadedRequests { requests = loadedRequests }
             lastSuccessfulRefresh = Date()
-            hasLoaded = true
-            refreshErrorMessage = nil
+            if !hasLoaded { hasLoaded = true }
+            if refreshErrorMessage != nil { refreshErrorMessage = nil }
         } catch {
             // Navigation and pull-to-refresh can cancel the in-flight
             // Supabase queries. Never show a system CancellationError alert.
@@ -407,10 +419,7 @@ final class TrainTogetherMarketplaceStore:
     func incomingRequests(
         for postID: UUID
     ) -> [TrainTogetherRequest] {
-        requests
-            .filter {
-                $0.postID == postID
-            }
+        requestsForPost(postID)
             .sorted {
                 $0.createdAt >
                     $1.createdAt
@@ -421,8 +430,7 @@ final class TrainTogetherMarketplaceStore:
         postID: UUID,
         userID: UUID
     ) -> TrainTogetherRequest? {
-        requests.first {
-            $0.postID == postID &&
+        requestsForPost(postID).first {
             $0.requesterID == userID &&
             $0.state == .accepted
         }

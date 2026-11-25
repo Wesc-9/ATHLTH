@@ -2042,6 +2042,21 @@ struct PerformanceStatsView: View {
         [WorkoutSummary] = []
     @State private var trainingVolumePeriod:
         PerformanceVolumePeriod = .year
+    private struct VolumeKey: Equatable {
+        let account: UUID
+        let period: PerformanceVolumePeriod
+        let calendar: Calendar
+        let day: Date
+        let workouts: [WorkoutSummary]
+    }
+    private struct VolumeTotals {
+        var distance: Double = 0
+        var count = 0
+        var running = 0
+        var strength = 0
+        var walking = 0
+    }
+    @State private var volumeMemo = ATHLTHProjectionMemo<VolumeKey, VolumeTotals>()
     private var featuredRecordSelectionRaw: String {
         get { profileRecords.selectionRaw }
         nonmutating set { profileRecords.setSelection(newValue) }
@@ -4189,127 +4204,45 @@ struct PerformanceStatsView: View {
         }
     }
 
-    private var selectedVolumeDistanceMeters:
-        Double {
-        if trainingVolumePeriod ==
-            .total {
-            return stats?
-                .totalRunningDistanceMeters ??
-                resolvedPerformanceWorkouts
-                    .filter {
-                        $0.activity ==
-                            .running
-                    }
-                    .reduce(0.0) {
-                        $0 +
-                        max(
-                            $1.distanceMeters ??
-                                0,
-                            0
-                        )
-                    }
+    private var volumeTotals: VolumeTotals {
+        let calendar = Calendar.current
+        let now = Date()
+        let key = VolumeKey(account: session.profile.userID, period: trainingVolumePeriod,
+                            calendar: calendar, day: calendar.startOfDay(for: now),
+                            workouts: resolvedPerformanceWorkouts)
+        return volumeMemo.value(for: key) {
+            let signpost = ATHLTHPerformance.begin("ProfileVolumeTotals")
+            defer { ATHLTHPerformance.end("ProfileVolumeTotals", id: signpost) }
+            var totals = VolumeTotals()
+            for workout in key.workouts {
+                guard key.period == .total || volumeDateIncluded(workout.startDate, period: key.period) else { continue }
+                totals.count += 1
+                switch workout.activity {
+                case .running:
+                    totals.running += 1
+                    totals.distance += max(workout.distanceMeters ?? 0, 0)
+                case .strength: totals.strength += 1
+                case .walking, .hiking: totals.walking += 1
+                default: break
+                }
+            }
+            return totals
         }
-
-        return resolvedPerformanceWorkouts
-            .filter {
-                $0.activity ==
-                    .running &&
-                volumeDateIncluded(
-                    $0.startDate,
-                    period:
-                        trainingVolumePeriod
-                )
-            }
-            .reduce(0.0) {
-                $0 +
-                max(
-                    $1.distanceMeters ??
-                        0,
-                    0
-                )
-            }
     }
 
-    private var selectedVolumeWorkoutCount:
-        Int {
-        if trainingVolumePeriod ==
-            .total {
-            return stats?
-                .totalWorkoutCount ??
-                resolvedPerformanceWorkouts.count
-        }
-
-        return resolvedPerformanceWorkouts
-            .filter {
-                volumeDateIncluded(
-                    $0.startDate,
-                    period:
-                        trainingVolumePeriod
-                )
-            }
-            .count
+    private var selectedVolumeDistanceMeters: Double {
+        if trainingVolumePeriod == .total, let total = stats?.totalRunningDistanceMeters { return total }
+        return volumeTotals.distance
     }
 
-    private var selectedVolumeRunningCount:
-        Int {
-        resolvedPerformanceWorkouts
-            .filter {
-                $0.activity ==
-                    .running &&
-                (
-                    trainingVolumePeriod ==
-                        .total ||
-                    volumeDateIncluded(
-                        $0.startDate,
-                        period:
-                            trainingVolumePeriod
-                    )
-                )
-            }
-            .count
+    private var selectedVolumeWorkoutCount: Int {
+        if trainingVolumePeriod == .total, let count = stats?.totalWorkoutCount { return count }
+        return volumeTotals.count
     }
 
-    private var selectedVolumeStrengthCount:
-        Int {
-        resolvedPerformanceWorkouts
-            .filter {
-                $0.activity ==
-                    .strength &&
-                (
-                    trainingVolumePeriod ==
-                        .total ||
-                    volumeDateIncluded(
-                        $0.startDate,
-                        period:
-                            trainingVolumePeriod
-                    )
-                )
-            }
-            .count
-    }
-
-    private var selectedVolumeWalkingCount:
-        Int {
-        resolvedPerformanceWorkouts
-            .filter {
-                (
-                    $0.activity ==
-                        .walking ||
-                    $0.activity ==
-                        .hiking
-                ) &&
-                (
-                    trainingVolumePeriod ==
-                        .total ||
-                    volumeDateIncluded(
-                        $0.startDate,
-                        period:
-                            trainingVolumePeriod
-                    )
-                )
-            }
-            .count
-    }
+    private var selectedVolumeRunningCount: Int { volumeTotals.running }
+    private var selectedVolumeStrengthCount: Int { volumeTotals.strength }
+    private var selectedVolumeWalkingCount: Int { volumeTotals.walking }
 
     private var selectedVolumeSeries:
         [PerformanceVolumePoint] {

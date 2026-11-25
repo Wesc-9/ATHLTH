@@ -3,7 +3,18 @@ import Foundation
 
 @MainActor
 final class ChallengeStore: ObservableObject {
-    @Published private(set) var challenges: [ATHLTHChallenge] = []
+    @Published private(set) var challenges: [ATHLTHChallenge] = [] {
+        didSet {
+            orderedMemo.clear()
+            challengeIndex.clear()
+            invitationMemo.clear()
+            trainingMemo.clear()
+        }
+    }
+    private let orderedMemo = ATHLTHProjectionMemo<Bool, [ATHLTHChallenge]>()
+    private let challengeIndex = ATHLTHProjectionMemo<Bool, [UUID: ATHLTHChallenge]>()
+    private let invitationMemo = ATHLTHBoundedProjectionMemo<UUID, [ATHLTHChallenge]>(capacity: 4)
+    private let trainingMemo = ATHLTHBoundedProjectionMemo<UUID, [ATHLTHChallenge]>(capacity: 4)
 
     init() {
         challenges = Self.loadChallenges()
@@ -11,13 +22,15 @@ final class ChallengeStore: ObservableObject {
     }
 
     var visibleChallenges: [ATHLTHChallenge] {
-        challenges.sorted {
-            challengeSortDate($0) < challengeSortDate($1)
+        orderedMemo.value(for: true) {
+            challenges.sorted { challengeSortDate($0) < challengeSortDate($1) }
         }
     }
 
     func challenge(id: UUID) -> ATHLTHChallenge? {
-        challenges.first { $0.id == id }
+        challengeIndex.value(for: true) {
+            Dictionary(challenges.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        }[id]
     }
 
     func invitationParticipant(
@@ -33,32 +46,23 @@ final class ChallengeStore: ObservableObject {
     func incomingInvitations(
         for userID: UUID
     ) -> [ATHLTHChallenge] {
-        visibleChallenges.filter {
-            invitationParticipant(
-                in: $0,
-                userID: userID
-            ) != nil &&
-            $0.status != .completed &&
-            $0.status != .cancelled
+        invitationMemo.value(for: userID) {
+            visibleChallenges.filter {
+                invitationParticipant(in: $0, userID: userID) != nil &&
+                $0.status != .completed && $0.status != .cancelled
+            }
         }
     }
 
     func trainingChallenges(
         for userID: UUID
     ) -> [ATHLTHChallenge] {
-        visibleChallenges.filter { challenge in
-            guard challenge.status == .active ||
-                    challenge.status == .upcoming
-            else {
-                return false
-            }
-
-            return challenge.participants.contains {
-                $0.userID == userID &&
-                (
-                    $0.state == .creator ||
-                    $0.state == .accepted
-                )
+        trainingMemo.value(for: userID) {
+            visibleChallenges.filter { challenge in
+                guard challenge.status == .active || challenge.status == .upcoming else { return false }
+                return challenge.participants.contains {
+                    $0.userID == userID && ($0.state == .creator || $0.state == .accepted)
+                }
             }
         }
     }
@@ -661,7 +665,7 @@ final class ChallengeStore: ObservableObject {
     }
 
     func leaderboard(for challengeID: UUID) -> [ChallengeLeaderboardEntry] {
-        guard let challenge = challenges.first(where: { $0.id == challengeID }),
+        guard let challenge = challenge(id: challengeID),
               challenge.scoringStartDate != nil,
               challenge.status != .cancelled,
               !challenge.expiredWithoutOpponent() else {
@@ -674,10 +678,14 @@ final class ChallengeStore: ObservableObject {
 
         var scored: [(participant: ChallengeParticipant, attempt: ChallengeAttempt?, score: Double?, count: Int)] = []
 
+        // Partition once; avoid rescanning every attempt for each athlete.
+        // Preserve attempt order and all existing eligibility/tie rules.
+        let eligibleIDs = Set(participants.map(\.id))
+        let attemptsByParticipant = Dictionary(grouping: challenge.attempts.filter {
+            eligibleIDs.contains($0.participantID) && challenge.countsAttempt($0)
+        }, by: { $0.participantID })
         for participant in participants {
-            let attempts = challenge.attempts.filter {
-                $0.participantID == participant.id && challenge.countsAttempt($0)
-            }
+            let attempts = attemptsByParticipant[participant.id] ?? []
 
             if challenge.rules.scoring == .mostDistance {
                 let totalScore = attempts.reduce(0) {
