@@ -120,7 +120,7 @@ struct TrainingDataSettingsView: View {
             if !mayRestoreBackup {
                 detail(tr("Finish the active workout before restoring.", "Avslutt den aktive økten før gjenoppretting."))
             }
-            Button(tr(tr("Delete cloud backups", "Slett sikkerhetskopier"), "Slett sikkerhetskopier"), role: .destructive) { confirmDeleteBackups = true }
+            Button(tr("Delete cloud backups", "Slett sikkerhetskopier"), role: .destructive) { confirmDeleteBackups = true }
                 .disabled(backups.isBusy || !session.signedIn).padding(16)
         }
         .padding(.bottom, 8)
