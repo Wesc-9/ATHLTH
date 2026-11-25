@@ -327,9 +327,13 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius ?? (compact ? 20 : 28),
                                         style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius ?? (compact ? 20 : 28),
-                                 style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.07), lineWidth: 0.8)
+                // Embedded feed artwork is clipped and bordered by its
+                // outer card; never draw a second outline inside it.
+                if cornerRadius != 0 {
+                    RoundedRectangle(cornerRadius: cornerRadius ?? (compact ? 20 : 28),
+                                     style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.07), lineWidth: 0.8)
+                }
             }
         }
         .frame(height: height)
