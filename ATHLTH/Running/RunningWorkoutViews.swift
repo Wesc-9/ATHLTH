@@ -401,6 +401,7 @@ struct RunningWorkoutDetailView: View {
     }
     @State private var lastHistory: ATHLTHLibraryWorkoutHistory.Summary?
     @State private var importEnvironment: RunEnvironment = .outdoor
+    @State private var didResolveImportEnvironment = false
     @State private var importAdjustedWorkout: RunningWorkoutTemplate?
 
     private func refreshLastHistory() {
@@ -1120,6 +1121,21 @@ struct RunningWorkoutDetailView: View {
         }
         .onAppear {
             reloadPrivateSettings()
+            if !didResolveImportEnvironment {
+                let source = privateSavedWorkout ?? workout
+                if let environment = source.launchRunEnvironment {
+                    importEnvironment = environment
+                } else if source.routeID == nil && source.blocks.contains(where: { block in
+                    block.work.treadmillInclinePercent != nil ||
+                        block.recovery?.treadmillInclinePercent != nil ||
+                        (block.repetitionOverrides ?? []).contains {
+                            $0.work?.treadmillInclinePercent != nil || $0.recovery?.treadmillInclinePercent != nil
+                        }
+                }) {
+                    importEnvironment = .treadmill
+                }
+                didResolveImportEnvironment = true
+            }
             refreshLastHistory()
         }
         .onChange(of: session.profile.userID) { _, _ in
