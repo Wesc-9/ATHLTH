@@ -101,6 +101,75 @@ enum ATHLTHWorkoutExerciseBinding {
         return copy
     }
 
+    /// Build once per batch. Migration preserves every prescription and all
+    /// private/custom IDs; missing RepDB targets leave the old record intact.
+    struct DuplicateIndex {
+        private let repDB: [String: ExerciseLibraryEntry]
+
+        init(library: [ExerciseLibraryEntry]) {
+            repDB = Dictionary(library.filter { $0.source == .repDB }.compactMap { entry in
+                entry.sourceIdentifier.map { ($0, entry) }
+            }, uniquingKeysWith: { first, _ in first })
+        }
+
+        private func replacement(id: UUID?, slug: String?) -> ExerciseLibraryEntry? {
+            guard let target = ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: id, slug: slug) else { return nil }
+            return repDB[target]
+        }
+
+        func migrate(_ source: PlannedSession) -> PlannedSession {
+            var copy = source
+            if var blocks = copy.workoutBlocks {
+                for i in blocks.indices {
+                    guard blocks[i].kind == .exercise || blocks[i].exerciseID != nil || blocks[i].exerciseSlug != nil,
+                          let match = replacement(id: blocks[i].exerciseID, slug: blocks[i].exerciseSlug) else { continue }
+                    if match.sourceIdentifier == "rowing-machine" {
+                        ATHLTHWorkoutExerciseBinding.replaceRowing(&blocks[i], with: match)
+                    } else {
+                        blocks[i].exerciseID = match.id
+                        blocks[i].exerciseSlug = match.sourceIdentifier
+                        blocks[i].exerciseSnapshot = match.exercise.snapshot
+                    }
+                }
+                copy.workoutBlocks = blocks
+            }
+            for i in copy.exercises.indices {
+                guard let match = replacement(id: copy.exercises[i].exerciseID, slug: nil) else { continue }
+                copy.exercises[i].exerciseID = match.id
+                copy.exercises[i].embeddedExercise = match.exercise.snapshot
+            }
+            if let rower = repDB["rowing-machine"] {
+                copy = ATHLTHWorkoutExerciseBinding.migrateRowing(copy, to: rower)
+            }
+            return copy
+        }
+
+        func migrate(_ source: TrainingPlan) -> TrainingPlan {
+            var copy = source
+            for w in copy.weeks.indices {
+                for d in copy.weeks[w].days.indices {
+                    copy.weeks[w].days[d].sessions = copy.weeks[w].days[d].sessions.map { migrate($0) }
+                }
+            }
+            return copy
+        }
+    }
+
+    static func needsDuplicateMigration(_ workout: PlannedSession) -> Bool {
+        needsRowingMigration(workout) ||
+            (workout.workoutBlocks ?? []).contains {
+                ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: $0.exerciseID, slug: $0.exerciseSlug) != nil
+            } || workout.exercises.contains {
+                ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: $0.exerciseID, slug: nil) != nil
+            }
+    }
+
+    static func needsDuplicateMigration(_ plan: TrainingPlan) -> Bool {
+        plan.weeks.contains { week in
+            week.days.contains { day in day.sessions.contains(where: { needsDuplicateMigration($0) }) }
+        }
+    }
+
     @discardableResult
     static func bind(
         _ workout: inout PlannedSession,
@@ -120,9 +189,8 @@ enum ATHLTHWorkoutExerciseBinding {
         misses: inout Set<LookupKey>
     ) -> Report {
         var report = Report()
-        if needsRowingMigration(workout),
-           let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: library) {
-            workout = migrateRowing(workout, to: rower)
+        if needsDuplicateMigration(workout) {
+            workout = DuplicateIndex(library: library).migrate(workout)
         }
 
         if var blocks = workout.workoutBlocks {

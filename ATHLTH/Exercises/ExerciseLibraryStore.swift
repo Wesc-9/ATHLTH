@@ -686,7 +686,8 @@ final class ExerciseLibraryStore: ObservableObject {
         if cachedEntriesByID == nil {
             cachedEntriesByID = Dictionary(uniqueKeysWithValues: allExercises.map { ($0.id, $0) })
         }
-        return cachedEntriesByID?[id]
+        let canonical = ATHLTHExerciseReferenceResolver.canonicalReviewedID(id)
+        return cachedEntriesByID?[canonical] ?? cachedEntriesByID?[id]
     }
 
     static func liveCanonicalNameKey(_ name: String, locale: Locale = .current) -> String {
@@ -698,9 +699,12 @@ final class ExerciseLibraryStore: ObservableObject {
         let locale = Locale.current
         if cachedEntriesByCanonicalName == nil || canonicalLookupLocale != locale.identifier {
             var index: [String: ExerciseLibraryEntry] = [:]
-            for entry in allExercises {
+            let entries = allExercises
+            let canonicalByID = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
+            for entry in entries {
                 let key = Self.liveCanonicalNameKey(entry.canonicalName, locale: locale)
-                if index[key] == nil { index[key] = entry }
+                let canonical = canonicalByID[ATHLTHExerciseReferenceResolver.canonicalReviewedID(entry.id)] ?? entry
+                if index[key] == nil { index[key] = canonical }
             }
             cachedEntriesByCanonicalName = index
             canonicalLookupLocale = locale.identifier
@@ -978,10 +982,11 @@ final class ExerciseLibraryStore: ObservableObject {
             // A hidden native exercise must never resolve to itself when a
             // unique, selectable RepDB equivalent exists.
             let completeLibrary = allExercises
-            let hasCanonicalRower = ATHLTHExerciseReferenceResolver.rowingMachine(in: completeLibrary) != nil
+            let repDBIDs = Set(repDBExercises.compactMap(\.sourceIdentifier))
             resolved = completeLibrary.filter { entry in
-                if hasCanonicalRower && entry.source == .athlthCatalog &&
-                    entry.id == ATHLTHExerciseReferenceResolver.retiredRowingID {
+                if entry.source == .athlthCatalog,
+                   let replacement = ATHLTHExerciseReferenceResolver.reviewedReplacementSlug(id: nil, slug: entry.sourceIdentifier),
+                   repDBIDs.contains(replacement) {
                     return false
                 }
                 guard !Self.isRetiredNativeDuplicate(entry) else {

@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Exact/curated alias matching only. Fuzzy string similarity can silently
 /// turn a cable movement into a different free-weight movement, so it must
@@ -35,6 +36,103 @@ enum ATHLTHExerciseReferenceResolver {
         if let id { return id == retiredRowingID }
         if let slug { return rowingSlugs.contains(key(slug)) }
         return rowingNames.contains(key(name))
+    }
+
+    // Reviewed source IDs, not fuzzy names. Keep this table independent of
+    // localization and equipment-label spelling. Ambiguous variants stay separate.
+    static let reviewedNativeDuplicates: [String: String] = [
+        "athlth-native-bench-press": "bench-press",
+        "athlth-native-incline-bench-press": "incline-bench-press",
+        "athlth-native-dumbbell-bench-press": "db-bench-press",
+        "athlth-native-dumbbell-fly": "db-fly",
+        "athlth-native-flat-dumbbell-chest-fly": "db-fly",
+        "athlth-native-push-up": "push-up",
+        "athlth-native-cable-fly": "cable-fly",
+        "athlth-native-pull-up": "pull-up",
+        "athlth-native-lat-pulldown": "lat-pulldown",
+        "athlth-native-seated-cable-row": "seated-cable-row",
+        "athlth-native-barbell-row": "barbell-row",
+        "athlth-native-one-arm-dumbbell-row": "single-arm-db-row",
+        "athlth-native-dumbbell-shoulder-press": "dumbbell-shoulder-press",
+        "athlth-native-lateral-raise": "lateral-raise",
+        "athlth-native-rear-delt-fly": "rear-delt-fly",
+        "athlth-native-face-pull": "face-pull",
+        "athlth-native-dumbbell-curl": "bicep-curl",
+        "athlth-native-hammer-curl": "hammer-curl",
+        "athlth-native-barbell-curl": "barbell-curl",
+        "athlth-native-front-squat": "front-squat",
+        "athlth-native-leg-press": "leg-press",
+        "athlth-native-leg-extension": "leg-extension",
+        "athlth-native-romanian-deadlift": "romanian-deadlift",
+        "athlth-native-deadlift": "deadlift",
+        "athlth-native-lying-leg-curl": "leg-curl",
+        "athlth-native-seated-leg-curl": "seated-leg-curl",
+        "athlth-native-hip-thrust": "hip-thrust",
+        "athlth-native-standing-calf-raise": "standing-calf-raise",
+        "athlth-native-seated-calf-raise": "seated-calf-raise",
+        "athlth-native-reverse-crunch": "reverse-crunches",
+        "athlth-native-ab-wheel-rollout": "ab-wheel-rollout",
+        "athlth-native-plank": "plank",
+        "athlth-native-side-plank": "side-plank",
+        "athlth-native-dead-bug": "dead-bug",
+        "athlth-native-cable-crunch": "cable-crunch",
+        "athlth-native-pallof-press": "cable-pallof-press",
+        "athlth-native-kettlebell-swing": "kettlebell-swing",
+        "athlth-native-burpee": "burpees",
+        "athlth-native-single-leg-romanian-deadlift": "single-leg-romanian-deadlift",
+        "athlth-native-cable-curl": "cable-curl",
+        "athlth-native-chin-up": "chin-ups",
+        "athlth-native-skullcrusher": "skull-crusher"
+    ]
+    private static let reviewedStationDuplicates: [String: String] = [
+        "athlth:skierg": "ski-erg",
+        "athlth:sled-push": "sled-push",
+        "athlth:rowing": "rowing-machine",
+        "athlth:wall-ball": "wall-ball"
+    ]
+    private static let reviewedStationRecipeAliases: [String: String] = [
+        "ski-erg": "ski-erg", "sled-push": "sled-push",
+        "rowing-erg": "rowing-machine", "wall-ball": "wall-ball"
+    ]
+
+    private static func stableCatalogID(_ value: String) -> UUID {
+        let hex = SHA256.hash(data: Data(value.utf8)).prefix(16)
+            .map { String(format: "%02x", $0) }.joined()
+        return UUID(uuidString: "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))")!
+    }
+
+    private static let reviewedLegacyIDs: [UUID: String] = {
+        var result = Dictionary(uniqueKeysWithValues: reviewedNativeDuplicates.map {
+            (stableCatalogID("athlth-native:" + String($0.key.dropFirst("athlth-native-".count))), $0.value)
+        })
+        result[UUID(uuidString: "C2000000-0000-0000-0000-000000000001")!] = "ski-erg"
+        result[UUID(uuidString: "C2000000-0000-0000-0000-000000000002")!] = "sled-push"
+        result[retiredRowingID] = "rowing-machine"
+        result[UUID(uuidString: "C2000000-0000-0000-0000-000000000008")!] = "wall-ball"
+        return result
+    }()
+
+    static func canonicalReviewedID(_ id: UUID) -> UUID {
+        reviewedLegacyIDs[id].map { stableCatalogID("repdb:" + $0) } ?? id
+    }
+
+    static func areReviewedAliases(_ lhs: UUID, _ rhs: UUID) -> Bool {
+        lhs != rhs && canonicalReviewedID(lhs) == canonicalReviewedID(rhs)
+    }
+
+    static func reviewedReplacementSlug(id: UUID?, slug: String?) -> String? {
+        if let id { return reviewedLegacyIDs[id] }
+        guard let slug else { return nil }
+        return reviewedNativeDuplicates[slug] ?? reviewedStationDuplicates[slug] ??
+            reviewedStationRecipeAliases[slug]
+    }
+
+    static func reviewedReplacement(for source: ExerciseLibraryEntry, in library: [ExerciseLibraryEntry]) -> ExerciseLibraryEntry? {
+        guard source.source == .athlthCatalog,
+              let slug = source.sourceIdentifier,
+              let target = reviewedNativeDuplicates[slug] ?? reviewedStationDuplicates[slug] else { return nil }
+        let matches = library.filter { $0.source == .repDB && $0.sourceIdentifier == target }
+        return matches.count == 1 ? matches[0] : nil
     }
 
     /// Reviewed equivalent names, not generic similarity heuristics.
@@ -315,9 +413,14 @@ enum ATHLTHExerciseReferenceResolver {
            let rower = rowingMachine(in: library) {
             return rower
         }
+        if let target = reviewedReplacementSlug(id: block.exerciseID, slug: block.exerciseSlug),
+           let entry = library.first(where: { $0.source == .repDB && $0.sourceIdentifier == target }) {
+            return entry
+        }
         if let id = block.exerciseID {
             if let exact = library.first(where: { $0.id == id }) {
-                return exact
+                // Only reviewed public identities can override explicit UUIDs.
+                return reviewedReplacement(for: exact, in: library) ?? exact
             }
             if let imported = library.first(where: {
                 $0.source == .custom &&
@@ -452,6 +555,7 @@ enum ATHLTHExerciseReferenceResolver {
         of source: ExerciseLibraryEntry,
         in library: [ExerciseLibraryEntry]
     ) -> ExerciseLibraryEntry {
+        if let reviewed = reviewedReplacement(for: source, in: library) { return reviewed }
         if source.source == .athlthCatalog, source.id == retiredRowingID,
            let rower = rowingMachine(in: library) {
             return rower

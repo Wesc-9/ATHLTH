@@ -69,6 +69,32 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         XCTAssertEqual(ATHLTHExerciseReferenceResolver.resolvePublicName("Roing", in: library)?.id, rower.id)
     }
 
+    func testReviewedStationAndNativeDuplicatesUseCanonicalRepDBIdentity() throws {
+        let store = ExerciseLibraryStore()
+        let library = store.allExercises
+        let native = try XCTUnwrap(library.first { $0.sourceIdentifier == "athlth-native-cable-curl" })
+        let repDB = try XCTUnwrap(library.first { $0.source == .repDB && $0.sourceIdentifier == "cable-curl" })
+        XCTAssertEqual(ATHLTHExerciseReferenceResolver.canonicalReviewedID(native.id), repDB.id)
+        XCTAssertFalse(store.selectableExercises.contains { $0.id == native.id })
+        XCTAssertTrue(store.selectableExercises.contains { $0.id == repDB.id })
+        var block = strengthBlock(title: "Cable Curl", slug: native.sourceIdentifier)
+        block.exerciseID = native.id
+        let foreign = UUID()
+        var custom = block
+        custom.exerciseID = foreign
+        let session = workout(blocks: [block, custom, strengthBlock(title: "SkiErg", slug: "athlth:skierg")])
+        let index = ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: library)
+        let migrated = index.migrate(session)
+        let blocks = try XCTUnwrap(migrated.workoutBlocks)
+        XCTAssertEqual(blocks[0].exerciseID, repDB.id)
+        XCTAssertEqual(blocks[0].setCount, block.setCount)
+        XCTAssertEqual(blocks[0].restBetweenSetsSeconds, block.restBetweenSetsSeconds)
+        XCTAssertEqual(blocks[1].exerciseID, foreign)
+        XCTAssertEqual(blocks[2].exerciseSlug, "ski-erg")
+        XCTAssertEqual(index.migrate(migrated), migrated)
+        XCTAssertEqual(ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: []).migrate(session), session)
+    }
+
     func testPlanWideLookupCachesRepeatedMovementWithoutReplacingForeignUUID() throws {
         let suite = "CatalogLookupCache.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

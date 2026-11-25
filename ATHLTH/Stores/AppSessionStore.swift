@@ -5358,9 +5358,9 @@ final class AppSessionStore: ObservableObject {
                   !workouts.isEmpty,
                   existing.endedAt == nil || incoming == existing else { return false }
         }
-        if workouts.contains(where: { ATHLTHWorkoutExerciseBinding.needsRowingMigration($0) }),
-           let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: ExerciseLibraryStore().allExercises) {
-            workouts = workouts.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
+        if workouts.contains(where: { ATHLTHWorkoutExerciseBinding.needsDuplicateMigration($0) }) {
+            let index = ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: ExerciseLibraryStore().allExercises)
+            workouts = workouts.map { index.migrate($0) }
         }
         standalonePlannedSessions.removeAll { $0.id == source.id }
         if let workout = workouts.first {
@@ -5406,9 +5406,9 @@ final class AppSessionStore: ObservableObject {
     func importAccountPlanDocument(_ source: TrainingPlan) -> Bool {
         guard source.ownerID == profile.userID else { return false }
         var plan = source
-        if ATHLTHWorkoutExerciseBinding.needsRowingMigration(plan),
-           let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: ExerciseLibraryStore().allExercises) {
-            plan = ATHLTHWorkoutExerciseBinding.migrateRowing(plan, to: rower)
+        if ATHLTHWorkoutExerciseBinding.needsDuplicateMigration(plan) {
+            let index = ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: ExerciseLibraryStore().allExercises)
+            plan = index.migrate(plan)
         }
         let template = plan.tags.contains("sync:template")
         let paused = plan.tags.contains("sync:paused")
@@ -6241,22 +6241,19 @@ final class AppSessionStore: ObservableObject {
                     ($0.scheduledStart ?? .distantFuture) <
                     ($1.scheduledStart ?? .distantFuture)
                 }
-        // Account-scoped, idempotent upgrade of the retired RowErg movement.
-        // Do not decode a second RepDB catalog on ordinary launches without
-        // legacy references; leave data intact if the canonical rower is absent.
+        // Account-scoped, idempotent upgrade. Do not decode a second RepDB
+        // catalog on ordinary launches without legacy public references.
         let loadedPlans = [activePlan].compactMap { $0 } + scheduledPlans + planTemplates
-        if loadedPlans.contains(where: { ATHLTHWorkoutExerciseBinding.needsRowingMigration($0) }) ||
+        if loadedPlans.contains(where: { ATHLTHWorkoutExerciseBinding.needsDuplicateMigration($0) }) ||
             (savedWorkoutTemplates + standalonePlannedSessions).contains(where: {
-                ATHLTHWorkoutExerciseBinding.needsRowingMigration($0)
+                ATHLTHWorkoutExerciseBinding.needsDuplicateMigration($0)
             }) {
-            let library = ExerciseLibraryStore().allExercises
-            if let rower = ATHLTHExerciseReferenceResolver.rowingMachine(in: library) {
-                activePlan = activePlan.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
-                scheduledPlans = scheduledPlans.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
-                planTemplates = planTemplates.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
-                savedWorkoutTemplates = savedWorkoutTemplates.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
-                standalonePlannedSessions = standalonePlannedSessions.map { ATHLTHWorkoutExerciseBinding.migrateRowing($0, to: rower) }
-            }
+            let index = ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: ExerciseLibraryStore().allExercises)
+            activePlan = activePlan.map { index.migrate($0) }
+            scheduledPlans = scheduledPlans.map { index.migrate($0) }
+            planTemplates = planTemplates.map { index.migrate($0) }
+            savedWorkoutTemplates = savedWorkoutTemplates.map { index.migrate($0) }
+            standalonePlannedSessions = standalonePlannedSessions.map { index.migrate($0) }
         }
         standaloneWorkoutTombstones = stored?.standaloneWorkoutTombstones ?? []
         standaloneWorkoutTombstones.subtract(standalonePlannedSessions.map(\.id))

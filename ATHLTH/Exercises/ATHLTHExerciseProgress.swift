@@ -91,7 +91,14 @@ enum ATHLTHExerciseProgress {
                 if let loggedID = logged.libraryExerciseID {
                     // Canonical library identity is authoritative, including
                     // when an exercise is renamed after the workout.
-                    guard loggedID == referenceIdentity else { return false }
+                    let reviewedAlias = !isCustom && ATHLTHExerciseReferenceResolver.areReviewedAliases(loggedID, referenceIdentity)
+                    guard loggedID == referenceIdentity || reviewedAlias else { return false }
+                    // Reviewed aliases have equivalent movement/equipment
+                    // despite spelling differences. Never merge differing
+                    // load bases or invent per-hand/total weight semantics.
+                    if reviewedAlias {
+                        return reference.map { logged.coachLoadBasis == $0.coachLoadBasis } ?? true
+                    }
                     // Known load semantics and equipment must also agree.
                     return reference.map {
                         ATHLTHCoachStrengthComparableHistory.isSameExercise(
