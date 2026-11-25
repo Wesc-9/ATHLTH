@@ -20,6 +20,23 @@ final class MessagingStore: ObservableObject {
     private var isPreferencesSyncing = false
     private var withdrawalsInFlight: Set<UUID> = []
     private var accountGeneration = UUID()
+    // Drafts survive closing a conversation, but never sign-out, account
+    // changes or process termination. Do not persist private unsent text.
+    private var textDrafts: [UUID: String] = [:]
+
+    func textDraft(for recipient: UUID, owner: UUID) -> String {
+        guard preferenceAccountID == owner else { return "" }
+        return textDrafts[recipient] ?? ""
+    }
+
+    func setTextDraft(_ text: String, for recipient: UUID, owner: UUID) {
+        guard preferenceAccountID == owner else { return }
+        if text.isEmpty {
+            textDrafts.removeValue(forKey: recipient)
+        } else {
+            textDrafts[recipient] = text
+        }
+    }
 
     private func ownsRequest(_ owner: UUID, generation: UUID) -> Bool {
         !Task.isCancelled && accountGeneration == generation &&
@@ -112,6 +129,7 @@ final class MessagingStore: ObservableObject {
         preferenceSyncTask = nil
         preferenceAccountID = userID
         accountGeneration = UUID()
+        textDrafts.removeAll()
         isRefreshing = false
         isPreferencesSyncing = false
         errorMessage = nil
