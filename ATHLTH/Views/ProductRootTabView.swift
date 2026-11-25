@@ -115,15 +115,9 @@ struct ProductRootTabView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var goalAccountSync: ATHLTHGoalAccountSyncStore
-    @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
-    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var notifications:
         ATHLTHNotificationStore
-    @EnvironmentObject private var messaging:
-        MessagingStore
-    @EnvironmentObject private var health:
-        HealthKitManager
+    @State private var observedAppBadgeCount: Int?
     @Environment(\.scenePhase)
     private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -261,14 +255,7 @@ struct ProductRootTabView: View {
         )
     }
 
-    private var visibleAppBadgeCount: Int {
-        ATHLTHSideMenuBadgePolicy.counts(
-            messaging: messaging,
-            social: social,
-            notificationStore: notifications,
-            health: health
-        ).total
-    }
+    private var visibleAppBadgeCount: Int { observedAppBadgeCount ?? 0 }
 
     init() {
         let prefix =
@@ -612,7 +599,7 @@ struct ProductRootTabView: View {
             openPendingWorkoutInviteIfNeeded()
         }
         .onChange(
-            of: visibleAppBadgeCount
+            of: observedAppBadgeCount
         ) { _, _ in
             Task {
                 await syncApplicationIconBadge()
@@ -671,6 +658,8 @@ struct ProductRootTabView: View {
     var body: some View {
         tabsWithCoachDock
         .background {
+            ATHLTHRootBadgeObserver(count: $observedAppBadgeCount)
+                .frame(width: 0, height: 0)
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
             #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
@@ -700,173 +689,9 @@ struct ProductRootTabView: View {
                         .allowsHitTesting(false)
                 }
 
-                if social
-                        .isCoordinatedLobbyMinimized,
-                   social
-                        .coordinatedLobbySessionID != nil {
-                    Button {
-                        social
-                            .presentCoordinatedLobby()
-                    } label: {
-                        HStack(spacing: 11) {
-                            Image(
-                                systemName:
-                                    "person.2.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 19,
-                                    weight:
-                                        .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .vitality
-                            )
-
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing: 1
-                            ) {
-                                Text(
-                                    minimizedLobbyStatusText
-                                )
-                                .font(
-                                    .system(
-                                        size: 10,
-                                        weight:
-                                            .bold
-                                    )
-                                )
-                                .tracking(0.8)
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .mutedText
-                                )
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Return to Train Together",
-                                        norwegian:
-                                            "Returner til Tren sammen"
-                                    )
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(
-                                            .semibold
-                                        )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .primaryText
-                                )
-                            }
-
-                            Spacer(minLength: 4)
-
-                            Image(
-                                systemName:
-                                    "chevron.up"
-                            )
-                            .font(
-                                .caption
-                                    .weight(.bold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
-                        }
-                        .padding(
-                            .horizontal,
-                            18
-                        )
-                        .frame(
-                            width: 340,
-                            height: 62
-                        )
-                        .background(
-                            .regularMaterial,
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    ATHLTHTheme
-                                        .vitality
-                                        .opacity(
-                                            0.15
-                                        ),
-                                    lineWidth:
-                                        0.8
-                                )
-                        }
-                        .shadow(
-                            color:
-                                Color.black
-                                    .opacity(
-                                        0.10
-                                    ),
-                            radius: 14,
-                            y: 6
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .transition(
-                        .move(edge: .top)
-                            .combined(
-                                with:
-                                    .opacity
-                            )
-                    )
-                }
-
-                if let workout = strengthWorkout.activeWorkout {
-                    ATHLTHMinimizedWorkoutReturnPill(
-                        title: ATHLTHLocalization.choose(
-                            english: "Return to strength workout",
-                            norwegian: "Tilbake til styrkeøkten"
-                        ),
-                        systemImage: "dumbbell.fill",
-                        detail: workout.title
-                    ) {
-                        // Reuse the existing Train presenter instead of
-                        // creating a new recording or competing full-screen
-                        // presentation over Home/Community.
-                        trainNavigationRequest = .quick(.strength)
-                        selectedTab = 1
-                    }
-                    .transition(
-                        .move(edge: .top).combined(with: .opacity)
-                    )
-                }
-
-                if workoutMirroring
-                        .hasActiveMirroredWorkout,
-                   workoutMirroring
-                        .isUserMinimized,
-                   strengthWorkout.activeWorkout == nil {
-                    ATHLTHMinimizedWorkoutReturnPill(
-                        title: ATHLTHLocalization.choose(
-                            english: "Return to Apple Watch workout",
-                            norwegian: "Tilbake til Apple Watch-økt"
-                        ),
-                        systemImage:
-                            workoutMirroring.snapshot?.kind.systemImage ??
-                            "figure.run"
-                    ) {
-                        workoutMirroring.presentWorkout()
-                    }
-                    .transition(
-                        .move(edge: .top)
-                            .combined(with: .opacity)
-                    )
+                ATHLTHRootLiveWorkoutPills {
+                    trainNavigationRequest = .quick(.strength)
+                    selectedTab = 1
                 }
             }
             .padding(.top, 8)
@@ -874,7 +699,7 @@ struct ProductRootTabView: View {
         }
         // Isolate the coordinated lobby's observation and presentation from
         // the large root TabView's AttributeGraph modifier chain.
-        .modifier(ATHLTHCoordinatedLobbyPresentation(social: social))
+        .modifier(ATHLTHRootLobbyPresentation())
         .overlay {
             ZStack(alignment: .leading) {
                 if showingSideMenu {
@@ -995,15 +820,229 @@ struct ProductRootTabView: View {
     @MainActor
     private func syncApplicationIconBadge()
         async {
+        guard let observedAppBadgeCount else { return }
         do {
             try await UNUserNotificationCenter
                 .current()
-                .setBadgeCount(
-                    visibleAppBadgeCount
-                )
+                .setBadgeCount(observedAppBadgeCount)
         } catch {
             // In-app badges remain the source of truth. iOS can briefly reject
             // a badge write while notification permissions are changing.
+        }
+    }
+
+}
+
+/// Root tab selection must not observe every heart-rate, strength-set,
+/// inbox or mirrored-workout tick. Keep high-frequency subscriptions in
+/// the small leaves that actually display those changes.
+private struct ATHLTHRootBadgeObserver: View {
+    @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var notifications: ATHLTHNotificationStore
+    @EnvironmentObject private var health: HealthKitManager
+    @Binding var count: Int?
+
+    private var badgeCount: Int {
+        ATHLTHSideMenuBadgePolicy.counts(
+            messaging: messaging, social: social,
+            notificationStore: notifications, health: health
+        ).total
+    }
+
+    var body: some View {
+        Color.clear
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onChange(of: badgeCount, initial: true) { _, newCount in
+                if count != newCount { count = newCount }
+            }
+    }
+}
+
+private struct ATHLTHRootLobbyPresentation: ViewModifier {
+    @EnvironmentObject private var social: SocialStore
+
+    func body(content: Content) -> some View {
+        content.modifier(ATHLTHCoordinatedLobbyPresentation(social: social))
+    }
+}
+
+private struct ATHLTHRootLiveWorkoutPills: View {
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    let returnToStrength: () -> Void
+
+    var body: some View {
+        Group {
+        if social
+                .isCoordinatedLobbyMinimized,
+           social
+                .coordinatedLobbySessionID != nil {
+            Button {
+                social
+                    .presentCoordinatedLobby()
+            } label: {
+                HStack(spacing: 11) {
+                    Image(
+                        systemName:
+                            "person.2.fill"
+                    )
+                    .font(
+                        .system(
+                            size: 19,
+                            weight:
+                                .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .vitality
+                    )
+
+                    VStack(
+                        alignment:
+                            .leading,
+                        spacing: 1
+                    ) {
+                        Text(
+                            minimizedLobbyStatusText
+                        )
+                        .font(
+                            .system(
+                                size: 10,
+                                weight:
+                                    .bold
+                            )
+                        )
+                        .tracking(0.8)
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .mutedText
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english:
+                                    "Return to Train Together",
+                                norwegian:
+                                    "Returner til Tren sammen"
+                            )
+                        )
+                        .font(
+                            .subheadline
+                                .weight(
+                                    .semibold
+                                )
+                        )
+                        .foregroundStyle(
+                            ATHLTHTheme
+                                .primaryText
+                        )
+                    }
+
+                    Spacer(minLength: 4)
+
+                    Image(
+                        systemName:
+                            "chevron.up"
+                    )
+                    .font(
+                        .caption
+                            .weight(.bold)
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+                .padding(
+                    .horizontal,
+                    18
+                )
+                .frame(
+                    width: 340,
+                    height: 62
+                )
+                .background(
+                    .regularMaterial,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            ATHLTHTheme
+                                .vitality
+                                .opacity(
+                                    0.15
+                                ),
+                            lineWidth:
+                                0.8
+                        )
+                }
+                .shadow(
+                    color:
+                        Color.black
+                            .opacity(
+                                0.10
+                            ),
+                    radius: 14,
+                    y: 6
+                )
+            }
+            .buttonStyle(.plain)
+            .transition(
+                .move(edge: .top)
+                    .combined(
+                        with:
+                            .opacity
+                    )
+            )
+        }
+
+        if let workout = strengthWorkout.activeWorkout {
+            ATHLTHMinimizedWorkoutReturnPill(
+                title: ATHLTHLocalization.choose(
+                    english: "Return to strength workout",
+                    norwegian: "Tilbake til styrkeøkten"
+                ),
+                systemImage: "dumbbell.fill",
+                detail: workout.title
+            ) {
+                // Reuse the existing Train presenter instead of
+                // creating a new recording or competing full-screen
+                // presentation over Home/Community.
+                returnToStrength()
+            }
+            .transition(
+                .move(edge: .top).combined(with: .opacity)
+            )
+        }
+
+        if workoutMirroring
+                .hasActiveMirroredWorkout,
+           workoutMirroring
+                .isUserMinimized,
+           strengthWorkout.activeWorkout == nil {
+            ATHLTHMinimizedWorkoutReturnPill(
+                title: ATHLTHLocalization.choose(
+                    english: "Return to Apple Watch workout",
+                    norwegian: "Tilbake til Apple Watch-økt"
+                ),
+                systemImage:
+                    workoutMirroring.snapshot?.kind.systemImage ??
+                    "figure.run"
+            ) {
+                workoutMirroring.presentWorkout()
+            }
+            .transition(
+                .move(edge: .top)
+                    .combined(with: .opacity)
+            )
+        }
         }
     }
 

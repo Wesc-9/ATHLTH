@@ -91,7 +91,12 @@ final class ATHLTHPlanRefreshPerformanceTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         var plan = samplePlan()
-        let workout = PlannedSession(id: UUID(), title: "Strength", kind: .strength)
+        let workout = PlannedSession(
+            id: UUID(), title: "Strength", kind: .strength,
+            scheduledStart: nil, durationMinutes: 30,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
         plan.weeks[0].days[0].sessions = [workout]
         let store = AppSessionStore(activePlan: plan, defaults: defaults)
         store.setPlanSessionManuallyCompleted(planID: plan.id, sessionID: workout.id, completed: true)
