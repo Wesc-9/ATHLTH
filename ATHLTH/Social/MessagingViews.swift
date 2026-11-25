@@ -3290,6 +3290,8 @@ struct DirectMessageThreadView: View {
     @State private var conversationID: UUID?
     @State private var draftOwner: UUID?
     @State private var foregroundRefreshRequest: UUID?
+    @State private var realtimeGeneration = UUID()
+    @State private var realtimeConnected = false
     @State private var loadingOlderMessages = false
     @FocusState private var composerFocused: Bool
     @State private var text = ""
@@ -3558,6 +3560,23 @@ struct DirectMessageThreadView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, conversationID != nil { foregroundRefreshRequest = UUID() }
+        }
+        .task(id: "\(conversationID?.uuidString ?? "")|\(session.profile.userID)|\(scenePhase)|\(session.signedIn)") {
+            let generation = UUID()
+            realtimeGeneration = generation
+            realtimeConnected = false
+            guard scenePhase == .active, let id = conversationID, let owner = draftOwner,
+                  session.signedIn, !session.previewModeEnabled, session.profile.userID == owner else { return }
+            await messaging.observeThreadChanges(owner: owner, conversation: id,
+                onChange: {
+                    guard realtimeGeneration == generation, conversationID == id,
+                          draftOwner == owner, session.profile.userID == owner else { return }
+                    foregroundRefreshRequest = UUID()
+                }, onStatus: { connected in
+                    guard realtimeGeneration == generation, conversationID == id,
+                          draftOwner == owner, session.profile.userID == owner else { return }
+                    realtimeConnected = connected
+                })
         }
         .task(id: foregroundRefreshRequest) {
             guard foregroundRefreshRequest != nil else { return }
@@ -5142,6 +5161,7 @@ struct DirectMessageThreadView: View {
             markLocalMessageNotificationsRead(conversationID: id)
 
             var pollTick = 0
+            var lastSafetyPoll = Date()
             while ownsThread() {
                 try? await Task.sleep(
                     nanoseconds:
@@ -5150,8 +5170,13 @@ struct DirectMessageThreadView: View {
                 guard ownsThread() else { break }
 
                 guard scenePhase == .active else { continue }
-                await refreshVisibleThread(id, owner: owner)
-                guard ownsThread() else { return }
+                if ATHLTHDirectMessageRefreshPolicy.shouldPoll(
+                    realtimeConnected: realtimeConnected,
+                    elapsed: Date().timeIntervalSince(lastSafetyPoll)) {
+                    lastSafetyPoll = Date()
+                    await refreshVisibleThread(id, owner: owner)
+                    guard ownsThread() else { return }
+                }
 
                 pollTick += 1
                 if pollTick.isMultiple(
