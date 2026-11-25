@@ -3288,6 +3288,7 @@ struct DirectMessageThreadView: View {
     let friend: SocialProfileCard
 
     @State private var conversationID: UUID?
+    @State private var draftOwner: UUID?
     @State private var text = ""
     @State private var selectedShare: MessageShareDraft?
     @State private var showingSharePicker = false
@@ -3531,7 +3532,32 @@ struct DirectMessageThreadView: View {
             }
         }
         .task(id: friend.userID) {
-            await openAndPoll()
+            guard session.signedIn, !session.previewModeEnabled else { return }
+            let owner = session.profile.userID
+            draftOwner = owner
+            text = messaging.textDraft(for: friend.userID, owner: owner)
+            await openAndPoll(owner: owner)
+        }
+        .onChange(of: text) { _, value in
+            guard let owner = draftOwner, session.signedIn, !session.previewModeEnabled,
+                  owner == session.profile.userID else { return }
+            messaging.setTextDraft(value, for: friend.userID, owner: owner)
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            draftOwner = nil
+            text = ""
+            selectedShare = nil
+            conversationID = nil
+            dismiss()
+        }
+        .onChange(of: session.signedIn) { _, signedIn in
+            if !signedIn {
+                draftOwner = nil
+                text = ""
+                selectedShare = nil
+                conversationID = nil
+                dismiss()
+            }
         }
     }
 
@@ -5017,7 +5043,11 @@ struct DirectMessageThreadView: View {
         }
     }
 
-    private func openAndPoll() async {
+    private func openAndPoll(owner: UUID) async {
+        func ownsThread() -> Bool {
+            !Task.isCancelled && session.signedIn && !session.previewModeEnabled &&
+                session.profile.userID == owner && draftOwner == owner
+        }
         do {
             let id = try await messaging.openConversation(with: friend.userID)
 
@@ -5025,28 +5055,30 @@ struct DirectMessageThreadView: View {
             // and messages have been refreshed. This avoids briefly showing
             // a stale "message request" composer after a pending conversation
             // has already been promoted to accepted.
+            guard ownsThread() else { return }
             await messaging.refreshConversation(id)
+            guard ownsThread() else { return }
             session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
             session.syncSharedWorkoutLifecycles(from: messaging.messages(in: id))
             await social.refreshChallenges(
                 challengeStore:
                     challengeStore
             )
+            guard ownsThread() else { return }
             await social.markChallengeEventsRead(
                 from: friend.userID
             )
+            guard ownsThread() else { return }
             conversationID = id
             markLocalMessageNotificationsRead(conversationID: id)
 
             var pollTick = 0
-            while !Task.isCancelled {
+            while ownsThread() {
                 try? await Task.sleep(
                     nanoseconds:
                         4_000_000_000
                 )
-                if Task.isCancelled {
-                    break
-                }
+                guard ownsThread() else { break }
 
                 guard scenePhase == .active else { continue }
                 await messaging
@@ -5054,8 +5086,9 @@ struct DirectMessageThreadView: View {
                         id
                     )
 
+                guard ownsThread() else { return }
                 session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
-            session.syncSharedWorkoutLifecycles(from: messaging.messages(in: id))
+                session.syncSharedWorkoutLifecycles(from: messaging.messages(in: id))
 
                 pollTick += 1
                 if pollTick.isMultiple(
@@ -5069,6 +5102,7 @@ struct DirectMessageThreadView: View {
                 }
             }
         } catch {
+            guard ownsThread() else { return }
             loadError = error.localizedDescription
         }
     }
@@ -5220,9 +5254,12 @@ struct DirectMessageThreadView: View {
     }
 
     private func send() async {
-        guard let conversationID, canSend else { return }
+        guard let conversationID, canSend, !isSending,
+              let owner = draftOwner, session.signedIn, !session.previewModeEnabled,
+              session.profile.userID == owner else { return }
 
         isSending = true
+        defer { isSending = false }
         let body = text
         let attachment =
             (
@@ -5243,11 +5280,14 @@ struct DirectMessageThreadView: View {
             body: body,
             attachment: attachment
         ) {
-            text = ""
+            guard session.signedIn, session.profile.userID == owner, draftOwner == owner else { return }
+            // Preserve text typed during the network request.
+            if text == body {
+                text = ""
+                messaging.setTextDraft("", for: friend.userID, owner: owner)
+            }
             selectedShare = nil
         }
-
-        isSending = false
     }
 
     private func proposalResponse(
