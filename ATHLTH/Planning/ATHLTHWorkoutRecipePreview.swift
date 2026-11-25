@@ -44,10 +44,16 @@ enum ATHLTHWorkoutStepCopy {
     }
 
     /// Coach guidance only, not a measured value or modification to the prescribed workout.
-    static func suggestedZone(for block: WorkoutTemplateBlock, workoutTitle: String) -> String? {
+    static func suggestedZones(for block: WorkoutTemplateBlock, workoutTitle: String) -> ClosedRange<Int>? {
         guard isFourByFour(workoutTitle), block.kind == .run,
-              block.targetHeartRateZone == nil else { return nil }
-        let isWork = block.resolvedPhase == .main
+              block.targetHeartRateZone == nil,
+              block.targetHeartRatePercentMin == nil, block.targetHeartRatePercentMax == nil else { return nil }
+        return block.resolvedPhase == .main && !block.isRestOrActiveRecovery ? 4...4 : 1...2
+    }
+
+    static func suggestedZone(for block: WorkoutTemplateBlock, workoutTitle: String) -> String? {
+        guard let zones = suggestedZones(for: block, workoutTitle: workoutTitle) else { return nil }
+        let isWork = zones.lowerBound == 4
         return ATHLTHLocalization.choose(
             english: isWork ? "Suggested HR zone Z4" : "Suggested HR zone Z1–Z2",
             norwegian: isWork ? "Anbefalt pulssone S4" : "Anbefalt pulssone S1–S2"
@@ -559,6 +565,8 @@ struct ATHLTHWorkoutRecipePreview: View {
     /// Library detail owns its own hero and compact mode selector.
     var compactDetailLayout = false
     var detailAdvancedMode: Binding<Bool>? = nil
+    var showEstimatedDistance = true
+    var configuredMaximumOnly = false
     var onUpdateBlock: ((Int, WorkoutTemplateBlock) -> Void)? = nil
     /// Library RunningWorkoutTemplate owns its independent interval editor.
     /// A direct tap opens that existing editor, never a second engine.
@@ -589,7 +597,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     private var maximumHeartRateBPM: Double? {
         ATHLTHHeartRateZones.resolvedMaximumBPM(
             configured: session.onboardingProfile?.maximumHeartRateBPM,
-            dateOfBirth: session.onboardingProfile?.dateOfBirth
+            dateOfBirth: configuredMaximumOnly ? nil : session.onboardingProfile?.dateOfBirth
         )
     }
 
@@ -619,7 +627,7 @@ struct ATHLTHWorkoutRecipePreview: View {
             if isAdvanced && !embeddedInDetails && !compactDetailLayout {
                 statistics
             }
-            if let meters = ATHLTHRunningEstimate.distanceMeters(for: normalizedBlocks),
+            if showEstimatedDistance, let meters = ATHLTHRunningEstimate.distanceMeters(for: normalizedBlocks),
                category == "running" || category == "walking" {
                 Label(
                     tr("Estimated distance", "Estimert distanse") + " · " +
@@ -683,7 +691,8 @@ struct ATHLTHWorkoutRecipePreview: View {
                             maximumHeartRateBPM: maximumHeartRateBPM,
                             suggestion: ATHLTHWorkoutStepCopy.suggestedZone(
                                 for: item.block, workoutTitle: title
-                            )
+                            ),
+                            suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: item.block, workoutTitle: title)
                         )
 
                         // Show the real next step, including a recovery after
@@ -1041,7 +1050,8 @@ struct ATHLTHWorkoutRecipePreview: View {
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
                             if let pulse = ATHLTHPlannedHeartRatePreview.rangeText(
-                                for: block, maximumBPM: maximumHeartRateBPM
+                                for: block, maximumBPM: maximumHeartRateBPM,
+                                suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: block, workoutTitle: title)
                             ) {
                                 Text(pulse)
                                     .font(.caption2.weight(.medium))
@@ -1245,10 +1255,12 @@ struct ATHLTHWorkoutRecipePreview: View {
         if let weight = block.targetWeightKilograms, weight > 0 {
             result.append(tr("Target load: ", "Målvekt: ") + "\(weight) kg")
         }
-        if let pace = block.targetPaceSecondsPerKilometer, pace > 0 {
+        if let pace = block.targetPaceSecondsPerKilometer, pace.isFinite, (1...3600).contains(pace) {
+            let treadmill = block.isIndoor == true && block.treadmillInclinePercent != nil
             let seconds = Int(pace.rounded())
-            result.append(tr("Target pace: ", "Måltempo: ") +
-                          String(format: "%d:%02d min/km", seconds / 60, seconds % 60))
+            result.append(treadmill
+                ? tr("Target speed: ", "Målfart: ") + String(format: "%.1f km/t", 3600 / pace)
+                : tr("Target pace: ", "Måltempo: ") + String(format: "%d:%02d min/km", seconds / 60, seconds % 60))
         }
         if let group = block.groupKind {
             let rounds = block.groupRounds.map { "\($0) × " } ?? ""
@@ -1730,7 +1742,7 @@ extension RunningWorkoutTemplate {
                   value.rounded() != value else { return nil }
             return String(format: "RPE %g", value)
         }
-        return WorkoutTemplateBlock(
+        var preview = WorkoutTemplateBlock(
             sequence: sequence, kind: .run, title: title,
             exerciseSlug: nil, distanceMeters: target.distanceMeters,
             repetitions: nil, durationSeconds: target.durationSeconds,
@@ -1739,11 +1751,18 @@ extension RunningWorkoutTemplate {
             targetPaceSecondsPerKilometer:
                 target.intensity.kind == .pace
                     ? target.intensity.paceMinSecondsPerKilometer : nil,
-            targetHeartRateZone:
-                target.intensity.kind == .heartRateZone
-                    ? target.intensity.heartRateZone : nil,
+            targetHeartRateZone: target.intensity.heartRateZone,
             targetIntensityType: fractionalRPE,
             targetEffortRPE: wholeRPE
         )
+        if let environment = launchRunEnvironment {
+            preview.isIndoor = environment != .outdoor
+            preview.treadmillInclinePercent = environment == .treadmill
+                ? (target.treadmillInclinePercent ?? 0) : nil
+        } else if let incline = target.treadmillInclinePercent {
+            preview.isIndoor = true
+            preview.treadmillInclinePercent = incline
+        }
+        return preview
     }
 }
