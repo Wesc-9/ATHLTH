@@ -196,8 +196,6 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var studioStartChoice: ATHLTHStudioSchedule.Occurrence?
     @StateObject private var registeredPhone = ATHLTHRegisteredPhoneAvailability()
     @State private var pendingStudioStart: StudioStartAction?
-    @State private var showingQuickActivityPicker = false
-    @State private var pendingQuickActivity: ATHLTHTrainNavigationRequest?
 
     private enum StudioStartAction {
         case local(ATHLTHStudioSchedule.Occurrence)
@@ -381,7 +379,7 @@ struct ATHLTHiPadStudioRootView: View {
         // adaptive side-by-side presentation differ on iPad.
         .environment(\.athlthStudioFullscreenEditing, true)
         .tint(gold)
-        .fullScreenCover(isPresented: $showingTrain) {
+        .fullScreenCover(isPresented: $showingTrain.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHStudioTrainWorkspaceView(navigationRequest: $trainRequest)
         }
         .athlthStablePresentationBoundary()
@@ -393,17 +391,6 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .sheet(item: $studioStartChoice, onDismiss: performPendingStudioStart) { item in
             studioDevicePicker(item)
-        }
-        .sheet(isPresented: $showingQuickActivityPicker, onDismiss: {
-            guard let request = pendingQuickActivity else { return }
-            pendingQuickActivity = nil
-            trainRequest = request
-            showingTrain = true
-        }) {
-            ATHLTHStudioQuickActivityPicker { request in
-                pendingQuickActivity = request
-                showingQuickActivityPicker = false
-            }
         }
         .alert(
             ATHLTHLocalization.choose(english: "Unable to start workout", norwegian: "Kunne ikke starte økten"),
@@ -452,7 +439,8 @@ struct ATHLTHiPadStudioRootView: View {
                         $0.hasPrefix("--athlth-compatibility-tab=") ||
                             $0.hasPrefix("--athlth-compatibility-library=") ||
                             $0.hasPrefix("--athlth-compatibility-sidebar=") ||
-                            $0 == "--athlth-compatibility-workout-planner"
+                            $0 == "--athlth-compatibility-workout-planner" ||
+                            $0 == "--athlth-compatibility-train-today"
                     }
                 if !compatibilityLaunch {
                     if let restored = ATHLTHStudioDestination(
@@ -479,6 +467,12 @@ struct ATHLTHiPadStudioRootView: View {
                     }
                 }
             }
+            #if targetEnvironment(simulator)
+            if ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview"),
+               ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-train-today") {
+                openTrainToday()
+            }
+            #endif
             studioPlanSync.switchAccount(
                 session.signedIn ? session.profile.userID : nil
             )
@@ -762,8 +756,7 @@ struct ATHLTHiPadStudioRootView: View {
                         symbol: "play.circle",
                         selected: false
                     ) {
-                        pendingQuickActivity = nil
-                        showingQuickActivityPicker = true
+                        openTrainToday()
                     }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                     .accessibilityIdentifier("athlth-ipad-sidebar-quick-train")
@@ -1140,6 +1133,14 @@ struct ATHLTHiPadStudioRootView: View {
         // Back navigation leaves the sidebar unchanged.
     }
 
+    /// One explicit route to the same Today surface as iPhone.
+    /// No activity chooser sheet or dismissal-triggered second presentation.
+    private func openTrainToday() {
+        guard !showingTrain else { return }
+        trainRequest = .today
+        showingTrain = true
+    }
+
     private func openStudio(_ destination: ATHLTHStudioDestination) {
         clearWeekInspectorIfNeeded()
         // Even a repeated Home or Plan Studio tap must return from an
@@ -1291,8 +1292,6 @@ struct ATHLTHiPadStudioRootView: View {
         selectedStandaloneWorkout = nil
         studioStartChoice = nil
         pendingStudioStart = nil
-        showingQuickActivityPicker = false
-        pendingQuickActivity = nil
         studioLocalLaunch = nil
         studioLaunchInProgress = false
         studioLaunchError = nil

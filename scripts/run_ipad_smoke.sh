@@ -309,6 +309,7 @@ if [ "$IPAD_SIZE" = "13" ]; then
   }
 
   preview_13_inch "home" "--athlth-compatibility-tab=0"
+  preview_13_inch "train-today" "--athlth-compatibility-train-today"
   preview_13_inch "plan-studio" "--athlth-compatibility-tab=1"
   preview_13_inch "workout-planner" "--athlth-compatibility-workout-planner"
   preview_13_inch "library-exercises" "--athlth-compatibility-library=exercises"
@@ -382,6 +383,23 @@ for TAB in 0 1 2 3 4; do
   validate_screen "tab-$TAB"
   simctl_bounded "terminate iPad preview" 35 terminate "$UDID" com.wesc9.athlth || true
 done
+
+# Exercise the real shared Train workspace, not merely the Studio tabs.
+TRAIN_OUTPUT=$(simctl_bounded "launch iPad Train Today" 65 launch "$UDID" com.wesc9.athlth \
+  --athlth-compatibility-preview --athlth-compatibility-train-today 2>&1)
+echo "$TRAIN_OUTPUT"
+TRAIN_PID=$(echo "$TRAIN_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+sleep 5
+if [ -z "$TRAIN_PID" ] || ! kill -0 "$TRAIN_PID" 2>/dev/null; then
+  echo "::error::ATHLTH iPad Train Today exited before rendering."
+  exit 1
+fi
+validate_screen "train-today"
+if ! kill -0 "$TRAIN_PID" 2>/dev/null; then
+  echo "::error::ATHLTH iPad Train Today crashed after rendering."
+  exit 1
+fi
+simctl_bounded "terminate iPad Train preview" 35 terminate "$UDID" com.wesc9.athlth || true
 
 # Verify the new native Studio library pages on the iPad, not
 # just the five top-level tabs. A missing source/empty layout must

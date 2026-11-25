@@ -46,6 +46,7 @@ struct ATHLTHStudioTrainWorkspaceView: View {
             )
             .environment(\.athlthStudioFullscreenEditing, true)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("athlth-ipad-shared-train-workspace")
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
     }

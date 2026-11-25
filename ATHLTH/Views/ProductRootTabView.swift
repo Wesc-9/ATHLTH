@@ -5767,7 +5767,7 @@ struct ATHLTHTrainView: View {
         .sheet(isPresented: $showingTrainAllPlans.keepingPresentedWhenInactive(scenePhase)) {
             AllTrainingPlansView()
         }
-        .sheet(isPresented: $showingAllWorkoutCategories.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(isPresented: $showingAllWorkoutCategories.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             guard let action = pendingWorkoutCategoryAction else { return }
             pendingWorkoutCategoryAction = nil
@@ -5780,11 +5780,11 @@ struct ATHLTHTrainView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
         }
-        .sheet(isPresented: $showingCompetitionHub.keepingPresentedWhenInactive(scenePhase)) {
+        .athlthStudioEditor(isPresented: $showingCompetitionHub.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) {
             AnyView(ATHLTHCompetitionEntryView())
         }
         .athlthStablePresentationBoundary()
-        .sheet(item: $selectedTrainCompetitionActivity.keepingPresentedItemWhenInactive(scenePhase)) { activity in
+        .athlthStudioEditor(item: $selectedTrainCompetitionActivity.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { activity in
             switch activity {
             case .running:
                 ATHLTHCompetitionCreationView(
@@ -5807,7 +5807,7 @@ struct ATHLTHTrainView: View {
         // This prevents one enormous nested modifier type from propagating
         // through the entire Train root view graph on iOS 27.3.
         .athlthStablePresentationBoundary()
-        .sheet(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(isPresented: $showingTrainRunningWorkoutLibrary.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             if let selected = trainRunningWorkoutSelection {
                 trainRunningWorkoutSelection = nil
@@ -5830,7 +5830,7 @@ struct ATHLTHTrainView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingTrainIntervalComposer.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(isPresented: $showingTrainIntervalComposer.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             // The interval editor closes before the running quick-start
             // sheet is presented. Preserve the newly built interval steps.
@@ -5890,7 +5890,7 @@ struct ATHLTHTrainView: View {
                 TrainingPlanProgressDetailView(planID: plan.id)
             }
         }
-        .sheet(item: $selectedSuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { entry in
+        .athlthStudioEditor(item: $selectedSuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { entry in
             NavigationStack {
                 WorkoutTemplateDetailView(entry: entry)
             }
@@ -5905,7 +5905,7 @@ struct ATHLTHTrainView: View {
         // This prevents one enormous nested modifier type from propagating
         // through the entire Train root view graph on iOS 27.3.
         .athlthStablePresentationBoundary()
-        .sheet(item: $selectedTrainStandaloneWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
+        .athlthStudioEditor(item: $selectedTrainStandaloneWorkout.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { workout in
             HomeDailyRecommendedWorkoutSheet(
                 workout: workout,
                 isPlanWorkout: false,
@@ -5932,7 +5932,7 @@ struct ATHLTHTrainView: View {
             .presentationDetents([.fraction(0.82), .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(item: $selectedTrainDailySuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase)) { workout in
+        .athlthStudioEditor(item: $selectedTrainDailySuggestedWorkout.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing) { workout in
             HomeDailyRecommendedWorkoutSheet(
                 workout: workout,
                 isPlanWorkout: false,
@@ -5963,7 +5963,7 @@ struct ATHLTHTrainView: View {
             )
             .environmentObject(session)
         }
-        .sheet(item: $selectedStrengthSession.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(item: $selectedStrengthSession.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             guard ATHLTHScratchComposerPresentationPolicy
                 .startsLiveAfterSetupDismiss(
@@ -6022,7 +6022,7 @@ struct ATHLTHTrainView: View {
 
     private var trainQuickStartPresentations: some View {
         trainPlanningPresentations
-        .sheet(isPresented: $showingRunQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(isPresented: $showingRunQuickStart.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             pendingPlannedEnduranceWorkout = nil
         }) {
@@ -6094,7 +6094,7 @@ struct ATHLTHTrainView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingWalkQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(isPresented: $showingWalkQuickStart.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             pendingPlannedEnduranceWorkout = nil
         }) {
@@ -6219,7 +6219,7 @@ struct ATHLTHTrainView: View {
                 }
             }
         }
-        .sheet(item: $pendingRunningTemplate.keepingPresentedItemWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(item: $pendingRunningTemplate.keepingPresentedItemWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             pendingPlannedEnduranceWorkout = nil
         }) { workout in
@@ -6293,7 +6293,7 @@ struct ATHLTHTrainView: View {
 
     private var trainRecordingPresentations: some View {
         trainQuickStartPresentations
-        .sheet(isPresented: $showingCustomQuickStart.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+        .athlthStudioEditor(isPresented: $showingCustomQuickStart.keepingPresentedWhenInactive(scenePhase), useFullScreen: studioFullscreenEditing, onDismiss: {
             guard scenePhase == .active else { return }
             // Never compete with the setup sheet's dismissal animation.
             if let launch = pendingCustomIPhoneQuick {
@@ -6573,7 +6573,9 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private func trainRootScroll(for section: ATHLTHTrainSection) -> some View {
-        ScrollView {
+        let readingWidth: CGFloat = studioFullscreenEditing && section == .today
+            ? 980 : ATHLTHTrainDesign.readingWidth
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 premiumTrainBrandHeader(for: section)
 
@@ -6605,7 +6607,7 @@ struct ATHLTHTrainView: View {
             .padding(.top, section == .today ? 18 : 24)
             .padding(.bottom, 36)
             .containerRelativeFrame(.horizontal) { @Sendable availableWidth, _ in
-                min(availableWidth, ATHLTHTrainDesign.readingWidth)
+                min(availableWidth, readingWidth)
             }
             .frame(maxWidth: .infinity)
         }
