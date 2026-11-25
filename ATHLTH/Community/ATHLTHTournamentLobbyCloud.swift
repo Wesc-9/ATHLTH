@@ -37,6 +37,7 @@ struct ATHLTHTournamentExerciseSearchResult: Identifiable {
     let name: String
     let isActivityTemplate: Bool
     var metric: String = "repetitions"
+    var activity: ATHLTHTournamentActivity = .strength
 }
 
 struct ATHLTHTournamentRuleProposalRemote: Decodable, Identifiable {
@@ -377,7 +378,7 @@ struct ATHLTHTournamentLobbyCloudService {
             .limit(40).execute().value
         var result = presets.map {
             ATHLTHTournamentExerciseSearchResult(
-                id: $0.id,name: $0.title,isActivityTemplate: true,metric: $0.metric ?? "repetitions"
+                id: $0.id,name: $0.title,isActivityTemplate: true,metric: $0.metric ?? "repetitions",activity: $0.activityType
             )
         }
         if allowed.contains(.strength) {
@@ -398,6 +399,18 @@ struct ATHLTHTournamentLobbyCloudService {
             .in("id", values: ids).limit(500).execute().value
         var result = try await exerciseNames(ids: Set(ids).subtracting(list.map(\.id)))
         for item in list { result[item.id] = item.title }
+        return result
+    }
+
+    func exerciseActivities(ids: [UUID]) async throws -> [UUID: ATHLTHTournamentActivity] {
+        guard !ids.isEmpty else { return [:] }
+        let templates: [ATHLTHTournamentActivityTemplateRemote] = try await client
+            .from("athlth_tournament_activity_templates").select("id,title,activity_type,metric")
+            .in("id", values: ids).limit(500).execute().value
+        var result = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0.activityType) })
+        let remaining = Set(ids).subtracting(templates.map(\.id))
+        let catalog = try await exerciseNames(ids: remaining)
+        for id in catalog.keys { result[id] = .strength }
         return result
     }
 
