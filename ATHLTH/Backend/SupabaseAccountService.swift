@@ -170,6 +170,25 @@ final class SupabaseAccountService: ObservableObject {
         )
     }
 
+    // Use the Auth provider's confirmation workflow; never update auth.users directly.
+    func requestEmailChange(_ email: String) async throws {
+        guard let current = client.auth.currentUser,
+              current.appMetadata["provider"]?.stringValue == "email",
+              current.email?.caseInsensitiveCompare(email) != .orderedSame else {
+            throw SupabaseAccountError.emailUnavailable
+        }
+        try await client.auth.update(
+            user: UserAttributes(email: email),
+            redirectTo: Self.emailConfirmationURL
+        )
+        objectWillChange.send()
+    }
+
+    func refreshAccountEmail() async throws {
+        _ = try await client.auth.refreshSession()
+        objectWillChange.send()
+    }
+
     func updateRecoveredPassword(_ newPassword: String) async throws -> BackendUserBootstrap {
         try await client.auth.update(
             user: UserAttributes(password: newPassword)
