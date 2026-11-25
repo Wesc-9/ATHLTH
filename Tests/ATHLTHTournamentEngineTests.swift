@@ -26,6 +26,29 @@ final class ATHLTHTournamentEngineTests: XCTestCase {
         )
     }
 
+    func testTeamRosterRequiresUniqueMembersAndFairTeamSizes() {
+        let ids = (0..<5).map { _ in UUID() }
+        let first = ATHLTHCompetitionTeamPolicy.Team(id: UUID(), members: Array(ids.prefix(2)))
+        let second = ATHLTHCompetitionTeamPolicy.Team(id: UUID(), members: Array(ids.suffix(3)))
+        let policy = ATHLTHCompetitionTeamPolicy.self
+        XCTAssertTrue(policy.validRoster([first, second], participants: Set(ids), aggregation: .average))
+        XCTAssertFalse(policy.validRoster([first, second], participants: Set(ids), aggregation: .sum))
+        XCTAssertFalse(policy.validRoster([first, second], participants: Set(ids), aggregation: .best))
+        let duplicate = ATHLTHCompetitionTeamPolicy.Team(id: UUID(), members: [ids[0], ids[2], ids[3], ids[4]])
+        XCTAssertFalse(policy.validRoster([first, duplicate], participants: Set(ids), aggregation: .average))
+    }
+
+    func testTeamScoreRequiresAllApprovedResultsAndPreservesExplicitZero() {
+        let a = UUID(), b = UUID()
+        let team = ATHLTHCompetitionTeamPolicy.Team(id: UUID(), members: [a, b])
+        let policy = ATHLTHCompetitionTeamPolicy.self
+        XCTAssertNil(policy.score(team: team, approvedPoints: [a: 5], aggregation: .sum))
+        XCTAssertNil(policy.score(team: team, approvedPoints: [a: 5, b: .nan], aggregation: .average))
+        XCTAssertEqual(policy.score(team: team, approvedPoints: [a: 5, b: 0], aggregation: .sum), 5)
+        XCTAssertEqual(policy.score(team: team, approvedPoints: [a: 5, b: 0], aggregation: .average), 2.5)
+        XCTAssertEqual(policy.score(team: team, approvedPoints: [a: 5, b: 0], aggregation: .best), 5)
+    }
+
     func testWarmupNeverChangesPointsOrAdvancement() throws {
         let tournament = draft(format: .cup, count: 4, warmupCount: 2)
         let all = try ATHLTHTournamentEngine.initialFixtures(for: tournament)
