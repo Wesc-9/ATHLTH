@@ -232,6 +232,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSaveTemplate: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         !allowedActivities.isEmpty && competitionSettings.isValid &&
+        competitionSettings.environment.supports(allowedActivities) &&
         !templateSaving && !publishing
     }
 
@@ -244,7 +245,8 @@ struct ATHLTHTournamentCreator: View {
         (!isSingleEvent || competitionSettings.race.discipline == .workout ||
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
-        competitionSettings.race.isOperational && scoringValid &&
+        competitionSettings.race.isOperational && competitionSettings.environment.canPublish &&
+        competitionSettings.environment.supports(allowedActivities) && scoringValid &&
         (!isRematch || (exerciseMode == .owner && competitionSettings.selectedExerciseIDs?.count == exerciseCount && exerciseCount > 0)) &&
         (!(isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified)) &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
