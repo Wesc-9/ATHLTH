@@ -5133,14 +5133,15 @@ struct DirectMessageThreadView: View {
                 guard ownsThread() else { break }
 
                 guard scenePhase == .active else { continue }
-                await messaging
-                    .refreshConversation(
-                        id
-                    )
+                let previousMessages = messaging.messages(in: id)
+                await messaging.refreshConversation(id, polling: true)
 
                 guard ownsThread() else { return }
-                session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
-                session.syncSharedWorkoutLifecycles(from: messaging.messages(in: id))
+                let updatedMessages = messaging.messages(in: id)
+                if previousMessages != updatedMessages {
+                    session.syncApprovedSharedWorkouts(from: updatedMessages)
+                    session.syncSharedWorkoutLifecycles(from: updatedMessages)
+                }
 
                 pollTick += 1
                 if pollTick.isMultiple(
