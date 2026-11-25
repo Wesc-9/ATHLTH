@@ -76,7 +76,16 @@ enum ATHLTHQuickRunTimelineAdapter {
         )
         source.runningWorkout = template
         source.runningWorkouts = [template]
-        return ATHLTHUnifiedWorkout.editorBlocks(from: source)
+        var blocks = ATHLTHUnifiedWorkout.editorBlocks(from: source)
+        if let environment = template.launchRunEnvironment {
+            for index in blocks.indices where blocks[index].kind == .run {
+                blocks[index].isIndoor = environment != .outdoor
+                blocks[index].treadmillInclinePercent = environment == .treadmill
+                    ? (blocks[index].treadmillInclinePercent ?? 0) : nil
+                if environment != .outdoor { blocks[index].routeID = nil }
+            }
+        }
+        return blocks
     }
 
     static func validationError(for workout: PlannedSession) -> String? {
