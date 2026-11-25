@@ -3302,14 +3302,19 @@ struct AroundYouExploreView: View {
                         ghostRace: ghostRace
                     )
 
-                routeActionMessage =
-                    "\(configuration.title) started" +
-                    (
-                        configuration.captureDevice ==
-                            .appleWatch
-                            ? " on Apple Watch."
-                            : " on iPhone."
+                if embeddedInStudio {
+                    // iPad queues a relay; a successful enqueue is not proof
+                    // that the remote recorder has started.
+                    routeActionMessage = ATHLTHLocalization.choose(
+                        english: "Start request sent. Check the selected device.",
+                        norwegian: "Startforespørsel sendt. Sjekk valgt enhet."
                     )
+                } else {
+                    routeActionMessage =
+                        "\(configuration.title) started" +
+                        (configuration.captureDevice == .appleWatch
+                            ? " on Apple Watch." : " on iPhone.")
+                }
             } catch {
                 await social.cancelActiveWorkout()
                 routeActionError =
