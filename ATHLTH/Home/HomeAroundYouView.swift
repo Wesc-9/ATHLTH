@@ -11,6 +11,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
     @Published var errorMessage: String?
 
     private let manager = CLLocationManager()
+    private var acceptsLocationUpdates = false
 
     override init() {
         authorizationStatus = manager.authorizationStatus
@@ -28,6 +29,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
     }
 
     func start() {
+        acceptsLocationUpdates = true
         authorizationStatus = manager.authorizationStatus
 
         switch authorizationStatus {
@@ -49,6 +51,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
     }
 
     func refresh() {
+        acceptsLocationUpdates = true
         guard canShowUserLocation else {
             start()
             return
@@ -59,6 +62,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
     }
 
     func stop() {
+        acceptsLocationUpdates = false
         manager.stopUpdatingLocation()
         isUpdating = false
     }
@@ -72,6 +76,7 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
             guard let self else { return }
 
             self.authorizationStatus = status
+            guard self.acceptsLocationUpdates else { return }
 
             if self.canShowUserLocation {
                 self.errorMessage = nil
@@ -101,7 +106,8 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
         let timestamp = newest.timestamp
 
         Task { @MainActor [weak self] in
-            self?.location = CLLocation(
+            guard let self, self.acceptsLocationUpdates else { return }
+            self.location = CLLocation(
                 coordinate: CLLocationCoordinate2D(
                     latitude: latitude,
                     longitude: longitude
@@ -113,8 +119,8 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
                 speed: speed,
                 timestamp: timestamp
             )
-            self?.isUpdating = false
-            self?.errorMessage = nil
+            self.isUpdating = false
+            self.errorMessage = nil
         }
     }
 
@@ -122,16 +128,15 @@ final class HomeLocationStore: NSObject, ObservableObject, CLLocationManagerDele
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
-        if let locationError = error as? CLError,
-           locationError.code == .locationUnknown {
-            return
-        }
-
+        let temporarilyUnavailable = (error as? CLError)?.code == .locationUnknown
         let message = error.localizedDescription
 
         Task { @MainActor [weak self] in
-            self?.isUpdating = false
-            self?.errorMessage = message
+            guard let self, self.acceptsLocationUpdates else { return }
+            // requestLocation is one-shot: a transient failure must not leave
+            // the visible map showing an endless loading state.
+            self.isUpdating = false
+            self.errorMessage = temporarilyUnavailable ? nil : message
         }
     }
 }
