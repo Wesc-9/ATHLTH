@@ -7,6 +7,9 @@ struct ATHLTHQuickRunStartFooter: View {
     let canStart: Bool
     let starting: Bool
     let scheduledDate: Date?
+    let defaultCountdownSeconds: Int
+    let onIPhonePreferred: () -> Void
+    let onWatchPreferred: () -> Void
     let onIPhoneNow: () -> Void
     let onWatchNow: () -> Void
     let onWatchCountDown: () -> Void
@@ -48,10 +51,13 @@ struct ATHLTHQuickRunStartFooter: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
             } else {
-                Text(ATHLTHLocalization.choose(
-                    english: "Tap to start now · hold a button for more start options.",
-                    norwegian: "Trykk for å starte nå · hold inne for startvalg."
-                ))
+                Text(defaultCountdownSeconds > 0
+                    ? ATHLTHLocalization.choose(
+                        english: "Starts after \(defaultCountdownSeconds) seconds · hold for other start options.",
+                        norwegian: "Starter etter \(defaultCountdownSeconds) sekunder · hold inne for andre startvalg.")
+                    : ATHLTHLocalization.choose(
+                        english: "Tap to start now · hold a button for more start options.",
+                        norwegian: "Trykk for å starte nå · hold inne for startvalg."))
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
@@ -67,7 +73,7 @@ struct ATHLTHQuickRunStartFooter: View {
                 appleAvailable: watchAvailable && canStart && !starting,
                 garminAvailable: false,
                 garminConnected: watchSelection.garminDataConnected,
-                onAppleWatch: onWatchNow, onGarmin: nil
+                onAppleWatch: onWatchPreferred, onGarmin: nil
             )
         } message: {
             Text(ATHLTHLocalization.choose(
@@ -122,8 +128,8 @@ struct ATHLTHQuickRunStartFooter: View {
         let enabled = canStart && !starting &&
             (device == .iPhone || watchAvailable || watchSelection.garminDataConnected)
         return Button {
-            if device == .iPhone { onIPhoneNow() }
-            else if watchSelection.resolve(apple: watchAvailable, garmin: false) == .appleWatch { onWatchNow() }
+            if device == .iPhone { onIPhonePreferred() }
+            else if watchSelection.resolve(apple: watchAvailable, garmin: false) == .appleWatch { onWatchPreferred() }
             else { showingWatchChoice = true }
         } label: {
             Label(label, systemImage: icon)
