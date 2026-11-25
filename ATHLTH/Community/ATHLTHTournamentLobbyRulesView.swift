@@ -353,7 +353,7 @@ struct ATHLTHTournamentLobbyRulesView: View {
             }
         }
         .task(id: tournament.id) { await reload() }
-        .sheet(isPresented: $showingProposal) {
+        .fullScreenCover(isPresented: $showingProposal) {
             ATHLTHTournamentRuleProposalEditor(initial: tournament) { choice in
                 try await cloud.proposeRules(
                     tournamentID: tournament.id,

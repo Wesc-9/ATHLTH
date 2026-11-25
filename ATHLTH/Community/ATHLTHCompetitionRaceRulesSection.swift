@@ -214,16 +214,21 @@ struct ATHLTHCompetitionRaceRulesSection: View {
         }
         .padding(15)
         .background(ATHLTHArenaV3Style.panel())
-        .sheet(isPresented: $showingSavedRoutes) {
+        .fullScreenCover(isPresented: $showingSavedRoutes) {
             NavigationStack {
                 SavedRoutesView(selectionTitle: "Konkurranserute") { route in
                     settings.race.routeID = route.id
                     settings.race.routeName = String(route.title.prefix(120))
                     showingSavedRoutes = false
                 }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Lukk") { showingSavedRoutes = false }
+                    }
+                }
             }
         }
-        .sheet(isPresented: $showingLapPoint, onDismiss: {
+        .fullScreenCover(isPresented: $showingLapPoint, onDismiss: {
             settings.race.lapCourseLatitude = settings.meetingLat
             settings.race.lapCourseLongitude = settings.meetingLon
         }) {

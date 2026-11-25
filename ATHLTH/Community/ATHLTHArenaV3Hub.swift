@@ -432,16 +432,22 @@ enum ATHLTHTournamentStructure {
     }
 }
 
-private enum ATHLTHArenaV3CreateAction: String, Identifiable {
-    case duel
-    case league
-    case cup
-    var id: String { rawValue }
-}
-
-private enum ATHLTHArenaV3Filter: String, CaseIterable, Identifiable {
+enum ATHLTHArenaV3Filter: String, CaseIterable, Identifiable {
     case active, invitations, finished
     var id: String { rawValue }
+
+    func includes(status: String, isMember: Bool, isInvited: Bool) -> Bool {
+        guard isMember || isInvited else { return false }
+        switch self {
+        case .active:
+            return !isInvited && ["active", "inviting"].contains(status)
+        case .invitations:
+            return isInvited && status == "inviting"
+        case .finished:
+            return ["completed", "cancelled"].contains(status)
+        }
+    }
+
     var title: String {
         switch self {
         case .active: return "Pågående"
@@ -521,19 +527,12 @@ struct ATHLTHArenaV3HomeView: View {
 
     private var visibleOfficialTournaments: [ATHLTHTournamentRemote] {
         officialTournaments.filter { item in
-            guard loadedID == session.profile.userID,
-                  myTournamentIDs.contains(item.id) || pendingTournamentIDs.contains(item.id) else { return false }
-            switch selectedFilter {
-            case .active:
-                return item.status != "completed" &&
-                    item.status != "cancelled" &&
-                    !pendingTournamentIDs.contains(item.id)
-            case .invitations:
-                return item.status == "inviting" &&
-                    pendingTournamentIDs.contains(item.id)
-            case .finished:
-                return item.status == "completed" || item.status == "cancelled"
-            }
+            guard session.signedIn, loadedID == session.profile.userID else { return false }
+            return selectedFilter.includes(
+                status: item.status,
+                isMember: myTournamentIDs.contains(item.id),
+                isInvited: pendingTournamentIDs.contains(item.id)
+            )
         }
     }
 
@@ -630,7 +629,7 @@ struct ATHLTHArenaV3HomeView: View {
     }
 
     private var allCompetitionCount: Int {
-        remoteSeries.count + myTournamentIDs.count +
+        remoteSeries.count + myTournamentIDs.union(pendingTournamentIDs).count +
             challengesForUser.count + tournaments.count + legacyDrafts.count
     }
 

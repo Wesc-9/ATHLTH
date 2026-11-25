@@ -7,6 +7,28 @@ final class ATHLTHArenaV3TournamentTests: XCTestCase {
         names.map { ATHLTHTournamentParticipant(id: UUID(), username: $0) }
     }
 
+    func testPendingInvitationDoesNotRequireAcceptedMembership() {
+        XCTAssertTrue(ATHLTHArenaV3Filter.invitations.includes(
+            status: "inviting", isMember: false, isInvited: true))
+        XCTAssertFalse(ATHLTHArenaV3Filter.active.includes(
+            status: "inviting", isMember: true, isInvited: true))
+        XCTAssertFalse(ATHLTHArenaV3Filter.invitations.includes(
+            status: "inviting", isMember: false, isInvited: false))
+    }
+
+    func testCompetitionHubHistoryAndActiveAreSeparate() {
+        for status in ["completed", "cancelled"] {
+            XCTAssertTrue(ATHLTHArenaV3Filter.finished.includes(
+                status: status, isMember: true, isInvited: false))
+            XCTAssertFalse(ATHLTHArenaV3Filter.active.includes(
+                status: status, isMember: true, isInvited: false))
+        }
+        XCTAssertTrue(ATHLTHArenaV3Filter.active.includes(
+            status: "active", isMember: true, isInvited: false))
+        XCTAssertFalse(ATHLTHArenaV3Filter.finished.includes(
+            status: "active", isMember: true, isInvited: false))
+    }
+
     func testGroupSizeFourProducesBalancedGroups() {
         let roster = athletes((1...10).map { "athlete\($0)" })
         let groups = ATHLTHTournamentStructure.groups(roster, size: 4)

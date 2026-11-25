@@ -1123,7 +1123,7 @@ struct ATHLTHArenaSeasonsSection: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
-        .sheet(isPresented: $showingCreate) {
+        .fullScreenCover(isPresented: $showingCreate) {
             ATHLTHArenaSeasonCreateView(clubs: adminClubs) {
                 Task { await reload() }
             }
@@ -3265,7 +3265,7 @@ private struct ATHLTHArenaTeamsSection: View {
             }
             .padding(15)
             .background(ATHLTHArenaLightStyle.card(20))
-            .sheet(isPresented: $showingEditor) {
+            .fullScreenCover(isPresented: $showingEditor) {
                 ATHLTHArenaTeamEditor(
                     members: eligible,
                     existing: assignments,
@@ -4044,7 +4044,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                 invitationToRemove = nil
             }
         }
-        .sheet(item: $invitationToReplace) { member in
+        .fullScreenCover(item: $invitationToReplace) { member in
             NavigationStack {
                 List {
                     if replacementChoices.isEmpty {
@@ -4086,7 +4086,7 @@ struct ATHLTHArenaOnlineDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingRoundCreator) {
+        .fullScreenCover(isPresented: $showingRoundCreator) {
             ATHLTHArenaAddRoundView { round in
                 Task { await propose(round) }
             }
@@ -5690,7 +5690,7 @@ private struct ATHLTHArenaRelaySection: View {
                 }
                 .padding(15)
                 .background(ATHLTHArenaLightStyle.card(20))
-                .sheet(isPresented: $showingOwnGPSCandidates) {
+                .fullScreenCover(isPresented: $showingOwnGPSCandidates) {
                     NavigationStack {
                         List(ownGPSCandidates) { candidate in
                             Button {
@@ -5740,7 +5740,7 @@ private struct ATHLTHArenaRelaySection: View {
                     }
                     .presentationDetents([.medium, .large])
                 }
-                .sheet(isPresented: $editing) {
+                .fullScreenCover(isPresented: $editing) {
                     ATHLTHArenaRelayEditor(
                         members: members,
                         assignments: assignments,

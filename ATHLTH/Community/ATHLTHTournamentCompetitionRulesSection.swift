@@ -207,7 +207,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             }
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
-            .sheet(isPresented: $showingMeetingPoint) {
+            .fullScreenCover(isPresented: $showingMeetingPoint) {
                 ATHLTHCompetitionMeetingPointPicker(settings: $settings)
             }
 

@@ -615,7 +615,7 @@ struct ATHLTHArenaScoringSection: View {
             guard let draft = liveOutcomeDraft else { return }
             Task { await prepareLiveOutcome(draft) }
         }
-        .sheet(item: $roundToScore, onDismiss: {
+        .fullScreenCover(item: $roundToScore, onDismiss: {
             liveOutcomeDraft = nil
         }) { round in
             ATHLTHArenaOutcomeEditor(

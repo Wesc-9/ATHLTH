@@ -150,7 +150,7 @@ struct ATHLTHArenaReplacementSection: View {
             }
         }
         .task(id: series.id) { await reload() }
-        .sheet(item: Binding(
+        .fullScreenCover(item: Binding(
             get: { selectedSlotID.map { ATHLTHArenaSelectedSlot(id: $0) } },
             set: { selectedSlotID = $0?.id }
         )) { selection in
