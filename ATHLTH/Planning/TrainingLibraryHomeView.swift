@@ -1926,6 +1926,7 @@ struct TrainingPlanLibraryView: View {
     var favoritePlansOnly = false
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
+    @State private var planFilterMemo = ATHLTHProjectionMemo<PlanFilterKey, [TrainingPlanCatalogEntry]>()
     @State private var query = ""
     @State private var selectedCategory = "all"
     @State private var selectedMuscle: ExerciseMuscleGroup?
@@ -2015,7 +2016,22 @@ struct TrainingPlanLibraryView: View {
         (weeklySortAscending == nil ? 0 : 1)
     }
 
+    private struct PlanFilterKey: Equatable {
+        let owner: UUID
+        let entries: [TrainingPlanCatalogEntry]
+        let favorites: [LibraryFavoriteRecord]
+        let filters: String
+        let norwegian: Bool
+    }
+
     private var filteredEntries: [TrainingPlanCatalogEntry] {
+        let key = PlanFilterKey(owner: session.profile.userID, entries: catalog.entries,
+            favorites: (favoritePlansOnly || showFavoritesOnly) ? favorites.favorites : [],
+            filters: pageFilterKey, norwegian: ATHLTHLocalization.isNorwegian)
+        return planFilterMemo.value(for: key) { calculateFilteredEntries() }
+    }
+
+    private func calculateFilteredEntries() -> [TrainingPlanCatalogEntry] {
         let signpost = ATHLTHPerformance.begin("PlanCatalogFilter")
         defer { ATHLTHPerformance.end("PlanCatalogFilter", id: signpost) }
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
