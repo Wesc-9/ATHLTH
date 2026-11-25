@@ -414,14 +414,15 @@ enum ATHLTHSimpleWorkoutOutline {
             // "1 min · Z5 arbeid · 1 min · Z1 pause".
             let workZone = paceText(for: work.block) + zoneText(for: work.block)
             let recoveryZone = recovery.map { paceText(for: $0.block) + zoneText(for: $0.block) } ?? ""
+            let compactWorkText = includePace && count > 1 ? "\(count) × \(workText)" : workText
             let detail: String
             if let recoveryText {
                 detail = ATHLTHLocalization.choose(
-                    english: "\(workText)\(workZone) work · \(recoveryText)\(recoveryZone) recovery",
-                    norwegian: "\(workText)\(workZone) arbeid · \(recoveryText)\(recoveryZone) pause"
+                    english: "\(compactWorkText)\(workZone) work · \(recoveryText)\(recoveryZone) recovery",
+                    norwegian: "\(compactWorkText)\(workZone) arbeid · \(recoveryText)\(recoveryZone) pause"
                 )
             } else {
-                detail = workText + workZone
+                detail = compactWorkText + workZone
             }
             let itemTitle = conciseTitle(
                 ATHLTHWorkoutNameSuggestion.displayStepTitle(
