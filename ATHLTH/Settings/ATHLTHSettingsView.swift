@@ -1180,189 +1180,60 @@ settingsSection("Connections") {
     }
 
     private var trainingSettingsSection: some View {
-settingsSection("Preferences") {
-                        PremiumSettingsCard {
-                            DatePicker(
-                                ATHLTHLocalization.choose(english: "Default workout start time", norwegian: "Standard starttid for økter"),
-                                selection: $settings.defaultPlannedWorkoutTime,
-                                displayedComponents: .hourAndMinute
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            SettingsDivider()
-                            NavigationLink {
-                                ATHLTHTrainingSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "figure.strengthtraining.traditional",
-                                    title: "Training",
-                                    subtitle: "Workout device, strength tracking and publishing"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHStrengthBarMassSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "scalemass",
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Default bar weight",
-                                        norwegian: "Standard stangvekt"
-                                    ),
-                                    subtitle: ATHLTHLocalization.choose(
-                                        english: "Choose a default and override it per exercise",
-                                        norwegian: "Velg en standard og overstyr for hver øvelse"
-                                    )
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                TrainingDataSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "arrow.triangle.2.circlepath",
-                                    iconTint: ATHLTHTheme.premiumGold,
-                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Training data & sync",
-                                        norwegian: "Treningsdata og synkronisering"
-                                    ),
-                                    subtitle: ATHLTHLocalization.choose(
-                                        english: "Private iPad/iPhone plan sync, cloud backup and Coach permissions",
-                                        norwegian: "Privat plansynk, skybackup og Coach-tillatelser"
-                                    )
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHWorkoutGuidanceSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "waveform.and.mic",
-                                    iconTint: ATHLTHTheme.premiumGold,
-                                    iconBackground:
-                                        ATHLTHTheme.premiumGoldSoft,
-                                    title: "Workout Guidance",
-                                    subtitle:
-                                        "Audio Coach · Ghost Race · Navigation"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText
-                                                .opacity(0.72)
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHNotificationSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "bell",
-                                    title: "Notifications",
-                                    subtitle: notificationSummary
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHAchievementSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "medal.fill",
-                                    iconTint: ATHLTHTheme.premiumGold,
-                                    iconBackground:
-                                        ATHLTHTheme.premiumGoldSoft,
-                                    title:
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Achievements",
-                                            norwegian:
-                                                "Achievements"
-                                        ),
-                                    subtitle:
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Unlock effects, sound and haptics",
-                                            norwegian:
-                                                "Unlock-effekter, lyd og haptikk"
-                                        )
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text(
-                                            settings
-                                                .achievementEffects
-                                                .title
-                                        )
-                                        .font(.subheadline)
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                        )
-
-                                        Image(
-                                            systemName:
-                                                "chevron.right"
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                                .opacity(
-                                                    0.72
-                                                )
-                                        )
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            Link(destination: URL(string: "https://repdb.co")!) {
-                                PremiumSettingsRow(
-                                    icon: "figure.strengthtraining.traditional",
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Exercise data",
-                                        norwegian: "Øvelsesdata"
-                                    ),
-                                    subtitle: ATHLTHLocalization.choose(
-                                        english: "Exercise catalog powered by RepDB",
-                                        norwegian: "Øvelsesbibliotek levert av RepDB"
-                                    )
-                                ) {
-                                    Image(systemName: "arrow.up.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
+        settingsSection("Preferences") {
+            PremiumSettingsCard {
+                NavigationLink { ATHLTHTrainingSettingsView() } label: {
+                    trainingPreferenceRow("figure.strengthtraining.traditional", "Training", "Trening",
+                                          "Workout setup, start time, equipment and sharing", "Øktoppsett, starttid, utstyr og deling")
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
+                NavigationLink { TrainingDataSettingsView() } label: {
+                    trainingPreferenceRow("arrow.triangle.2.circlepath", "Training data & sync", "Treningsdata og synkronisering",
+                                          "Account sync and recovery", "Kontosynkronisering og gjenoppretting")
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
+                NavigationLink { ATHLTHWorkoutGuidanceSettingsView() } label: {
+                    trainingPreferenceRow("waveform.and.mic", "Workout guidance", "Øktveiledning",
+                                          "Audio Coach · Ghost Race · Navigation", "Audio coach · Ghost race · Navigasjon")
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
+                NavigationLink { ATHLTHNotificationSettingsView() } label: {
+                    trainingPreferenceRow("bell", "Notifications", "Varsler",
+                                          "Reminders, training and community", "Påminnelser, trening og fellesskap")
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
+                NavigationLink { ATHLTHAchievementSettingsView() } label: {
+                    trainingPreferenceRow("medal.fill", "Achievements", "Prestasjoner",
+                                          "Animations, sound and haptics", "Animasjoner, lyd og vibrasjon")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        settingsSection(ATHLTHLocalization.choose(english: "About exercise data", norwegian: "Om øvelsesdata")) {
+            PremiumSettingsCard {
+                Link(destination: URL(string: "https://repdb.co")!) {
+                    PremiumSettingsRow(icon: "book.closed", title: "RepDB",
+                        subtitle: ATHLTHLocalization.choose(english: "Exercise catalog provider", norwegian: "Leverandør av øvelsesbibliotek")) {
+                        Image(systemName: "arrow.up.right").foregroundStyle(ATHLTHTheme.mutedText)
                     }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func trainingPreferenceRow(_ icon: String, _ en: String, _ no: String,
+                                       _ detailEn: String, _ detailNo: String) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep,
+                           iconBackground: ATHLTHTheme.premiumGoldSoft,
+                           title: ATHLTHLocalization.choose(english: en, norwegian: no),
+                           subtitle: ATHLTHLocalization.choose(english: detailEn, norwegian: detailNo)) {
+            Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+        }
     }
 
     private var membershipSettingsSection: some View {
@@ -3124,6 +2995,44 @@ private struct ATHLTHPremiumSettingsChoices<Option: Identifiable & Equatable>: V
     }
 }
 
+/// Shared layout for settings subpages. Uses the same margins, theme and
+/// lazy section loading on iPhone and iPad.
+struct ATHLTHSettingsScreen<Content: View>: View {
+    let title: String
+    let subtitle: String
+    @ViewBuilder var content: Content
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title).font(.system(size: 32, design: .serif)).foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(subtitle).font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                content
+            }
+            .padding(.horizontal, 18).padding(.vertical, 22)
+            .frame(maxWidth: 720).frame(maxWidth: .infinity)
+        }
+        .background {
+            LinearGradient(colors: [ATHLTHTheme.canvasTop, .white, ATHLTHTheme.canvasBottom],
+                           startPoint: .top, endPoint: .bottomTrailing).ignoresSafeArea()
+        }
+        .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct ATHLTHSettingsGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title.uppercased()).font(.caption.weight(.semibold)).tracking(2.4)
+                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82)).padding(.leading, 16)
+            content
+        }
+    }
+}
+
 struct PremiumSettingsCard<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -3612,90 +3521,86 @@ private struct GarminConnectionSetupView: View {
 
 private struct ATHLTHTrainingSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
-
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
     var body: some View {
-        Form {
-            Section {
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "Default workout setup",
-                        norwegian: "Standard oppsett"
-                    ),
-                    selection:
-                        $settings
-                            .workoutSetupPreference
-                ) {
-                    ForEach(
-                        WorkoutSetupPreference
-                            .allCases
-                    ) { preference in
-                        Text(preference.title)
-                            .tag(preference)
+        ATHLTHSettingsScreen(title: tr("Training", "Trening"),
+                             subtitle: tr("Your defaults for new workouts.", "Dine standardvalg for nye økter.")) {
+            ATHLTHSettingsGroup(title: tr("Workout setup", "Øktoppsett")) {
+                PremiumSettingsCard {
+                    NavigationLink {
+                        ATHLTHPremiumSettingsChoices(title: tr("Default setup", "Standardoppsett"),
+                            subtitle: tr("Can be changed for each workout.", "Kan endres for hver økt."),
+                            options: WorkoutSetupPreference.allCases, selection: $settings.workoutSetupPreference,
+                            optionTitle: { $0.title }, optionDetail: { $0.subtitle })
+                    } label: {
+                        row("slider.horizontal.3", tr("Default setup", "Standardoppsett"), settings.workoutSetupPreference.title)
+                    }.buttonStyle(.plain)
+                    SettingsDivider()
+                    NavigationLink {
+                        ATHLTHPremiumSettingsChoices(title: tr("Recording device", "Opptaksenhet"),
+                            subtitle: tr("Preferred device when available.", "Foretrukket enhet når den er tilgjengelig."),
+                            options: WorkoutCapturePreference.allCases, selection: $settings.preferredWorkoutCapture,
+                            optionTitle: { $0.title }, optionDetail: { _ in "" })
+                    } label: {
+                        row("applewatch", tr("Recording device", "Opptaksenhet"), settings.preferredWorkoutCapture.title)
+                    }.buttonStyle(.plain)
+                    SettingsDivider()
+                    PremiumSettingsRow(icon: "clock", iconTint: ATHLTHTheme.accentDeep,
+                        iconBackground: ATHLTHTheme.premiumGoldSoft,
+                        title: tr("Default start time", "Standard starttid"),
+                        subtitle: tr("New planned workouts", "Nye planlagte økter")) {
+                        DatePicker(tr("Start time", "Starttid"), selection: $settings.defaultPlannedWorkoutTime,
+                                   displayedComponents: .hourAndMinute)
+                            .labelsHidden().datePickerStyle(.compact).fixedSize()
                     }
                 }
-
-                Text(
-                    settings
-                        .workoutSetupPreference
-                        .subtitle
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } header: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Workout setup",
-                        norwegian: "Oppsett av økt"
-                    )
-                )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "This controls the starting mode only. You can still switch between Basic and Advanced for an individual workout without changing the preference.",
-                        norwegian:
-                            "Dette styrer bare hvilken modus økten åpner i. Du kan fortsatt bytte mellom Basic og Avansert for en enkeltøkt uten å endre standardvalget."
-                    )
-                )
             }
-
-            Section {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Auto-pause outdoor workouts",
-                        norwegian: "Auto-pause utendørs trening"
-                    ),
-                    isOn:
-                        $settings
-                            .autoPauseOutdoorWorkouts
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "This is the default for outdoor running and walking. Advanced setup on an individual workout can use this default or override it.",
-                        norwegian:
-                            "Dette er standarden for utendørs løping og gåing. Avansert oppsett på en enkelt økt kan bruke standarden eller overstyre den."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } header: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Outdoor workouts",
-                        norwegian: "Utendørsøkter"
-                    )
-                )
+            ATHLTHSettingsGroup(title: tr("Running & walking", "Løping og gåing")) {
+                PremiumSettingsCard {
+                    toggle("pause.circle", tr("Auto-pause outdoors", "Automatisk pause ute"),
+                           tr("Default for outdoor running and walking", "Standard for løping og gåing utendørs"),
+                           $settings.autoPauseOutdoorWorkouts)
+                }
             }
-
-
+            ATHLTHSettingsGroup(title: tr("Strength", "Styrke")) {
+                PremiumSettingsCard {
+                    NavigationLink { ATHLTHStrengthBarMassSettingsView() } label: {
+                        row("scalemass", tr("Default bar weight", "Standard stangvekt"),
+                            tr("Default and per-exercise overrides", "Standard og tilpasning per øvelse"))
+                    }.buttonStyle(.plain)
+                }
+            }
+            ATHLTHSettingsGroup(title: tr("Feedback", "Tilbakemelding")) {
+                PremiumSettingsCard {
+                    toggle("waveform", tr("Sound cues", "Lydsignaler"), tr("Feedback during training", "Tilbakemelding under trening"), $settings.audioCuesEnabled)
+                    SettingsDivider()
+                    toggle("waveform.path", tr("Haptic cues", "Vibrasjon"), tr("Haptic feedback during training", "Haptisk tilbakemelding under trening"), $settings.hapticCuesEnabled)
+                }
+            }
+            ATHLTHSettingsGroup(title: tr("Sharing", "Deling")) {
+                PremiumSettingsCard {
+                    NavigationLink { ATHLTHPrivacyCenterView() } label: {
+                        row("person.2.shield.checkmark", tr("Workout sharing", "Øktdeling"),
+                            tr("Automatic publishing and visibility", "Automatisk publisering og synlighet"))
+                    }.buttonStyle(.plain)
+                }
+            }
         }
-        .athlthBrandedForm()
-        .navigationTitle("Training")
-        .navigationBarTitleDisplayMode(.inline)
     }
-
+    private func row(_ icon: String, _ title: String, _ subtitle: String) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep,
+                           iconBackground: ATHLTHTheme.premiumGoldSoft, title: title, subtitle: subtitle) {
+            Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+        }
+    }
+    private func toggle(_ icon: String, _ title: String, _ subtitle: String, _ binding: Binding<Bool>) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep,
+                           iconBackground: ATHLTHTheme.premiumGoldSoft, title: title, subtitle: subtitle) {
+            Toggle(title, isOn: binding).labelsHidden().tint(ATHLTHTheme.premiumGold).fixedSize()
+        }
+    }
 }
 
 private struct ATHLTHAchievementSettingsView:
