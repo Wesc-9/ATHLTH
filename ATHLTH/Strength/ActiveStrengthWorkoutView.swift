@@ -837,6 +837,30 @@ struct ActiveStrengthWorkoutView: View {
                         onFinish: { showingFinishConfirmation = true }
                     )
 
+                    if let next = strength.pendingExecutionQueue.first,
+                       let exercise = workout.exercises.first(where: { $0.id == next.exerciseID }) {
+                        Button {
+                            showingExerciseQueue = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "list.number")
+                                Text(ATHLTHLocalization.choose(english: "Queue", norwegian: "I kø") + ":")
+                                Text(exercise.exercise.displayName)
+                                    .lineLimit(1)
+                                if let set = exercise.sets.first(where: { $0.id == next.setID }) {
+                                    Text("· " + ATHLTHLocalization.choose(english: "Set \(set.setNumber)", norwegian: "Sett \(set.setNumber)"))
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .padding(.horizontal, 8)
+                            .frame(minHeight: 32)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     if showingSpotifyControls {
                         ATHLTHLiveSpotifyExpandedBar()
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -10865,6 +10889,12 @@ private struct StrengthActiveExerciseQueueView: View {
     let onSingleSet: (UUID) -> Void
     let onContinuousTraining: () -> Void
     @State private var showingGroupBuilder = false
+    @State private var showingUndoConfirmation = false
+    @State private var batchExercise: StrengthExerciseLog?
+    @State private var replacementExercise: StrengthExerciseLog?
+    @State private var groupRestExercise: StrengthExerciseLog?
+    @State private var pendingSetEditor: StrengthQueueSetEdit?
+    @State private var showingEditFailure = false
     @State private var showingSelectionBlocked = false
     @State private var showingExerciseLibrary = false
     @State private var showingAppendWorkout = false
@@ -10903,16 +10933,28 @@ private struct StrengthActiveExerciseQueueView: View {
     private func queueMenu(_ exercise: StrengthExerciseLog, set: StrengthSetLog? = nil) -> some View {
         Menu {
             Button {
-                strength.enqueueStrength(exerciseID: exercise.id, setID: set?.id, next: true)
-                onContinuousTraining()
+                if strength.enqueueStrength(exerciseID: exercise.id, setID: set?.id, next: true) { onContinuousTraining() }
+                else { showingEditFailure = true }
             } label: {
                 Label(ATHLTHLocalization.choose(english: "Play next", norwegian: "Ta neste"), systemImage: "text.line.first.and.arrowtriangle.forward")
             }
             Button {
-                strength.enqueueStrength(exerciseID: exercise.id, setID: set?.id)
-                onContinuousTraining()
+                if strength.enqueueStrength(exerciseID: exercise.id, setID: set?.id) { onContinuousTraining() }
+                else { showingEditFailure = true }
             } label: {
                 Label(ATHLTHLocalization.choose(english: "Add to queue", norwegian: "Legg i kø"), systemImage: "text.append")
+            }
+            if set == nil && exercise.groupID == nil {
+                Button {
+                    batchExercise = exercise
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Choose sets", norwegian: "Velg flere sett"), systemImage: "checklist")
+                }
+                Button {
+                    if !strength.postponeStrengthExercise(exercise.id) { showingEditFailure = true }
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Postpone to later", norwegian: "Utsett til senere"), systemImage: "clock.arrow.circlepath")
+                }
             }
         } label: {
             Image(systemName: "text.badge.plus")
@@ -10960,13 +11002,15 @@ private struct StrengthActiveExerciseQueueView: View {
                             .frame(width: 26, height: 26)
                             .background(ATHLTHPlanDesign.warmSurface, in: Circle())
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(exercise.exercise.displayName)
+                            Text(entry.groupID == nil ? exercise.exercise.displayName : (exercise.groupStyle?.title ?? exercise.exercise.displayName))
                                 .font(.subheadline.weight(.semibold))
                             if let set = exercise.sets.first(where: { $0.id == entry.setID }) {
                                 Text(ATHLTHLocalization.choose(english: "Set \(set.setNumber)", norwegian: "Sett \(set.setNumber)"))
                                     .font(.caption)
                             } else {
-                                let remaining = exercise.sets.filter { !$0.isResolved }.count
+                                let remaining = entry.groupID.map { group in
+                                    workout.exercises.filter { $0.groupID == group }.reduce(0) { $0 + $1.sets.filter { !$0.isResolved }.count }
+                                } ?? exercise.sets.filter { !$0.isResolved }.count
                                 Text(ATHLTHLocalization.choose(english: "\(remaining) remaining sets", norwegian: "\(remaining) gjenstående sett"))
                                     .font(.caption)
                             }
@@ -10992,6 +11036,11 @@ private struct StrengthActiveExerciseQueueView: View {
                         .buttonStyle(.plain)
                     }
                     .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .draggable(entry.id.uuidString)
+                    .dropDestination(for: String.self) { ids, _ in
+                        guard let id = ids.first.flatMap(UUID.init(uuidString:)) else { return false }
+                        return strength.moveQueuedStrength(id, before: entry.id)
+                    }
                 }
             }
         }
@@ -11038,9 +11087,47 @@ private struct StrengthActiveExerciseQueueView: View {
             }
             .buttonStyle(.plain)
             .disabled(groupingWorkout == nil)
+            workoutProgressDetails(workout)
+            if strength.canUndoLatestStrengthSet {
+                Button {
+                    showingUndoConfirmation = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Undo last recorded set", norwegian: "Angre siste registrerte sett"), systemImage: "arrow.uturn.backward")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(minHeight: 36)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(15)
         .athlthTrainPaper()
+    }
+
+    private func workoutProgressDetails(_ workout: StrengthWorkoutLog) -> some View {
+        let remaining = workout.exercises.flatMap(\.sets).filter { !$0.isResolved }
+        let seconds = remaining.reduce(0) { sum, set in
+            sum + (set.plannedDurationSeconds ?? 30) + (set.restSeconds ?? 90)
+        }
+        let trained = Set(workout.exercises.filter { $0.sets.contains(where: \.isCompleted) }.flatMap { $0.exercise.primaryMuscles })
+        let pending = Set(workout.exercises.filter { $0.sets.contains(where: { !$0.isResolved }) }.flatMap { $0.exercise.primaryMuscles })
+        return VStack(alignment: .leading, spacing: 5) {
+            Label(ATHLTHLocalization.choose(
+                english: "Estimated remaining: \(Int(ceil(Double(seconds) / 60))) min",
+                norwegian: "Estimert gjenstår: \(Int(ceil(Double(seconds) / 60))) min"
+            ), systemImage: "clock")
+            if !trained.isEmpty {
+                Text(ATHLTHLocalization.choose(english: "Trained: ", norwegian: "Trent: ") + trained.sorted().joined(separator: " · "))
+            }
+            if !pending.isEmpty {
+                Text(ATHLTHLocalization.choose(english: "Remaining: ", norwegian: "Gjenstår: ") + pending.sorted().joined(separator: " · "))
+            }
+            Text(ATHLTHLocalization.choose(english: "Estimate uses planned pauses and 30 sec for repetition sets.", norwegian: "Estimatet bruker planlagte pauser og 30 sek per repetisjonssett."))
+                .font(.caption2)
+        }
+        .font(.caption)
+        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var exercisePendingRemovalName: String {
@@ -11422,7 +11509,9 @@ private struct StrengthActiveExerciseQueueView: View {
                                         .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
-                                    if exercise.groupID == nil { queueMenu(exercise) }
+                                    if exercise.groupID == nil || exercise.groupStyle == .circuit || exercise.groupStyle == .superset {
+                                        queueMenu(exercise)
+                                    }
                                     }
                                 }
 
@@ -11432,6 +11521,25 @@ private struct StrengthActiveExerciseQueueView: View {
                                         norwegian: "Sett og innstillinger"
                                     )
                                 ) {
+                                if exercise.groupStyle == .circuit || exercise.groupStyle == .superset {
+                                    Button {
+                                        groupRestExercise = exercise
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(english: "Station and round rest", norwegian: "Pause mellom øvelser og runder"), systemImage: "timer")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                if exercise.groupID == nil && exercise.sets.allSatisfy({ !$0.isResolved }) &&
+                                    exercise.isEmbeddedRunningInterval != true {
+                                    Button {
+                                        replacementExercise = exercise
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(english: "Replace exercise", norwegian: "Erstatt øvelse"), systemImage: "arrow.left.arrow.right")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                                 if StrengthBarbellExercisePolicy.usesBar(exercise) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "scalemass")
@@ -11557,8 +11665,17 @@ private struct StrengthActiveExerciseQueueView: View {
                                                       norwegian: "Velg dette settet for å trene det nå."
                                                     )
                                             )
-                                            if !set.isResolved && exercise.groupID == nil {
-                                                queueMenu(exercise, set: set)
+                                            if !set.isResolved {
+                                                Button {
+                                                    pendingSetEditor = StrengthQueueSetEdit(exerciseID: exercise.id, set: set)
+                                                } label: {
+                                                    Image(systemName: "slider.horizontal.3")
+                                                        .frame(width: 40, height: 44)
+                                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityLabel(ATHLTHLocalization.choose(english: "Edit planned set", norwegian: "Rediger planlagt sett"))
+                                                if exercise.groupID == nil { queueMenu(exercise, set: set) }
                                             }
                                             }
                                             if set.id != exercise.sets.last?.id {
@@ -11784,6 +11901,45 @@ private struct StrengthActiveExerciseQueueView: View {
                 english: "Complete or stop the current set before choosing another.",
                 norwegian: "Fullfør eller stopp det pågående settet før du velger et annet."
             ))
+        }
+        .confirmationDialog(ATHLTHLocalization.choose(english: "Undo mistaken result?", norwegian: "Angre feilregistrert sett?"),
+                            isPresented: $showingUndoConfirmation, titleVisibility: .visible) {
+            Button(ATHLTHLocalization.choose(english: "Undo last set", norwegian: "Angre siste sett"), role: .destructive) {
+                if !strength.undoLatestStrengthSet() { showingEditFailure = true }
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(english: "Only undo if the set was recorded incorrectly.", norwegian: "Angre kun dersom settet ble feilregistrert."))
+        }
+        .alert(ATHLTHLocalization.choose(english: "Cannot change this item now", norwegian: "Kan ikke endre dette nå"), isPresented: $showingEditFailure) {
+            Button("OK", role: .cancel) {}
+        }
+        .sheet(item: $batchExercise) { exercise in
+            StrengthQueueBatchPicker(exercise: exercise) { ids in
+                if strength.enqueueStrengthSets(exerciseID: exercise.id, setIDs: ids) { onContinuousTraining() }
+                else { showingEditFailure = true }
+                batchExercise = nil
+            }
+        }
+        .sheet(item: $replacementExercise) { exercise in
+            StrengthExerciseSwapView(current: exercise, entries: exerciseLibrary.allExercises) { selected in
+                if !strength.replacePendingStrengthExercise(exercise.id, with: selected.exercise) { showingEditFailure = true }
+                replacementExercise = nil
+            }
+        }
+        .sheet(item: $pendingSetEditor) { target in
+            StrengthQueueSetEditor(target: target) { reps, duration, weight, rest, resistance in
+                if !strength.updatePendingStrengthSet(exerciseID: target.exerciseID, setID: target.set.id,
+                    reps: reps, duration: duration, weight: weight, rest: rest, resistance: resistance) {
+                    showingEditFailure = true
+                }
+                pendingSetEditor = nil
+            }
+        }
+        .sheet(item: $groupRestExercise) { exercise in
+            StrengthQueueGroupRestEditor(exercise: exercise) { station, round in
+                strength.setLiveGroupRest(exerciseID: exercise.id, station: station, round: round)
+                groupRestExercise = nil
+            }
         }
         .sheet(isPresented: $showingAppendWorkout) {
             ActiveHybridWorkoutPicker { planned, startNow in
