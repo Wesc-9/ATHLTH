@@ -695,6 +695,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private var lastSourceSessionID: UUID?
     private var lastSourceStartedAt: Date?
     private var trackingAccountID: UUID?
+    private var trackingGeneration = UUID()
+
+    private func ownsTracking(_ accountID: UUID, generation: UUID) -> Bool {
+        !Task.isCancelled && trackingGeneration == generation &&
+            trackingAccountID == accountID && client.auth.currentUser?.id == accountID
+    }
+
     private var structuredSession: ATHLTHLocalStructuredWorkoutStatus?
     private var approvedSourceSessionID: UUID?
     private var nextWorkoutSharingExpiresAt: Date?
@@ -809,6 +816,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     }
 
     func clearLocalState() {
+        trackingGeneration = UUID()
         remoteReadGeneration &+= 1
         presenceReadGeneration &+= 1
         pollingLease.reset()
@@ -873,12 +881,13 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             clearLocalState()
             trackingAccountID = accountID
         }
+        let generation = trackingGeneration
         let isPad = ATHLTHDeviceRole.isIPad
         let thisPoller = UUID()
         defer {
             pollingLease.release(thisPoller)
         }
-        while !Task.isCancelled && trackingAccountID == accountID {
+        while !Task.isCancelled && trackingAccountID == accountID && trackingGeneration == generation {
             // Expiration is local: a network outage or auth refresh cannot
             // keep a superseded iPad permission request pending indefinitely.
             if isPad { expireOutgoingRequestIfNeeded() }
@@ -891,14 +900,11 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             if ownsPolling && client.auth.currentUser?.id == accountID {
                 if isPad {
                     await readPresence(accountID: accountID)
-                    guard !Task.isCancelled, trackingAccountID == accountID else {
-                        break
-                    }
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await readRemote(accountID: accountID)
-                    guard !Task.isCancelled, trackingAccountID == accountID else {
-                        break
-                    }
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await pollOutgoingRequest(accountID: accountID)
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await pollRemoteControlReceipt(accountID: accountID)
                 } else {
                     // The Web API may report an active Spotify Connect player
@@ -914,13 +920,17 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                             await spotify.refreshPlaybackForLiveSpectator()
                         }
                     }
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await publishLocal(
                         accountID: accountID, phone: phone,
                         strength: strength, mirroredWatch: mirroredWatch,
                         spotify: spotify
                     )
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await pollIncomingRequests(accountID: accountID)
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await publishDeviceHeartbeat(accountID: accountID, watchConnection: watchConnection)
+                    guard ownsTracking(accountID, generation: generation) else { break }
                     await pollRemoteControlCommands(accountID: accountID, phone: phone,
                         strength: strength, mirroredWatch: mirroredWatch, spotify: spotify,
                         appSession: appSession)
@@ -1490,6 +1500,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         mirroredWatch: WorkoutMirroringStore,
         spotify: SpotifyPlaybackStore
     ) async {
+        let generation = trackingGeneration
+        guard ownsTracking(accountID, generation: generation) else { return }
         var active = liveSnapshot(
             phone: phone, strength: strength, mirroredWatch: mirroredWatch,
             spotify: spotify
@@ -1509,7 +1521,18 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         // Presence is intentionally independent from session-scoped approval.
         // No metrics or workout names enter this table.
         await publishPresence(accountID: accountID, snapshot: active)
-        if let active, isApprovedForSession(active.id) {
+        guard ownsTracking(accountID, generation: generation) else { return }
+        // A workout may end or change while the presence request is suspended.
+        // Do not publish a stale frame or control grant from that recording.
+        let latestID = liveSnapshot(phone: phone, strength: strength,
+                                    mirroredWatch: mirroredWatch, spotify: spotify)?.id
+        guard latestID == active?.id else { return }
+        if var active, isApprovedForSession(active.id) {
+            if controlGrantID != active.controlGrantID {
+                active.controlGrantID = nil
+                active.controlDeviceID = nil
+                active.supportedControls = nil
+            }
             let now = Date()
             let row = ATHLTHCrossDeviceWorkoutRow(
                 userID: accountID,
@@ -1521,6 +1544,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 try await client.from("private_active_workout_status")
                     .upsert(row, onConflict: "user_id")
                     .execute()
+                guard ownsTracking(accountID, generation: generation) else { return }
                 lastUnauthorisedCleanupAt = nil
                 lastPublishedID = active.id
             } catch {
@@ -1542,6 +1566,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         .delete()
                         .eq("user_id", value: accountID)
                         .execute()
+                    guard ownsTracking(accountID, generation: generation) else { return }
                     lastPublishedID = nil
                 } catch {
                     // No fallback ever starts a recording or enables viewing.
@@ -1770,6 +1795,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         accountID: UUID,
         snapshot: ATHLTHCrossDeviceWorkoutSnapshot?
     ) async {
+        let generation = trackingGeneration
+        guard ownsTracking(accountID, generation: generation) else { return }
         if let snapshot {
             let now = Date()
             let row = ATHLTHCrossDevicePresenceRow(
@@ -1782,6 +1809,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 try await client.from("private_active_workout_presence")
                     .upsert(row, onConflict: "user_id")
                     .execute()
+                guard ownsTracking(accountID, generation: generation) else { return }
                 lastPresencePublished = true
                 lastPresenceCleanupAt = nil
             } catch {
@@ -1798,6 +1826,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         .delete()
                         .eq("user_id", value: accountID)
                         .execute()
+                    guard ownsTracking(accountID, generation: generation) else { return }
                     lastPresencePublished = false
                 } catch {
                     // Expiring the heartbeat is the offline safety fallback.
