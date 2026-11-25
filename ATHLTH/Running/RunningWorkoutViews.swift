@@ -402,6 +402,8 @@ struct RunningWorkoutDetailView: View {
     @State private var askingForTargets = false
     @State private var pendingAddToPlan = false
     @State private var lastHistory: ATHLTHLibraryWorkoutHistory.Summary?
+    @State private var importEnvironment: RunEnvironment = .outdoor
+    @State private var importAdjustedWorkout: RunningWorkoutTemplate?
 
     private func refreshLastHistory() {
         let records = ATHLTHRunningPerformanceHistory.load(
@@ -497,10 +499,124 @@ struct RunningWorkoutDetailView: View {
     /// A catalogue page always shows the catalogue original. Personalized
     /// copies appear only when opening that specific workout in My Workouts.
     private var previewWorkout: RunningWorkoutTemplate {
-        workout.isBuiltIn
-            ? (privateSavedWorkout ??
-               ATHLTHRunningLibraryDefaults.unpersonalized(workout))
+        let source = workout.isBuiltIn
+            ? (privateSavedWorkout ?? ATHLTHRunningLibraryDefaults.unpersonalized(workout))
             : workout
+        guard onSelect != nil else { return source }
+        var selected = importAdjustedWorkout ?? source
+        selected.launchRunEnvironment = importEnvironment
+        if importEnvironment != .outdoor { selected.routeID = nil }
+        return selected
+    }
+
+    private var importModePicker: some View {
+        Menu {
+            Picker(ATHLTHLocalization.choose(english: "Detail level", norwegian: "Detaljnivå"), selection: $advancedMode) {
+                Text(ATHLTHLocalization.choose(english: "Simple", norwegian: "Enkel")).tag(false)
+                Text(ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")).tag(true)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(advancedMode
+                    ? ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")
+                    : ATHLTHLocalization.choose(english: "Simple", norwegian: "Enkel"))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .padding(.horizontal, 11)
+            .frame(minHeight: 36)
+            .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
+        }
+        .accessibilityIdentifier("workout-recipe-detail-mode")
+    }
+
+    private var importPace: Double? {
+        let efforts = previewWorkout.blocks.filter { $0.kind == .work }.flatMap { block in
+            (1...min(max(block.repetitions, 1), 60)).map { block.resolvedWork(at: $0).intensity.paceMinSecondsPerKilometer }
+        }
+        guard let first = efforts.first ?? nil, efforts.allSatisfy({ $0 == first }) else { return nil }
+        return first
+    }
+
+    private var importHero: some View {
+        let selected = previewWorkout
+        let steps = selected.recipePreviewBlocks
+        return VStack(alignment: .leading, spacing: 15) {
+            HStack(spacing: 10) {
+                Image(systemName: selected.type.systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 44, height: 44)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 14))
+                Text(ATHLTHLocalization.choose(english: "RUNNING", norwegian: "LØPING"))
+                    .font(.caption2.weight(.bold)).tracking(2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Spacer(minLength: 0)
+            }
+            Text(selected.title)
+                .font(.system(size: 31, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            if !selected.summary.isEmpty {
+                Text(selected.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Divider().overlay(ATHLTHPlanDesign.outline.opacity(0.5))
+            HStack(alignment: .top, spacing: 7) {
+                importMetric("\(steps.count)", ATHLTHLocalization.choose(english: "Steps", norwegian: "Deler"), icon: "square.stack")
+                Divider()
+                importMetric(ATHLTHLocalization.choose(english: "All levels", norwegian: "Alle nivåer"), ATHLTHLocalization.choose(english: "Level", norwegian: "Nivå"), icon: "chart.bar.xaxis")
+                Divider()
+                importMetric(selected.estimatedDurationSeconds.map { "~\(Int(($0 / 60).rounded(.up))) min" } ?? "—", ATHLTHLocalization.choose(english: "Duration", norwegian: "Varighet"), icon: "clock")
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            if let meters = selected.estimatedDistanceMeters {
+                Label(ATHLTHLocalization.choose(english: "Estimated distance", norwegian: "Estimert distanse") + " · " + String(format: "%.2f km", meters / 1000), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if onSelect != nil {
+                Divider().overlay(ATHLTHPlanDesign.outline.opacity(0.5))
+                Text(ATHLTHLocalization.choose(english: "Running environment", norwegian: "Løpemiljø"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Picker(ATHLTHLocalization.choose(english: "Running environment", norwegian: "Løpemiljø"), selection: $importEnvironment) {
+                    Text(ATHLTHLocalization.choose(english: "Outdoor", norwegian: "Utendørs")).tag(RunEnvironment.outdoor)
+                    Text(ATHLTHLocalization.choose(english: "Indoor", norwegian: "Innendørs")).tag(RunEnvironment.indoor)
+                    Text(ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle")).tag(RunEnvironment.treadmill)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("athlth-running-import-environment")
+                let count = ATHLTHRunningPrivateSpeedPolicy.workCount(in: selected)
+                if count > 0 {
+                    ATHLTHRunningPrivateSpeedEditor(effortCount: count, environment: importEnvironment, currentPace: importPace) { speed in
+                        importAdjustedWorkout = ATHLTHRunningPrivateSpeedPolicy.applying(kilometersPerHour: speed, to: selected)
+                    }
+                }
+            }
+        }
+        .padding(19)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient(colors: [ATHLTHPlanDesign.surface, ATHLTHPlanDesign.selectedSurface], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 26))
+        .overlay { RoundedRectangle(cornerRadius: 26).strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8) }
+        .accessibilityIdentifier("athlth-running-import-hero")
+    }
+
+    private func importMetric(_ value: String, _ label: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: icon).font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Text(value).font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(2).minimumScaleFactor(0.8)
+            Text(label).font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private func continueWithSavedCopy() {
@@ -811,6 +927,7 @@ struct RunningWorkoutDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                importHero
                 ATHLTHWorkoutRecipePreview(
                     title: previewWorkout.title,
                     summary: previewWorkout.summary,
@@ -821,16 +938,20 @@ struct RunningWorkoutDetailView: View {
                         Int(($0 / 60).rounded(.up))
                     },
                     blocks: previewWorkout.recipePreviewBlocks,
-                    onEditStep: { index in
+                    compactDetailLayout: true,
+                    detailAdvancedMode: $advancedMode,
+                    showEstimatedDistance: false,
+                    configuredMaximumOnly: true,
+                    onEditStep: onSelect == nil ? { index in
                         if workout.isBuiltIn {
                             editPrivatePreset(focusing: index)
                         } else {
                             editPersonalizedCopy()
                         }
-                    }
+                    } : nil
                 )
 
-                if workout.isBuiltIn {
+                if workout.isBuiltIn && onSelect == nil {
                     privateRunningSettingsCard
                 }
 
@@ -850,6 +971,7 @@ struct RunningWorkoutDetailView: View {
                     .tint(ATHLTHPlanDesign.accentInk)
                 }
 
+                if onSelect == nil {
                 Button {
                         pendingAddToPlan = false
                         if workout.isBuiltIn {
@@ -889,12 +1011,16 @@ struct RunningWorkoutDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
+                }
             }
             .padding()
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(ATHLTHLocalization.choose(english: "Running workout", norwegian: "Løpeøkt"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { importModePicker }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let onSelect {
                 VStack(spacing: 0) {
@@ -902,10 +1028,12 @@ struct RunningWorkoutDetailView: View {
                         .opacity(0.35)
 
                     Button {
-                        handleFirstAddition(toPlan: true)
+                        continueWithSavedCopy()
                     } label: {
                         Label(
-                            selectionTitle ?? "Use Workout",
+                            selectionTitle == nil || selectionTitle == "Choose Workout" || selectionTitle == "Use Workout"
+                                ? ATHLTHLocalization.choose(english: "Choose workout", norwegian: "Velg økt")
+                                : selectionTitle ?? "",
                             systemImage: "plus.circle.fill"
                         )
                         .font(.headline)
@@ -1049,7 +1177,9 @@ struct RunningWorkoutDetailView: View {
             refreshLastHistory()
         }
         .onChange(of: session.profile.userID) { _, _ in
+            importAdjustedWorkout = nil
             reloadPrivateSettings()
+            refreshLastHistory()
         }
         .onChange(of: privateOptions) { _, updated in
             guard workout.isBuiltIn else { return }
