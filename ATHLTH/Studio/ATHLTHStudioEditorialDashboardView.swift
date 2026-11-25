@@ -196,6 +196,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// a different week; reopening must not silently jump back to today.
     @SceneStorage("athlth.studio.homeFollowsToday") private var followsToday = true
     @State private var showingReadinessExplanation = false
+    @State private var recordingProjection = ATHLTHRecordedWorkoutProjection()
     @State private var homeProjection: ATHLTHStudioHomeProjection?
     @State private var pendingProjectionTask: Task<Void, Never>?
 
@@ -213,9 +214,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private var recordedWorkouts: [WorkoutSummary] {
-        ATHLTHStudioRecordedWorkouts.merged(
+        recordingProjection.recordings(
+            account: session.profile.userID,
             health: hasHealth ? health.workouts : [],
-            localStrength: strength.workoutHistory
+            strength: strength.workoutHistory
         )
     }
 

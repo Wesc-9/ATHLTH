@@ -5604,6 +5604,7 @@ struct ATHLTHTrainView: View {
     @State private var interruptedDraftResumePending = false
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var preparedTrainUserID: UUID?
+    @State private var trainRecordingProjection = ATHLTHRecordedWorkoutProjection()
     @State private var trainHistoryReconcileTask: Task<Void, Never>?
     @State private var todayScrollPosition = ScrollPosition(edge: .top)
     @State private var planScrollPosition = ScrollPosition(edge: .top)
@@ -6802,9 +6803,10 @@ struct ATHLTHTrainView: View {
                   selectedSection == .today,
                   session.profile.userID == account else { return }
 
-            let recorded = ATHLTHStudioRecordedWorkouts.merged(
+            let recorded = trainRecordingProjection.recordings(
+                account: account,
                 health: health.workouts,
-                localStrength: strengthWorkout.workoutHistory
+                strength: strengthWorkout.workoutHistory
             )
             let advice = HomeDailyRecommendationPolicy.recommendation(
                 readiness: readiness,

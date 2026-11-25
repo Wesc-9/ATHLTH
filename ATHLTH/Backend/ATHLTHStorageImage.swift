@@ -58,7 +58,7 @@ private enum ATHLTHStorageImageDecoder {
         guard let source =
                 CGImageSourceCreateWithData(
                     data as CFData,
-                    nil
+                    [kCGImageSourceShouldCache: false] as CFDictionary
                 )
         else {
             return nil
@@ -69,7 +69,7 @@ private enum ATHLTHStorageImageDecoder {
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize:
                 max(maxPixelSize, 64),
-            kCGImageSourceShouldCacheImmediately: false
+            kCGImageSourceShouldCacheImmediately: true
         ]
 
         guard let cgImage =
@@ -144,7 +144,13 @@ struct ATHLTHStorageImage<Content: View>: View {
 
     @State private var resolvedURL: URL?
     @State private var resolutionError: Error?
-    @State private var resolvedAccountID: UUID?
+    @State private var resolvedRequest: ATHLTHSizedImageRequestID?
+
+    private var requestID: ATHLTHSizedImageRequestID? {
+        url.map {
+            ATHLTHSizedImageRequestID(url: $0, accountID: accountID, maxPixelSize: maxPixelSize)
+        }
+    }
     @State private var sizedImage: UIImage?
 
     init(
@@ -165,7 +171,7 @@ struct ATHLTHStorageImage<Content: View>: View {
                     maxPixelSize:
                         maxPixelSize
                 )
-            } else if let resolutionError {
+            } else if resolvedRequest == requestID, let resolutionError {
                 content(
                     .failure(
                         resolutionError
@@ -174,27 +180,13 @@ struct ATHLTHStorageImage<Content: View>: View {
             } else {
                 AsyncImage(
                     url:
-                        resolvedAccountID ==
-                            accountID
-                            ? resolvedURL
-                            : nil,
+                        resolvedRequest == requestID ? resolvedURL : nil,
                     content: content
                 )
-                .id(accountID)
+                .id(requestID)
             }
         }
-        .task(
-            id:
-                url.map {
-                    ATHLTHSizedImageRequestID(
-                        url: $0,
-                        accountID:
-                            accountID,
-                        maxPixelSize:
-                            maxPixelSize
-                    )
-                }
-        ) {
+        .task(id: requestID) {
             await loadImage()
         }
     }
@@ -203,14 +195,13 @@ struct ATHLTHStorageImage<Content: View>: View {
     private func sizedContent(
         maxPixelSize: Int
     ) -> some View {
-        if let resolutionError {
+        if resolvedRequest == requestID, let resolutionError {
             content(
                 .failure(
                     resolutionError
                 )
             )
-        } else if resolvedAccountID ==
-                    accountID,
+        } else if resolvedRequest == requestID,
                   let sizedImage {
             content(
                 .success(
@@ -228,14 +219,15 @@ struct ATHLTHStorageImage<Content: View>: View {
     @MainActor
     private func loadImage()
         async {
+        let requested = requestID
+        if resolvedRequest == requested, resolutionError == nil,
+           (sizedImage != nil || resolvedURL != nil) { return }
         resolvedURL = nil
         resolutionError = nil
-        resolvedAccountID = nil
+        resolvedRequest = nil
         sizedImage = nil
 
-        guard let url else {
-            return
-        }
+        guard let url, let requested else { return }
 
         // Public thumbnails can be served immediately from memory, without
         // resolving a URL or starting a download. Private media remains uncached.
@@ -244,10 +236,10 @@ struct ATHLTHStorageImage<Content: View>: View {
             [accountID?.uuidString ?? "anonymous", String($0), url.absoluteString]
                 .joined(separator: "|")
         }
-        if !isPrivate,
+        if !isPrivate, !url.isFileURL,
            let cacheKey,
            let cached = ATHLTHSizedStorageImageCache.shared.image(for: cacheKey) {
-            resolvedAccountID = accountID
+            resolvedRequest = requested
             sizedImage = cached
             return
         }
@@ -257,13 +249,10 @@ struct ATHLTHStorageImage<Content: View>: View {
                 try await ATHLTHStorageImageURL
                     .resolve(url)
 
-            guard !Task.isCancelled else {
-                return
-            }
+            guard !Task.isCancelled, requestID == requested else { return }
 
             guard let maxPixelSize else {
-                resolvedAccountID =
-                    accountID
+                resolvedRequest = requested
                 resolvedURL =
                     resolved
                 return
@@ -271,11 +260,9 @@ struct ATHLTHStorageImage<Content: View>: View {
 
             let data: Data
             if resolved.isFileURL {
-                data =
-                    try Data(
-                        contentsOf: resolved,
-                        options: .mappedIfSafe
-                    )
+                data = try await Task.detached(priority: .utility) {
+                    try Data(contentsOf: resolved, options: .mappedIfSafe)
+                }.value
             } else {
                 var request =
                     URLRequest(
@@ -308,29 +295,21 @@ struct ATHLTHStorageImage<Content: View>: View {
                 }
                 .value
 
-            guard !Task.isCancelled,
-                  let prepared
-            else {
-                throw URLError(
-                    .cannotDecodeContentData
-                )
-            }
+            guard !Task.isCancelled, requestID == requested else { return }
+            guard let prepared else { throw URLError(.cannotDecodeContentData) }
 
-            if !isPrivate, let cacheKey {
+            if !isPrivate, !url.isFileURL, let cacheKey {
                 ATHLTHSizedStorageImageCache.shared.store(
                     prepared.image,
                     for: cacheKey
                 )
             }
 
-            resolvedAccountID =
-                accountID
-            sizedImage =
-                prepared.image
+            resolvedRequest = requested
+            sizedImage = prepared.image
         } catch {
-            guard !Task.isCancelled else {
-                return
-            }
+            guard !Task.isCancelled, requestID == requested else { return }
+            resolvedRequest = requested
             resolutionError = error
         }
     }
