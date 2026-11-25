@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Verify ordinary and Garmin release archive arguments
+        run: bash scripts/test_archive_testflight_release.sh
       - name: Guard Insights tab routing and reference design
         run: python3 scripts/audit_insights_entrypoints.py
       - name: Guard Train Together existing workout draft routing
