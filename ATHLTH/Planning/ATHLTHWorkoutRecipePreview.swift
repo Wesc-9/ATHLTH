@@ -692,7 +692,8 @@ struct ATHLTHWorkoutRecipePreview: View {
                             suggestion: ATHLTHWorkoutStepCopy.suggestedZone(
                                 for: item.block, workoutTitle: title
                             ),
-                            suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: item.block, workoutTitle: title)
+                            suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: item.block, workoutTitle: title),
+                            showMissingHeartRateHint: !configuredMaximumOnly
                         )
 
                         // Show the real next step, including a recovery after
@@ -879,6 +880,21 @@ struct ATHLTHWorkoutRecipePreview: View {
                                     Text(item.detail)
                                         .font(.caption)
                                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                if configuredMaximumOnly, normalizedBlocks.indices.contains(item.id) {
+                                    let step = normalizedBlocks[item.id]
+                                    if let pace = step.targetPaceSecondsPerKilometer, pace.isFinite, (1...3600).contains(pace) {
+                                        let treadmill = step.isIndoor == true && step.treadmillInclinePercent != nil
+                                        let seconds = Int(pace.rounded())
+                                        Text(treadmill
+                                            ? tr("Speed", "Fart") + " · " + String(format: "%.1f km/t", 3600 / pace)
+                                            : tr("Pace", "Tempo") + " · " + String(format: "%d:%02d/km", seconds / 60, seconds % 60))
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                    if let pulse = ATHLTHPlannedHeartRatePreview.rangeText(for: step, maximumBPM: maximumHeartRateBPM, suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: step, workoutTitle: title)) {
+                                        Text(pulse).font(.caption2.weight(.medium)).foregroundStyle(recipeTint)
+                                    }
                                 }
                             }
                             Spacer(minLength: 0)
