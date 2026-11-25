@@ -40,6 +40,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var pendingWithdrawal: UUID?
     @State private var showingCancelConfirmation = false
     @State private var nextSeasonDraft: ATHLTHTournamentDraft?
+    @State private var continuationExists = false
     @State private var checkingSeasonRenewal = false
     @State private var seasonNotice: String?
 
@@ -205,20 +206,22 @@ struct ATHLTHTournamentLiveDetailView: View {
                 preset: draft.format,
                 fixedClubID: draft.clubID,
                 continuation: draft,
+                fixedInvitees: draft.competitionSettings.race.duelMode == true ? draft.participants.filter { $0.id != userID } : nil,
                 onPublished: { _ in
                     nextSeasonDraft = nil
-                    seasonNotice = "Ny sesong opprettet. Forrige sesongs resultater er bevart."
+                    continuationExists = true
+                    seasonNotice = draft.competitionSettings.race.duelMode == true ? "Rematch sendt som ny invitasjon." : "Ny sesong opprettet. Forrige sesongs resultater er bevart."
                 },
                 onSave: { newDraft in
                     var stored = ATHLTHTournamentDraftStore.load(userID)
                     stored.append(newDraft)
                     ATHLTHTournamentDraftStore.save(stored, owner: userID)
                     nextSeasonDraft = nil
-                    seasonNotice = "Neste sesong er lagret som utkast i Arena."
+                    seasonNotice = draft.competitionSettings.race.duelMode == true ? "Rematch lagret som utkast." : "Neste sesong er lagret som utkast i Arena."
                 }
             )
         }
-        .alert("Sesong", isPresented: Binding(
+        .alert("Konkurranse", isPresented: Binding(
             get: { seasonNotice != nil },
             set: { if !$0 { seasonNotice = nil } }
         )) {
@@ -288,6 +291,27 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
             }
+            if let season = current.seasonLabel {
+                Label(season, systemImage: "calendar").font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+            }
+            if current.isDuel && current.status == "completed" {
+                if ATHLTHDuelRematch.canRematch(current, entries: entries, userID: userID) {
+                    Button {
+                        Task { await prepareRematch() }
+                    } label: {
+                        Label(continuationExists ? "Rematch allerede opprettet" : "Ta rematch", systemImage: "arrow.clockwise.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white).frame(maxWidth: .infinity)
+                            .padding(15).background(ATHLTHArenaV3Style.ink, in: RoundedRectangle(cornerRadius: 16))
+                    }.buttonStyle(.plain).disabled(checkingSeasonRenewal || continuationExists)
+                    Text("Din tur til å velge øvelsene. Bruk de samme eller velg nye, og send en ny invitasjon.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                } else if current.ownerID == userID {
+                    Text("Motstanderen får velge øvelsene ved rematch.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
             if !current.singleEventMode &&
                ATHLTHTournamentSeasonContinuation.canContinue(
                 format: current.format,
@@ -315,7 +339,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                                 in: RoundedRectangle(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
-                .disabled(checkingSeasonRenewal)
+                .disabled(checkingSeasonRenewal || continuationExists)
                 .accessibilityIdentifier("athlth-tournament-next-season")
                 Text(
                     "Ny sesong får egen tabell, nye invitasjoner og nullstilte poeng. " +
@@ -1047,6 +1071,30 @@ struct ATHLTHTournamentLiveDetailView: View {
     }
 
     @MainActor
+    private func prepareRematch() async {
+        guard !checkingSeasonRenewal else { return }
+        checkingSeasonRenewal = true
+        defer { checkingSeasonRenewal = false }
+        do {
+            let existing = try await cloud.visibleTournaments()
+            guard !existing.contains(where: { $0.raceRules.previousCompetitionID == current.id && $0.status != "cancelled" }) else {
+                continuationExists = true
+                errorMessage = "En rematch finnes allerede."
+                return
+            }
+            let candidates = try await ATHLTHTournamentLobbyCloudService().candidates(tournamentID: current.id)
+            let ids = candidates.filter { $0.selectedPosition != nil }
+                .sorted { ($0.selectedPosition ?? 0) < ($1.selectedPosition ?? 0) }.map(\.lookupID)
+            guard let draft = ATHLTHDuelRematch.draft(from: current, entries: entries, names: names,
+                                                     userID: userID, exerciseIDs: ids) else {
+                errorMessage = "Kunne ikke hente øvelsene fra forrige duell."
+                return
+            }
+            nextSeasonDraft = draft
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
     private func prepareNextSeason() async {
         guard !checkingSeasonRenewal else { return }
         guard let candidate = ATHLTHTournamentSeasonContinuation.nextDraft(
@@ -1061,10 +1109,9 @@ struct ATHLTHTournamentLiveDetailView: View {
         do {
             let existing = try await cloud.visibleTournaments()
             if existing.contains(where: {
-                $0.ownerID == userID && $0.title == candidate.title &&
-                    $0.format == candidate.format && $0.status != "cancelled"
+                $0.raceRules.previousCompetitionID == current.id && $0.status != "cancelled"
             }) || ATHLTHTournamentDraftStore.load(userID).contains(where: {
-                $0.title == candidate.title && $0.format == candidate.format
+                $0.competitionSettings.race.previousCompetitionID == current.id
             }) {
                 errorMessage = "En ny sesong med samme navn finnes allerede."
                 return

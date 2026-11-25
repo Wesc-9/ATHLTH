@@ -70,6 +70,8 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     }
 
     var isDuel: Bool { raceRules.duelMode == true }
+    var isRematch: Bool { isDuel && raceRules.previousCompetitionID != nil }
+    var seasonLabel: String? { singleEventMode ? nil : "Sesong \(raceRules.seasonNumber ?? 1)" }
     var minimumAthletes: Int { isDuel ? 2 : singleEventMode ? 3 : format == .cup ? 4 : 2 }
 
     var displayFormatTitle: String {
@@ -319,6 +321,7 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
     let meetingLat: Double?
     let meetingLon: Double?
     let coachExerciseIDs: [UUID]?
+    let selectedExerciseIDs: [UUID]?
     let raceRules: ATHLTHCompetitionRaceRules
     let singleEventMode: Bool
     let invitationDays: Int
@@ -349,6 +352,7 @@ private struct ATHLTHTournamentCompetitionPayload: Encodable {
         meetingLon = settings.meetingLon
         coachExerciseIDs = settings.coachExerciseIDs.isEmpty
             ? nil : settings.coachExerciseIDs
+        selectedExerciseIDs = settings.selectedExerciseIDs
         raceRules = settings.race
         invitationDays = settings.invitationDays
         unansweredPolicy = settings.unansweredPolicy.rawValue

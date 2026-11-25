@@ -24,6 +24,10 @@ struct ATHLTHTournamentPersonalTemplate: Decodable, Identifiable {
         draft.participants = draft.participants.filter { $0.id == userID }
         draft.clubID = nil
         draft.seasonID = nil
+        draft.competitionSettings.race.previousCompetitionID = nil
+        draft.competitionSettings.race.seasonNumber = nil
+        draft.competitionSettings.race.competitionEndsAt = nil
+        draft.competitionSettings.endsAt = nil
         draft.competitionSettings.startsAt = nil
         if draft.competitionSettings.startMode == .scheduled {
             draft.competitionSettings.startMode = .manual
@@ -77,6 +81,10 @@ struct ATHLTHTournamentTemplateCloudService {
         copy.seasonID = nil
         // Templates capture a recipe, not users, health notes, or private chats.
         copy.participants = copy.participants.filter { $0.id == userID }
+        copy.competitionSettings.race.previousCompetitionID = nil
+        copy.competitionSettings.race.seasonNumber = nil
+        copy.competitionSettings.race.competitionEndsAt = nil
+        copy.competitionSettings.endsAt = nil
         copy.competitionSettings.startsAt = nil
         if copy.competitionSettings.startMode == .scheduled {
             copy.competitionSettings.startMode = .manual

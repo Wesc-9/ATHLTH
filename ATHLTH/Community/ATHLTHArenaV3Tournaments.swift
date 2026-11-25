@@ -28,6 +28,13 @@ struct ATHLTHTournamentCreator: View {
     let fixedClubID: UUID?
     let isSingleEvent: Bool
     let isDuel: Bool
+    let continuationParentID: UUID?
+    let continuationSeasonNumber: Int?
+    private var isRematch: Bool { isDuel && continuationParentID != nil }
+    @State private var rematchSearch = ""
+    @State private var rematchResults: [ATHLTHTournamentExerciseSearchResult] = []
+    @State private var rematchNames: [UUID: String] = [:]
+    @State private var rematchSearchError: String?
     /// Sports chosen from Quick Train cannot silently change to another mode.
     let fixedActivity: ATHLTHTournamentActivity?
     /// Entry flows choose a single competition format. The detailed rules
@@ -112,6 +119,8 @@ struct ATHLTHTournamentCreator: View {
         self.preset = preset
         self.fixedClubID = fixedClubID
         self.isDuel = continuation?.competitionSettings.race.duelMode == true || duelMode
+        self.continuationParentID = continuation?.competitionSettings.race.previousCompetitionID
+        self.continuationSeasonNumber = continuation?.competitionSettings.race.seasonNumber
         self.isSingleEvent = continuation?.singleEventMode ?? (singleEventMode || duelMode)
         self.fixedActivity = fixedActivity
         self.restrictFormat = fixedActivity != nil || continuation != nil || fixedInvitees != nil
@@ -224,6 +233,7 @@ struct ATHLTHTournamentCreator: View {
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
         competitionSettings.race.isOperational &&
+        (!isRematch || (exerciseMode == .owner && competitionSettings.selectedExerciseIDs?.count == exerciseCount && exerciseCount > 0)) &&
         (!(isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified)) &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
           (exerciseMode == .owner &&
@@ -256,6 +266,9 @@ struct ATHLTHTournamentCreator: View {
                             },
                             set: { newValue in
                                 if fixedActivity == nil {
+                                    if isRematch && newValue != allowedActivities {
+                                        competitionSettings.selectedExerciseIDs = []
+                                    }
                                     allowedActivities = newValue
                                 }
                             }
@@ -294,9 +307,13 @@ struct ATHLTHTournamentCreator: View {
                             .padding(13)
                             .background(ATHLTHArenaV3Style.panel())
                     }
-                    coachEntry
-                    templateEntry
-                    exerciseRulesSection
+                    if isRematch {
+                        rematchExerciseSection
+                    } else {
+                        coachEntry
+                        templateEntry
+                        exerciseRulesSection
+                    }
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
                         restDays: $restWeekdays,
@@ -488,6 +505,8 @@ struct ATHLTHTournamentCreator: View {
         configured.race.exerciseScoringVersion = isSingleEvent && configured.race.discipline == .workout ? 2 : nil
         configured.race.competitionEndsAt = configured.endsAt.map { ISO8601DateFormatter().string(from: $0) }
         configured.race.duelMode = isDuel ? true : nil
+        configured.race.previousCompetitionID = continuationParentID
+        configured.race.seasonNumber = isSingleEvent ? nil : (continuationSeasonNumber ?? 1)
         if isDuel {
             configured.unansweredPolicy = .cancel
             configured.invitationPermission = .admin
@@ -672,6 +691,8 @@ struct ATHLTHTournamentCreator: View {
         winPoints = saved.winPoints
         drawPoints = saved.drawPoints
         competitionSettings = saved.competitionSettings
+        competitionSettings.race.previousCompetitionID = continuationParentID
+        competitionSettings.race.seasonNumber = continuationSeasonNumber
         allowExtensions = saved.allowExtensions
         publicResults = saved.publicResults
         proofMode = saved.proofMode
@@ -730,6 +751,67 @@ struct ATHLTHTournamentCreator: View {
                 .font(.caption)
                 .tint(ATHLTHArenaV3Style.gold)
             }
+        }
+    }
+
+    private var rematchExerciseSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("Velg øvelser til rematch")
+            Text("Behold øvelsene fra forrige duell, eller fjern dem og velg nye. Motstanderen får en ny invitasjon med hele oppsettet.")
+                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
+                HStack {
+                    Text(rematchNames[id] ?? "Valgt øvelse").font(.subheadline)
+                    Spacer()
+                    Button {
+                        competitionSettings.selectedExerciseIDs?.removeAll { $0 == id }
+                        exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
+                    } label: { Image(systemName: "minus.circle").frame(width: 44, height: 44) }
+                    .buttonStyle(.plain)
+                }
+            }
+            TextField("Søk etter ny øvelse", text: $rematchSearch)
+                .padding(12).background(ATHLTHArenaV3Style.panel())
+            ForEach(rematchResults) { item in
+                Button {
+                    var ids = competitionSettings.selectedExerciseIDs ?? []
+                    guard ids.count < 12, !ids.contains(item.id) else { return }
+                    ids.append(item.id)
+                    rematchNames[item.id] = item.name
+                    competitionSettings.selectedExerciseIDs = ids
+                    exerciseCount = ids.count
+                } label: {
+                    HStack {
+                        Text(item.name)
+                        Spacer()
+                        Image(systemName: (competitionSettings.selectedExerciseIDs ?? []).contains(item.id) ? "checkmark.circle.fill" : "plus.circle")
+                    }.font(.subheadline).padding(.vertical, 8)
+                }.buttonStyle(.plain)
+                .disabled((competitionSettings.selectedExerciseIDs ?? []).contains(item.id) ||
+                          (competitionSettings.selectedExerciseIDs ?? []).count >= 12)
+            }
+            if let rematchSearchError { Text(rematchSearchError).font(.caption).foregroundStyle(.red) }
+            Text("\(competitionSettings.selectedExerciseIDs?.count ?? 0) av maksimalt 12 øvelser").font(.caption)
+        }
+        .padding(15).background(ATHLTHArenaV3Style.panel())
+        .task {
+            guard let parentID = continuationParentID else { return }
+            do {
+                let service = ATHLTHTournamentLobbyCloudService()
+                let candidates = try await service.candidates(tournamentID: parentID)
+                let titles = try await service.candidateNames(candidates)
+                for (id, name) in titles { rematchNames[id] = name }
+            } catch { rematchSearchError = error.localizedDescription }
+        }
+        .task(id: rematchSearch + allowedActivities.map(\.rawValue).sorted().joined(separator: ",")) {
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+                let results = try await ATHLTHTournamentLobbyCloudService().searchCompetitionExercises(
+                    rematchSearch, allowed: Array(allowedActivities))
+                guard !Task.isCancelled else { return }
+                rematchResults = results
+                rematchSearchError = nil
+            } catch is CancellationError {} catch { rematchSearchError = error.localizedDescription }
         }
     }
 
@@ -1086,6 +1168,9 @@ struct ATHLTHTournamentCreator: View {
             Label(exerciseMode == .open ? "Åpen øvelsesliste" : "\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
             Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
             Label(competitionSettings.unlock.title, systemImage: "list.bullet").font(.subheadline)
+            if !isSingleEvent {
+                Label("Sesong \(continuationSeasonNumber ?? 1)", systemImage: "calendar").font(.subheadline)
+            }
             if let start = competitionSettings.startsAt {
                 Text(start.formatted(date: .abbreviated, time: .shortened)).font(.caption)
             }

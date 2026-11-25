@@ -30,7 +30,7 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
         }
         XCTAssertEqual(ATHLTHCompetitionFormat.allCases,
                        [.duel, .single, .league, .cup])
-        // Duel is a Challenge, not an ATHLTHTournamentFormat: no seasons.
+        // A duel is a shared event and is renewed through rematch, not seasons.
         XCTAssertEqual(Set(ATHLTHTournamentFormat.allCases),
                        Set([.league, .groups, .cup]))
     }
@@ -130,6 +130,10 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
         XCTAssertNotEqual(next.id, ended.id)
         XCTAssertNil(next.seasonID)
         XCTAssertEqual(next.title, "Testliga · Sesong 2")
+        XCTAssertEqual(next.competitionSettings.race.previousCompetitionID, ended.id)
+        XCTAssertEqual(next.competitionSettings.race.seasonNumber, 2)
+        XCTAssertNil(next.competitionSettings.startsAt)
+        XCTAssertNil(next.competitionSettings.endsAt)
         XCTAssertEqual(next.format, .groups)
         XCTAssertEqual(next.participants.map(\.id), [owner, rival])
         XCTAssertEqual(next.rulesAuthority, .group)

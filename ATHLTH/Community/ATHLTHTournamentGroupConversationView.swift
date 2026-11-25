@@ -156,13 +156,16 @@ struct ATHLTHTournamentGroupConversationView: View {
 
     private var invitationCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Du er invitert", systemImage: "envelope.badge")
+            Label(displayed.isRematch ? "Du er invitert til rematch" : "Du er invitert", systemImage: "envelope.badge")
                 .font(.headline)
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
             Label(displayed.selectedBranchesLabel, systemImage: "figure.mixed.cardio")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHArenaV3Style.gold)
                 .fixedSize(horizontal: false, vertical: true)
+            if let season = displayed.seasonLabel {
+                Label(season, systemImage: "calendar").font(.caption.weight(.semibold))
+            }
             Text("Se reglene før du svarer. Du bestemmer selv om du vil delta.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)

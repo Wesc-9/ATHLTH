@@ -136,6 +136,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var meetingLat: Double? = nil
     var meetingLon: Double? = nil
     var coachExerciseIDs: [UUID] = []
+    var selectedExerciseIDs: [UUID]? = nil
     var race: ATHLTHCompetitionRaceRules = .init()
     var invitationDays: Int = 3
     var unansweredPolicy: ATHLTHCompetitionUnansweredPolicy = .cancel
@@ -161,6 +162,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
         let validEnd = endsAt.map { $0 > max(now, startsAt ?? now) && $0 <= now.addingTimeInterval(366 * 86_400) } ?? true
         return validStart && validEnd && validVenue && race.isValid &&
             (1...30).contains(invitationDays) &&
+            (selectedExerciseIDs.map { (1...12).contains($0.count) && Set($0).count == $0.count && coachExerciseIDs.isEmpty } ?? true) &&
             coachExerciseIDs.count <= 12 &&
             Set(coachExerciseIDs).count == coachExerciseIDs.count &&
             (startMode != .scheduled || startsAt != nil) &&
@@ -182,7 +184,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     init() {}
     private enum CodingKeys: String, CodingKey {
         case startsAt, endsAt, startMode, environment, meetingPlace, meetingLat,
-             meetingLon, coachExerciseIDs, race, invitationDays, unansweredPolicy,
+             meetingLon, coachExerciseIDs, selectedExerciseIDs, race, invitationDays, unansweredPolicy,
              allowFeedPost, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
     }
@@ -200,6 +202,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
         meetingLon = try c.decodeIfPresent(Double.self, forKey: .meetingLon)
         coachExerciseIDs = try c.decodeIfPresent([UUID].self,
                                                   forKey: .coachExerciseIDs) ?? []
+        selectedExerciseIDs = try c.decodeIfPresent([UUID].self, forKey: .selectedExerciseIDs)
         race = try c.decodeIfPresent(ATHLTHCompetitionRaceRules.self,
                                      forKey: .race) ?? .init()
         invitationDays = try c.decodeIfPresent(Int.self,

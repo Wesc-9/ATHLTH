@@ -41,7 +41,7 @@ enum ATHLTHTournamentSeasonContinuation {
         currentUserID: UUID,
         now: Date = Date()
     ) -> ATHLTHTournamentDraft? {
-        guard canContinue(
+        guard !completed.singleEventMode, canContinue(
             format: completed.format, status: completed.status,
             ownerID: completed.ownerID,
             currentUserID: currentUserID
@@ -63,6 +63,7 @@ enum ATHLTHTournamentSeasonContinuation {
             )
         }
         guard participants.count >= 2,
+              participants.count >= (completed.format == .cup ? 4 : 2),
               (try? ATHLTHTournamentEngine.validate(
                 participants, groupSize: completed.groupSize,
                 qualifiersPerGroup: completed.qualifiersPerGroup
@@ -97,6 +98,10 @@ enum ATHLTHTournamentSeasonContinuation {
             thirdPrize: completed.prizeThird,
             loserConsequence: completed.loserConsequence
         )
+        nextSettings.race = completed.raceRules
+        nextSettings.race.previousCompetitionID = completed.id
+        nextSettings.race.seasonNumber = (completed.raceRules.seasonNumber ?? 1) + 1
+        nextSettings.race.duelMode = nil
         nextSettings.startsAt = nil
         nextSettings.endsAt = nil
         nextSettings.race.competitionEndsAt = nil
@@ -150,5 +155,52 @@ enum ATHLTHTournamentSeasonContinuation {
             drawPoints: completed.drawPoints,
             competitionSettings: nextSettings
         )
+    }
+}
+
+
+/// The previous invitee takes the next turn as organizer. New rules and
+/// measurements are independent of the completed duel.
+enum ATHLTHDuelRematch {
+    static func canRematch(_ previous: ATHLTHTournamentRemote,
+                          entries: [ATHLTHTournamentRemoteEntry], userID: UUID) -> Bool {
+        previous.isDuel && previous.status == "completed" && previous.ownerID != userID &&
+        Set(entries.filter { $0.response == "accepted" && $0.removedAt == nil }.map(\.userID)) ==
+            Set([previous.ownerID, userID])
+    }
+
+    static func draft(from previous: ATHLTHTournamentRemote,
+                      entries: [ATHLTHTournamentRemoteEntry], names: [UUID: String],
+                      userID: UUID, exerciseIDs: [UUID]) -> ATHLTHTournamentDraft? {
+        guard canRematch(previous, entries: entries, userID: userID),
+              (1...12).contains(exerciseIDs.count), Set(exerciseIDs).count == exerciseIDs.count else { return nil }
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.race = previous.raceRules
+        settings.race.previousCompetitionID = previous.id
+        settings.race.seasonNumber = nil
+        settings.race.competitionEndsAt = nil
+        settings.race.duelMode = true
+        settings.race.exerciseScoringVersion = 2
+        settings.race.discipline = .workout
+        settings.startMode = .manual
+        settings.unlock = ATHLTHCompetitionUnlock(rawValue: previous.releaseMode) ?? .interval
+        settings.unit = ATHLTHCompetitionIntervalUnit(rawValue: previous.releaseUnit) ?? .day
+        settings.every = min(max(1, previous.releaseEvery), settings.unit.maximumCount)
+        settings.completionHours = previous.completionHours
+        settings.environment = ATHLTHCompetitionEnvironment(rawValue: previous.requiredEnvironment) ?? .any
+        settings.invitationDays = previous.invitationDays
+        settings.selectedExerciseIDs = exerciseIDs
+        let base = previous.title.replacingOccurrences(of: #"(?i)\s*·\s*rematch$"#, with: "", options: .regularExpression)
+        return ATHLTHTournamentDraft(ownerID: userID, clubID: nil, seasonID: nil,
+            title: String(base.prefix(70)) + " · Rematch", format: .league, singleEventMode: true,
+            groupSize: previous.groupSize, qualifiersPerGroup: previous.qualifiersPerGroup,
+            participants: [userID, previous.ownerID].map { ATHLTHTournamentParticipant(id: $0, username: names[$0] ?? "Utøver") },
+            warmupRounds: [], exerciseMode: .owner, exerciseCount: exerciseIDs.count,
+            proposalsCloseAt: nil, votesCloseAt: nil, approvePlayerChanges: false,
+            allowedActivities: previous.allowedActivities, rulesAuthority: .owner,
+            cadenceDays: previous.cadenceDays, completionHours: previous.completionHours,
+            rotationMode: .all, restWeekdays: [], proofMode: .opponent, publicResults: false,
+            allowExtensions: false, winPoints: previous.winPoints, drawPoints: previous.drawPoints,
+            competitionSettings: settings)
     }
 }
