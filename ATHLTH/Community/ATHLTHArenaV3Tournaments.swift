@@ -1337,6 +1337,47 @@ struct ATHLTHTournamentCreator: View {
         .buttonStyle(.plain)
     }
 
+    /// Uses hypothetical measurements, never an actual result or predicted winner.
+    @ViewBuilder
+    private var scoringExample: some View {
+        let race = competitionSettings.race
+        let exercise = (competitionSettings.selectedExerciseIDs ?? []).first {
+            exerciseMetrics[$0] != nil && (!race.effectiveScoringMode.needsGoal || race.goal(for: $0) != nil)
+        }
+        let metric = exercise.flatMap { exerciseMetrics[$0] } ?? "repetitions"
+        let goal = exercise.flatMap { race.goal(for: $0) }
+        let weight = exercise.map { race.weight(for: $0) } ?? 1
+        let sample = goal.map { [$0 * 0.9, $0 * 1.1] } ?? [10.0, 12.0]
+        let participants = Array(athletes.prefix(2))
+        let unit = metric == "duration" ? "m" : metric == "distance" || metric == "time" ? "sek" : "repetisjoner"
+        if participants.count == 2,
+           let points = ATHLTHCompetitionRaceRules.previewPoints(
+                mode: race.effectiveScoringMode, metric: metric, values: sample,
+                handicaps: participants.map { race.handicap(for: $0.id) },
+                basePoints: race.pointsPerExercise ?? 1, weight: weight, goal: goal) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Eksempel på poengberegning", systemImage: "calculator")
+                    .font(.subheadline.weight(.semibold))
+                Text("Illustrasjon med to deltakere og eksempelverdier. Serveren beregner faktiske poeng.")
+                    .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                ForEach(participants.indices, id: \.self) { index in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(participants[index].username)
+                            Text(sample[index].formatted(.number.precision(.fractionLength(0...2))) + " " + unit
+                                 + " · " + String(race.handicap(for: participants[index].id)) + " % handicap")
+                                .font(.caption2).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        Spacer()
+                        Text("\(points[index]) p").font(.headline.monospacedDigit())
+                    }.font(.subheadline)
+                }
+            }
+            .padding(12)
+            .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
     private var preview: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Gjennomgang før invitasjon")
@@ -1348,6 +1389,7 @@ struct ATHLTHTournamentCreator: View {
             Label(competitionSettings.unlock.title, systemImage: "list.bullet").font(.subheadline)
             if competitionSettings.race.discipline == .workout {
                 Label(competitionSettings.race.scoringSummary, systemImage: "chart.bar").font(.subheadline)
+                scoringExample
                 Label("Godkjenningsfrist: \(competitionSettings.race.reviewHours ?? 48) timer", systemImage: "clock.badge.checkmark").font(.caption)
                 ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
                     let metric = exerciseMetrics[id] ?? "repetitions"
