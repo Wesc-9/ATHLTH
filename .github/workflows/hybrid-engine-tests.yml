@@ -380,6 +380,9 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHDirectMessageDeliveryTests \
             -only-testing:ATHLTHTests/ATHLTHCompetitionRaceRulesTests \
             -only-testing:ATHLTHTests/ATHLTHTournamentSeasonContinuationTests \
+            -only-testing:ATHLTHTests/ATHLTHPlannedHeartRatePreviewTests \
+            -only-testing:ATHLTHTests/ATHLTHQuickRunTimelineAdapterTests \
+            -only-testing:ATHLTHTests/ATHLTHPlanWorkoutCardPresentationTests \
             -only-testing:ATHLTHTests/ATHLTHHomeWorkoutComposerRecoveryTests \
             CODE_SIGNING_ALLOWED=NO \
             test
