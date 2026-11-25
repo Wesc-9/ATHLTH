@@ -490,7 +490,7 @@ final class MessagingStore: ObservableObject {
                         loadedIDs.contains($0.id) || $0.senderID == currentUserID
                     }
                     markConversationReadLocally(conversationID: conversationID,
-                                                currentUserID: currentUserID, markedAt: Date())
+                                                currentUserID: currentUserID, markedAt: Date(), messageIDs: Set(unread))
                 } else {
                     messagesByConversation[conversationID] = messages
                 }
@@ -528,7 +528,8 @@ final class MessagingStore: ObservableObject {
     private func markConversationReadLocally(
         conversationID: UUID,
         currentUserID: UUID,
-        markedAt: Date
+        markedAt: Date,
+        messageIDs: Set<UUID>
     ) {
         func marked(
             _ message:
@@ -538,7 +539,8 @@ final class MessagingStore: ObservableObject {
                     conversationID,
                   message.recipientID ==
                     currentUserID,
-                  message.readAt == nil
+                  message.readAt == nil,
+                  messageIDs.contains(message.id)
             else {
                 return message
             }
