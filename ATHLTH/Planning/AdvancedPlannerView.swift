@@ -6697,10 +6697,15 @@ struct SessionEditorView: View {
             let attachment = try MessageShareDraft(
                 kind: .workout,
                 title: bound.title,
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Build this workout together",
-                    norwegian: "Bygg denne økten sammen"
-                ),
+                subtitle: bound.allowInviteeExercises == true
+                    ? ATHLTHLocalization.choose(
+                        english: "Build this workout together",
+                        norwegian: "Bygg denne økten sammen"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Locked workout · approval required",
+                        norwegian: "Låst økt · godkjenning kreves"
+                    ),
                 snapshot: privateCopy,
                 sourceObjectID: bound.id,
                 sourceOwnerID: session.profile.userID,
@@ -6709,10 +6714,15 @@ struct SessionEditorView: View {
             let sent = await messaging.send(
                 to: partnerID,
                 conversationID: conversationID,
-                body: ATHLTHLocalization.choose(
-                    english: "Let's build our workout together. Add exercises or suggest changes before we start.",
-                    norwegian: "La oss bygge treningsøkten sammen! Legg til øvelser eller foreslå endringer før vi starter."
-                ),
+                body: bound.allowInviteeExercises == true
+                    ? ATHLTHLocalization.choose(
+                        english: "Let's build our workout together. Add exercises or suggest changes before we start.",
+                        norwegian: "La oss bygge treningsøkten sammen! Legg til øvelser eller foreslå endringer før vi starter."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "You're invited to a locked workout. Review and approve it before we start.",
+                        norwegian: "Du er invitert til en låst treningsøkt. Se gjennom og godkjenn økten før vi starter."
+                    ),
                 attachment: attachment
             )
             guard sent else {
