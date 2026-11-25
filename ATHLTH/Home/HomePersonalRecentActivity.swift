@@ -1237,10 +1237,10 @@ struct HomePersonalRecentActivitySection:
     }
 
     private var recentArtworkHeight: CGFloat {
-        // Compact Home-only preview: the detail screen keeps full artwork.
+        // Match the exact media slot; no centered, shorter image inside it.
         ATHLTHRecentActivityLayoutPolicy.artworkHeight(
             horizontal: isWideRecentLayout
-        ) * 0.78
+        )
     }
 
     private var recentRevision:
@@ -1568,7 +1568,7 @@ struct HomePersonalRecentActivitySection:
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                             .frame(maxWidth: .infinity)
                             .frame(height: recentArtworkHeight)
-                            .background(ATHLTHTheme.accentSoft, in: RoundedRectangle(cornerRadius: 14))
+                            .background(ATHLTHTheme.accentSoft)
                     } details: {
                         VStack(alignment: .leading, spacing: 7) {
                             HomeRecentActivityMetricLine(
@@ -1599,7 +1599,8 @@ struct HomePersonalRecentActivitySection:
                     HomeFollowingWorkoutArtwork(
                         item: feedItem,
                         activity: HomeFollowingWorkoutPresentation.activity(for: feedItem),
-                        height: recentArtworkHeight
+                        height: recentArtworkHeight,
+                        embeddedInFeedCard: true
                     )
                     .frame(maxWidth: .infinity)
                     .clipped()
@@ -2550,6 +2551,8 @@ private struct HomeFollowingWorkoutArtwork:
     let activity: WorkoutActivity
     let height: CGFloat
 
+    var embeddedInFeedCard = false
+
     private var strengthMuscleProfile:
         StrengthMuscleProfile {
         guard activity == .strength,
@@ -2603,7 +2606,9 @@ private struct HomeFollowingWorkoutArtwork:
                     volumeKilograms: HomeRecentCardFormat.number(item, key: "volume_kg"),
                     height: height,
                     compact: true,
-                    showsCompletionLabel: false
+                    showsCompletionLabel: false,
+                    cornerRadius: embeddedInFeedCard ? 0 : nil,
+                    recentActivityStrip: embeddedInFeedCard && height < 170
                 )
             } else if ATHLTHHomeFeedFallbackPolicy.imageName(for: activity) != nil {
                 ATHLTHHomeRunningFeedPhoto(height: height)
@@ -3413,7 +3418,8 @@ private struct HomePersonalHistoryCard:
                     strengthWorkout,
                 phoneWorkout:
                     phoneWorkout,
-                height: workout.activity == .strength ? 236 : 148
+                height: ATHLTHRecentActivityLayoutPolicy.historyArtworkHeight,
+                embeddedInFeedCard: true
             )
 
             VStack(
@@ -3842,7 +3848,8 @@ private struct HomeFollowingSocialFeedCard: View {
                 HomeFollowingWorkoutArtwork(
                     item: item,
                     activity: activity,
-                    height: 190
+                    height: ATHLTHRecentActivityLayoutPolicy.historyArtworkHeight,
+                    embeddedInFeedCard: true
                 )
             }
             .buttonStyle(.plain)
@@ -4177,7 +4184,8 @@ private struct HomeFollowingHistoryCard:
             HomeFollowingWorkoutArtwork(
                 item: item,
                 activity: activity,
-                height: 150
+                height: ATHLTHRecentActivityLayoutPolicy.historyArtworkHeight,
+                embeddedInFeedCard: true
             )
             .overlay(
                 alignment:
@@ -4768,6 +4776,7 @@ private struct HomePersonalWorkoutVisual:
     var precomputedStrengthProfile:
         StrengthMuscleProfile? = nil
     var recentActivityStrip = false
+    var embeddedInFeedCard = false
 
     @State private var hasLoadedRoute = false
     @State private var routePreviewImage: UIImage?
@@ -4876,6 +4885,7 @@ private struct HomePersonalWorkoutVisual:
             height: height,
             compact: height < 250,
             showsCompletionLabel: height >= 220,
+            cornerRadius: (recentActivityStrip || embeddedInFeedCard) ? 0 : nil,
             recentActivityStrip: recentActivityStrip
         )
     }
