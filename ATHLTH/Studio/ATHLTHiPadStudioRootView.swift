@@ -1182,6 +1182,8 @@ struct ATHLTHiPadStudioRootView: View {
                 onOpenTrainTogether: {
                     openSidebarPage(.trainTogether)
                 },
+                onOpenWorkoutLibrary: { openPersonalLibrary(.workouts) },
+                onOpenCoach: { openStudio(.coach) },
                 onOpenNotifications: {
                     openSidebarPage(.notifications)
                 },

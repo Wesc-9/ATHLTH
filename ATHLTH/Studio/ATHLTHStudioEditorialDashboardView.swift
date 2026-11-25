@@ -179,6 +179,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onOpenSettings: () -> Void
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
     let onOpenTrainTogether: () -> Void
+    let onOpenWorkoutLibrary: () -> Void
+    let onOpenCoach: () -> Void
     let onOpenNotifications: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
@@ -769,61 +771,61 @@ struct ATHLTHStudioEditorialDashboardView: View {
             Rectangle()
                 .fill(outline)
                 .frame(height: 1)
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: activeDay?.restDays.isEmpty == false
-                      ? "moon.zzz" : "calendar.badge.clock")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(bronze)
-                    .frame(width: 42, height: 42)
-                    .background(cream, in: RoundedRectangle(cornerRadius: 13))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(weekSelectionSummary(activeDay))
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(ink)
-                        .accessibilityAddTraits(.isHeader)
-                    if let activeDay {
-                        Text(activeDay.date.formatted(
-                            .dateTime.weekday(.wide).day().month(.wide)
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 8)
-                if let activeDay, activeDay.restDays.isEmpty,
-                   HomeWeeklyProgressCalendar.canScheduleStandalone(
-                       on: activeDay.date
-                   ) {
-                    Button {
-                        focusedPlanningDate = activeDay.date
-                    } label: {
-                        Label(tr("Plan workout", "Planlegg økt"),
-                              systemImage: "plus")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(minHeight: 44)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(bronze)
-                    .accessibilityIdentifier("athlth-ipad-week-plan-selected-day")
-                }
-            }
-
-            if let activeDay,
-               !activeDay.planned.isEmpty || !activeDay.recorded.isEmpty {
-                selectedDayWorkouts(activeDay, availableWidth: width)
-                    .accessibilityIdentifier("athlth-ipad-selected-week-day-details")
-            } else if let activeDay, !activeDay.restDays.isEmpty {
-                Label(tr("Planned rest day", "Planlagt hviledag"),
-                      systemImage: "moon.zzz")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 10)
+            if let activeDay, activeDay.planned.isEmpty,
+               activeDay.recorded.isEmpty, activeDay.restDays.isEmpty,
+               HomeWeeklyProgressCalendar.canScheduleStandalone(on: activeDay.date) {
+                emptyDayPlanningCard(activeDay.date)
             } else {
-                Label(tr("No workout scheduled", "Ingen økt planlagt"),
-                      systemImage: "calendar")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 10)
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: activeDay?.restDays.isEmpty == false
+                          ? "moon.zzz" : "calendar.badge.clock")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(bronze)
+                        .frame(width: 42, height: 42)
+                        .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(weekSelectionSummary(activeDay))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(ink)
+                            .accessibilityAddTraits(.isHeader)
+                        if let activeDay {
+                            Text(activeDay.date.formatted(
+                                .dateTime.weekday(.wide).day().month(.wide)
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    if let activeDay, activeDay.restDays.isEmpty,
+                       HomeWeeklyProgressCalendar.canScheduleStandalone(on: activeDay.date) {
+                        Button {
+                            focusedPlanningDate = activeDay.date
+                        } label: {
+                            Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 44)
+                                .background(cream, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(outline, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-ipad-week-plan-selected-day")
+                    }
+                }
+
+                if let activeDay,
+                   !activeDay.planned.isEmpty || !activeDay.recorded.isEmpty {
+                    selectedDayWorkouts(activeDay, availableWidth: width)
+                        .accessibilityIdentifier("athlth-ipad-selected-week-day-details")
+                } else if let activeDay, !activeDay.restDays.isEmpty {
+                    Label(tr("Planned rest day", "Planlagt hviledag"), systemImage: "moon.zzz")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                }
             }
 
             if !hasHealth {
@@ -1049,6 +1051,131 @@ struct ATHLTHStudioEditorialDashboardView: View {
                      "\(day.recorded.count) registrerte økter")
         }
         return tr("No workout scheduled", "Ingen økt planlagt")
+    }
+
+    // A single integrated action surface replaces the duplicate empty label
+    // and floating pill. Adaptive stacks keep the card usable in split view.
+    private func emptyDayPlanningCard(_ date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) {
+                    emptyDayHeading(date)
+                    Spacer(minLength: 12)
+                    primaryPlanningButton(date)
+                }
+                VStack(alignment: .leading, spacing: 14) {
+                    emptyDayHeading(date)
+                    primaryPlanningButton(date)
+                }
+            }
+            Rectangle()
+                .fill(outline)
+                .frame(height: 1)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { planningShortcuts }
+                VStack(alignment: .leading, spacing: 8) { planningShortcuts }
+            }
+        }
+        .padding(16)
+        .background {
+            RoundedRectangle(cornerRadius: 17)
+                .fill(LinearGradient(colors: [.white, cream],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
+        .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(outline, lineWidth: 1))
+        .accessibilityIdentifier("athlth-ipad-week-empty-planning")
+    }
+
+    private func emptyDayHeading(_ date: Date) -> some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(bronze)
+                .frame(width: 48, height: 48)
+                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(outline, lineWidth: 1))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+                Text(tr("No workout scheduled", "Ingen økt planlagt"))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .accessibilityAddTraits(.isHeader)
+                Text(tr("Make room for your next workout.", "Sett av tid til din neste treningsøkt."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func primaryPlanningButton(_ date: Date) -> some View {
+        Button {
+            focusedPlanningDate = Calendar.current.startOfDay(for: date)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .frame(width: 30, height: 30)
+                    .background(.white, in: Circle())
+                Text(tr("Plan workout", "Planlegg økt"))
+                    .font(.subheadline.weight(.semibold))
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(minHeight: 50)
+            .background {
+                RoundedRectangle(cornerRadius: 13)
+                    .fill(LinearGradient(colors: [ink.opacity(0.88), ink],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+            .shadow(color: ink.opacity(0.12), radius: 6, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityIdentifier("athlth-ipad-week-plan-selected-day")
+    }
+
+    @ViewBuilder
+    private var planningShortcuts: some View {
+        planningShortcut(tr("From library", "Fra bibliotek"), symbol: "books.vertical",
+                         identifier: "library", action: onOpenWorkoutLibrary)
+        planningShortcut(tr("Coach", "Coach"), symbol: "sparkles",
+                         identifier: "coach", action: onOpenCoach)
+        planningShortcut(tr("Train together", "Tren sammen"), symbol: "person.2",
+                         identifier: "together", action: onOpenTrainTogether)
+    }
+
+    private func planningShortcut(
+        _ title: String, symbol: String, identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .foregroundStyle(bronze)
+                Text(title)
+                    .foregroundStyle(ink)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(bronze)
+            }
+            .font(.subheadline.weight(.medium))
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(.white, in: RoundedRectangle(cornerRadius: 11))
+            .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(outline, lineWidth: 0.8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-ipad-week-shortcut-" + identifier)
     }
 
     private func dayTile(
