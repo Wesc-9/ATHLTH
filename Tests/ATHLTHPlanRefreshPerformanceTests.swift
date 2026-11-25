@@ -52,6 +52,28 @@ final class ATHLTHPlanRefreshPerformanceTests: XCTestCase {
         XCTAssertEqual(store.activePlan?.id, plan.id)
     }
 
+    func testProjectionMemoCachesNilAndInvalidatesEveryInputChange() {
+        let memo = ATHLTHProjectionMemo<[Int], Int?>()
+        var computations = 0
+        func projected(_ key: [Int]) -> Int? {
+            memo.value(for: key) {
+                computations += 1
+                return key.isEmpty ? nil : key.reduce(0, +)
+            }
+        }
+        XCTAssertNil(projected([]))
+        XCTAssertNil(projected([]))
+        XCTAssertEqual(computations, 1)
+        XCTAssertEqual(projected([1, 2]), 3)
+        XCTAssertEqual(projected([1, 2]), 3)
+        XCTAssertEqual(computations, 2)
+        XCTAssertEqual(projected([1, 3]), 4)
+        XCTAssertEqual(computations, 3)
+        memo.clear()
+        XCTAssertEqual(projected([1, 3]), 4)
+        XCTAssertEqual(computations, 4)
+    }
+
     func testEmptyPlansRefreshDoesNotPublish() throws {
         let suite = "ATHLTHNoPlansPerformance.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
