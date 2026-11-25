@@ -542,7 +542,7 @@ final class MessagingStore: ObservableObject {
         }
     }
 
-    func refreshConversation(_ conversationID: UUID, requestedLimit: Int? = nil) async {
+    func refreshConversation(_ conversationID: UUID, requestedLimit: Int? = nil, polling: Bool = false) async {
         guard let owner = currentUserID, preferenceAccountID == owner else { return }
         let generation = accountGeneration
         guard conversationRefreshInFlight.insert(conversationID).inserted else { return }
@@ -554,12 +554,16 @@ final class MessagingStore: ObservableObject {
             let messages = try await service.loadMessages(conversationID: conversationID, limit: limit)
             guard ownsRequest(owner, generation: generation) else { return }
 
+            let previous = messagesByConversation[conversationID]
+            let changed = previous != messages
+            var markedUnread = false
             if let currentUserID {
                 let unread = messages.filter {
                     $0.recipientID == currentUserID && $0.readAt == nil && $0.deletedAt == nil
                 }.map(\.id)
 
                 if !unread.isEmpty {
+                    markedUnread = true
                     // Commit actual read state before publishing the text. A
                     // concurrent successful retraction must not appear here.
                     try await service.markConversationRead(conversationID, messageIDs: unread)
@@ -571,22 +575,23 @@ final class MessagingStore: ObservableObject {
                     }
                     markConversationReadLocally(conversationID: conversationID,
                                                 currentUserID: currentUserID, markedAt: Date(), messageIDs: Set(unread))
-                } else {
+                } else if changed {
                     messagesByConversation[conversationID] = messages
                 }
 
-                messageWindowLimits[conversationID] = limit
-                await clearDeliveredNotifications(
-                    for:
-                        conversationID
-                )
+                if messageWindowLimits[conversationID] != limit {
+                    messageWindowLimits[conversationID] = limit
+                }
+                if !polling || changed || markedUnread {
+                    await clearDeliveredNotifications(for: conversationID)
+                }
             }
 
             // Force this refresh. A normal refresh may be throttled for
             // 60 seconds, which previously left the inbox unread badge stuck
             // after the thread had already been marked read on the backend.
             guard ownsRequest(owner, generation: generation) else { return }
-            await refresh(force: true)
+            await refresh(force: !polling || changed || markedUnread)
             guard ownsRequest(owner, generation: generation) else { return }
 
             // Full inbox refreshes must not make a just-created pending
@@ -597,9 +602,9 @@ final class MessagingStore: ObservableObject {
                             id: conversationID
                         ) {
                 guard ownsRequest(owner, generation: generation) else { return }
-                upsertConversation(
-                    conversation
-                )
+                if conversations.first(where: { $0.id == conversationID }) != conversation {
+                    upsertConversation(conversation)
+                }
             }
         } catch is CancellationError {
             return
