@@ -599,6 +599,8 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     /// Recorded when this group first becomes active. Optional so
     /// existing history and Watch transfers stay decodable.
     var groupStartedAt: Date? = nil
+    var groupStationRestSeconds: Int? = nil
+    var groupRoundRestSeconds: Int? = nil
     var substitutedFromExerciseName: String? = nil
     // Actual transition time from finishing this exercise until the athlete
     // explicitly confirms that they are ready to start the next exercise.
@@ -764,8 +766,9 @@ struct StrengthRepPersonalRecord: Identifiable, Hashable {
 struct StrengthLiveQueueEntry: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     let exerciseID: UUID
-    // nil means all remaining sets of the exercise.
+    // nil means all remaining sets of the exercise, or the complete group.
     let setID: UUID?
+    var groupID: UUID? = nil
 }
 
 struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
