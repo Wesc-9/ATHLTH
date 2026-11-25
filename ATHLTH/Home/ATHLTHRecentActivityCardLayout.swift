@@ -10,6 +10,9 @@ enum ATHLTHRecentActivityLayoutPolicy {
         availableWidth >= 650 && !accessibilityText
     }
 
+    /// Full history uses a single height for own and friends' artwork.
+    static let historyArtworkHeight: CGFloat = 190
+
     static func artworkHeight(horizontal: Bool) -> CGFloat {
         horizontal ? 158 : 132
     }
@@ -42,7 +45,7 @@ struct ATHLTHRecentActivityCardLayout<Artwork: View, Details: View>: View {
     var body: some View {
         Group {
             if isHorizontal {
-                HStack(alignment: .center, spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
                     artwork
                         .frame(
                             width: ATHLTHRecentActivityLayoutPolicy.artworkWidth(
@@ -63,7 +66,7 @@ struct ATHLTHRecentActivityCardLayout<Artwork: View, Details: View>: View {
                 VStack(alignment: .leading, spacing: 0) {
                     artwork
                         .frame(maxWidth: .infinity)
-                        .frame(height: mediaHeight)
+                        .frame(height: mediaHeight, alignment: .top)
                         .clipped()
 
                     details
