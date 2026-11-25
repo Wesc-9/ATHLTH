@@ -18,13 +18,14 @@ enum ATHLTHAppLock {
 
 /// A separate scene window covers presented sheets too, while leaving the
 /// underlying SwiftUI navigation and active workout stores intact.
+@MainActor
 struct ATHLTHAppLockBridge: UIViewRepresentable {
     let owner: UUID?
     let enabled: Bool
     let phase: ScenePhase
 
     final class Anchor: UIView {
-        var didAttach: ((UIWindowScene?) -> Void)?
+        var didAttach: (@MainActor (UIWindowScene?) -> Void)?
         override func didMoveToWindow() {
             super.didMoveToWindow()
             didAttach?(window?.windowScene)
@@ -151,7 +152,7 @@ private struct ATHLTHLockedScreen: View {
     let interactive: Bool
     let authenticating: Bool
     let failed: Bool
-    let unlock: () -> Void
+    let unlock: @MainActor () -> Void
 
     var body: some View {
         ZStack {
@@ -164,7 +165,7 @@ private struct ATHLTHLockedScreen: View {
                 if interactive {
                     Text(ATHLTHLocalization.choose(english: "Your app is locked", norwegian: "Appen er låst"))
                         .foregroundStyle(ATHLTHTheme.mutedText)
-                    Button(action: unlock) {
+                    Button { unlock() } label: {
                         Label(ATHLTHLocalization.choose(english: "Unlock", norwegian: "Lås opp"),
                               systemImage: "faceid")
                     }
