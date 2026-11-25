@@ -156,11 +156,16 @@ struct ATHLTHSystemDiagnosticsView: View {
                     icon: "heart.text.square"
                 )
                 diagnosticRow(
-                    "Background delivery",
-                    value: CapabilityProbe.backgroundDeliveryEntitlementConfigured
-                        ? "Configured"
-                        : "Unavailable",
+                    ATHLTHLocalization.choose(english: "Background delivery", norwegian: "Bakgrunnssynkronisering"),
+                    value: health.backgroundDeliveryStatus.title,
                     icon: "arrow.clockwise.icloud"
+                )
+                diagnosticRow(
+                    ATHLTHLocalization.choose(english: "Last background sync", norwegian: "Siste bakgrunnssynk"),
+                    value: health.lastSuccessfulBackgroundRefreshAt?.formatted(
+                        date: .abbreviated, time: .shortened
+                    ) ?? ATHLTHLocalization.choose(english: "Not recorded", norwegian: "Ikke registrert"),
+                    icon: "clock"
                 )
                 diagnosticRow(
                     "WorkoutKit",
