@@ -35,6 +35,7 @@ struct ATHLTHTournamentCreator: View {
     @State private var rematchResults: [ATHLTHTournamentExerciseSearchResult] = []
     @State private var rematchNames: [UUID: String] = [:]
     @State private var exerciseMetrics: [UUID: String] = [:]
+    @State private var exerciseActivities: [UUID: ATHLTHTournamentActivity] = [:]
     private var usesExplicitExercises: Bool { isRematch || competitionSettings.selectedExerciseIDs != nil || competitionSettings.race.effectiveScoringMode.needsGoal }
     private var scoringValid: Bool {
         guard competitionSettings.race.discipline == .workout else { return true }
@@ -232,7 +233,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSaveTemplate: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         !allowedActivities.isEmpty && competitionSettings.isValid &&
-        competitionSettings.environment.supports(allowedActivities) &&
+        competitionSettings.environmentsValid(activities: allowedActivities, exerciseActivities: exerciseActivities) &&
         !templateSaving && !publishing
     }
 
@@ -245,8 +246,8 @@ struct ATHLTHTournamentCreator: View {
         (!isSingleEvent || competitionSettings.race.discipline == .workout ||
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
-        competitionSettings.race.isOperational && competitionSettings.environment.canPublish &&
-        competitionSettings.environment.supports(allowedActivities) && scoringValid &&
+        competitionSettings.race.isOperational && competitionSettings.environmentsCanPublish(activities: allowedActivities) &&
+        competitionSettings.environmentsValid(activities: allowedActivities, exerciseActivities: exerciseActivities) && scoringValid &&
         (!isRematch || (exerciseMode == .owner && competitionSettings.selectedExerciseIDs?.count == exerciseCount && exerciseCount > 0)) &&
         (!(isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified)) &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
@@ -282,10 +283,14 @@ struct ATHLTHTournamentCreator: View {
                                 if fixedActivity == nil {
                                     if usesExplicitExercises && newValue != allowedActivities {
                                         competitionSettings.selectedExerciseIDs = []
+                                        competitionSettings.exerciseEnvironments = [:]
                                         competitionSettings.race.scoringGoals = nil
                                         competitionSettings.race.exerciseWeights = nil
                                     }
-                                    allowedActivities = newValue
+                                    competitionSettings.activityEnvironments = competitionSettings.activityEnvironments.filter { key, _ in
+                                         newValue.contains { $0.rawValue == key }
+                                     }
+                                     allowedActivities = newValue
                                 }
                             }
                         ),
@@ -820,6 +825,7 @@ struct ATHLTHTournamentCreator: View {
                     get: { competitionSettings.selectedExerciseIDs != nil },
                     set: { enabled in
                         competitionSettings.selectedExerciseIDs = enabled ? [] : nil
+                        competitionSettings.exerciseEnvironments = [:]
                         competitionSettings.coachExerciseIDs = []
                         competitionSettings.race.scoringGoals = nil
                         competitionSettings.race.exerciseWeights = nil
@@ -875,11 +881,17 @@ struct ATHLTHTournamentCreator: View {
                     Spacer()
                     Button {
                         competitionSettings.selectedExerciseIDs?.removeAll { $0 == id }
+                        competitionSettings.exerciseEnvironments.removeValue(forKey: id)
                         competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
                         competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
                         exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
                     } label: { Image(systemName: "minus.circle").frame(width: 44, height: 44) }
                     .buttonStyle(.plain)
+                }
+                if let activity = exerciseActivities[id] {
+                    exerciseVenuePicker(id: id, activity: activity)
+                } else {
+                    Text("Henter treningsform for miljøregel…").font(.caption)
                 }
                 if competitionSettings.race.effectiveScoringMode.needsGoal {
                     let metric = exerciseMetrics[id] ?? "repetitions"
@@ -915,6 +927,7 @@ struct ATHLTHTournamentCreator: View {
                     ids.append(item.id)
                     rematchNames[item.id] = item.name
                     exerciseMetrics[item.id] = item.metric
+                    exerciseActivities[item.id] = item.activity
                     competitionSettings.selectedExerciseIDs = ids
                     exerciseCount = ids.count
                 } label: {
@@ -937,9 +950,11 @@ struct ATHLTHTournamentCreator: View {
                 let ids = competitionSettings.selectedExerciseIDs ?? []
                 let labels = try await service.exerciseLabels(ids: ids)
                 let metrics = try await service.exerciseMetrics(ids: ids)
+                let activities = try await service.exerciseActivities(ids: ids)
                 guard !Task.isCancelled else { return }
                 for (id, name) in labels { rematchNames[id] = name }
                 for (id, metric) in metrics { exerciseMetrics[id] = metric }
+                exerciseActivities = activities
             } catch { rematchSearchError = error.localizedDescription }
         }
         .task(id: rematchSearch + allowedActivities.map(\.rawValue).sorted().joined(separator: ",")) {
@@ -951,6 +966,30 @@ struct ATHLTHTournamentCreator: View {
                 rematchResults = results
                 rematchSearchError = nil
             } catch is CancellationError {} catch { rematchSearchError = error.localizedDescription }
+        }
+    }
+
+    private func exerciseVenuePicker(id: UUID, activity: ATHLTHTournamentActivity) -> some View {
+        let inherited = competitionSettings.effectiveEnvironment(activity: activity)
+        let options = competitionSettings.allowedEnvironments(activity: activity, exerciseID: id)
+        let current = competitionSettings.exerciseEnvironments[id]
+        return VStack(alignment: .leading, spacing: 4) {
+            Picker("Treningsmiljø", selection: Binding<ATHLTHCompetitionEnvironment?>(
+                get: { competitionSettings.exerciseEnvironments[id] },
+                set: { competitionSettings.exerciseEnvironments[id] = $0 }
+            )) {
+                Text("Arv: " + inherited.title).tag(ATHLTHCompetitionEnvironment?.none)
+                ForEach(ATHLTHCompetitionEnvironment.allCases.filter {
+                    ($0 != inherited && options.contains($0)) || $0 == current
+                }) { value in
+                    Text(value.title).tag(Optional(value))
+                }
+            }
+            .pickerStyle(.menu)
+            if let current, !options.contains(current) {
+                Text("Miljøregelen strider mot treningsformen eller fellesregelen.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
         }
     }
 
