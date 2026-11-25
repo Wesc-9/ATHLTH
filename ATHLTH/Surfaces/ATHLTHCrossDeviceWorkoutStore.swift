@@ -1651,9 +1651,10 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             let source = snapshot.sourceDevice == "watch" ? "watch" : "iphone"
             // Presence has a 30-second TTL, independent of 4-second metric and
             // command polling. Refresh sooner on every source/session change.
-            if lastPresencePublished, lastPublishedPresenceSessionID == snapshot.id,
-               lastPublishedPresenceSource == source, let lastPublishedPresenceAt,
-               (0..<12).contains(now.timeIntervalSince(lastPublishedPresenceAt)) { return }
+            if lastPresencePublished, !ATHLTHCrossDevicePresenceRefreshPolicy.needsWrite(
+                sessionID: snapshot.id, source: source, previousSessionID: lastPublishedPresenceSessionID,
+                previousSource: lastPublishedPresenceSource, previousWrite: lastPublishedPresenceAt,
+                now: now) { return }
             let signpost = ATHLTHPerformance.begin("CrossDevicePresenceWrite")
             defer { ATHLTHPerformance.end("CrossDevicePresenceWrite", id: signpost) }
             let row = ATHLTHCrossDevicePresenceRow(
