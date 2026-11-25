@@ -3629,6 +3629,7 @@ struct ATHLTHAccountSecurityView: View {
     @State private var showingGlobalSignOutConfirmation = false
     @State private var signOutInProgress = false
     @State private var sendingReset = false
+    @State private var showingEmailChange = false
     @State private var statusMessage: String?
     @State private var statusIsError = false
 
@@ -3673,6 +3674,16 @@ struct ATHLTHAccountSecurityView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 14)
 
+                        if session.signInMethod == .email {
+                            SettingsDivider()
+                            Button { showingEmailChange = true } label: {
+                                accountLinkRow(icon: "envelope.badge.shield.half.filled",
+                                               title: tr("Change email", "Endre e-post"),
+                                               subtitle: tr("Confirm a new sign-in address", "Bekreft ny innloggingsadresse"))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(signOutInProgress || sendingReset)
+                        }
                         SettingsDivider()
                         accountFact(icon: session.signInMethod == .apple ? "apple.logo" : "key",
                                     title: tr("Sign-in method", "Innloggingsmetode"),
@@ -3834,6 +3845,9 @@ struct ATHLTHAccountSecurityView: View {
             )
         )
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingEmailChange) {
+            ATHLTHChangeAccountEmailView()
+        }
         .confirmationDialog(
             tr("Sign out of ATHLTH?", "Logge ut av ATHLTH?"),
             isPresented: $showingSignOutConfirmation,
