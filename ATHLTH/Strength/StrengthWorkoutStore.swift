@@ -1620,6 +1620,95 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
+    private static func queueTarget(
+        _ entry: StrengthLiveQueueEntry, in workout: StrengthWorkoutLog
+    ) -> (exercise: Int, set: Int)? {
+        guard let exercise = workout.exercises.firstIndex(where: {
+            $0.id == entry.exerciseID && $0.groupID == nil
+        }), let set = workout.exercises[exercise].sets.firstIndex(where: {
+            !$0.isResolved && (entry.setID == nil || $0.id == entry.setID)
+        }) else { return nil }
+        return (exercise, set)
+    }
+
+    var pendingExecutionQueue: [StrengthLiveQueueEntry] {
+        guard let workout = activeWorkout else { return [] }
+        return (workout.liveExecutionQueue ?? []).filter {
+            Self.queueTarget($0, in: workout) != nil
+        }
+    }
+
+    @discardableResult
+    func enqueueStrength(exerciseID: UUID, setID: UUID? = nil, next: Bool = false) -> Bool {
+        guard var workout = activeWorkout else { return false }
+        let entry = StrengthLiveQueueEntry(exerciseID: exerciseID, setID: setID)
+        guard Self.queueTarget(entry, in: workout) != nil else { return false }
+        var entries = pendingExecutionQueue
+        // A whole exercise already includes its remaining sets.
+        if setID == nil {
+            entries.removeAll { $0.exerciseID == exerciseID }
+        } else {
+            guard !entries.contains(where: {
+                $0.exerciseID == exerciseID && ($0.setID == nil || $0.setID == setID)
+            }) else { return false }
+        }
+        if next { entries.insert(entry, at: 0) } else { entries.append(entry) }
+        workout.liveExecutionQueue = entries
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
+    func removeQueuedStrength(_ id: UUID) {
+        guard var workout = activeWorkout else { return }
+        workout.liveExecutionQueue = pendingExecutionQueue.filter { $0.id != id }
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
+    func clearStrengthQueue() {
+        guard var workout = activeWorkout else { return }
+        workout.liveExecutionQueue = nil
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
+    func moveQueuedStrengthToFront(_ id: UUID) {
+        guard var workout = activeWorkout else { return }
+        var entries = pendingExecutionQueue
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        let entry = entries.remove(at: index)
+        entries.insert(entry, at: 0)
+        workout.liveExecutionQueue = entries
+        activeWorkout = workout
+        persistCheckpointNow()
+    }
+
+    /// Run explicit queued work at a set boundary, never interrupt a timed
+    /// group, change the plan order, or mark any pending set as completed.
+    private func advanceLiveExecutionQueue(
+        workout: inout StrengthWorkoutLog,
+        automaticRestTimer: Bool, restSeconds: Int, at date: Date
+    ) -> Bool {
+        let entries = (workout.liveExecutionQueue ?? []).filter {
+            Self.queueTarget($0, in: workout) != nil
+        }
+        workout.liveExecutionQueue = entries.isEmpty ? nil : entries
+        if let groupID = workout.exercises[currentExerciseIndex].groupID,
+           workout.exercises.contains(where: {
+               $0.groupID == groupID && $0.sets.contains(where: { !$0.isResolved })
+           }) { return false }
+        guard let entry = entries.first,
+              let target = Self.queueTarget(entry, in: workout) else { return false }
+        currentExerciseIndex = target.exercise
+        currentSetIndex = target.set
+        isFreeTrainingBetweenExercises = false
+        watchCaptureNeedsBaseline.insert(workout.exercises[target.exercise].sets[target.set].id)
+        restStartedAt = automaticRestTimer && restSeconds > 0 ? date : nil
+        restEndsAt = restStartedAt?.addingTimeInterval(TimeInterval(restSeconds))
+        return true
+    }
+
     func reorderActiveExercises(
         fromOffsets: IndexSet,
         toOffset: Int
@@ -3867,6 +3956,14 @@ final class StrengthWorkoutStore: ObservableObject {
                 0
             )
 
+        if advanceLiveExecutionQueue(workout: &workout, automaticRestTimer: automaticRestTimer,
+                                     restSeconds: resolvedRestSeconds, at: completedAt) {
+            activeWorkout = workout
+            reloadDraftFromCurrentSet()
+            persistCheckpointNow()
+            return
+        }
+
         if advanceGroupedSetIfNeeded(
             workout: &workout,
             completedExerciseIndex:
@@ -5617,6 +5714,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         // A restored checkpoint can be hours old. Its save timestamp
         // must not truncate the real workout's duration on completion.
+        workout.liveExecutionQueue = nil
         workout.endedAt = ATHLTHWorkoutSessionFoundation.completionTimestamp(
             startedAt: workout.startedAt,
             finishedAt: finishDate
