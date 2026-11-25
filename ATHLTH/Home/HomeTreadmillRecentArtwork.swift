@@ -56,6 +56,7 @@ struct ATHLTHFeedArtworkMetrics {
     var exerciseCount: Int? = nil
     var volumeKilograms: Double? = nil
     var strength = false
+    var showsPace = true
 
     var durationText: String? {
         guard let duration, duration.isFinite, duration > 0, duration < 10_000_000 else { return nil }
@@ -96,7 +97,7 @@ struct ATHLTHFeedArtworkMetrics {
             }
         } else if distanceText != nil {
             if let durationText { parts.append(durationText) }
-            if let paceText { parts.append(paceText) }
+            if showsPace, let paceText { parts.append(paceText) }
         }
         return parts.joined(separator: " · ")
     }
@@ -147,7 +148,11 @@ struct ATHLTHFeedArtworkOverlay<Artwork: View>: View {
                     Spacer(minLength: 0)
                     if let averageHeartRate, averageHeartRate.isFinite,
                        averageHeartRate > 0, averageHeartRate < 300 {
-                        Label("\(Int(averageHeartRate.rounded()))", systemImage: "heart.fill")
+                        HStack(spacing: 3) {
+                            Image(systemName: "heart.fill")
+                                .foregroundStyle(Color(red: 0.67, green: 0.96, blue: 0.79))
+                            Text("\(Int(averageHeartRate.rounded()))")
+                        }
                             .font(.system(size: 10, weight: .bold)).monospacedDigit()
                             .padding(.horizontal, 7).frame(height: 23)
                             .background(.black.opacity(0.40), in: Capsule())
