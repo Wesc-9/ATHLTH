@@ -9,8 +9,6 @@ struct HomeTreadmillRecentArtwork: View {
     let averageHeartRate: Double?
     let height: CGFloat
 
-    private let mint = Color(red: 0.67, green: 0.96, blue: 0.79)
-
     /// The original tiny treadmill artwork has been replaced in-place by
     /// a high-resolution 1536 x 1024 treadmill photograph. Keep the treadmill
     /// identity instead of reusing an outdoor running photo in the feed.
@@ -35,169 +33,135 @@ struct HomeTreadmillRecentArtwork: View {
         }
     }
 
-    private var distance: Double? {
-        guard let meters = workout.distanceMeters,
-              meters.isFinite, meters > 0 else {
-            return nil
+    var body: some View {
+        ATHLTHFeedArtworkOverlay(
+            title: ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle"),
+            icon: "figure.run", height: height,
+            metrics: .init(duration: workout.duration, distanceMeters: workout.distanceMeters),
+            averageHeartRate: averageHeartRate
+        ) {
+            GeometryReader { geometry in
+                treadmillImage.resizable().scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }
         }
-        return meters / 1_000
+    }
+}
+
+/// Real workout values only. Missing measurements are omitted.
+struct ATHLTHFeedArtworkMetrics {
+    var duration: Double? = nil
+    var distanceMeters: Double? = nil
+    var exerciseCount: Int? = nil
+    var volumeKilograms: Double? = nil
+    var strength = false
+
+    var durationText: String? {
+        guard let duration, duration.isFinite, duration > 0, duration < 10_000_000 else { return nil }
+        let minutes = max(1, Int((duration / 60).rounded()))
+        return minutes >= 60 ? "\(minutes / 60)t \(minutes % 60)m" : "\(minutes) min"
     }
 
-    private var durationText: String {
-        let totalMinutes = max(Int((workout.duration / 60).rounded()), 0)
-        if totalMinutes >= 60 {
-            return "\(totalMinutes / 60)t \(totalMinutes % 60)m"
-        }
-        return "\(totalMinutes) min"
+    var distanceText: String? {
+        guard let distanceMeters, distanceMeters.isFinite, distanceMeters > 0 else { return nil }
+        return String(format: "%.2f km", distanceMeters / 1000)
     }
 
-    private var paceText: String? {
-        guard let distance, workout.duration.isFinite,
-              workout.duration > 0 else {
-            return nil
-        }
-        let secondsPerKilometer = workout.duration / distance
-        guard secondsPerKilometer.isFinite,
-              secondsPerKilometer > 0 else {
-            return nil
-        }
-        let seconds = Int(secondsPerKilometer.rounded())
+    var paceText: String? {
+        guard let duration, let distanceMeters, duration.isFinite, duration > 0,
+              distanceMeters.isFinite, distanceMeters > 0 else { return nil }
+        let pace = duration / (distanceMeters / 1000)
+        guard pace.isFinite, pace > 0, pace < 36000 else { return nil }
+        let seconds = Int(pace.rounded())
         return String(format: "%d:%02d /km", seconds / 60, seconds % 60)
     }
 
-    private var heartRate: Int? {
-        guard let averageHeartRate,
-              averageHeartRate.isFinite,
-              averageHeartRate > 0 else {
-            return nil
+    var primary: String? {
+        if strength {
+            if let exerciseCount, exerciseCount > 0 {
+                return ATHLTHLocalization.choose(english: "\(exerciseCount) exercises", norwegian: "\(exerciseCount) øvelser")
+            }
+            return durationText
         }
-        return Int(averageHeartRate.rounded())
+        return distanceText ?? durationText
     }
 
+    var secondary: String {
+        var parts: [String] = []
+        if strength {
+            if let exerciseCount, exerciseCount > 0, let durationText { parts.append(durationText) }
+            if let volumeKilograms, volumeKilograms.isFinite, volumeKilograms > 0 {
+                parts.append(String(format: "%.0f kg", volumeKilograms))
+            }
+        } else if distanceText != nil {
+            if let durationText { parts.append(durationText) }
+            if let paceText { parts.append(paceText) }
+        }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// One typography and metric layout for all feed artwork. Backgrounds may
+/// be photos, private route snapshots or explicitly shared route previews.
+struct ATHLTHFeedArtworkOverlay<Artwork: View>: View {
+    let title: String
+    let icon: String
+    let height: CGFloat
+    let metrics: ATHLTHFeedArtworkMetrics
+    var averageHeartRate: Double? = nil
+    @ViewBuilder let artwork: Artwork
+
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottomLeading) {
-                treadmillImage
-                    .resizable()
-                    .scaledToFill()
-                    .frame(
-                        width: geometry.size.width,
-                        height: geometry.size.height
-                    )
-                    .clipped()
-
-                LinearGradient(
-                    stops: [
-                        .init(color: .black.opacity(0.10), location: 0),
-                        .init(color: .clear, location: 0.42),
-                        .init(color: .black.opacity(0.65), location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                VStack {
-                    HStack {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Treadmill",
-                                norwegian: "Tredemølle"
-                            ),
-                            systemImage: "figure.run"
-                        )
+        ZStack(alignment: .bottomLeading) {
+            artwork.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+            LinearGradient(stops: [
+                .init(color: .black.opacity(0.22), location: 0),
+                .init(color: .clear, location: 0.42),
+                .init(color: .black.opacity(0.68), location: 1)
+            ], startPoint: .top, endPoint: .bottom)
+            .allowsHitTesting(false)
+            VStack {
+                HStack {
+                    Label(title, systemImage: icon)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .frame(height: 26)
-                        .background(.black.opacity(0.38), in: Capsule())
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 10)
+                        .lineLimit(1).minimumScaleFactor(0.75)
+                        .padding(.horizontal, 10).frame(height: 26)
+                        .background(.black.opacity(0.42), in: Capsule())
                     Spacer(minLength: 0)
                 }
-
+                Spacer(minLength: 0)
                 HStack(alignment: .bottom, spacing: 6) {
                     VStack(alignment: .leading, spacing: 3) {
-                        if let distance {
-                            Text(
-                                String(
-                                    format: "%.2f km",
-                                    distance
-                                )
-                            )
-                            .font(
-                                .system(
-                                    size: height < 140 ? 19 : 24,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
-                            )
-                            .monospacedDigit()
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        } else {
-                            Text(durationText)
-                                .font(
-                                    .system(
-                                        size: height < 140 ? 18 : 22,
-                                        weight: .bold,
-                                        design: .rounded
-                                    )
-                                )
-                                .monospacedDigit()
+                        if let primary = metrics.primary {
+                            Text(primary)
+                                .font(.system(size: height < 140 ? 19 : 24, weight: .bold, design: .rounded))
+                                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
                         }
-
-                        HStack(spacing: 4) {
-                            if distance != nil {
-                                Text(durationText)
-                            }
-                            if let paceText {
-                                Text("·")
-                                Text(paceText)
-                            }
+                        if !metrics.secondary.isEmpty {
+                            Text(metrics.secondary)
+                                .font(.system(size: 9, weight: .semibold))
+                                .lineLimit(1).minimumScaleFactor(0.7)
                         }
-                        .font(.system(size: 9, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
                     }
-
                     Spacer(minLength: 0)
-
-                    if let heartRate {
-                        HStack(spacing: 3) {
-                            Image(systemName: "heart.fill")
-                                .foregroundStyle(mint)
-                            Text("\(heartRate)")
-                                .monospacedDigit()
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 7)
-                        .frame(height: 23)
-                        .background(
-                            .black.opacity(0.40),
-                            in: Capsule()
-                        )
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english: "Average heart rate \(heartRate)",
-                                norwegian: "Snittpuls \(heartRate)"
-                            )
-                        )
+                    if let averageHeartRate, averageHeartRate.isFinite,
+                       averageHeartRate > 0, averageHeartRate < 300 {
+                        Label("\(Int(averageHeartRate.rounded()))", systemImage: "heart.fill")
+                            .font(.system(size: 10, weight: .bold)).monospacedDigit()
+                            .padding(.horizontal, 7).frame(height: 23)
+                            .background(.black.opacity(0.40), in: Capsule())
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Average heart rate \(Int(averageHeartRate.rounded()))",
+                                norwegian: "Snittpuls \(Int(averageHeartRate.rounded()))"))
                     }
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 11)
             }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 11)
         }
         .frame(height: height)
         .clipped()
-        .accessibilityLabel(
-            ATHLTHLocalization.choose(
-                english: "Treadmill workout",
-                norwegian: "Tredemølleøkt"
-            )
-        )
+        .accessibilityElement(children: .combine)
     }
 }
