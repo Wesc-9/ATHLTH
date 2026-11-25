@@ -3630,6 +3630,9 @@ struct ATHLTHAccountSecurityView: View {
     @State private var signOutInProgress = false
     @State private var sendingReset = false
     @State private var showingEmailChange = false
+    @AppStorage(ATHLTHAppLock.preferenceKey) private var appLockOwner = ""
+    @State private var changingAppLock = false
+    @State private var appLockError: String?
     @State private var statusMessage: String?
     @State private var statusIsError = false
 
@@ -3731,6 +3734,32 @@ struct ATHLTHAccountSecurityView: View {
                                     .padding(.bottom, 14)
                             }
                         }
+                    }
+                }
+
+                accountSection(tr("App lock", "Applås")) {
+                    PremiumSettingsCard {
+                        PremiumSettingsRow(
+                            icon: "faceid",
+                            iconTint: ATHLTHTheme.accentDeep,
+                            iconBackground: ATHLTHTheme.premiumGoldSoft,
+                            title: tr("Face ID / Touch ID", "Face ID / Touch ID"),
+                            subtitle: tr("Lock the app when you leave it", "Lås appen når du forlater den")
+                        ) {
+                            Toggle(tr("App lock", "Applås"), isOn: Binding(
+                                get: { appLockOwner == session.profile.userID.uuidString },
+                                set: { value in Task { await changeAppLock(value) } }
+                            ))
+                            .labelsHidden()
+                            .tint(ATHLTHTheme.premiumGold)
+                            .disabled(changingAppLock || !session.signedIn)
+                        }
+                    }
+                    Text(tr("Applies only to this device. Device passcode is available as a fallback. Workouts continue in the background.", "Gjelder bare denne enheten. Enhetskode kan brukes som reserve. Treningen fortsetter i bakgrunnen."))
+                        .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.horizontal, 8)
+                    if let appLockError {
+                        Text(appLockError).font(.caption).foregroundStyle(.red)
                     }
                 }
 
@@ -3880,6 +3909,22 @@ struct ATHLTHAccountSecurityView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(statusMessage ?? "")
+        }
+    }
+
+    @MainActor private func changeAppLock(_ enabled: Bool) async {
+        guard !changingAppLock, session.signedIn else { return }
+        let owner = session.profile.userID
+        changingAppLock = true
+        appLockError = nil
+        defer { changingAppLock = false }
+        let accepted = await ATHLTHAppLock.authenticate(reason: tr(
+            "Confirm app lock change", "Bekreft endring av applås"))
+        guard session.signedIn, owner == session.profile.userID else { return }
+        if accepted {
+            appLockOwner = enabled ? owner.uuidString : ""
+        } else {
+            appLockError = tr("Authentication was not completed. The setting is unchanged.", "Autentisering ble ikke fullført. Innstillingen er uendret.")
         }
     }
 
