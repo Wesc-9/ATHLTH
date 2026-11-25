@@ -2856,11 +2856,20 @@ struct RunQuickStartSheet: View {
                 canStart: canSubmitQuickRun(captureDevice: .iPhone),
                 starting: launchInProgress,
                 scheduledDate: pendingStartDate,
+                defaultCountdownSeconds: settings.quickRunStartCountdown.rawValue,
+                onIPhonePreferred: { startWithPreferredCountdown(device: .iPhone) },
+                onWatchPreferred: { startWithPreferredCountdown(device: .appleWatch) },
                 onIPhoneNow: {
-                    startWithPreferredCountdown(device: .iPhone)
+                    cancelPendingQuickRun()
+                    captureDevice = .iPhone
+                    watchStartMode = .immediate
+                    submitQuickRun(captureDevice: .iPhone)
                 },
                 onWatchNow: {
-                    startWithPreferredCountdown(device: .appleWatch)
+                    cancelPendingQuickRun()
+                    captureDevice = .appleWatch
+                    watchStartMode = .immediate
+                    submitQuickRun(captureDevice: .appleWatch)
                 },
                 onWatchCountDown: {
                     cancelPendingQuickRun()
