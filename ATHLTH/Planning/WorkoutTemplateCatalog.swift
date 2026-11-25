@@ -5440,6 +5440,8 @@ struct WorkoutTemplateBuilderView: View {
         guard draftActive, !draftFinished else { return }
         pendingDraftCheckpoint?.cancel()
         pendingDraftCheckpoint = nil
+        let signpost = ATHLTHPerformance.begin("WorkoutDraftCheckpoint")
+        defer { ATHLTHPerformance.end("WorkoutDraftCheckpoint", id: signpost) }
         // Save on edits and when locking the device, not only on explicit Save.
         let snapshot = StoredWorkoutDraft(
             signature: initialDraftSignature,
@@ -6216,31 +6218,31 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: selectedWorkoutGearIDs) { _, _ in
                 if draftActive { gearSelectionTouched = true }
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: gearSelectionTouched) { _, _ in
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: selectedSpotifyPlaylist) { _, _ in
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: spotifyAutoplayOnStart) { _, _ in
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: spotifyIntervalTrack) { _, _ in
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: manualDurationMinutes) { _, _ in
                 savedToMyWorkouts = false
                 scheduleWorkoutDraftCheckpoint()
             }
-            .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
-            .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
+            .onChange(of: pendingCopyDayIDs) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioVisiblePhases) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: selectedPhase) { _, _ in scheduleWorkoutDraftCheckpoint() }
             .onChange(of: studioAdvanced) { _, isAdvanced in
                 if !isAdvanced, let onSwitchToBasic {
                     // Basic for an imported workout remains the concise
@@ -6253,23 +6255,23 @@ struct WorkoutTemplateBuilderView: View {
                     UserDefaults.standard.removeObject(forKey: draftStorageKey)
                     onSwitchToBasic(snapshot)
                 } else {
-                    persistWorkoutDraft()
+                    scheduleWorkoutDraftCheckpoint()
                 }
             }
-            .onChange(of: studioBasicRunMode) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGoalSelected) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGhostSelected) { _, _ in persistWorkoutDraft() }
-            .onChange(of: intervalGhostConfiguration) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGoalKind) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGoalDistance) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGoalMinutes) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGoalPace) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGoalZone) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicGhostMinutes) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicWorkoutTitle) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicRunMode) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGoalSelected) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGhostSelected) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: intervalGhostConfiguration) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGoalKind) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGoalDistance) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGoalMinutes) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGoalPace) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGoalZone) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicGhostMinutes) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicWorkoutTitle) { _, _ in scheduleWorkoutDraftCheckpoint() }
+            .onChange(of: studioBasicDate) { _, _ in scheduleWorkoutDraftCheckpoint() }
             .onChange(of: studioBasicRunEnvironment) { _, _ in
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
