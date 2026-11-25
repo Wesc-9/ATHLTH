@@ -55,6 +55,25 @@ enum ATHLTHCompetitionGPSLapCounter {
         else { return state }
 
         var next = state
+        if let last = state.lastFixAt {
+            let elapsed = fix.timestamp.timeIntervalSince(last)
+            let travelled: Double? = {
+                guard let a = state.lastFixLatitude, let b = state.lastFixLongitude else { return nil }
+                return haversineMeters(a, b, fix.latitude, fix.longitude)
+            }()
+            // A gap or teleport invalidates the unfinished lap, not the
+            // previously accepted laps. Do not bridge missing GPS evidence.
+            if elapsed > 25 || travelled.map({ $0 / elapsed > 9.5 }) == true {
+                next.outsideSamples = 0
+                next.insideSamples = 0
+                next.leftStartZone = false
+                next.totalAcceptedLapMeters = 0
+                next.lastFixAt = fix.timestamp
+                next.lastFixLatitude = fix.latitude
+                next.lastFixLongitude = fix.longitude
+                return next
+            }
+        }
         let distance = haversineMeters(fix.latitude, fix.longitude,
                                       startLatitude, startLongitude)
         if let a = state.lastFixLatitude, let b = state.lastFixLongitude,
@@ -96,7 +115,7 @@ enum ATHLTHCompetitionGPSLapCounter {
         // reports a reliable heading. Absence of heading is not positive
         // proof of wrong-direction travel.
         if let expected = next.crossingHeadingDegrees,
-           let actual = fix.courseDegrees, actual >= 0,
+           let actual = fix.courseDegrees, (0..<360).contains(actual),
            angularDifference(expected, actual) > 75 {
             next.insideSamples = 0
             return next
@@ -173,10 +192,39 @@ struct ATHLTHCompetitionLocalResult: Identifiable {
         return nil
     }
 
+    /// Positive values mean improvement, independent of scoring direction.
+    /// This is a private comparison only; it never alters official points.
+    static func improvementPercent(metric: String, baseline: Double, current: Double) -> Double? {
+        guard ["distance", "duration", "time", "repetitions"].contains(metric),
+              baseline.isFinite, baseline > 0, baseline <= 100_000_000,
+              current.isFinite, current >= 0, current <= 100_000_000,
+              metric != "distance" || current > 0 else { return nil }
+        let difference = metric == "distance" ? baseline - current : current - baseline
+        return 100 * difference / baseline
+    }
+
+    static func personalBaseline(exercise: ATHLTHSharedEventExerciseRow, libraryExerciseID: UUID?,
+                                 health: [WorkoutSummary], phone: [PhoneWorkout],
+                                 strength: [StrengthWorkoutLog]) -> Self? {
+        guard let opened = exercise.opensAt, opened <= Date() else { return nil }
+        let cutoff = opened.addingTimeInterval(-0.001)
+        let lower = opened.addingTimeInterval(-90 * 86_400)
+        let candidates = suggestions(exercise: exercise, libraryExerciseID: libraryExerciseID,
+                                     health: health, phone: phone, strength: strength,
+                                     historicalWindow: lower...cutoff)
+            .filter { $0.value > 0 }
+        return candidates.sorted {
+            if $0.value == $1.value { return $0.date > $1.date }
+            return exercise.metric == "distance" ? $0.value < $1.value : $0.value > $1.value
+        }.first
+    }
+
     static func suggestions(exercise: ATHLTHSharedEventExerciseRow, libraryExerciseID: UUID?,
                             health: [WorkoutSummary], phone: [PhoneWorkout],
-                            strength: [StrengthWorkoutLog]) -> [Self] {
-        guard let start = exercise.opensAt, let end = exercise.deadlineAt else { return [] }
+                            strength: [StrengthWorkoutLog],
+                            historicalWindow: ClosedRange<Date>? = nil) -> [Self] {
+        guard let start = historicalWindow?.lowerBound ?? exercise.opensAt,
+              let end = historicalWindow?.upperBound ?? exercise.deadlineAt else { return [] }
         if exercise.activity == "strength" {
             // Match the actual library exercise identity, not just a name.
             // Templates without a stable identity require manual entry.
