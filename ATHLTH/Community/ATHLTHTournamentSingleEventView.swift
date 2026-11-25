@@ -365,6 +365,7 @@ private struct ATHLTHSharedEventProgressView: View {
                     ProgressView(value: Double(decided), total: Double(ownExercises.count))
                         .tint(ATHLTHTrainDesign.gold)
                 }
+                if !rows.isEmpty { participantProgress }
                 if let end = tournament.raceRules.endDate {
                     Label("Slutt: " + end.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar.badge.clock")
                         .font(.caption)
@@ -382,6 +383,10 @@ private struct ATHLTHSharedEventProgressView: View {
                             autoReporting = value
                         }))
                         .tint(ATHLTHTrainDesign.bronze)
+                    if let status = ATHLTHCompetitionAutoReporting.syncStatus(tournamentID: tournament.id, userID: userID) {
+                        Label(status, systemImage: "arrow.clockwise.icloud").font(.caption).foregroundStyle(ATHLTHTrainDesign.bronze)
+                        Button("Prøv synkronisering") { Task { await ATHLTHCompetitionAutoReporting.retryPending(userID: userID); await reload() } }.font(.caption.weight(.medium))
+                    }
                     Text("Gjelder nye økter på denne enheten etter aktivering. Entydige målinger sendes til godkjenning, ikke som serververifiserte resultater. Kun én konkurranse kan være aktiv om gangen.")
                         .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
                 }.padding(15).athlthTrainEditorialCard()
@@ -428,6 +433,31 @@ private struct ATHLTHSharedEventProgressView: View {
                     score: score, evidence: note, sourceWorkoutID: source)
                 await reload()
                 await onChanged()
+            }
+        }
+    }
+    private var participantProgress: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text("Deltakernes fremdrift").font(ATHLTHTrainDesign.cardTitle)
+            ForEach(Array(Set(rows.map(\.userID))).sorted { $0.uuidString < $1.uuidString }, id: \.self) { athlete in
+                let exercises = rows.filter { $0.userID == athlete }
+                let completed = exercises.filter { ["approved", "auto_approved", "missed"].contains($0.progress) }.count
+                let displayName = athlete == userID ? "Du" : names[athlete] ?? "Utøver"
+                HStack(spacing: 10) {
+                    Text(String(displayName.prefix(2)).uppercased())
+                        .font(.caption.weight(.semibold)).foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 34,height: 34).background(ATHLTHTrainDesign.paleGold, in: Circle())
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(displayName).font(.subheadline.weight(.medium))
+                            Spacer()
+                            Text("\(completed)/\(exercises.count)").font(.caption.monospacedDigit())
+                        }
+                        ProgressView(value: Double(completed), total: Double(max(1, exercises.count)))
+                            .tint(ATHLTHTrainDesign.bronze)
+                    }
+                }
             }
         }
     }

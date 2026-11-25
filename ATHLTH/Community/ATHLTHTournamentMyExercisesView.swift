@@ -64,6 +64,10 @@ struct ATHLTHTournamentMyExercisesView: View {
                             autoReporting = value
                         }))
                         .tint(ATHLTHArenaV3Style.gold)
+                    if let status = ATHLTHCompetitionAutoReporting.syncStatus(tournamentID: tournament.id, userID: userID) {
+                        Label(status, systemImage: "arrow.clockwise.icloud").font(.caption).foregroundStyle(ATHLTHArenaV3Style.gold)
+                        Button("Prøv synkronisering") { Task { await ATHLTHCompetitionAutoReporting.retryPending(userID: userID); await reload() } }.font(.caption.weight(.medium))
+                    }
                     Text("Entydige målinger fra nye økter på denne enheten sendes som gjennomføringsbevis til motstanderen. Kampresultatet følger konkurransens vanlige godkjenning. Kun én konkurranse om gangen.")
                         .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }.padding(15).background(ATHLTHArenaV3Style.panel())

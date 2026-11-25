@@ -89,6 +89,7 @@ struct ATHLTHCompetitionEntryView: View {
         .sheet(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
             NavigationStack {
                 ATHLTHTournamentLiveDetailView(tournament: item)
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { selectedTournament = nil } } }
             }
         }
         .presentationDetents([.large])

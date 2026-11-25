@@ -229,6 +229,62 @@ enum ATHLTHCompetitionAutoReporting {
         let enabledAt: Date
     }
     private static let storageName = "competitionAutoReporting"
+    private static let queueName = "competitionAutoReportingPending"
+    private struct PendingMeasurement: Codable, Equatable {
+        let consent: Consent
+        let targetID: UUID
+        let workoutID: UUID
+        let score: Double
+        let started: Date
+        let ended: Date
+        let deadline: Date
+        var id: String { targetID.uuidString + workoutID.uuidString }
+    }
+    private static var syncingUsers: Set<UUID> = []
+    private static var lastErrors: [UUID: String] = [:]
+    private static func pending(userID: UUID) -> [PendingMeasurement] {
+        AccountLocalStorage.read([PendingMeasurement].self, name: queueName, userID: userID, defaults: .standard) ?? []
+    }
+    private static func savePending(_ items: [PendingMeasurement], userID: UUID) {
+        guard !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return }
+        AccountLocalStorage.write(items, name: queueName, userID: userID, defaults: .standard)
+    }
+    static func syncStatus(tournamentID: UUID, userID: UUID) -> String? {
+        guard enabled(tournamentID: tournamentID, userID: userID) else { return nil }
+        let count = pending(userID: userID).filter { $0.consent.tournamentID == tournamentID }.count
+        if count > 0 { return "\(count) resultat(er) venter på synkronisering." }
+        return lastErrors[userID]
+    }
+    static func retryPending(userID: UUID) async {
+        guard let selection = consent(userID: userID), syncingUsers.insert(userID).inserted else { return }
+        defer { syncingUsers.remove(userID) }
+        let cloud = ATHLTHTournamentSingleEventCloud()
+        let items = pending(userID: userID)
+        for item in items {
+            guard !Task.isCancelled, consent(userID: userID) == selection else { break }
+            guard item.consent == selection else {
+                savePending(pending(userID: userID).filter { $0.id != item.id }, userID: userID)
+                continue
+            }
+            if item.deadline <= Date() {
+                savePending(pending(userID: userID).filter { $0.id != item.id }, userID: userID)
+                lastErrors[userID] = "Et resultat kunne ikke synkroniseres før øvelsesfristen."
+                continue
+            }
+            do {
+                _ = try await cloud.submitLocal(tournamentID: selection.tournamentID, userID: userID,
+                    targetID: item.targetID, workoutID: item.workoutID, score: item.score,
+                    started: item.started, ended: item.ended)
+                savePending(pending(userID: userID).filter { $0.id != item.id }, userID: userID)
+            } catch {
+                lastErrors[userID] = "Resultatet venter på ny innsending."
+                break
+            }
+        }
+        if pending(userID: userID).isEmpty && lastErrors[userID] == "Resultatet venter på ny innsending." {
+            lastErrors[userID] = nil
+        }
+    }
     private static var inFlight: Set<String> = []
     private static func consent(userID: UUID) -> Consent? {
         guard !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return nil }
@@ -241,6 +297,9 @@ enum ATHLTHCompetitionAutoReporting {
     static func setEnabled(_ enabled: Bool, tournamentID: UUID, userID: UUID) {
         guard !UserDefaults.standard.bool(forKey: AccountLocalStorage.key("deleted", userID: userID)) else { return }
         if !enabled && !Self.enabled(tournamentID: tournamentID, userID: userID) { return }
+        if enabled && Self.enabled(tournamentID: tournamentID, userID: userID) { return }
+        savePending([], userID: userID)
+        lastErrors[userID] = nil
         let records: [Consent] = enabled ? [Consent(tournamentID: tournamentID, enabledAt: Date())] : []
         AccountLocalStorage.write(records, name: storageName, userID: userID, defaults: .standard)
     }
@@ -308,13 +367,21 @@ enum ATHLTHCompetitionAutoReporting {
             for (target, metricKey, score) in values where target.progress == "pending" {
                 guard values.filter({ $0.1 == metricKey }).count == 1,
                       consent(userID: userID) == selection else { continue }
-                _ = try await cloud.submitLocal(tournamentID: selection.tournamentID, userID: userID,
-                    targetID: target.id, workoutID: strengthLog?.id ?? workout.id,
-                    score: score, started: workout.startDate, ended: workout.endDate)
+                let item = PendingMeasurement(consent: selection, targetID: target.id,
+                    workoutID: strengthLog?.id ?? workout.id, score: score,
+                    started: workout.startDate, ended: workout.endDate, deadline: target.deadlineAt)
+                var queue = pending(userID: userID)
+                if !queue.contains(where: { $0.id == item.id }) {
+                    queue.append(item)
+                    savePending(queue, userID: userID)
+                }
             }
+            lastErrors[userID] = nil
+            await retryPending(userID: userID)
         } catch {
-            // A failed sync never blocks workout saving. Manual reporting
-            // remains available, and a repeated completion may retry.
+            // The workout remains saved locally. Without a server target, do
+            // not guess which competition exercise should receive the result.
+            lastErrors[userID] = "Kunne ikke hente åpne konkurranseøvelser. Bruk treningshistorikken for å registrere resultatet."
         }
     }
 }

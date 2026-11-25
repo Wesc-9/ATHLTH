@@ -2064,6 +2064,14 @@ struct AppRootView: View {
                 }
             }
         }
+        .task(id: "competition-reporting-\(appSession.signedIn)-\(appSession.profile.userID)-\(scenePhase == .active)") {
+            guard appSession.signedIn, scenePhase == .active else { return }
+            let ownerID = appSession.profile.userID
+            while !Task.isCancelled && appSession.signedIn && appSession.profile.userID == ownerID {
+                await ATHLTHCompetitionAutoReporting.retryPending(userID: ownerID)
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+            }
+        }
         .onChange(of: homeAssistant.shareOnlineStatus) { _, _ in
             guard appSession.signedIn,
                   ATHLTHDeviceRole.isIPhone else { return }

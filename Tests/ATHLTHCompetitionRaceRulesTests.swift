@@ -16,6 +16,27 @@ final class ATHLTHCompetitionRaceRulesTests: XCTestCase {
         XCTAssertNil(ATHLTHCompetitionRaceRules().duelMode)
     }
 
+    func testScoringRulesSurviveRoundTrip() throws {
+        let exercise = UUID()
+        let athlete = UUID()
+        var rules = ATHLTHCompetitionRaceRules()
+        rules.scoringMode = .target
+        rules.pointsPerExercise = 3
+        rules.scoringGoals = [ATHLTHCompetitionRaceRules.key(exercise): 1250]
+        rules.exerciseWeights = [ATHLTHCompetitionRaceRules.key(exercise): 2]
+        rules.handicapPercentages = [ATHLTHCompetitionRaceRules.key(athlete): 10]
+        rules.reviewHours = 48
+        let decoded = try JSONDecoder().decode(ATHLTHCompetitionRaceRules.self, from: JSONEncoder().encode(rules))
+        XCTAssertEqual(decoded.effectiveScoringMode, .target)
+        XCTAssertEqual(decoded.goal(for: exercise), 1250)
+        XCTAssertEqual(decoded.weight(for: exercise), 2)
+        XCTAssertEqual(decoded.handicap(for: athlete), 10)
+        XCTAssertEqual(decoded.reviewHours, 48)
+        XCTAssertTrue(decoded.isValid)
+        rules.handicapPercentages = [ATHLTHCompetitionRaceRules.key(athlete): 31]
+        XCTAssertFalse(rules.isValid)
+    }
+
     func testOneRaceDisciplineCanBeReusedForEachCompetitionFormat() {
         XCTAssertEqual(ATHLTHCompetitionDiscipline.allCases.count, 5)
         XCTAssertEqual(ATHLTHCompetitionSprintMode.allCases.count, 3)
