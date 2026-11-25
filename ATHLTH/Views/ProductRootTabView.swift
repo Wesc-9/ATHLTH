@@ -9727,8 +9727,9 @@ struct ATHLTHProgressView: View {
                 LazyVStack(spacing: 15) {
                     progressHeader
                     periodPicker
-                    premiumOverview
-                    premiumTrend
+                    let selected = selectedPeriodWorkouts
+                    premiumOverview(runs: selected.runs, lifts: selected.lifts)
+                    premiumTrend(runs: selected.runs, lifts: selected.lifts)
                     if trainingScope == .all {
                         if let snapshot = progressSnapshot {
                             ProgressConsistencyCard(snapshot: consistencySnapshot)
@@ -9738,14 +9739,14 @@ struct ATHLTHProgressView: View {
                         }
                     }
                     ProgressPerformanceCard(
-                        runningWorkouts: trainingScope == .strength ? [] : selectedPeriodRunningWorkouts,
-                        strengthWorkouts: trainingScope == .running ? [] : selectedPeriodStrengthWorkouts,
+                        runningWorkouts: trainingScope == .strength ? [] : selected.runs,
+                        strengthWorkouts: trainingScope == .running ? [] : selected.lifts,
                         healthRecords: trainingScope == .strength ? [] : personalRecords,
                         strengthRecords: trainingScope == .running ? [] : strengthWorkout.personalRecords,
                         repRecords: trainingScope == .running ? [] : strengthWorkout.repPersonalRecords
                     )
                     personalRecordsCard
-                    recentActivity
+                    recentActivity(runs: selected.runs, lifts: selected.lifts)
                     if trainingScope == .all { achievementsCard }
                     if progressLoading {
                         ProgressView().controlSize(.small)
@@ -9785,9 +9786,7 @@ struct ATHLTHProgressView: View {
         }
     }
 
-    private var premiumOverview: some View {
-        let runs = selectedPeriodRunningWorkouts
-        let lifts = selectedPeriodStrengthWorkouts
+    private func premiumOverview(runs: [WorkoutSummary], lifts: [StrengthWorkoutLog]) -> some View {
         let runDuration = runs.reduce(0.0) { $0 + $1.duration }
         let liftDuration = lifts.reduce(0.0) {
             $0 + max(0, ($1.endedAt ?? $1.startedAt).timeIntervalSince($1.startedAt))
@@ -9853,7 +9852,7 @@ struct ATHLTHProgressView: View {
         }
     }
 
-    private var premiumTrend: some View {
+    private func premiumTrend(runs: [WorkoutSummary], lifts: [StrengthWorkoutLog]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(trainingScope == .running ? "Utvikling i distanse"
                 : trainingScope == .strength ? "Utvikling i treningsvolum"
@@ -9867,10 +9866,10 @@ struct ATHLTHProgressView: View {
                 .foregroundStyle(ATHLTHTheme.mutedText)
 
             if trainingScope == .running {
-                if selectedPeriodRunningWorkouts.isEmpty {
+                if runs.isEmpty {
                     emptyTrend
                 } else {
-                    Chart(selectedPeriodRunningWorkouts) { workout in
+                    Chart(runs) { workout in
                         BarMark(
                             x: .value("Dato", workout.startDate),
                             y: .value("km", (workout.distanceMeters ?? 0) / 1_000)
@@ -9881,10 +9880,10 @@ struct ATHLTHProgressView: View {
                     .frame(height: 178)
                 }
             } else if trainingScope == .strength {
-                if selectedPeriodStrengthWorkouts.isEmpty {
+                if lifts.isEmpty {
                     emptyTrend
                 } else {
-                    Chart(selectedPeriodStrengthWorkouts) { workout in
+                    Chart(lifts) { workout in
                         BarMark(
                             x: .value("Dato", workout.startedAt),
                             y: .value("kg", workout.totalVolumeKilograms)
@@ -9924,13 +9923,13 @@ struct ATHLTHProgressView: View {
             .frame(maxWidth: .infinity, minHeight: 170)
     }
 
-    private var recentActivity: some View {
-        let runEntries = selectedPeriodRunningWorkouts.map {
+    private func recentActivity(runs: [WorkoutSummary], lifts: [StrengthWorkoutLog]) -> some View {
+        let runEntries = runs.map {
             (date: $0.startDate, title: "Løping", detail:
                 String(format: "%.1f km", ($0.distanceMeters ?? 0) / 1_000),
              symbol: "figure.run")
         }
-        let strengthEntries = selectedPeriodStrengthWorkouts.map {
+        let strengthEntries = lifts.map {
             (date: $0.startedAt, title: "Styrketrening",
              detail: "\($0.totalWorkingSets) arbeidssett", symbol: "dumbbell")
         }
@@ -10353,24 +10352,21 @@ struct ATHLTHProgressView: View {
         )
     }
 
-    private var selectedPeriodRunningWorkouts: [WorkoutSummary] {
+    private var selectedPeriodWorkouts: (runs: [WorkoutSummary], lifts: [StrengthWorkoutLog]) {
+        let signpost = ATHLTHPerformance.begin("ProgressPeriodProjection")
+        defer { ATHLTHPerformance.end("ProgressPeriodProjection", id: signpost) }
         let range = progressRange
-
-        return workoutHistory.filter {
+        let runs = workoutHistory.filter {
             $0.activity == .running &&
             $0.startDate >= range.start &&
             $0.startDate <= range.end
         }
-    }
-
-    private var selectedPeriodStrengthWorkouts: [StrengthWorkoutLog] {
-        let range = progressRange
-
-        return strengthWorkout.workoutHistory.filter {
+        let lifts = strengthWorkout.workoutHistory.filter {
             $0.isFinished &&
             $0.startedAt >= range.start &&
             $0.startedAt <= range.end
         }
+        return (runs, lifts)
     }
 
     private var consistencyRange: (
