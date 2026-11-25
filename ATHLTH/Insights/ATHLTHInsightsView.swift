@@ -133,6 +133,8 @@ struct ATHLTHInsightsView: View {
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
+                updateWorkoutProjection(health.workouts)
+                updateMuscleProjection(strength.workoutHistory)
                 // Keep the already-rendered insight snapshots on quick tab
                 // returns, but invalidate on new workouts/account switches.
                 let accountID = session.profile.userID
@@ -158,41 +160,12 @@ struct ATHLTHInsightsView: View {
                 lastInsightsWorkoutID = newestID
             }
             .onReceive(health.$workouts) { workouts in
-                let count = workouts.count
-                let first = workouts.first
-                let last = workouts.last
-                guard renderedWorkoutsCount != count ||
-                    renderedFirstWorkoutID != first?.id ||
-                    renderedLastWorkoutID != last?.id ||
-                    renderedFirstWorkoutDuration != first?.duration else {
-                    return
-                }
-                renderedWorkoutsCount = count
-                renderedFirstWorkoutID = first?.id
-                renderedLastWorkoutID = last?.id
-                renderedFirstWorkoutDuration = first?.duration
-                let signpost = ATHLTHPerformance.begin("InsightsWorkoutDerivedData")
-                let updated = InsightsSessionBaselines.calculate(
-                    workouts: workouts, at: Date()
-                )
-                if sessionBaselines != updated {
-                    sessionBaselines = updated
-                }
-                trainingDays = ATHLTHInsightsTrainingDay.make(from: workouts)
-                ATHLTHPerformance.end("InsightsWorkoutDerivedData", id: signpost)
+                guard isActive else { return }
+                updateWorkoutProjection(workouts)
             }
             .onReceive(strength.$workoutHistory) { history in
-                let latest = history.first?.startedAt
-                let oldest = history.last?.startedAt
-                guard renderedStrengthHistoryCount != history.count ||
-                    renderedStrengthLatestDate != latest ||
-                    renderedStrengthOldestDate != oldest else { return }
-                renderedStrengthHistoryCount = history.count
-                renderedStrengthLatestDate = latest
-                renderedStrengthOldestDate = oldest
-                let signpost = ATHLTHPerformance.begin("InsightsMuscleDerivedData")
-                muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
-                ATHLTHPerformance.end("InsightsMuscleDerivedData", id: signpost)
+                guard isActive else { return }
+                updateMuscleProjection(history)
             }
             .onChange(of: session.profile.userID) { _, _ in
                 // Different accounts can have identical workout counts.
@@ -200,6 +173,11 @@ struct ATHLTHInsightsView: View {
                 renderedStrengthHistoryCount = -1
                 trainingDays = []
                 muscleSummary = .empty
+                sessionBaselines = .empty
+                cachedPersonalFindings = []
+                recoverySnapshot = .empty
+                trendSnapshot = nil
+                lastInsightsRefreshAt = nil
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: Notification.Name("athlth.dailyCheckInDidUpdate")
@@ -208,6 +186,39 @@ struct ATHLTHInsightsView: View {
                 updatePersonalFindings()
             }
         }
+    }
+
+    private func updateWorkoutProjection(_ workouts: [WorkoutSummary]) {
+        let count = workouts.count
+        let first = workouts.first
+        let last = workouts.last
+        guard renderedWorkoutsCount != count ||
+            renderedFirstWorkoutID != first?.id ||
+            renderedLastWorkoutID != last?.id ||
+            renderedFirstWorkoutDuration != first?.duration else { return }
+        renderedWorkoutsCount = count
+        renderedFirstWorkoutID = first?.id
+        renderedLastWorkoutID = last?.id
+        renderedFirstWorkoutDuration = first?.duration
+        let signpost = ATHLTHPerformance.begin("InsightsWorkoutDerivedData")
+        defer { ATHLTHPerformance.end("InsightsWorkoutDerivedData", id: signpost) }
+        let updated = InsightsSessionBaselines.calculate(workouts: workouts, at: Date())
+        if sessionBaselines != updated { sessionBaselines = updated }
+        trainingDays = ATHLTHInsightsTrainingDay.make(from: workouts)
+    }
+
+    private func updateMuscleProjection(_ history: [StrengthWorkoutLog]) {
+        let latest = history.first?.startedAt
+        let oldest = history.last?.startedAt
+        guard renderedStrengthHistoryCount != history.count ||
+            renderedStrengthLatestDate != latest ||
+            renderedStrengthOldestDate != oldest else { return }
+        renderedStrengthHistoryCount = history.count
+        renderedStrengthLatestDate = latest
+        renderedStrengthOldestDate = oldest
+        let signpost = ATHLTHPerformance.begin("InsightsMuscleDerivedData")
+        defer { ATHLTHPerformance.end("InsightsMuscleDerivedData", id: signpost) }
+        muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
     }
 
     // Each tab uses a distinct existing licensed image, following the
@@ -307,7 +318,10 @@ struct ATHLTHInsightsView: View {
         }
         // Need enough paired days for meaningful personal comparisons.
         // HealthKit caches each time range to avoid unnecessary repeat work.
-        recoverySnapshot = await health.recoveryTrendSnapshot(days: 28)
+        let owner = session.profile.userID
+        let updated = await health.recoveryTrendSnapshot(days: 28)
+        guard !Task.isCancelled, session.profile.userID == owner else { return }
+        recoverySnapshot = updated
         updatePersonalFindings()
     }
 
@@ -805,16 +819,20 @@ struct ATHLTHInsightsView: View {
             ) ??
             start.addingTimeInterval(-2_419_200)
 
+        let owner = session.profile.userID
         do {
-            trendSnapshot = try await health.progressSnapshot(
+            let updated = try await health.progressSnapshot(
                 startDate: start,
                 endDate: end,
                 previousStartDate: previousStart,
                 previousEndDate: start,
                 grouping: .week
             )
+            guard !Task.isCancelled, session.profile.userID == owner else { return }
+            trendSnapshot = updated
             updatePersonalFindings()
         } catch {
+            guard !Task.isCancelled, session.profile.userID == owner else { return }
             trendSnapshot = nil
             trendError = error.localizedDescription
             updatePersonalFindings()
