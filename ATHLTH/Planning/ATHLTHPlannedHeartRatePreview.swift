@@ -5,7 +5,8 @@ import Foundation
 enum ATHLTHPlannedHeartRatePreview {
     static func expectedBPM(
         for block: WorkoutTemplateBlock,
-        maximumBPM: Double?
+        maximumBPM: Double?,
+        suggestedZones: ClosedRange<Int>? = nil
     ) -> ClosedRange<Int>? {
         guard let maximumBPM, maximumBPM.isFinite,
               (100...240).contains(maximumBPM) else { return nil }
@@ -20,14 +21,18 @@ enum ATHLTHPlannedHeartRatePreview {
         if let zone = block.targetHeartRateZone {
             return ATHLTHHeartRateZones.range(for: zone, maximumBPM: maximumBPM)
         }
+        if let suggestedZones {
+            return ATHLTHHeartRateZones.range(from: suggestedZones.lowerBound, through: suggestedZones.upperBound, maximumBPM: maximumBPM)
+        }
         return nil
     }
 
     static func rangeText(
         for block: WorkoutTemplateBlock,
-        maximumBPM: Double?
+        maximumBPM: Double?,
+        suggestedZones: ClosedRange<Int>? = nil
     ) -> String? {
-        guard let range = expectedBPM(for: block, maximumBPM: maximumBPM) else {
+        guard let range = expectedBPM(for: block, maximumBPM: maximumBPM, suggestedZones: suggestedZones) else {
             return nil
         }
         return ATHLTHLocalization.choose(
