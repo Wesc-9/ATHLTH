@@ -3277,6 +3277,7 @@ private struct MessageConversationRow: View {
 
 struct DirectMessageThreadView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -3307,6 +3308,7 @@ struct DirectMessageThreadView: View {
     @State private var showingFriendProfile = false
     @State private var cancellingChallengeID: UUID?
     @State private var cancellationError: String?
+    @State private var undoSendError: String?
 
     var body: some View {
         ZStack {
@@ -3453,6 +3455,14 @@ struct DirectMessageThreadView: View {
                     )
                 )
             }
+        }
+        .alert(
+            ATHLTHLocalization.choose(english: "Undo send", norwegian: "Angre sending"),
+            isPresented: Binding(get: { undoSendError != nil }, set: { if !$0 { undoSendError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(undoSendError ?? "")
         }
         .alert(
             "Saved to ATHLTH",
@@ -3835,7 +3845,11 @@ struct DirectMessageThreadView: View {
                                    message.deletedAt == nil,
                                    message.readAt == nil {
                                     Button(role: .destructive) {
-                                        Task { await messaging.retractTextMessage(message) }
+                                        Task {
+                                            if !(await messaging.retractTextMessage(message)) {
+                                                undoSendError = messaging.errorMessage ?? ATHLTHLocalization.choose(english: "The message can no longer be withdrawn.", norwegian: "Meldingen kan ikke lenger trekkes tilbake.")
+                                            }
+                                        }
                                     } label: {
                                         Label(ATHLTHLocalization.choose(english: "Undo send", norwegian: "Angre sending"), systemImage: "arrow.uturn.backward")
                                     }
@@ -5034,6 +5048,7 @@ struct DirectMessageThreadView: View {
                     break
                 }
 
+                guard scenePhase == .active else { continue }
                 await messaging
                     .refreshConversation(
                         id
