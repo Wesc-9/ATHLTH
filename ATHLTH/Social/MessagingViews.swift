@@ -3289,6 +3289,7 @@ struct DirectMessageThreadView: View {
 
     @State private var conversationID: UUID?
     @State private var draftOwner: UUID?
+    @State private var foregroundRefreshRequest: UUID?
     @State private var loadingOlderMessages = false
     @FocusState private var composerFocused: Bool
     @State private var text = ""
@@ -3548,6 +3549,24 @@ struct DirectMessageThreadView: View {
             draftOwner = owner
             text = messaging.textDraft(for: friend.userID, owner: owner)
             await openAndPoll(owner: owner)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .athlthRemoteNotificationReceived)) { event in
+            guard let owner = draftOwner, let conversationID,
+                  let payload = event.userInfo,
+                  (payload["athlth_recipient_id"] as? String).flatMap(UUID.init(uuidString:)) == owner,
+                  payload["athlth_entity_type"] as? String == "direct_conversation",
+                  (payload["athlth_entity_id"] as? String).flatMap(UUID.init(uuidString:)) == conversationID else { return }
+            foregroundRefreshRequest = UUID()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, conversationID != nil { foregroundRefreshRequest = UUID() }
+        }
+        .task(id: foregroundRefreshRequest) {
+            guard foregroundRefreshRequest != nil else { return }
+            do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
+            guard let owner = draftOwner, let conversationID, scenePhase == .active,
+                  session.signedIn, !session.previewModeEnabled, session.profile.userID == owner else { return }
+            await refreshVisibleThread(conversationID, owner: owner)
         }
         .onChange(of: text) { _, value in
             guard let owner = draftOwner, session.signedIn, !session.previewModeEnabled,
@@ -5133,15 +5152,8 @@ struct DirectMessageThreadView: View {
                 guard ownsThread() else { break }
 
                 guard scenePhase == .active else { continue }
-                let previousMessages = messaging.messages(in: id)
-                await messaging.refreshConversation(id, polling: true)
-
+                await refreshVisibleThread(id, owner: owner)
                 guard ownsThread() else { return }
-                let updatedMessages = messaging.messages(in: id)
-                if previousMessages != updatedMessages {
-                    session.syncApprovedSharedWorkouts(from: updatedMessages)
-                    session.syncSharedWorkoutLifecycles(from: updatedMessages)
-                }
 
                 pollTick += 1
                 if pollTick.isMultiple(
@@ -5157,6 +5169,22 @@ struct DirectMessageThreadView: View {
         } catch {
             guard ownsThread() else { return }
             loadError = error.localizedDescription
+        }
+    }
+
+    private func refreshVisibleThread(_ id: UUID, owner: UUID) async {
+        func ownsThread() -> Bool {
+            !Task.isCancelled && session.signedIn && !session.previewModeEnabled &&
+                session.profile.userID == owner && draftOwner == owner && conversationID == id
+        }
+        guard ownsThread(), scenePhase == .active else { return }
+        let previous = messaging.messages(in: id)
+        await messaging.refreshConversation(id, polling: true)
+        guard ownsThread() else { return }
+        let updated = messaging.messages(in: id)
+        if previous != updated {
+            session.syncApprovedSharedWorkouts(from: updated)
+            session.syncSharedWorkoutLifecycles(from: updated)
         }
     }
 
