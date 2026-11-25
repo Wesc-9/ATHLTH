@@ -13,6 +13,9 @@ struct ATHLTHTournamentSingleEventView: View {
     @State private var eligible: [ATHLTHTournamentEligibleWorkout] = []
     @State private var chosenWorkout: UUID?
     @State private var scoreText = ""
+    @State private var exercises: [ATHLTHTournamentScoredExercise] = []
+    @State private var exerciseValues: [UUID: String] = [:]
+    @State private var exerciseDetails: [ATHLTHTournamentExerciseScoreDetail] = []
     @State private var evidence = ""
     @State private var busy = false
     @State private var loading = true
@@ -23,17 +26,32 @@ struct ATHLTHTournamentSingleEventView: View {
     private var started: Bool {
         tournament.status == "active" || tournament.status == "completed"
     }
+    private var usesExerciseScores: Bool { tournament.raceRules.exerciseScoringVersion == 1 }
+
+    private var parsedExerciseScores: [String: Double]? {
+        guard !exercises.isEmpty else { return nil }
+        var scores: [String: Double] = [:]
+        for exercise in exercises {
+            guard let raw = exerciseValues[exercise.id],
+                  let value = Double(raw.replacingOccurrences(of: ",", with: ".")),
+                  exercise.accepts(value) else { return nil }
+            scores[exercise.id.uuidString.lowercased()] = value
+        }
+        return scores
+    }
+
     private var canReport: Bool {
         guard started, tournament.status == "active",
               tournament.raceSignalAt.map({ Date() >= $0 }) == true,
               !busy,
-              let score = Double(scoreText.replacingOccurrences(of: ",", with: ".")),
-              score.isFinite, score >= 0, score <= 100_000_000,
               (3...500).contains(evidence.trimmingCharacters(
                   in: .whitespacesAndNewlines).count),
               entries.contains(where: { $0.userID == userID &&
                   $0.progress != "finished" })
         else { return false }
+        if usesExerciseScores { return parsedExerciseScores != nil }
+        guard let score = Double(scoreText.replacingOccurrences(of: ",", with: ".")),
+              score.isFinite, score >= 0, score <= 100_000_000 else { return false }
         if tournament.raceRules.recordingDevice == .appleWatch {
             return false // Secure source provenance must arrive from Watch.
         }
@@ -55,8 +73,19 @@ struct ATHLTHTournamentSingleEventView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(tournament.raceRules.discipline.title)
+                Text(usesExerciseScores ? "Øvelser og sammenlagtpoeng" : tournament.raceRules.discipline.title)
                     .font(.system(size: 25, design: .serif))
+                if usesExerciseScores {
+                    Text(tournament.selectedBranchesLabel).font(.subheadline)
+                    Text("Hver øvelse rangeres separat. Førsteplass gir poeng lik antall deltakere, andreplass ett mindre. Like resultater får like poeng.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    ForEach(exercises) { exercise in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(exercise.title).font(.subheadline.weight(.semibold))
+                            Text(exercise.instruction).font(.caption)
+                        }
+                    }
+                }
                 if tournament.raceRules.discipline == .sprint {
                     Text(tournament.raceRules.sprintMode.title)
                         .font(.subheadline)
@@ -141,7 +170,7 @@ struct ATHLTHTournamentSingleEventView: View {
                                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
                         }
                         if let score = result.score {
-                            Text("Resultat: \(score.formatted())" +
+                            Text((usesExerciseScores ? "Poeng: " : "Resultat: ") + score.formatted() +
                                  (result.rank.map { " · Plass \($0)" } ?? ""))
                                 .font(.caption.weight(.medium))
                         } else if result.progress == "finished" ||
@@ -150,6 +179,19 @@ struct ATHLTHTournamentSingleEventView: View {
                                   systemImage: "lock")
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        if usesExerciseScores, let detail = exerciseDetails.first(where: { $0.userID == result.userID }) {
+                            ForEach(exercises) { exercise in
+                                if let value = detail.exerciseScores[exercise.id.uuidString.lowercased()] {
+                                    HStack {
+                                        Text(exercise.title)
+                                        Spacer()
+                                        Text(value.formatted() + " " + exercise.unit).monospacedDigit()
+                                    }
+                                    .font(.caption)
+                                }
+                            }
+                            if let note = detail.evidenceNote { Text(note).font(.caption).foregroundStyle(.secondary) }
                         }
                         if isOrganizer && result.progress == "awaiting_review" {
                             HStack(spacing: 11) {
@@ -204,10 +246,25 @@ struct ATHLTHTournamentSingleEventView: View {
                     .foregroundStyle(.orange)
             }
 
-            TextField(scoreTitle, text: $scoreText)
-                .keyboardType(.decimalPad)
-                .padding(12)
-                .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            if usesExerciseScores {
+                ForEach(exercises) { exercise in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(exercise.title).font(.subheadline.weight(.semibold))
+                        Text(exercise.instruction).font(.caption).foregroundStyle(.secondary)
+                        TextField(exercise.unit, text: Binding(
+                            get: { exerciseValues[exercise.id, default: ""] },
+                            set: { exerciseValues[exercise.id] = $0 }))
+                            .keyboardType(.decimalPad)
+                            .padding(12)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            } else {
+                TextField(scoreTitle, text: $scoreText)
+                    .keyboardType(.decimalPad)
+                    .padding(12)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 12))
+            }
 
             TextField("Beskriv gjennomføringen", text: $evidence,
                       axis: .vertical)
@@ -281,7 +338,18 @@ struct ATHLTHTournamentSingleEventView: View {
         defer { loading = false }
         do {
             entries = try await cloud.statuses(tournamentID: tournament.id)
-            if let started = tournament.raceSignalAt {
+            if usesExerciseScores {
+                exercises = try await cloud.exercises(tournamentID: tournament.id)
+                exerciseDetails = try await cloud.exerciseDetails(tournamentID: tournament.id)
+                if let own = exerciseDetails.first(where: { $0.userID == userID }) {
+                    for exercise in exercises where exerciseValues[exercise.id] == nil {
+                        if let score = own.exerciseScores[exercise.id.uuidString.lowercased()] {
+                            exerciseValues[exercise.id] = String(score)
+                        }
+                    }
+                    if evidence.isEmpty { evidence = own.evidenceNote ?? "" }
+                }
+            } else if let started = tournament.raceSignalAt {
                 eligible = (try? await cloud.eligibleWorkouts(
                     userID: userID, after: started)) ?? []
             }
@@ -289,18 +357,20 @@ struct ATHLTHTournamentSingleEventView: View {
     }
 
     @MainActor private func submit() async {
-        guard canReport,
-              let score = Double(scoreText.replacingOccurrences(
-                  of: ",", with: ".")) else { return }
+        guard canReport else { return }
         busy = true
         defer { busy = false }
         do {
-            try await cloud.submit(
-                tournamentID: tournament.id, score: score,
-                laps: tournament.raceRules.discipline == .laps
-                    ? tournament.raceRules.lapCount : nil,
-                evidence: evidence, workoutID: chosenWorkout
-            )
+            if usesExerciseScores, let scores = parsedExerciseScores {
+                try await cloud.submitExercises(tournamentID: tournament.id, scores: scores, evidence: evidence)
+            } else if let score = Double(scoreText.replacingOccurrences(of: ",", with: ".")) {
+                try await cloud.submit(
+                    tournamentID: tournament.id, score: score,
+                    laps: tournament.raceRules.discipline == .laps
+                        ? tournament.raceRules.lapCount : nil,
+                    evidence: evidence, workoutID: chosenWorkout
+                )
+            } else { return }
             await refresh()
             await onChanged()
         } catch { errorMessage = error.localizedDescription }

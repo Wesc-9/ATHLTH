@@ -209,7 +209,8 @@ struct ATHLTHTournamentCreator: View {
         // require the organizer plus at least two invitees.
         athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2) &&
         !busy && !allowedActivities.isEmpty &&
-        (!isSingleEvent || allowedActivities.count == 1) &&
+        (!isSingleEvent || competitionSettings.race.discipline == .workout ||
+            (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
         competitionSettings.race.isOperational &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
@@ -252,8 +253,10 @@ struct ATHLTHTournamentCreator: View {
                         completionHours: $competitionSettings.completionHours,
                         showsLegacyRoundTiming: false
                     )
-                    if isSingleEvent && allowedActivities.count > 1 {
-                        Label("Enkeltkonkurranse har foreløpig én resultatmåling. Velg én gren for å publisere. Liga og cup støtter øvelser fra flere grener.",
+                    if isSingleEvent {
+                        Label(competitionSettings.race.discipline == .workout
+                              ? "Hver øvelse får en egen resultatmåling. Plasseringen i hver øvelse gir poeng til sammenlagtlisten."
+                              : "Sprint, distanse, tid og runder krever én gren og én øvelse. Velg Treningsøkt for å kombinere flere øvelser og grener.",
                               systemImage: "info.circle")
                             .font(.caption)
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
@@ -459,7 +462,9 @@ struct ATHLTHTournamentCreator: View {
     }
 
     private func makeDraft() -> ATHLTHTournamentDraft {
-        ATHLTHTournamentDraft(
+        var configured = competitionSettings
+        configured.race.exerciseScoringVersion = isSingleEvent && configured.race.discipline == .workout ? 1 : nil
+        return ATHLTHTournamentDraft(
             ownerID: session.profile.userID,
             clubID: activeClubID,
             seasonID: activeClubID == nil ? nil : selectedSeasonID,
@@ -501,7 +506,7 @@ struct ATHLTHTournamentCreator: View {
             allowExtensions: allowExtensions,
             winPoints: winPoints,
             drawPoints: drawPoints,
-            competitionSettings: competitionSettings
+            competitionSettings: configured
         )
     }
 

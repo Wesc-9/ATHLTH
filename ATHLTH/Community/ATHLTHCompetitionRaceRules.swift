@@ -67,6 +67,8 @@ enum ATHLTHCompetitionLapVerification: String, Codable, CaseIterable, Identifiab
 
 struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     var discipline: ATHLTHCompetitionDiscipline = .workout
+    // Absent in legacy events: only new exercise-scored events opt in.
+    var exerciseScoringVersion: Int? = nil
     var sprintMode: ATHLTHCompetitionSprintMode = .massStart
     var sprintTarget: ATHLTHCompetitionSprintTarget = .distance
     var routeID: UUID? = nil
@@ -94,11 +96,12 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
              recordingDevice, targetDistanceMeters, targetDurationSeconds,
              lapCount, lapVerification, lapCourseName, lapCourseLatitude,
              lapCourseLongitude, countdownSeconds, allowOptInLiveLocation,
-             equipmentRules
+             equipmentRules, exerciseScoringVersion
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        exerciseScoringVersion = try c.decodeIfPresent(Int.self, forKey: .exerciseScoringVersion)
         discipline = try c.decodeIfPresent(ATHLTHCompetitionDiscipline.self,
                          forKey: .discipline) ?? .workout
         sprintMode = try c.decodeIfPresent(ATHLTHCompetitionSprintMode.self,

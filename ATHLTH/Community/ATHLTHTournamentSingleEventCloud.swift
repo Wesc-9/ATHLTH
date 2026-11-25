@@ -44,6 +44,60 @@ struct ATHLTHTournamentEligibleWorkout: Decodable, Identifiable {
     }
 }
 
+struct ATHLTHTournamentScoredExercise: Decodable, Identifiable {
+    let id: UUID
+    let title: String
+    let metric: String
+    let targetValue: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "candidate_id"
+        case title, metric
+        case targetValue = "target_value"
+    }
+
+    var unit: String {
+        switch metric {
+        case "distance", "time": "sek"
+        case "duration": "m"
+        default: "repetisjoner"
+        }
+    }
+
+    var instruction: String {
+        switch metric {
+        case "distance": "Lavest tid vinner · mål: " + (targetValue.map { $0.formatted() + " m" } ?? "avtalt distanse")
+        case "duration": "Lengst distanse vinner · tid: " + (targetValue.map { $0.formatted() + " sek" } ?? "avtalt tid")
+        case "time": "Lengst tid vinner"
+        default: "Flest repetisjoner vinner"
+        }
+    }
+
+    func accepts(_ value: Double) -> Bool {
+        value.isFinite && (0...100_000_000).contains(value) &&
+            (metric != "distance" || value > 0) &&
+            (metric != "repetitions" || value.rounded(.towardZero) == value)
+    }
+}
+
+struct ATHLTHTournamentExerciseScoreDetail: Decodable, Identifiable {
+    let userID: UUID
+    let exerciseScores: [String: Double]
+    let evidenceNote: String?
+    var id: UUID { userID }
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case exerciseScores = "exercise_scores"
+        case evidenceNote = "evidence_note"
+    }
+}
+
+private struct ATHLTHTournamentExerciseScoresParams: Encodable {
+    let p_tournament: UUID
+    let p_scores: [String: Double]
+    let p_evidence: String
+}
+
 private struct ATHLTHTournamentSingleEventIDParams: Encodable {
     let p_tournament: UUID
 }
@@ -80,6 +134,24 @@ struct ATHLTHTournamentSingleEventCloud {
           params: ATHLTHTournamentSingleEventIDParams(
               p_tournament: tournamentID
           )).execute().value
+    }
+
+    func exercises(tournamentID: UUID) async throws -> [ATHLTHTournamentScoredExercise] {
+        try await client.rpc("athlth_tournament_single_event_exercises",
+            params: ATHLTHTournamentSingleEventIDParams(p_tournament: tournamentID))
+            .execute().value
+    }
+
+    func exerciseDetails(tournamentID: UUID) async throws -> [ATHLTHTournamentExerciseScoreDetail] {
+        try await client.rpc("athlth_tournament_single_event_exercise_details",
+            params: ATHLTHTournamentSingleEventIDParams(p_tournament: tournamentID))
+            .execute().value
+    }
+
+    func submitExercises(tournamentID: UUID, scores: [String: Double], evidence: String) async throws {
+        try await client.rpc("athlth_tournament_single_event_submit_exercises",
+            params: ATHLTHTournamentExerciseScoresParams(p_tournament: tournamentID,
+                p_scores: scores, p_evidence: evidence)).execute()
     }
 
     func eligibleWorkouts(userID: UUID, after: Date)
