@@ -173,6 +173,13 @@ function threadID(event: InboxEvent): string {
   return event.kind;
 }
 
+// Conversation grouping is visual only. Never replace message text or
+// collapse separate chat messages into the sender's most recent event.
+function isMessageEvent(event: InboxEvent): boolean {
+  return ["message", "message_request", "mention", "group_message", "train_together_chat", "tournament_message", "event_message"].includes(event.kind) ||
+    event.entity_type === "direct_conversation";
+}
+
 function localizedAlert(
   event: InboxEvent,
   languageCode: string | null | undefined,
@@ -227,7 +234,7 @@ function localizedAlert(
     event.entity_type === "community_event" &&
     event.title === "Event cancelled";
 
-  if (actorName && actorUnreadCount > 1 && !isCommunityEventCancellation) {
+  if (actorName && actorUnreadCount > 1 && !isCommunityEventCancellation && !isMessageEvent(event)) {
     if (languageCode === "nb") {
       return {
         title: actorName,
@@ -562,9 +569,10 @@ async function sendToDevice(
         "apns-push-type": "alert",
         "apns-priority": "10",
         "apns-expiration": "0",
-        "apns-collapse-id": event.kind === "workout_invite" && event.entity_id
-          ? `workout-invite-${event.entity_id}`
-          : event.actor_id ?? event.id,
+        "apns-collapse-id": isMessageEvent(event) ? event.id :
+          event.kind === "workout_invite" && event.entity_id
+            ? `workout-invite-${event.entity_id}`
+            : event.actor_id ?? event.id,
         "content-type": "application/json",
       },
       body: JSON.stringify(payload),
