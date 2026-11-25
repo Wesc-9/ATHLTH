@@ -5,6 +5,20 @@ struct ATHLTHCompetitionEntryView: View {
     var preselectedFriend: SocialProfileCard? = nil
     var initialFormat: ATHLTHCompetitionFormat? = nil
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var hubTab: HubTab = .mine
+    @State private var tournaments: [ATHLTHTournamentRemote] = []
+    @State private var invitedIDs: Set<UUID> = []
+    @State private var selectedTournament: ATHLTHTournamentRemote?
+    @State private var showingFormats = false
+    @State private var loading = false
+    @State private var errorMessage: String?
+    private let cloud = ATHLTHTournamentCloudService()
+    private enum HubTab: String, CaseIterable, Identifiable {
+        case mine = "Mine", invitations = "Invitasjoner", history = "Historikk"
+        var id: String { rawValue }
+    }
+    private var isDirectEntry: Bool { preselectedFriend != nil || initialFormat != nil }
     @State private var selectedFormat: ATHLTHCompetitionFormat?
     @State private var initialized = false
 
@@ -13,6 +27,7 @@ struct ATHLTHCompetitionEntryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
                     ATHLTHTrainPageTitle(title: "Konkurranse")
+                    if !isDirectEntry && !showingFormats { hubContent } else {
                     Text("Velg hvordan dere vil konkurrere.")
                         .font(ATHLTHTrainDesign.pageSubtitle)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
@@ -47,15 +62,20 @@ struct ATHLTHCompetitionEntryView: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("athlth-competition-entry-\(format.rawValue)")
                     }
+                    }
                 }
                 .padding(18).frame(maxWidth: 650)
                 .frame(maxWidth: .infinity)
             }
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .refreshable { await reloadHub() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Avbryt") { dismiss() }
+                    Button(showingFormats && !isDirectEntry ? "Tilbake" : "Lukk") {
+                        if showingFormats && !isDirectEntry { showingFormats = false; Task { await reloadHub() } }
+                        else { dismiss() }
+                    }
                 }
             }
         }
@@ -66,12 +86,112 @@ struct ATHLTHCompetitionEntryView: View {
                 choosesActivityInRules: true
             ))
         }
+        .sheet(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
+            NavigationStack {
+                ATHLTHTournamentLiveDetailView(tournament: item)
+            }
+        }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .task(id: session.profile.userID) { if !isDirectEntry { await reloadHub() } }
+        .onChange(of: selectedFormat) { _, value in
+            if value == nil && !isDirectEntry { showingFormats = false; Task { await reloadHub() } }
+        }
         .onAppear {
             guard !initialized else { return }
             initialized = true
             selectedFormat = initialFormat
         }
+    }
+
+    private var filtered: [ATHLTHTournamentRemote] {
+        tournaments.filter { item in
+            switch hubTab {
+            case .mine: return !invitedIDs.contains(item.id) && ["active", "inviting"].contains(item.status)
+            case .invitations: return invitedIDs.contains(item.id) && item.status == "inviting"
+            case .history: return ["completed", "cancelled"].contains(item.status)
+            }
+        }.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var hubContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Button { showingFormats = true } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "trophy.fill").font(.title2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ny konkurranse").font(ATHLTHTrainDesign.cardTitle)
+                        Text("Duell, enkeltkonkurranse, liga eller cup").font(.caption)
+                    }
+                    Spacer()
+                    Image(systemName: "plus.circle").font(.title2)
+                }
+                .foregroundStyle(.white)
+                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHTrainDesign.bronze, in: RoundedRectangle(cornerRadius: 23))
+            }.buttonStyle(.plain)
+            Picker("Konkurranser", selection: $hubTab) {
+                ForEach(HubTab.allCases) { tab in
+                    Text(tab == .invitations && !invitedIDs.isEmpty ? "Invitasjoner (\(invitedIDs.count))" : tab.rawValue).tag(tab)
+                }
+            }.pickerStyle(.segmented)
+            if loading && tournaments.isEmpty { ProgressView("Henter konkurranser…") }
+            if let errorMessage {
+                Text(errorMessage).font(.caption).foregroundStyle(.red)
+                Button("Prøv igjen") { Task { await reloadHub() } }.font(.subheadline)
+            }
+            if filtered.isEmpty && !loading && errorMessage == nil {
+                Text(hubTab == .invitations ? "Ingen nye invitasjoner." : hubTab == .history ? "Ingen avsluttede konkurranser." : "Ingen pågående konkurranser.")
+                    .font(.subheadline).foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .padding(18).frame(maxWidth: .infinity, alignment: .leading).athlthTrainEditorialCard()
+            }
+            ForEach(filtered) { item in
+                Button { selectedTournament = item } label: {
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack {
+                            Text(item.displayFormatTitle + (item.seasonLabel.map { " · " + $0 } ?? ""))
+                                .font(ATHLTHTrainDesign.cardEyebrow).foregroundStyle(ATHLTHTrainDesign.bronze)
+                            Spacer()
+                            Text(status(item)).font(.caption)
+                        }
+                        HStack {
+                            Image(systemName: item.displayFormatSymbol).foregroundStyle(ATHLTHTrainDesign.bronze)
+                            Text(item.title).font(ATHLTHTrainDesign.cardTitle)
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption)
+                        }
+                        Text(item.selectedBranchesLabel).font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                        if let end = item.raceRules.endDate, item.status == "active" {
+                            Label("Frist " + end.formatted(date: .abbreviated, time: .shortened), systemImage: "clock").font(.caption)
+                        }
+                    }.foregroundStyle(ATHLTHTrainDesign.ink).padding(15).athlthTrainEditorialCard()
+                }.buttonStyle(.plain)
+            }
+        }
+    }
+    private func status(_ item: ATHLTHTournamentRemote) -> String {
+        if invitedIDs.contains(item.id) && item.status == "inviting" { return "Svar på invitasjon" }
+        switch item.status {
+        case "active": return "Pågår"
+        case "completed": return "Fullført"
+        case "cancelled": return "Avlyst"
+        default: return "Venter på deltakere"
+        }
+    }
+    @MainActor private func reloadHub() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        let userID = session.profile.userID
+        do {
+            async let records = cloud.visibleTournaments()
+            async let memberIDs = cloud.myTournamentIDs(userID: userID)
+            async let invitations = cloud.pendingInvitationIDs(userID: userID)
+            let (all, mine, invited) = try await (records, memberIDs, invitations)
+            guard session.profile.userID == userID else { return }
+            tournaments = all.filter { mine.contains($0.id) || invited.contains($0.id) }
+            invitedIDs = invited.intersection(Set(tournaments.filter { $0.status == "inviting" }.map(\.id)))
+            errorMessage = nil
+        } catch { errorMessage = error.localizedDescription }
     }
 }

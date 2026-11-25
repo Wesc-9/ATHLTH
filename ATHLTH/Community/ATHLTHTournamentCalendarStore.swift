@@ -107,6 +107,19 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
                     $0.removedAt == nil
                 }) else { continue }
 
+                if tournament.singleEventMode && tournament.raceRules.exerciseScoringVersion == 2 {
+                    let rows = try await ATHLTHTournamentSingleEventCloud().sharedState(tournamentID: tournament.id)
+                    for row in rows where row.userID == userID && ["pending", "rejected"].contains(row.progress) {
+                        guard let opens = row.opensAt, let deadline = row.deadlineAt,
+                              deadline >= now, opens <= windowEnd else { continue }
+                        newItems.append(ATHLTHTournamentCalendarItem(
+                            id: row.candidateID, tournamentID: tournament.id,
+                            tournamentTitle: tournament.title, exerciseTitle: row.title,
+                            opensAt: opens, deadlineAt: deadline, exerciseNumber: row.sortOrder,
+                            phase: tournament.isDuel ? "duel" : "single"))
+                    }
+                    continue
+                }
                 let matches = try await tournamentCloud.matches(
                     for: tournament.id
                 )
