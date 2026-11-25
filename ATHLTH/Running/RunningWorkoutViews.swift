@@ -399,8 +399,6 @@ struct RunningWorkoutDetailView: View {
         let index: Int
         var id: Int { index }
     }
-    @State private var askingForTargets = false
-    @State private var pendingAddToPlan = false
     @State private var lastHistory: ATHLTHLibraryWorkoutHistory.Summary?
     @State private var importEnvironment: RunEnvironment = .outdoor
     @State private var importAdjustedWorkout: RunningWorkoutTemplate?
@@ -412,10 +410,6 @@ struct RunningWorkoutDetailView: View {
         lastHistory = ATHLTHLibraryWorkoutHistory.running(
             id: workout.id, records: records
         )
-    }
-
-    private var personalCopy: RunningWorkoutTemplate? {
-        library.savedCopy(for: workout)
     }
 
     private var hasSavedPrivateSettings: Bool {
@@ -594,7 +588,7 @@ struct RunningWorkoutDetailView: View {
                 let count = ATHLTHRunningPrivateSpeedPolicy.workCount(in: selected)
                 if count > 0 {
                     ATHLTHRunningPrivateSpeedEditor(effortCount: count, environment: importEnvironment, currentPace: importPace) { speed in
-                        importAdjustedWorkout = ATHLTHRunningPrivateSpeedPolicy.applying(kilometersPerHour: speed, to: selected)
+                        applyImportSpeed(speed)
                     }
                 }
             }
@@ -626,18 +620,15 @@ struct RunningWorkoutDetailView: View {
         dismiss()
     }
 
-    private func handleFirstAddition(toPlan: Bool) {
-        pendingAddToPlan = toPlan
-        if workout.isBuiltIn &&
-            ATHLTHWorkoutFirstUsePolicy.asksForTargets(
-                advanced: advancedMode, hasPersonalCopy: privateSavedWorkout != nil
-            ) {
-            askingForTargets = true
-        } else if toPlan {
-            continueWithSavedCopy()
-        } else if workout.isBuiltIn {
-            // Saving a copy starts with actual edits and a new name.
-            editPersonalizedCopy()
+    private func applyImportSpeed(_ speed: Double) {
+        // Remember personal pace on the original built-in recipe, never create
+        // a new library workout and never persist the temporary import venue.
+        var adjusted = ATHLTHRunningPrivateSpeedPolicy.applying(kilometersPerHour: speed, to: previewWorkout)
+        adjusted.launchRunEnvironment = nil
+        adjusted.routeID = (privateSavedWorkout ?? workout).routeID
+        importAdjustedWorkout = adjusted
+        if workout.isBuiltIn, session.signedIn, !session.previewModeEnabled {
+            savePrivateWorkout(adjusted)
         }
     }
 
@@ -973,7 +964,6 @@ struct RunningWorkoutDetailView: View {
 
                 if onSelect == nil {
                 Button {
-                        pendingAddToPlan = false
                         if workout.isBuiltIn {
                             editPrivatePreset()
                         } else {
@@ -1086,42 +1076,6 @@ struct RunningWorkoutDetailView: View {
                 norwegian: "Lagrede innstillinger er private. Juster nå endrer bare denne starten."
             ))
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Add your pace and other personal targets?",
-                norwegian: "Vil du legge inn fart og andre personlige mål?"
-            ),
-            isPresented: $askingForTargets,
-            titleVisibility: .visible
-        ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Enter targets in Advanced", norwegian: "Legg inn mål i Avansert"
-            )) {
-                if workout.isBuiltIn {
-                    editPrivatePreset()
-                } else {
-                    editPersonalizedCopy()
-                }
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Use workout without personal targets",
-                norwegian: "Bruk økten uten personlige mål"
-            )) {
-                if pendingAddToPlan {
-                    continueWithSavedCopy()
-                } else {
-                    editPersonalizedCopy()
-                }
-            }
-            Button(ATHLTHLocalization.choose(
-                english: "Cancel", norwegian: "Avbryt"
-            ), role: .cancel) {}
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "The workout structure stays as it is. Pace, incline and personal zones are optional and you can add them later.",
-                norwegian: "Øktoppsettet beholdes. Fart, stigning og egne pulssoner er valgfrie og kan legges inn senere."
-            ))
-        }
         .sheet(isPresented: $showingIntervalEditor) {
             ATHLTHTrainIntervalComposerView(
                 initial: previewWorkout,
@@ -1135,15 +1089,7 @@ struct RunningWorkoutDetailView: View {
                 // renamed; rejected saves keep the original intact.
                 if editingPrivatePreset {
                     savePrivateWorkout(personalized)
-                    if !editingPrivatePreset && pendingAddToPlan {
-                        pendingAddToPlan = false
-                        onSelect?(previewWorkout)
-                        dismiss()
-                    }
                 } else if library.save(personalized) {
-                    if pendingAddToPlan {
-                        onSelect?(personalized)
-                    }
                     dismiss()
                 } else {
                     let original = workout.isBuiltIn
