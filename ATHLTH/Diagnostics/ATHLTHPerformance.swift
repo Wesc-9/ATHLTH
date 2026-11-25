@@ -42,3 +42,20 @@ enum ATHLTHPerformance {
         )
     }
 }
+
+
+/// A view-local, single-entry memo. It does not publish observable changes,
+/// retain historical accounts or use a global cache. Keys must include every
+/// input affecting the pure projection, including nil results.
+final class ATHLTHProjectionMemo<Key: Equatable, Value> {
+    private var entry: (key: Key, value: Value)?
+
+    func value(for key: Key, compute: () -> Value) -> Value {
+        if let entry, entry.key == key { return entry.value }
+        let result = compute()
+        entry = (key, result)
+        return result
+    }
+
+    func clear() { entry = nil }
+}
