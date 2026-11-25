@@ -6153,8 +6153,9 @@ struct ATHLTHTrainView: View {
                 }
             }
         }
-        .sheet(
+        .athlthStudioEditor(
             isPresented: $showingStrengthQuickStart.keepingPresentedWhenInactive(scenePhase),
+            useFullScreen: studioFullscreenEditing,
             onDismiss: {
                 guard scenePhase == .active else { return }
                 quickStrengthStartWithExercises = false
