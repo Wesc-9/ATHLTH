@@ -11,6 +11,10 @@ struct SocialPrivacySettingsView: View {
 
     @State private var draft: SocialPrivacySettings?
     @State private var saving = false
+    @State private var readReceipts: Bool?
+    @State private var updatingReceipts = false
+    private let messagingService = SupabaseMessagingService()
+
     @State private var errorMessage: String?
     @State private var activityExpanded = true
     @State private var achievementsExpanded = false
@@ -91,6 +95,7 @@ struct SocialPrivacySettingsView: View {
             }
             // Never overwrite unsaved changes on scene reactivation.
             if draft == nil { draft = social.privacy }
+            readReceipts = try? await messagingService.readReceiptPreference()
         }
     }
 
@@ -218,8 +223,39 @@ struct SocialPrivacySettingsView: View {
                     .accessibilityLabel(loc("Who can message me", "Hvem kan sende meg meldinger"))
 
                     privacyHint(messageExplanation(for: data.wrappedValue.allowDirectMessages))
+                    Divider()
+                    if let readReceipts {
+                        privacyToggle("checkmark.circle",
+                                      loc("Read receipts", "Lesebekreftelser"),
+                                      detail: loc("Let others see when you have read their messages. Saved immediately.", "La andre se når du har lest meldingene deres. Lagres med en gang."),
+                                      binding: Binding(get: { readReceipts }, set: { value in
+                                          Task { await updateReadReceipts(value) }
+                                      }))
+                        .disabled(updatingReceipts)
+                        privacyHint(loc("Turning this off hides receipts, not actual read state. A read message cannot be withdrawn.", "Slår du dette av, skjules lesebekreftelsen. Meldinger du har lest kan fortsatt ikke trekkes tilbake."))
+                    } else {
+                        Button(loc("Load read receipt setting", "Hent innstilling for lesebekreftelser")) {
+                            Task { readReceipts = try? await messagingService.readReceiptPreference() }
+                        }
+                        .font(.subheadline)
+                    }
+
                 }
             }
+        }
+    }
+
+    @MainActor private func updateReadReceipts(_ value: Bool) async {
+        guard !updatingReceipts, let owner = messagingService.currentUserID else { return }
+        updatingReceipts = true
+        defer { updatingReceipts = false }
+        do {
+            let confirmed = try await messagingService.setReadReceiptPreference(value)
+            guard messagingService.currentUserID == owner else { return }
+            readReceipts = confirmed
+        } catch {
+            guard messagingService.currentUserID == owner else { return }
+            errorMessage = loc("Could not update read receipts.", "Kunne ikke oppdatere lesebekreftelser.")
         }
     }
 
