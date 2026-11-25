@@ -505,7 +505,7 @@ struct RunningWorkoutDetailView: View {
         guard onSelect != nil else { return source }
         var selected = importAdjustedWorkout ?? source
         selected.launchRunEnvironment = importEnvironment
-        if importEnvironment != .outdoor { selected.routeID = nil }
+        selected.routeID = importEnvironment == .outdoor ? source.routeID : nil
         return selected
     }
 
