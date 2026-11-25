@@ -113,6 +113,7 @@ final class MessagingStore: ObservableObject {
         preferenceAccountID = userID
         accountGeneration = UUID()
         isRefreshing = false
+        isPreferencesSyncing = false
         errorMessage = nil
         lastRefreshAt = nil
         preferenceSyncError = nil
@@ -198,12 +199,13 @@ final class MessagingStore: ObservableObject {
     func refreshPreferences() async {
         guard !isPreferencesSyncing, let userID = preferenceAccountID,
               currentUserID == userID else { return }
+        let generation = accountGeneration
         isPreferencesSyncing = true
-        defer { isPreferencesSyncing = false }
+        defer { if accountGeneration == generation { isPreferencesSyncing = false } }
         do {
             let merged = try await ATHLTHConversationPreferenceSyncService
                 .reconcile(userID: userID, local: preferences)
-            guard !Task.isCancelled, preferenceAccountID == userID else {
+            guard ownsRequest(userID, generation: generation) else {
                 return
             }
             // Never lose a pin/archive edit made while the request ran.
@@ -218,7 +220,7 @@ final class MessagingStore: ObservableObject {
         } catch is CancellationError {
             return
         } catch {
-            guard preferenceAccountID == userID else { return }
+            guard ownsRequest(userID, generation: generation) else { return }
             preferenceSyncError = ATHLTHLocalization.choose(
                 english: "Conversation preferences are saved locally until sync succeeds.",
                 norwegian: "Samtalevalg er lagret lokalt til synkronisering lykkes."
@@ -379,6 +381,8 @@ final class MessagingStore: ObservableObject {
     }
 
     func openConversation(with userID: UUID) async throws -> UUID {
+        guard let owner = currentUserID, preferenceAccountID == owner else { throw CancellationError() }
+        let generation = accountGeneration
         if let existing = conversation(with: userID),
            existing.requestStatus == .accepted {
             return existing.id
@@ -394,22 +398,26 @@ final class MessagingStore: ObservableObject {
                     with: userID
                 )
 
+        guard ownsRequest(owner, generation: generation) else { throw CancellationError() }
         // Refresh the normal inbox first, then hydrate the exact row last.
         // A brand-new pending conversation has no message/last_message_at yet;
         // keeping the exact row as the final source of truth prevents the
         // first-request composer from falling back to a disabled state.
         await refresh()
+        guard ownsRequest(owner, generation: generation) else { throw CancellationError() }
 
         if let conversation =
                 try await service
                     .loadConversation(
                         id: conversationID
                     ) {
+            guard ownsRequest(owner, generation: generation) else { throw CancellationError() }
             upsertConversation(
                 conversation
             )
         }
 
+        guard ownsRequest(owner, generation: generation) else { throw CancellationError() }
         return conversationID
     }
 
@@ -445,6 +453,8 @@ final class MessagingStore: ObservableObject {
         _ conversationID: UUID,
         accept: Bool
     ) async -> Bool {
+        guard let owner = currentUserID, preferenceAccountID == owner else { return false }
+        let generation = accountGeneration
         errorMessage = nil
 
         do {
@@ -452,6 +462,7 @@ final class MessagingStore: ObservableObject {
                 conversationID: conversationID,
                 accept: accept
             )
+            guard ownsRequest(owner, generation: generation) else { return false }
 
             if accept {
                 // Hydrate the thread immediately so the request bar can turn
@@ -467,13 +478,15 @@ final class MessagingStore: ObservableObject {
                     for:
                         conversationID
                 )
+                guard ownsRequest(owner, generation: generation) else { return false }
                 await refresh(
                     force: true
                 )
             }
 
-            return true
+            return ownsRequest(owner, generation: generation)
         } catch {
+            guard ownsRequest(owner, generation: generation) else { return false }
             errorMessage =
                 error.localizedDescription
             return false
