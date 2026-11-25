@@ -205,9 +205,8 @@ struct ATHLTHTournamentCreator: View {
 
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        // Two athletes belong in a private duel. Group competitions
-        // require the organizer plus at least two invitees.
-        athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2) &&
+        // Single events and leagues allow the organizer plus one opponent.
+        athletes.count >= (format == .cup ? 4 : 2) &&
         !busy && !allowedActivities.isEmpty &&
         competitionSettings.isValid &&
         competitionSettings.race.isOperational &&
@@ -532,7 +531,7 @@ struct ATHLTHTournamentCreator: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Konkurranseform")
             if isSingleEvent {
-                Label("Enkeltkonkurranse · én hendelse for minst tre",
+                Label("Enkeltkonkurranse · én hendelse for minst to",
                       systemImage: "person.3.sequence.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
