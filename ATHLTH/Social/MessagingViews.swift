@@ -3289,6 +3289,8 @@ struct DirectMessageThreadView: View {
 
     @State private var conversationID: UUID?
     @State private var draftOwner: UUID?
+    @State private var loadingOlderMessages = false
+    @FocusState private var composerFocused: Bool
     @State private var text = ""
     @State private var selectedShare: MessageShareDraft?
     @State private var showingSharePicker = false
@@ -3781,6 +3783,28 @@ struct DirectMessageThreadView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 10) {
+                    if messaging.canLoadOlderMessages(in: conversationID) {
+                        Button {
+                            guard !loadingOlderMessages else { return }
+                            loadingOlderMessages = true
+                            let anchor = timeline.first?.id
+                            Task {
+                                await messaging.loadOlderMessages(in: conversationID)
+                                loadingOlderMessages = false
+                                if let anchor { proxy.scrollTo(anchor, anchor: .top) }
+                            }
+                        } label: {
+                            if loadingOlderMessages {
+                                ProgressView()
+                            } else {
+                                Label(ATHLTHLocalization.choose(english: "Load older messages", norwegian: "Hent eldre meldinger"),
+                                      systemImage: "clock.arrow.circlepath")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                        }
+                        .frame(minHeight: 44)
+                        .disabled(loadingOlderMessages)
+                    }
                     if messages.isEmpty &&
                         standaloneInvites.isEmpty &&
                         lifecycleEvents.isEmpty {
@@ -3875,6 +3899,24 @@ struct DirectMessageThreadView: View {
                                 }
                             )
                             .contextMenu {
+                                if message.deletedAt == nil,
+                                   let body = message.body, !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Button {
+                                        UIPasteboard.general.string = body
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(english: "Copy text", norwegian: "Kopier tekst"), systemImage: "doc.on.doc")
+                                    }
+                                    if currentConversation?.requestStatus == .accepted {
+                                        Button {
+                                            let excerpt = String(body.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(140))
+                                            let quote = "«" + excerpt + "»\n\n"
+                                            text = quote + text
+                                            composerFocused = true
+                                        } label: {
+                                            Label(ATHLTHLocalization.choose(english: "Reply with quote", norwegian: "Svar med sitat"), systemImage: "arrowshape.turn.up.left")
+                                        }
+                                    }
+                                }
                                 if message.senderID == messaging.currentUserID,
                                    message.attachmentKindRaw == nil,
                                    message.deletedAt == nil,
@@ -4911,6 +4953,7 @@ struct DirectMessageThreadView: View {
                     text: $text,
                     axis: .vertical
                 )
+                    .focused($composerFocused)
                     .lineLimit(1...5)
                     .submitLabel(.send)
                     .onSubmit {
