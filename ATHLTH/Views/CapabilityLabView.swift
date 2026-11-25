@@ -39,11 +39,10 @@ struct CapabilityLabView: View {
                         )
 
                         CapabilityRow(
-                            title: "Background delivery entitlement",
-                            detail: CapabilityProbe.backgroundDeliveryEntitlementConfigured
-                                ? "Configured in this build."
-                                : "Intentionally not signed into the first Personal Team build.",
-                            state: CapabilityProbe.backgroundDeliveryEntitlementConfigured ? .ready : .warning
+                            title: "Background delivery",
+                            detail: health.backgroundDeliveryStatus.title,
+                            state: health.backgroundDeliveryStatus == .active ? .ready :
+                                health.backgroundDeliveryStatus == .unavailable ? .failed : .warning
                         )
 
                         CapabilityRow(
@@ -97,7 +96,7 @@ struct CapabilityLabView: View {
                     TestSection(
                         title: "Background delivery",
                         description: health.backgroundDeliveryTestResult
-                            ?? "Attempts to enable immediate workout background delivery. In this first Personal Team build, failure due to a missing entitlement is expected and useful."
+                            ?? "Checks background delivery registration using the existing Apple Health and background sync preferences."
                     ) {
                         Button {
                             checkingBackground = true
