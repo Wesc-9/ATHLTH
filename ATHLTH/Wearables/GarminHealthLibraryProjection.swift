@@ -5,7 +5,7 @@ struct GarminLibraryReading {
     let source: String
 }
 
-#if ATHLTH_GARMIN_PERSONAL && DEBUG
+#if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
 extension HomeHealthMetricKind {
     var garminLibraryMetric: ATHLTHInsightHealthMetric? {
         switch self {
