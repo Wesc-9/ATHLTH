@@ -71,7 +71,7 @@ struct ATHLTHStrengthSyncDocument: Codable, Equatable {
 final class ATHLTHStrengthAccountSyncStore: ObservableObject {
     @Published private(set) var isBusy = false
     @Published private(set) var lastSuccessfulSync: Date?
-    @Published private(set) var status = "Strength history sync waits for sign-in."
+    @Published private(set) var status = ATHLTHLocalization.choose(english: "Strength history sync waits for sign-in.", norwegian: "Styrkehistorikk venter på innlogging.")
 
     private struct Record: Codable {
         let user_id: UUID
@@ -112,8 +112,8 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
         isBusy = false
         lastSuccessfulSync = nil
         lastSyncedLocalCount = -1
-        status = id == nil ? "Sign in to sync training history." :
-            "Strength training history syncs automatically with your account."
+        status = id == nil ? ATHLTHLocalization.choose(english: "Sign in to sync training history.", norwegian: "Logg inn for å synkronisere treningshistorikken.") :
+            ATHLTHLocalization.choose(english: "Strength training history syncs automatically with your account.", norwegian: "Styrkehistorikken synkroniseres automatisk med kontoen din.")
     }
 
     func scheduleSync(session: AppSessionStore, strength: StrengthWorkoutStore) {
