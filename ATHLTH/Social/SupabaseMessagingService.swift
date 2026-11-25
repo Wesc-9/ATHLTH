@@ -189,6 +189,30 @@ final class SupabaseMessagingService: Sendable {
             .execute()
     }
 
+    func groupReadReceipts(kind: String, messageIDs: [UUID], markRead: Bool = true) async throws -> [UUID: [String]] {
+        struct Params: Encodable {
+            let p_kind: String
+            let p_ids: [UUID]
+            let p_mark_read: Bool
+        }
+        struct Row: Decodable {
+            let message_id: UUID
+            let reader_name: String
+        }
+        guard !messageIDs.isEmpty else { return [:] }
+        var result: [UUID: [String]] = [:]
+        // The RPC bounds each request. Preserve all loaded messages.
+        for start in stride(from: 0, to: messageIDs.count, by: 300) {
+            let ids = Array(messageIDs[start..<min(start + 300, messageIDs.count)])
+            let rows: [Row] = try await client.rpc(
+                "athlth_group_message_receipts",
+                params: Params(p_kind: kind, p_ids: ids, p_mark_read: markRead)
+            ).execute().value
+            for row in rows { result[row.message_id, default: []].append(row.reader_name) }
+        }
+        return result
+    }
+
     func retractUnreadMessage(_ id: UUID) async throws -> Bool {
         struct Params: Encodable { let p_message_id: UUID }
         return try await client.rpc("athlth_retract_unread_direct_message", params: Params(p_message_id: id))
