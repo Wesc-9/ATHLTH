@@ -125,6 +125,7 @@ enum ATHLTHLiveAddAction: String, CaseIterable, Identifiable {
 /// A lightweight, opaque menu, with no system confirmation bubble or
 /// independent workout state. All selections route back to the host.
 struct ATHLTHLiveAddMenu: View {
+    var actions: [ATHLTHLiveAddAction] = ATHLTHLiveAddAction.allCases
     let onSelect: (ATHLTHLiveAddAction) -> Void
     let onClose: () -> Void
 
@@ -157,8 +158,8 @@ struct ATHLTHLiveAddMenu: View {
                 .padding(.bottom, 6)
                 .accessibilityAddTraits(.isHeader)
 
-            ForEach(ATHLTHLiveAddAction.allCases) { action in
-                if action != .exercise {
+            ForEach(actions) { action in
+                if action != actions.first {
                     Rectangle()
                         .fill(ATHLTHTrainDesign.rule.opacity(0.45))
                         .frame(height: 1)
