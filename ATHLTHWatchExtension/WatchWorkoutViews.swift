@@ -3238,7 +3238,7 @@ private struct WatchStrengthRestView: View {
                 ))
                     .font(.system(size: 10, weight: .bold))
                     .tracking(1)
-                    .foregroundStyle(WatchTheme.muted)
+                    .foregroundStyle(WatchTheme.liveStrengthLoad)
 
                 if remaining > 0 {
                     Text(durationText(remaining))
@@ -3262,7 +3262,7 @@ private struct WatchStrengthRestView: View {
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(.system(size: 23, weight: .bold, design: .rounded))
-                    .foregroundStyle(WatchTheme.liveAction)
+                    .foregroundStyle(WatchTheme.liveStrengthLoad)
                 }
 
                 if let nextSetNumber, let totalSetCount,
@@ -3272,7 +3272,7 @@ private struct WatchStrengthRestView: View {
                         norwegian: "NESTE SETT \(nextSetNumber) AV \(totalSetCount)"
                     ))
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(WatchTheme.accentDeep)
+                    .foregroundStyle(WatchTheme.textSecondary)
                 }
 
                 if allowsControls {
@@ -3285,7 +3285,7 @@ private struct WatchStrengthRestView: View {
                                     .font(.system(size: 11, weight: .bold))
                                     .frame(maxWidth: .infinity, minHeight: 32)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(WatchStrengthRestButtonStyle(primary: false))
                         }
 
                         Button {
@@ -3318,8 +3318,7 @@ private struct WatchStrengthRestView: View {
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, minHeight: 32)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(WatchTheme.liveAction)
+                        .buttonStyle(WatchStrengthRestButtonStyle(primary: true))
                     }
                 } else {
                     Text(ATHLTHLocalization.choose(
@@ -3332,13 +3331,41 @@ private struct WatchStrengthRestView: View {
             }
             .padding(9)
             .frame(maxWidth: .infinity)
-            .watchSurface(radius: 17)
+            .background(
+                WatchTheme.planCanvas,
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .strokeBorder(WatchTheme.planBorder, lineWidth: 0.75)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
     private func durationText(_ duration: TimeInterval) -> String {
         let total = max(Int(duration.rounded(.up)), 0)
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+}
+
+/// Explicit brand colours prevent watchOS's default tinted button surfaces
+/// from introducing blue into the warm strength-rest card.
+private struct WatchStrengthRestButtonStyle: ButtonStyle {
+    let primary: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            // Dark brand ink on gold is more legible than white on gold.
+            .foregroundStyle(Color(red: 0.07, green: 0.08, blue: 0.10))
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, minHeight: 38)
+            .background(
+                primary ? WatchTheme.premiumGold : WatchTheme.accentSoft,
+                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .opacity(configuration.isPressed ? 0.72 : 1)
     }
 }
 
