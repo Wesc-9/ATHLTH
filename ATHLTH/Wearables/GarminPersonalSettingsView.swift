@@ -11,7 +11,7 @@ struct GarminPersonalSettingsView: View {
 
     private var accountMatches: Bool {
         scenePhase == .active && session.signedIn && !session.previewModeEnabled &&
-        session.profile.userID == accountID
+        session.profile.userID == accountID && session.currentRole.canAccessControlCenter
     }
 
     var body: some View {

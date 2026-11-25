@@ -1124,12 +1124,12 @@ settingsSection("Connections") {
                                 }
                             } else {
                                 NavigationLink {
-                                    ATHLTHTrainingDeviceSettingsView()
+                                    AppleWatchConnectionView()
                                 } label: {
                                     PremiumSettingsRow(
                                         icon: "applewatch",
                                         iconTint: ATHLTHTheme.primaryText,
-                                        title: "Watch",
+                                        title: "Apple Watch",
                                         subtitle: trainingDeviceSubtitle
                                     ) {
                                         connectionTrailing(
@@ -1140,6 +1140,30 @@ settingsSection("Connections") {
                                 }
                                 .buttonStyle(.plain)
                             }
+
+                            SettingsDivider()
+
+                            NavigationLink {
+                                GarminConnectionSetupView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "watch.analog",
+                                    iconTint: ATHLTHTheme.accentDeep,
+                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                    title: "Garmin",
+                                    subtitle: session.currentRole.canAccessControlCenter
+                                        ? ATHLTHLocalization.choose(english: "Developer testing · connection and status", norwegian: "Utviklertest · tilkobling og status")
+                                        : ATHLTHLocalization.choose(english: "Garmin Connect integration", norwegian: "Garmin Connect-integrasjon")
+                                ) {
+                                    connectionTrailing(
+                                        session.currentRole.canAccessControlCenter
+                                            ? ATHLTHLocalization.choose(english: "Test", norwegian: "Test")
+                                            : ATHLTHLocalization.choose(english: "Coming soon", norwegian: "Kommer snart"),
+                                        showChevron: true
+                                    )
+                                }
+                            }
+                            .buttonStyle(.plain)
 
                             SettingsDivider()
 
@@ -3141,387 +3165,79 @@ struct SettingsDivider: View {
     }
 }
 
-private struct ATHLTHTrainingDeviceSettingsView: View {
-    #if ATHLTH_GARMIN_PERSONAL && DEBUG
-    @EnvironmentObject private var session: AppSessionStore
-    #endif
-    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
-    private var watchSelection = ATHLTHWatchLaunchSelection()
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(ATHLTHLocalization.choose(english: "DEFAULT WATCH", norwegian: "STANDARDKLOKKE"))
-                        .font(.caption.weight(.semibold))
-                        .tracking(2.4)
-                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
-                        .padding(.leading, 16)
-                    PremiumSettingsCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            ATHLTHPreferredWatchPicker(selection: watchSelection)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Tap Watch to start on your preferred watch. Hold to select a different watch for this workout.",
-                                norwegian: "Trykk på Watch for å starte på standardklokken. Hold inne for å velge en annen klokke for denne økten."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        .padding(16)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("APPLE WATCH")
-                        .font(.caption.weight(.semibold))
-                        .tracking(2.4)
-                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
-                        .padding(.leading, 16)
-
-                    PremiumSettingsCard {
-                        VStack(alignment: .leading, spacing: 0) {
-                            detailRow(
-                                title: "Connection",
-                                value: watchConnectionTitle,
-                                icon: "applewatch"
-                            )
-
-                            SettingsDivider()
-
-                            detailRow(
-                                title: "Watch app",
-                                value: watchAppTitle,
-                                icon: watchConnection.isReady
-                                    ? "checkmark.circle.fill"
-                                    : "app.badge"
-                            )
-
-                            SettingsDivider()
-
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(watchSetupDetail)
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                NavigationLink {
-                                    AppleWatchConnectionView()
-                                } label: {
-                                    HStack {
-                                        Label(
-                                            watchConnection.isReady
-                                                ? "Open Apple Watch details"
-                                                : watchConnection.state == .appNotInstalled
-                                                    ? "Install Watch app"
-                                                    : "Open setup",
-                                            systemImage: "applewatch"
-                                        )
-                                        .font(.subheadline.weight(.semibold))
-
-                                        Spacer()
-
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption.weight(.bold))
-                                    }
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .padding(.horizontal, 14)
-                                    .frame(height: 46)
-                                    .background(
-                                        ATHLTHTheme.accentSoft,
-                                        in: RoundedRectangle(
-                                            cornerRadius: 14,
-                                            style: .continuous
-                                        )
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(16)
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("HOW WORKOUT RECORDING WORKS")
-                        .font(.caption.weight(.semibold))
-                        .tracking(2.4)
-                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
-                        .padding(.leading, 16)
-
-                    PremiumSettingsCard {
-                        HStack(alignment: .top, spacing: 14) {
-                            Image(systemName: "figure.run.circle")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(
-                                        cornerRadius: 14,
-                                        style: .continuous
-                                    )
-                                )
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Choose when you start")
-                                    .font(.system(size: 16.5, weight: .semibold))
-                                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english: "Choose iPhone or Watch when starting a workout. Connected data sources are not necessarily capable of live recording.",
-                                        norwegian: "Velg iPhone eller Watch når du starter en økt. En tilkoblet datakilde støtter ikke nødvendigvis live-registrering."
-                                    )
-                                )
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Spacer(minLength: 8)
-                        }
-                        .padding(16)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("OTHER WATCHES")
-                        .font(.caption.weight(.semibold))
-                        .tracking(2.4)
-                        .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
-                        .padding(.leading, 16)
-
-                    #if ATHLTH_GARMIN_PERSONAL && DEBUG
-                    if session.signedIn && !session.previewModeEnabled {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                GarminPersonalSettingsView(accountID: session.profile.userID)
-                                    .id(session.profile.userID)
-                            } label: {
-                                Label("Garmin · Personal API", systemImage: "watch.analog")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(16)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    } else {
-                        Text("Sign in to your own ATHLTH account to use private Garmin testing.")
-                            .font(.caption)
-                    }
-                    #else
-                    PremiumSettingsCard {
-                        HStack(spacing: 14) {
-                            Image(systemName: "watch.analog")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Color.primary.opacity(0.035),
-                                    in: RoundedRectangle(
-                                        cornerRadius: 14,
-                                        style: .continuous
-                                    )
-                                )
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 8) {
-                                    Text("Garmin")
-                                        .font(.system(size: 16.5, weight: .semibold))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                                    Text("COMING SOON")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .tracking(0.7)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                        .padding(.horizontal, 7)
-                                        .padding(.vertical, 4)
-                                        .background(
-                                            Color.primary.opacity(0.045),
-                                            in: Capsule()
-                                        )
-                                }
-
-                                Text("Garmin Connect support is planned and will appear here when it is ready.")
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-
-                            Spacer()
-                        }
-                        .padding(16)
-                    }
-                    #endif
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 48)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
-        }
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.canvasTop,
-                    Color.white,
-                    ATHLTHTheme.canvasBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-        )
-        .navigationTitle("Watch")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            watchConnection.connect()
-        }
-    }
-
-    private func detailRow(
-        title: String,
-        value: String,
-        icon: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(width: 32)
-
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-
-            Spacer()
-
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(
-                    value == "Not installed" ||
-                    value == "Not paired" ||
-                    value == "Unavailable"
-                        ? Color.orange
-                        : ATHLTHTheme.mutedText
-                )
-                .multilineTextAlignment(.trailing)
-                .lineLimit(2)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-
-    private var watchConnectionTitle: String {
-        switch watchConnection.state {
-        case .ready, .appNotInstalled:
-            return ATHLTHLocalization.choose(
-                english: "Paired",
-                norwegian: "Sammenkoblet"
-            )
-        case .notPaired:
-            return ATHLTHLocalization.choose(
-                english: "Not paired",
-                norwegian: "Ikke sammenkoblet"
-            )
-        case .checking:
-            return ATHLTHLocalization.choose(
-                english: "Checking…",
-                norwegian: "Sjekker…"
-            )
-        case .unsupported:
-            return ATHLTHLocalization.choose(
-                english: "Unavailable",
-                norwegian: "Ikke tilgjengelig"
-            )
-        }
-    }
-
-    private var watchAppTitle: String {
-        switch watchConnection.state {
-        case .ready:
-            return ATHLTHLocalization.choose(
-                english: "Installed",
-                norwegian: "Installert"
-            )
-        case .appNotInstalled:
-            return ATHLTHLocalization.choose(
-                english: "Not installed",
-                norwegian: "Ikke installert"
-            )
-        case .notPaired, .unsupported:
-            return ATHLTHLocalization.choose(
-                english: "Unavailable",
-                norwegian: "Ikke tilgjengelig"
-            )
-        case .checking:
-            return ATHLTHLocalization.choose(
-                english: "Checking…",
-                norwegian: "Sjekker…"
-            )
-        }
-    }
-
-    private var watchSetupDetail: String {
-        switch watchConnection.state {
-        case .ready:
-            return ATHLTHLocalization.choose(
-                english: "ATHLTH Watch is ready for live workouts, routes and HealthKit sync.",
-                norwegian: "ATHLTH på Apple Watch er klar for liveøkter, ruter og HealthKit-synkronisering."
-            )
-        case .appNotInstalled:
-            return ATHLTHLocalization.choose(
-                english: "Install the ATHLTH Watch app to start workouts, sync routes and use live tracking.",
-                norwegian: "Installer ATHLTH på Apple Watch for å starte økter, synkronisere ruter og bruke live-sporing."
-            )
-        case .notPaired:
-            return ATHLTHLocalization.choose(
-                english: "Pair an Apple Watch with this iPhone first, then return here to finish ATHLTH setup.",
-                norwegian: "Koble først en Apple Watch til denne iPhonen, og gå deretter tilbake hit for å fullføre ATHLTH-oppsettet."
-            )
-        case .checking:
-            return ATHLTHLocalization.choose(
-                english: "ATHLTH is checking the paired Apple Watch and app installation.",
-                norwegian: "ATHLTH sjekker den sammenkoblede Apple Watch-en og appinstallasjonen."
-            )
-        case .unsupported:
-            return ATHLTHLocalization.choose(
-                english: "Apple Watch connectivity is unavailable on this device.",
-                norwegian: "Apple Watch-tilkobling er ikke tilgjengelig på denne enheten."
-            )
-        }
-    }
-}
-
 private struct GarminConnectionSetupView: View {
+    @EnvironmentObject private var session: AppSessionStore
+
+    private var canTest: Bool {
+        session.signedIn && !session.previewModeEnabled &&
+            session.currentRole.canAccessControlCenter
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var body: some View {
-        Form {
-            Section("Garmin Connect") {
-                Label("Garmin integration is coming soon", systemImage: "watch.analog")
-                    .font(.headline)
-
-                Text(
-                    "When Garmin access is enabled, this screen will guide you through account authorization, permissions and the data ATHLTH can sync."
-                )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        ATHLTHSettingsScreen(title: "Garmin",
+            subtitle: tr("Garmin Connect and compatible watches", "Garmin Connect og kompatible klokker")) {
+            ATHLTHSettingsGroup(title: tr("Connection", "Tilkobling")) {
+                PremiumSettingsCard {
+                    PremiumSettingsRow(icon: "watch.analog",
+                        iconTint: ATHLTHTheme.accentDeep,
+                        iconBackground: ATHLTHTheme.premiumGoldSoft,
+                        title: "Garmin Connect",
+                        subtitle: canTest
+                            ? tr("Restricted developer testing", "Begrenset utviklertest")
+                            : tr("Not available for general use yet", "Ikke tilgjengelig for allmenn bruk ennå")) {
+                        Text(canTest ? tr("Test", "Test") : tr("Coming soon", "Kommer snart"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    if canTest {
+                        SettingsDivider()
+                        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+                        NavigationLink {
+                            GarminPersonalSettingsView(accountID: session.profile.userID)
+                                .id(session.profile.userID)
+                        } label: {
+                            PremiumSettingsRow(icon: "key", iconTint: ATHLTHTheme.accentDeep,
+                                title: tr("Connect personal Garmin account", "Koble til personlig Garmin-konto"),
+                                subtitle: tr("Private local test · your own data only", "Privat lokal test · kun dine egne data")) {
+                                Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        #else
+                        PremiumSettingsRow(icon: "lock.shield", iconTint: ATHLTHTheme.accentDeep,
+                            title: tr("Developer access", "Utviklertilgang"),
+                            subtitle: tr("Personal API requires an owner-installed local development build. Distributed builds require approved Garmin authorization.", "Personal API krever et lokalt utviklingsbygg. Distribuerte bygg krever godkjent Garmin-autorisasjon.")) {
+                            Image(systemName: "info.circle").foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        #endif
+                    }
+                }
             }
-
-            Section("Planned sync") {
-                Label("Workouts and routes", systemImage: "figure.run")
-                Label("Heart rate and HRV", systemImage: "heart.fill")
-                Label("Sleep and recovery", systemImage: "moon.fill")
-                Label("Steps and activity", systemImage: "figure.walk")
+            ATHLTHSettingsGroup(title: tr("Capabilities", "Funksjoner")) {
+                PremiumSettingsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label(tr("Activity and health data · planned", "Trenings- og helsedata · planlagt"), systemImage: "heart.text.clipboard")
+                        Label(tr("Routes and training plans · planned", "Ruter og treningsplaner · planlagt"), systemImage: "map")
+                        Label(tr("Direct workout start · not available", "Direkte øktstart · ikke tilgjengelig"), systemImage: "play.circle")
+                        Text(tr("Connecting a data source does not enable live workout recording.", "En tilkoblet datakilde gir ikke automatisk støtte for live-registrering."))
+                            .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .padding(16)
+                }
             }
         }
-        .athlthBrandedForm()
-        .navigationTitle("Garmin Setup")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private struct ATHLTHTrainingSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    private var watchSelection = ATHLTHWatchLaunchSelection()
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
@@ -3547,6 +3263,14 @@ private struct ATHLTHTrainingSettingsView: View {
                     } label: {
                         row("applewatch", tr("Recording device", "Opptaksenhet"), settings.preferredWorkoutCapture.title)
                     }.buttonStyle(.plain)
+                    SettingsDivider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        ATHLTHPreferredWatchPicker(selection: watchSelection)
+                        Text(tr("Choose the watch used when starting a workout. You can choose another available watch for each workout.", "Velg standardklokke ved øktstart. Du kan velge en annen tilgjengelig klokke for hver økt."))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .padding(16)
                     SettingsDivider()
                     PremiumSettingsRow(icon: "clock", iconTint: ATHLTHTheme.accentDeep,
                         iconBackground: ATHLTHTheme.premiumGoldSoft,

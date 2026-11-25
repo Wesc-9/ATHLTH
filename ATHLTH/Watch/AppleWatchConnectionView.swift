@@ -1,196 +1,123 @@
 import SwiftUI
 
+/// Canonical Apple Watch settings page; status reflects the actual connection
+/// rather than conflating installation, pairing and live reachability.
 struct AppleWatchConnectionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var body: some View {
-        Form {
-            if watchConnection.state == .appNotInstalled {
-                Section("Install ATHLTH on Apple Watch") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Label(
-                            "Your Watch is paired — only the ATHLTH app is missing.",
-                            systemImage: "applewatch"
-                        )
-                        .font(.subheadline.weight(.semibold))
-
-                        VStack(alignment: .leading, spacing: 9) {
-                            installStep(
-                                "1",
-                                "Open Apple’s Watch app"
-                            )
-                            installStep(
-                                "2",
-                                "Scroll to Available Apps"
-                            )
-                            installStep(
-                                "3",
-                                "Tap Install next to ATHLTH"
-                            )
-                        }
-
-                        Button {
-                            AppleWatchInstallSupport.openWatchApp()
-                        } label: {
-                            Label(
-                                "Install ATHLTH on Apple Watch",
-                                systemImage: "arrow.down.app.fill"
-                            )
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-
-                        Text(
-                            "When you return to ATHLTH, installation status is checked automatically."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-            Section("Status") {
-                LabeledContent("Pairing", value: pairedText)
-                LabeledContent("ATHLTH Watch app", value: installedText)
-                LabeledContent(
-                    "WatchConnectivity",
-                    value: watchConnection.activationStateText
-                )
-                LabeledContent(
-                    "Immediate reachability",
-                    value: watchConnection.reachable ? "Active now" : "Background"
-                )
-
-                if let verifiedAt = watchConnection.lastVerifiedAt {
-                    LabeledContent(
-                        "ATHLTH link verified",
-                        value: verifiedAt.formatted(
-                            date: .omitted,
-                            time: .shortened
-                        )
-                    )
-                } else {
-                    LabeledContent(
-                        "ATHLTH link verified",
-                        value: watchConnection.verificationInProgress
-                            ? "Checking…"
-                            : "Not yet"
-                    )
+        ATHLTHSettingsScreen(title: "Apple Watch",
+            subtitle: tr("Connection, app and workout readiness", "Tilkobling, app og treningsklarhet")) {
+            ATHLTHSettingsGroup(title: tr("Connection status", "Tilkoblingsstatus")) {
+                PremiumSettingsCard {
+                    statusRow("applewatch", tr("Pairing", "Sammenkobling"), pairedText)
+                    SettingsDivider()
+                    statusRow("app.badge.checkmark", tr("ATHLTH app", "ATHLTH-app"), installedText)
+                    SettingsDivider()
+                    statusRow("arrow.triangle.2.circlepath", tr("Connection service", "Tilkoblingstjeneste"), watchConnection.activationStateText)
+                    SettingsDivider()
+                    statusRow("antenna.radiowaves.left.and.right", tr("Reachability", "Tilgjengelighet"),
+                        watchConnection.reachable ? tr("Active now", "Aktiv nå") : tr("Not reachable now", "Ikke aktiv nå"))
+                    SettingsDivider()
+                    statusRow("checkmark.shield", tr("Last verified", "Sist verifisert"), verificationText)
                 }
             }
 
-            Section {
-                Button {
-                    watchConnection.connect()
-                } label: {
-                    HStack {
-                        Label("Check Apple Watch again", systemImage: "arrow.clockwise")
-                        Spacer()
-                        if watchConnection.state == .checking ||
-                            watchConnection.verificationInProgress {
-                            ProgressView()
-                        }
+            ATHLTHSettingsGroup(title: tr("Actions", "Handlinger")) {
+                PremiumSettingsCard {
+                    if watchConnection.state == .appNotInstalled {
+                        Button { AppleWatchInstallSupport.openWatchApp() } label: {
+                            PremiumSettingsRow(icon: "arrow.down.app", iconTint: ATHLTHTheme.accentDeep,
+                                title: tr("Install ATHLTH on Apple Watch", "Installer ATHLTH på Apple Watch"),
+                                subtitle: tr("Open the Watch app and find ATHLTH under available apps.", "Åpne Watch-appen og finn ATHLTH under tilgjengelige apper.")) {
+                                Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }.buttonStyle(.plain)
+                        SettingsDivider()
                     }
+                    Button { watchConnection.connect() } label: {
+                        PremiumSettingsRow(icon: "arrow.clockwise", iconTint: ATHLTHTheme.accentDeep,
+                            title: tr("Check connection", "Kontroller tilkobling"),
+                            subtitle: tr("Refresh pairing and verify the ATHLTH link", "Oppdater sammenkobling og verifiser ATHLTH-forbindelsen")) {
+                            if watchConnection.state == .checking || watchConnection.verificationInProgress {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                    }.buttonStyle(.plain)
+                    .disabled(watchConnection.state == .checking || watchConnection.verificationInProgress)
                 }
-
-                Text(watchConnection.statusText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
                 if let error = watchConnection.connectivityError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.horizontal, 12)
                 }
             }
-
-            Section("How the check works") {
-                Text(
-                    "ATHLTH first waits for WatchConnectivity to activate. Only then does it read Apple's paired-Watch and app-installed status. If ATHLTH is installed, the iPhone also sends a small handshake so the Watch app can confirm that the ATHLTH link is working."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                Text(
-                    "“Background” is normal when the Watch app is not open. Apple only reports immediate reachability while the counterpart app is active; background transfers can still work."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            ATHLTHSettingsGroup(title: tr("Workout readiness", "Klar for trening")) {
+                PremiumSettingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(readinessText, systemImage: watchConnection.isReady ? "checkmark.circle" : "info.circle")
+                            .font(.subheadline.weight(.medium))
+                        Text(tr("The watch may be unavailable for immediate messages while the app is closed. Background transfers can still work.", "Klokken kan være utilgjengelig for direkte meldinger når appen er lukket. Overføring i bakgrunnen kan fortsatt fungere."))
+                            .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                        Text(tr("Choose your preferred watch under Settings → Training.", "Velg foretrukket klokke under Innstillinger → Trening."))
+                            .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .padding(16)
+                }
             }
-
         }
-        .navigationTitle("Apple Watch")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            watchConnection.connect()
-        }
+        .task { watchConnection.connect() }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            refreshAfterInstallReturn()
+            if phase == .active { watchConnection.connect() }
         }
     }
 
-    private func refreshAfterInstallReturn() {
-        watchConnection.connect()
-
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1))
-            guard watchConnection.state == .appNotInstalled else {
-                return
-            }
-
-            watchConnection.connect()
-
-            try? await Task.sleep(for: .seconds(2))
-            guard watchConnection.state == .appNotInstalled else {
-                return
-            }
-
-            watchConnection.connect()
-        }
-    }
-
-    private func installStep(
-        _ number: String,
-        _ title: String
-    ) -> some View {
-        HStack(spacing: 10) {
-            Text(number)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(
-                    ATHLTHTheme.accentDeep,
-                    in: Circle()
-                )
-
-            Text(title)
-                .font(.subheadline)
+    private func statusRow(_ icon: String, _ title: String, _ value: String) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep, title: title) {
+            Text(value).font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                .multilineTextAlignment(.trailing)
         }
     }
 
     private var pairedText: String {
         switch watchConnection.paired {
-        case true:
-            return "Paired"
-        case false:
-            return "Not paired"
-        case nil:
-            return "Checking…"
+        case true: return tr("Paired", "Sammenkoblet")
+        case false: return tr("Not paired", "Ikke sammenkoblet")
+        case nil: return tr("Checking…", "Sjekker…")
         }
     }
 
     private var installedText: String {
         switch watchConnection.watchAppInstalled {
-        case true:
-            return "Installed"
-        case false:
-            return "Not installed"
-        case nil:
-            return "Checking…"
+        case true: return tr("Installed", "Installert")
+        case false: return tr("Not installed", "Ikke installert")
+        case nil: return tr("Checking…", "Sjekker…")
+        }
+    }
+
+    private var verificationText: String {
+        if let date = watchConnection.lastVerifiedAt {
+            return date.formatted(date: .abbreviated, time: .shortened)
+        }
+        return watchConnection.verificationInProgress
+            ? tr("Checking…", "Sjekker…") : tr("Not yet verified", "Ikke verifisert ennå")
+    }
+
+    private var readinessText: String {
+        switch watchConnection.state {
+        case .ready: return tr("ATHLTH is installed on your paired watch", "ATHLTH er installert på den sammenkoblede klokken")
+        case .appNotInstalled: return tr("Install the ATHLTH Watch app first", "Installer ATHLTH på klokken først")
+        case .notPaired: return tr("Pair Apple Watch in the Watch app first", "Koble sammen Apple Watch i Watch-appen først")
+        case .checking: return tr("Checking Apple Watch", "Sjekker Apple Watch")
+        case .unsupported: return tr("Apple Watch is unavailable on this device", "Apple Watch er ikke tilgjengelig på denne enheten")
         }
     }
 }

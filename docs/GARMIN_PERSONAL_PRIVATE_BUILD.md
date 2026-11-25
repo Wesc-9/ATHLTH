@@ -8,7 +8,7 @@ Do not enable this in Release, TestFlight, distributed project settings or
 normal CI builds. A separate unsigned, simulator-only compile check may use
 the flags with synthetic/no data and no credentials; it never publishes an app.
 Install locally on your own device using Xcode, sign into your own ATHLTH account,
-and open Settings > Watch > Garmin. Create a personal key on Garmin Connect once.
+and open Settings > Health & connections > Garmin (admin/owner account). Create a personal key on Garmin Connect once.
 The key is stored only after a successful preview in a device-only Keychain item
 scoped to the ATHLTH account. Disconnect removes the local key; revoke on Garmin
 to invalidate it server-side. Data stays in the private screen's memory.
