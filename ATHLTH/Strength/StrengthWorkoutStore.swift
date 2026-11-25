@@ -1753,6 +1753,12 @@ final class StrengthWorkoutStore: ObservableObject {
         if set.resolvedLoadKind == .resistanceLevel, let resistance {
             set.plannedResistanceLevel = min(max(resistance, 1), 10)
         }
+        if let override = workout.exercises[e].restSecondsOverride {
+            for index in workout.exercises[e].sets.indices where !workout.exercises[e].sets[index].isResolved {
+                workout.exercises[e].sets[index].restSeconds = override
+            }
+            workout.exercises[e].restSecondsOverride = nil
+        }
         set.restSeconds = min(max(rest, 0), 600)
         workout.exercises[e].sets[i] = set
         activeWorkout = workout
@@ -1772,6 +1778,54 @@ final class StrengthWorkoutStore: ObservableObject {
         }
         activeWorkout = workout
         persistCheckpointNow()
+    }
+
+    /// Round positions are shared by all stations. Only completely pending
+    /// rounds can move or be omitted; measured results keep their IDs.
+    @discardableResult
+    func editFutureStrengthRound(groupID: UUID, round: Int, moveTo: Int? = nil) -> Bool {
+        guard var workout = activeWorkout, round >= 0 else { return false }
+        let stations = workout.exercises.indices.filter { workout.exercises[$0].groupID == groupID }
+        guard stations.count >= 2,
+              stations.allSatisfy({ index in
+                  let exercise = workout.exercises[index]
+                  return (exercise.groupStyle == .circuit || exercise.groupStyle == .superset) &&
+                      exercise.sets.indices.contains(round) && !exercise.sets[round].isResolved &&
+                      exercise.sets[round].id != currentSet?.id
+              }) else { return false }
+        if let destination = moveTo {
+            guard destination >= 0, destination != round,
+                  stations.allSatisfy({ index in
+                      let exercise = workout.exercises[index]
+                      return exercise.sets.indices.contains(destination) &&
+                          (min(round, destination)...max(round, destination)).allSatisfy {
+                              !exercise.sets[$0].isResolved && exercise.sets[$0].id != currentSet?.id
+                          }
+                  }) else { return false }
+        }
+        let selectedID = currentSet?.id
+        for index in stations {
+            if let destination = moveTo {
+                let set = workout.exercises[index].sets.remove(at: round)
+                workout.exercises[index].sets.insert(set, at: destination)
+                for position in workout.exercises[index].sets.indices {
+                    workout.exercises[index].sets[position].setNumber = position + 1
+                }
+            } else {
+                workout.exercises[index].sets[round].skippedAt = Date()
+                workout.exercises[index].skippedPlannedSetCount =
+                    (workout.exercises[index].skippedPlannedSetCount ?? 0) + 1
+                if workout.exercises[index].sets.allSatisfy(\.isResolved) {
+                    workout.exercises[index].completedAt = Date()
+                }
+            }
+        }
+        if let selectedID, let position = workout.exercises[currentExerciseIndex].sets.firstIndex(where: { $0.id == selectedID }) {
+            currentSetIndex = position
+        }
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
     }
 
     private func latestStrengthSet(in workout: StrengthWorkoutLog) -> (Int, Int)? {
