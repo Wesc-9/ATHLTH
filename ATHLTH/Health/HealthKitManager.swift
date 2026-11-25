@@ -1175,6 +1175,9 @@ final class HealthKitManager: ObservableObject {
 
         backgroundRefreshTask = task
         await task.value
+        // Do not attribute a later foreground refresh to an observer that
+        // arrived after this batch had already started reading.
+        backgroundRefreshReceivedWhileBackgrounded = false
         backgroundRefreshTask = nil
     }
 
@@ -4735,22 +4738,15 @@ final class HealthKitManager: ObservableObject {
     }
 
     func testBackgroundDelivery() async {
-        backgroundDeliveryTestResult = "Testing…"
-
-        let type = HKObjectType.workoutType()
-        let result: String = await withCheckedContinuation { continuation in
-            healthStore.enableBackgroundDelivery(for: type, frequency: .immediate) { success, error in
-                if success {
-                    continuation.resume(returning: "Success: HealthKit accepted background delivery for workouts.")
-                } else if let error {
-                    continuation.resume(returning: "Not available in this signed build: \(error.localizedDescription)")
-                } else {
-                    continuation.resume(returning: "Background delivery was not enabled.")
-                }
-            }
+        guard integrationEnabled, backgroundSyncPreferenceEnabled,
+              healthDataAvailable, hasRequestedAuthorization,
+              !shouldDeferAutomaticHealthWork else {
+            backgroundDeliveryTestResult = backgroundDeliveryStatus.title
+            return
         }
-
-        backgroundDeliveryTestResult = result
+        backgroundDeliveryTestResult = ATHLTHLocalization.choose(english: "Testing…", norwegian: "Tester…")
+        await configureBackgroundSync(allowed: true)
+        backgroundDeliveryTestResult = backgroundDeliveryStatus.title
     }
 
     func testWorkoutRouteCapability() async {
