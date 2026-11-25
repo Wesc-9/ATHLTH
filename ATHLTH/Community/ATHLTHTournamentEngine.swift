@@ -363,3 +363,48 @@ enum ATHLTHTournamentEngine {
         return qualified
     }
 }
+
+ 
+/// Foundation for team competition, operating on already approved points,
+/// not heterogeneous raw workout measurements. Server-owned roster, scoring
+/// and relay handoff must be implemented before exposing team publishing.
+enum ATHLTHCompetitionTeamPolicy {
+    enum Aggregation: String, Codable, CaseIterable {
+        case sum, average, best
+    }
+
+    struct Team: Equatable {
+        let id: UUID
+        let members: [UUID]
+    }
+
+    static func validRoster(_ teams: [Team], participants: Set<UUID>,
+                            aggregation: Aggregation) -> Bool {
+        guard teams.count >= 2, Set(teams.map(\.id)).count == teams.count,
+              teams.allSatisfy({ $0.members.count >= 2 }) else { return false }
+        let members = teams.flatMap(\.members)
+        guard Set(members).count == members.count,
+              Set(members) == participants else { return false }
+        // Sum and best give a structural advantage to larger teams.
+        return aggregation == .average ||
+            Set(teams.map { $0.members.count }).count == 1
+    }
+
+    /// A nil member score means pending, not zero. The server must explicitly
+    /// resolve absence/disqualification before a team can be ranked.
+    static func score(team: Team, approvedPoints: [UUID: Double],
+                      aggregation: Aggregation) -> Double? {
+        guard team.members.count >= 2,
+              Set(team.members).count == team.members.count else { return nil }
+        let values = team.members.compactMap { approvedPoints[$0] }
+        guard values.count == team.members.count,
+              values.allSatisfy({ $0.isFinite && $0 >= 0 }) else { return nil }
+        let total = values.reduce(0, +)
+        guard total.isFinite else { return nil }
+        switch aggregation {
+        case .sum: return total
+        case .average: return total / Double(values.count)
+        case .best: return values.max()
+        }
+    }
+}
