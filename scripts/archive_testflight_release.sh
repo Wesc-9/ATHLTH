@@ -8,26 +8,27 @@ echo "Release archive started; CPU and memory:"
 sysctl hw.logicalcpu hw.memsize
 xcodebuild -version
 # Fresh, job-local output. No cross-commit compiled app cache.
-GARMIN_FLAGS=()
+# macOS ships Bash 3.2: with nounset, expanding an empty array fails.
+# Keep the base array non-empty in both ordinary and internal archives.
+ARCHIVE_ARGS=(
+  -project ATHLTH.xcodeproj
+  -scheme ATHLTH
+  -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages"
+  -configuration Release
+  -destination 'generic/platform=iOS'
+  -derivedDataPath "$RUNNER_TEMP/ATHLTHReleaseDerivedData"
+  -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive"
+  -showBuildTimingSummary
+  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_REQUIRED=NO
+  COMPILER_INDEX_STORE_ENABLE=NO
+  DEVELOPMENT_TEAM="${APPLE_TEAM_ID:-D3AX7B6RMW}"
+)
 if [ "${ATHLTH_GARMIN_INTERNAL_TEST:-0}" = "1" ]; then
   test "${GITHUB_REF:-}" = "refs/heads/release/v3.0.2"
-  GARMIN_FLAGS+=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ATHLTH_GARMIN_PERSONAL ATHLTH_GARMIN_INTERNAL_TEST')
+  ARCHIVE_ARGS+=('SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ATHLTH_GARMIN_PERSONAL ATHLTH_GARMIN_INTERNAL_TEST')
 fi
-xcodebuild \
-  -project ATHLTH.xcodeproj \
-  -scheme ATHLTH \
-  -clonedSourcePackagesDirPath "$RUNNER_TEMP/ATHLTHSourcePackages" \
-  -configuration Release \
-  -destination 'generic/platform=iOS' \
-  -derivedDataPath "$RUNNER_TEMP/ATHLTHReleaseDerivedData" \
-  -archivePath "$RUNNER_TEMP/ATHLTH.xcarchive" \
-  -showBuildTimingSummary \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  COMPILER_INDEX_STORE_ENABLE=NO \
-  DEVELOPMENT_TEAM="${APPLE_TEAM_ID:-D3AX7B6RMW}" \
-  "${GARMIN_FLAGS[@]}" \
-  archive > "$LOG" 2>&1 &
+xcodebuild "${ARCHIVE_ARGS[@]}" archive > "$LOG" 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true' INT TERM EXIT
 while kill -0 "$pid" 2>/dev/null; do
