@@ -11,6 +11,49 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         ]
     }
 
+    func testHybridCompetitionCanUseSeparateVenueRules() throws {
+        let runID = UUID(), strengthID = UUID()
+        let sports: Set<ATHLTHTournamentActivity> = [.running, .strength]
+        let actual: [UUID: ATHLTHTournamentActivity] = [runID: .running, strengthID: .strength]
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.selectedExerciseIDs = [runID, strengthID]
+        XCTAssertFalse(ATHLTHCompetitionEnvironment.treadmill.supports(sports))
+        settings.activityEnvironments["running"] = .treadmill
+        settings.activityEnvironments["strength"] = .gym
+        XCTAssertTrue(settings.environmentsValid(activities: sports, exerciseActivities: actual))
+        XCTAssertEqual(settings.effectiveEnvironment(activity: .running, exerciseID: runID), .treadmill)
+        XCTAssertEqual(settings.effectiveEnvironment(activity: .strength, exerciseID: strengthID), .gym)
+        XCTAssertFalse(settings.environmentsCanPublish(activities: sports))
+        settings.exerciseEnvironments[runID] = .outdoor
+        XCTAssertFalse(settings.environmentsValid(activities: sports, exerciseActivities: actual))
+        settings.exerciseEnvironments[runID] = nil
+        settings.activityEnvironments["running"] = .indoor
+        settings.exerciseEnvironments[runID] = .treadmill
+        XCTAssertTrue(settings.environmentsValid(activities: sports, exerciseActivities: actual))
+        let restored = try JSONDecoder().decode(ATHLTHTournamentCompetitionSettings.self, from: JSONEncoder().encode(settings))
+        XCTAssertEqual(restored, settings)
+        XCTAssertFalse(restored.environmentsValid(activities: sports, exerciseActivities: [:]))
+    }
+
+    func testVenueInheritanceRejectsContradictionsAndStaleIDs() {
+        let run = UUID(), stale = UUID()
+        let sports: Set<ATHLTHTournamentActivity> = [.running, .strength]
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.environment = .indoor
+        settings.selectedExerciseIDs = [run]
+        settings.activityEnvironments["running"] = .outdoor
+        XCTAssertFalse(settings.environmentsValid(activities: sports, exerciseActivities: [run: .running]))
+        settings.activityEnvironments["running"] = .any
+        XCTAssertFalse(settings.environmentsValid(activities: sports, exerciseActivities: [run: .running]))
+        settings.activityEnvironments = [:]
+        settings.exerciseEnvironments[run] = .treadmill
+        XCTAssertTrue(settings.environmentsValid(activities: sports, exerciseActivities: [run: .running]))
+        XCTAssertFalse(settings.environmentsValid(activities: sports, exerciseActivities: [run: .strength]))
+        settings.exerciseEnvironments[stale] = .gym
+        XCTAssertFalse(settings.environmentsValid(activities: sports, exerciseActivities: [run: .running, stale: .strength]))
+        XCTAssertFalse(settings.isValid)
+    }
+
     func testCompetitionVenueSeparatesTreadmillFromOutdoorGPS() {
         let treadmill = ATHLTHCompetitionEnvironment.treadmill
         XCTAssertTrue(treadmill.supports(Set([ATHLTHTournamentActivity.running])))
