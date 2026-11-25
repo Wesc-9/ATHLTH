@@ -613,22 +613,34 @@ struct ATHLTHTrainPlanPremiumView: View {
     /// Long localizations use an icon-only My plans button automatically.
     private var referencePageIntro: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .center, spacing: 8) {
-                Text("Plan")
-                    .font(.system(size: 40, weight: .regular, design: .serif))
-                    .foregroundStyle(graphite)
-                    .accessibilityAddTraits(.isHeader)
-
-                Spacer(minLength: 4)
-
-                ViewThatFits(in: .horizontal) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 8) {
+                    ATHLTHTrainPageTitle(title: "Plan").fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 4)
                     HStack(spacing: 7) {
                         referenceMyPlansShortcut(compact: false)
                         referenceViewSelector
-                    }
+                    }.fixedSize(horizontal: true, vertical: false)
+                }
+                HStack(alignment: .center, spacing: 8) {
+                    ATHLTHTrainPageTitle(title: "Plan").fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 4)
                     HStack(spacing: 7) {
                         referenceMyPlansShortcut(compact: true)
                         referenceViewSelector
+                    }.fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    ATHLTHTrainPageTitle(title: "Plan")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 7) {
+                            referenceMyPlansShortcut(compact: false)
+                            referenceViewSelector
+                        }
+                        HStack(spacing: 7) {
+                            referenceMyPlansShortcut(compact: true)
+                            referenceViewSelector
+                        }
                     }
                 }
             }
@@ -640,8 +652,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                          "Velg en lagret plan eller opprett en ny."))
                 : tr("Build week by week, with structure and flow.",
                      "Bygg uke for uke, med struktur og flyt."))
-                .font(.system(size: 13, weight: .regular, design: .serif))
-                .foregroundStyle(secondaryInk)
+                .font(ATHLTHTrainDesign.pageSubtitle)
+                .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.73))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

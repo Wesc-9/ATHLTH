@@ -364,39 +364,48 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     }
 
     private var editorialHeading: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(tr("Progress", "Fremdrift"))
-                    .font(.system(size: 39, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                Menu {
-                    Picker(tr("Training type", "Treningstype"), selection: $area) {
-                        ForEach(Area.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 7) {
-                        Text(area.title).lineLimit(1).minimumScaleFactor(0.7)
-                        Image(systemName: "chevron.down").font(.system(size: 10))
-                    }
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
-                    .background(
-                        LinearGradient(colors: [ATHLTHTrainDesign.gold, ATHLTHTrainDesign.bronze],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        in: Capsule()
-                    )
+        VStack(alignment: .leading, spacing: 9) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 8) {
+                    ATHLTHTrainPageTitle(title: tr("Progress", "Fremdrift"))
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 4)
+                    progressAreaMenu.fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    ATHLTHTrainPageTitle(title: tr("Progress", "Fremdrift"))
+                    progressAreaMenu
                 }
             }
             Text(tr("See your development. Build on what works.",
                     "Se utviklingen din. Bygg videre på det som fungerer."))
-                .font(.system(size: 13))
-                .foregroundStyle(muted)
+                .font(ATHLTHTrainDesign.pageSubtitle)
+                .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.73))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var progressAreaMenu: some View {
+        Menu {
+            Picker(tr("Training type", "Treningstype"), selection: $area) {
+                ForEach(Area.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Text(area.title).lineLimit(1).minimumScaleFactor(0.7)
+                Image(systemName: "chevron.down").font(.system(size: 10))
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(
+                LinearGradient(colors: [ATHLTHTrainDesign.gold, ATHLTHTrainDesign.bronze],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: Capsule()
+            )
         }
     }
 
@@ -971,7 +980,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
                 Text(tr("Development", "Utvikling"))
-                    .font(.system(size: 22, weight: .medium, design: .serif))
+                    .font(ATHLTHTrainDesign.sectionTitle)
                     .foregroundStyle(ink)
                 Spacer(minLength: 0)
 

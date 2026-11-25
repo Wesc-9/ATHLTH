@@ -8,7 +8,6 @@ struct ATHLTHTrainTodayCoverView: View {
     @Binding var selection: ATHLTHTrainSection
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .largeTitle) private var headingSize: CGFloat = 49
 
     private let ink = ATHLTHTrainDesign.ink
 
@@ -44,20 +43,14 @@ struct ATHLTHTrainTodayCoverView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ATHLTHTrainHeaderRow(selection: $selection)
 
-                    Text(ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
-                        .font(.system(size: min(headingSize, 71),
-                                      weight: .regular, design: .serif))
-                        .foregroundStyle(ink)
-                        .minimumScaleFactor(0.8)
-                        .lineLimit(1)
+                    ATHLTHTrainPageTitle(title: ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
                         .padding(.top, 22)
-                        .accessibilityAddTraits(.isHeader)
 
                     Text(ATHLTHLocalization.choose(
                         english: "Stronger habits\nin a more beautiful everyday.",
                         norwegian: "Sterkere vaner\ni en vakrere hverdag."
                     ))
-                    .font(.system(.title3, design: .serif))
+                    .font(ATHLTHTrainDesign.pageSubtitle)
                     .foregroundStyle(ink.opacity(0.73))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 9)

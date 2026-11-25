@@ -17,6 +17,27 @@ enum ATHLTHTrainDesign {
     static let sectionSpacing: CGFloat = 26
     static let title = Font.system(.largeTitle, design: .serif).weight(.regular)
     static let sectionTitle = Font.system(.title2, design: .serif).weight(.medium)
+    static let pageSubtitle = Font.system(.title3, design: .serif)
+    static let pageTitleSize: CGFloat = 49
+    static let pageTitleMaximumSize: CGFloat = 71
+    static func pageTitle(size: CGFloat) -> Font {
+        .system(size: min(size, pageTitleMaximumSize), weight: .regular, design: .serif)
+    }
+}
+
+/// The Today cover is the typography reference for every Train tab.
+struct ATHLTHTrainPageTitle: View {
+    let title: String
+    @ScaledMetric(relativeTo: .largeTitle) private var headingSize: CGFloat = ATHLTHTrainDesign.pageTitleSize
+
+    var body: some View {
+        Text(title)
+            .font(ATHLTHTrainDesign.pageTitle(size: headingSize))
+            .foregroundStyle(ATHLTHTrainDesign.ink)
+            .minimumScaleFactor(0.8)
+            .lineLimit(1)
+            .accessibilityAddTraits(.isHeader)
+    }
 }
 
 /// A fine metallic edge, warm paper and two restrained shadows establish depth
