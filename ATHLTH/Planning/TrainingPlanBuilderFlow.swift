@@ -236,7 +236,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var planDiscardError: String?
     @State private var deliberatelyDiscardedPlanDraft = false
 
-    private struct ConfigurationCheckpoint: Codable {
+    @State private var pendingPlanCheckpoint: Task<Void, Never>?
+
+    private struct ConfigurationCheckpoint: Codable, Equatable {
         var saveToLibrary: Bool?
         var customTitle: String?
         var workoutTitles: [Int: String]?
@@ -255,10 +257,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         var selectedDay: Int?
         var aiInstruction: String
     }
-    private var configurationCheckpoint: Data? {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        return try? encoder.encode(ConfigurationCheckpoint(
+    private var checkpointConfiguration: ConfigurationCheckpoint {
+        ConfigurationCheckpoint(
             saveToLibrary: saveToLibrary, customTitle: title, workoutTitles: workoutTitleOverridesByDay,
             workoutMinutes: workoutMinutesByDay,
             goalDetail: goalDetail, summary: planSummary,
@@ -267,7 +267,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             secondaryFocus: secondaryFocus, focusWeight: focusWeight,
             hasCompetitionDate: hasCompetitionDate, competitionDate: competitionDate,
             visibility: visibility, selectedDay: selectedAdvancedWeekDay,
-            aiInstruction: aiAdjustmentInstruction))
+            aiInstruction: aiAdjustmentInstruction)
+    }
+
+    private var configurationCheckpoint: Data? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try? encoder.encode(checkpointConfiguration)
     }
 
     private let draftStore = ATHLTHPlanCreationDraftStore()
@@ -873,22 +879,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var planCheckpointObservers: some View {
         AnyView(planLifecycle)
-        .onChange(of: title) { _, _ in saveResumableDraft() }
-        .onChange(of: configurationCheckpoint) { _, _ in saveResumableDraft() }
-        .onChange(of: inlineGoalDraft) { _, _ in saveResumableDraft() }
-        .onChange(of: approvedPlanReplacementID) { _, _ in saveResumableDraft() }
-        .onChange(of: advancedAddDestination?.id) { _, _ in saveResumableDraft() }
-        .onChange(of: weekCount) { _, _ in saveResumableDraft() }
-        .onChange(of: startDate) { _, _ in saveResumableDraft() }
-        .onChange(of: mode) { _, _ in saveResumableDraft() }
+        .onChange(of: title) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: checkpointConfiguration) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: inlineGoalDraft) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: approvedPlanReplacementID) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: advancedAddDestination?.id) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: weekCount) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: startDate) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: mode) { _, _ in schedulePlanCheckpoint() }
     }
 
     private var planGoalObservers: some View {
         AnyView(planCheckpointObservers)
-        .onChange(of: focus) { _, _ in saveResumableDraft() }
-        .onChange(of: goal) { _, _ in saveResumableDraft() }
-        .onChange(of: selectedGoalArea) { _, _ in saveResumableDraft() }
-        .onChange(of: selectedGoalChoice) { _, _ in saveResumableDraft() }
+        .onChange(of: focus) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: goal) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: selectedGoalArea) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: selectedGoalChoice) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: selectedGoalIDs) { _, selected in
             if !isHydratingPlanDraft,
                (mode == .basic || selectedGoalChoice.isEmpty || selectedGoalChoice == "area"),
@@ -897,30 +903,30 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }) {
                 applyExistingGoalFocus(linked)
             }
-            saveResumableDraft()
+            schedulePlanCheckpoint()
         }
-        .onChange(of: varyWeekdays) { _, _ in saveResumableDraft() }
-        .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
+        .onChange(of: varyWeekdays) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: selectedSource) { _, _ in schedulePlanCheckpoint() }
     }
 
     private var planPrimaryObservers: some View {
         AnyView(planGoalObservers)
-        .onChange(of: workoutKindOverridesByDay) { _, _ in saveResumableDraft() }
-        .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
-        .onChange(of: workoutMinutesByDay) { _, _ in saveResumableDraft() }
-        .onChange(of: structuredWorkoutsByDay) { _, _ in saveResumableDraft() }
-        .onChange(of: weekDayEdits) { _, _ in saveResumableDraft() }
-        .onChange(of: weekPlanningApproach) { _, _ in saveResumableDraft() }
+        .onChange(of: workoutKindOverridesByDay) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: workoutTitleOverridesByDay) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: workoutMinutesByDay) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: structuredWorkoutsByDay) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: weekDayEdits) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: weekPlanningApproach) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: guidedDayCursor) { _, _ in
             selectedPlanWeekIndex = guidedCurrentWeek
             guidedTrainingPlaceExpanded = false
             expandedWeekPreviewDays.insert(
                 weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
             )
-            saveResumableDraft()
+            schedulePlanCheckpoint()
         }
-        .onChange(of: firstGuidedWeekDecisionMade) { _, _ in saveResumableDraft() }
-        .onChange(of: guidedWeekAwaitingDecision) { _, _ in saveResumableDraft() }
+        .onChange(of: firstGuidedWeekDecisionMade) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: guidedWeekAwaitingDecision) { _, _ in schedulePlanCheckpoint() }
     }
 
     private var planSecondaryObservers: some View {
@@ -938,22 +944,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             // Advanced workout details just because a day was toggled in Simple.
             // Advanced edits remain in their original positions when returning.
             sessionsPerWeek = selectedDays.count
-            saveResumableDraft()
+            schedulePlanCheckpoint()
         }
-        .onChange(of: equipment) { _, _ in saveResumableDraft() }
+        .onChange(of: equipment) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: weeklyTimeBudgetMinutes) { _, newValue in
             if mode == .advanced {
                 let perSession = Double(newValue) / Double(max(1, selectedDays.count))
                 advancedSessionMinutes = min(180, max(5, Int((perSession / 5).rounded()) * 5))
             }
-            saveResumableDraft()
+            schedulePlanCheckpoint()
         }
         .onChange(of: step) { _, next in
             if studioFullscreenEditing, next != .week,
                composingAdvancedDay != nil {
                 closeInlineWorkoutBuilder()
             }
-            saveResumableDraft()
+            schedulePlanCheckpoint()
         }
         .onChange(of: selectedPlanWeekIndex) { old, new in
             // A day number is only unique *within its week*. Never let an
@@ -962,13 +968,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                composingAdvancedDay != nil {
                 closeInlineWorkoutBuilder()
             }
-            saveResumableDraft()
+            schedulePlanCheckpoint()
         }
-        .onChange(of: simpleMinutes) { _, _ in saveResumableDraft() }
-        .onChange(of: simpleActivities) { _, _ in saveResumableDraft() }
-        .onChange(of: editingWeekDay) { _, _ in saveResumableDraft() }
-        .onChange(of: composingAdvancedDay) { _, _ in saveResumableDraft() }
-        .onChange(of: selectingLibraryDay) { _, _ in saveResumableDraft() }
+        .onChange(of: simpleMinutes) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: simpleActivities) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: editingWeekDay) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: composingAdvancedDay) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: selectingLibraryDay) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: scenePhase) { _, _ in
             saveResumableDraft()
         }
@@ -7061,14 +7067,30 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private func schedulePlanCheckpoint() {
+        pendingPlanCheckpoint?.cancel()
+        guard didApplySuggestedStartDate, !completedPlanCreation,
+              !deliberatelyDiscardedPlanDraft, !isHydratingPlanDraft else { return }
+        let owner = session.profile.userID
+        pendingPlanCheckpoint = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(280)) } catch { return }
+            guard !Task.isCancelled, session.profile.userID == owner else { return }
+            saveResumableDraft()
+        }
+    }
+
     @discardableResult
     private func saveResumableDraft() -> Bool {
+        pendingPlanCheckpoint?.cancel()
+        pendingPlanCheckpoint = nil
         guard didApplySuggestedStartDate,
               !completedPlanCreation,
               !deliberatelyDiscardedPlanDraft,
               !isHydratingPlanDraft else {
             return true
         }
+        let signpost = ATHLTHPerformance.begin("PlanDraftCheckpoint")
+        defer { ATHLTHPerformance.end("PlanDraftCheckpoint", id: signpost) }
         let draft = ATHLTHPlanCreationDraft(
             title: resolvedPlanTitle,
             weekCount: weekCount,
