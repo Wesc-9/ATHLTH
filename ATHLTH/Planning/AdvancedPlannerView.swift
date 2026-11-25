@@ -7553,6 +7553,9 @@ struct SessionEditorView: View {
                         onPreparedWorkout == nil &&
                         selectedScratchWorkoutType != nil
                         ? { draft in await invitePartnerToBuild(draft) } : nil,
+                    collaborationRules: isStandalone && onPreparedWorkout == nil &&
+                        selectedPartnerID != nil && selectedScratchWorkoutType != nil
+                        ? AnyView(sharedWorkoutRulesCard) : nil,
                     onAddStandalone: { updated in
                         if collaborationInvitationSent &&
                             selectedScratchWorkoutType != nil &&
@@ -9246,6 +9249,39 @@ struct SessionEditorView: View {
                     )
                 )
             }
+        }
+    }
+
+    /// Expose the same rules before the invitation is sent, in both Basic
+    /// and Advanced. A participant may not edit a locked recipe.
+    private var sharedWorkoutRulesCard: some View {
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(
+                    ATHLTHLocalization.choose(english: "Shared workout rules", norwegian: "Regler for fellesøkten"),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                partnerCollaborationOptions
+
+                Divider()
+
+                Label(
+                    ATHLTHLocalization.choose(english: "Both approve before Ready", norwegian: "Begge godkjenner før Klar"),
+                    systemImage: "checkmark.shield"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(ATHLTHLocalization.choose(
+                    english: "The workout is prepared in the shared room before the host starts the workout. Edits require both to approve the new version.",
+                    norwegian: "Økten klargjøres i fellesrommet før arrangøren starter. Ved endringer må begge godkjenne den nye versjonen."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .accessibilityIdentifier("athlth-shared-workout-rules")
         }
     }
 

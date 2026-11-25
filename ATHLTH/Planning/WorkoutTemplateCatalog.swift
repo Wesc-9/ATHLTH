@@ -4961,6 +4961,7 @@ struct WorkoutTemplateBuilderView: View {
     private let collaborationPartnerName: String?
     private let collaborationWorkoutID: UUID?
     private let collaborationInviteSent: Bool
+    private let collaborationRules: AnyView?
     /// A true invite can be sent before any exercise is added. It sends a
     /// private, editable proposal invitation rather than starting recording.
     private let onInviteToBuild: ((PlannedSession) async -> String?)?
@@ -5034,6 +5035,7 @@ struct WorkoutTemplateBuilderView: View {
         collaborationWorkoutID: UUID? = nil,
         collaborationInviteSent: Bool = false,
         onInviteToBuild: ((PlannedSession) async -> String?)? = nil,
+        collaborationRules: AnyView? = nil,
         onAddStandalone: ((PlannedSession) -> Bool)? = nil,
         onSwitchToBasic: ((PlannedSession) -> Void)? = nil,
         onValidateSave: ((PlannedSession) -> String?)? = nil,
@@ -5169,6 +5171,7 @@ struct WorkoutTemplateBuilderView: View {
         self.collaborationWorkoutID = collaborationWorkoutID
         self.collaborationInviteSent = collaborationInviteSent
         self.onInviteToBuild = onInviteToBuild
+        self.collaborationRules = collaborationRules
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -6379,6 +6382,9 @@ struct WorkoutTemplateBuilderView: View {
                 collaborationInviteSending: collaborationInviteSending,
                 onInviteToBuild: nil
             )
+            if let collaborationRules {
+                collaborationRules
+            }
             // Audio Coach, Spotify and advanced options are grouped
             // underneath the workout instead of above its hero card.
         }
