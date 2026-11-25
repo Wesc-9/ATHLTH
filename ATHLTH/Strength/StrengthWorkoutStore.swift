@@ -1774,6 +1774,81 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    private func latestStrengthSet(in workout: StrengthWorkoutLog) -> (Int, Int)? {
+        var latest: (Int, Int, Date)?
+        for (e, exercise) in workout.exercises.enumerated() {
+            for (i, set) in exercise.sets.enumerated() {
+                if let date = set.completedAt, latest == nil || date > latest!.2 {
+                    latest = (e, i, date)
+                }
+            }
+        }
+        return latest.map { ($0.0, $0.1) }
+    }
+
+    var canUndoLatestStrengthSet: Bool {
+        guard let workout = activeWorkout, workout.captureDevice == .iPhone,
+              currentSetEffortClock == nil, currentTimedSetCountdown == nil,
+              let (e, i) = latestStrengthSet(in: workout) else { return false }
+        return workout.exercises[e].groupID == nil &&
+            workout.exercises[e].sets[i].hybridPhaseKind == nil
+    }
+
+    @discardableResult
+    func undoLatestStrengthSet() -> Bool {
+        guard canUndoLatestStrengthSet, var workout = activeWorkout,
+              let (e, i) = latestStrengthSet(in: workout) else { return false }
+        var set = workout.exercises[e].sets[i]
+        // Only the selected mistaken result is cleared. Prescription and ID survive.
+        set.completedAt = nil
+        set.completedReps = nil
+        set.completedWeightKilograms = nil
+        set.completedDurationSeconds = nil
+        set.completedResistanceLevel = nil
+        set.completedDistanceMeters = nil
+        set.completedTreadmillSpeedKilometersPerHour = nil
+        set.completedTreadmillInclinePercent = nil
+        set.manuallyEstimatedTreadmillDistanceMeters = nil
+        set.watchMeasuredDistanceMeters = nil
+        set.watchActiveDurationSeconds = nil
+        set.watchAverageHeartRateBPM = nil
+        set.watchMaximumHeartRateBPM = nil
+        set.actualSetElapsedSeconds = nil
+        set.actualRestAfterSeconds = nil
+        set.effortSegments = nil
+        set.rpe = nil
+        set.rir = nil
+        workout.exercises[e].sets[i] = set
+        workout.exercises[e].completedAt = nil
+        workout.exercises[e].transitionToNextExerciseSeconds = nil
+        currentExerciseIndex = e
+        currentSetIndex = i
+        restStartedAt = nil
+        restEndsAt = nil
+        isFreeTrainingBetweenExercises = false
+        activeWorkout = workout
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+        return true
+    }
+
+    @discardableResult
+    func replacePendingStrengthExercise(_ id: UUID, with replacement: Exercise) -> Bool {
+        guard var workout = activeWorkout,
+              let index = workout.exercises.firstIndex(where: { $0.id == id }),
+              workout.exercises[index].groupID == nil,
+              workout.exercises[index].isEmbeddedRunningInterval != true,
+              workout.exercises[index].sets.allSatisfy({ !$0.isResolved }),
+              !(currentExercise?.id == id && (currentSetEffortClock != nil || currentTimedSetCountdown != nil))
+        else { return false }
+        workout.exercises[index].substitutedFromExerciseName = workout.exercises[index].exercise.name
+        workout.exercises[index].exercise = replacement.snapshot
+        activeWorkout = workout
+        if currentExercise?.id == id { reloadDraftFromCurrentSet() }
+        persistCheckpointNow()
+        return true
+    }
+
     func removeQueuedStrength(_ id: UUID) {
         guard var workout = activeWorkout else { return }
         workout.liveExecutionQueue = pendingExecutionQueue.filter { $0.id != id }
