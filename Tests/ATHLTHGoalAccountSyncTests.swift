@@ -16,6 +16,16 @@ final class ATHLTHGoalAccountSyncTests: XCTestCase {
         )
     }
 
+    func testGoalUpdateDoesNotIntroduceLocalBodyMeasurements() {
+        let goal = item()
+        let reading = ATHLTHBodyMeasurement(metric: .weight, value: 68, date: Date(timeIntervalSince1970: 1_800_000_000))
+        let fresh = ATHLTHCloudGoalDocument(goals: [], measurements: [])
+        XCTAssertTrue(fresh.replacingGoals([goal]).measurements.isEmpty)
+        let legacy = ATHLTHCloudGoalDocument(goals: [], measurements: [reading])
+        XCTAssertEqual(legacy.replacingGoals([goal]).measurements, [reading])
+        XCTAssertEqual(legacy.replacingGoals([goal]).goals, [goal])
+    }
+
     func testFreshIPadImportsAnExistingIPhoneGoal() {
         let remote = item()
         let outcome = ATHLTHGoalMergePolicy.reconcile(
