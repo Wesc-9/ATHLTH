@@ -18,8 +18,12 @@ enum ATHLTHWorkoutScreenAwake {
             reasons.remove(reason)
         }
 
-        let shouldStayAwake =
-            !reasons.isEmpty
+        refresh()
+    }
+
+    static func refresh() {
+        let preference = UserDefaults.standard.object(forKey: "settings.keepWorkoutScreenAwake") as? Bool ?? true
+        let shouldStayAwake = preference && !reasons.isEmpty
 
         if UIApplication.shared
             .isIdleTimerDisabled !=
