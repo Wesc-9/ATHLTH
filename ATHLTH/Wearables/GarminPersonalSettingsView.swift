@@ -129,6 +129,29 @@ struct GarminPersonalSettingsView: View {
                     }
                 }
                 if let snapshot = store.snapshot(for: accountID) {
+                    ATHLTHSettingsGroup(title: tr("Preferred health sources · private preview", "Foretrukne helsekilder · privat visning")) {
+                        PremiumSettingsCard {
+                            ForEach(WearableDisplayMetric.allCases) { metric in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Picker(metric.title, selection: Binding(
+                                        get: { store.preference(for: metric, account: accountID) },
+                                        set: { if accountMatches { store.setPreference($0, metric: metric, account: accountID) } }
+                                    )) {
+                                        ForEach(WearableDisplayPreference.allCases) { value in
+                                            Text(value.title).tag(value)
+                                        }
+                                    }
+                                    Text(preferredReading(metric, snapshot: snapshot))
+                                        .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                .padding(16)
+                                if metric != WearableDisplayMetric.allCases.last { SettingsDivider() }
+                            }
+                            Text(tr("HRV methods differ between providers. Values are not averaged or combined; this preference changes only the private display.", "HRV-metodene er forskjellige. Verdiene slås ikke sammen eller gjennomsnittsberegnes; valget gjelder kun privat visning."))
+                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                                .padding(16)
+                        }
+                    }
                     ATHLTHSettingsGroup(title: tr("Garmin measurements", "Garmin-målinger")) {
                         PremiumSettingsCard {
                             GarminPersonalMetricsView(snapshot: snapshot, expanded: true)
@@ -151,6 +174,27 @@ struct GarminPersonalSettingsView: View {
             store.refresh(account: accountID)
         }
         .onDisappear { key = "" }
+    }
+
+    private func preferredReading(_ metric: WearableDisplayMetric, snapshot: GarminPersonalPreview) -> String {
+        let apple: Double?
+        let garmin: Double?
+        switch metric {
+        case .sleep: apple = health.sleep.totalAsleep; garmin = snapshot.sleepSeconds
+        case .steps: apple = health.training.stepsToday.map(Double.init); garmin = snapshot.steps.map(Double.init)
+        case .hrv: apple = health.heart.hrvMilliseconds; garmin = snapshot.overnightHRV
+        case .restingHeartRate: apple = health.heart.restingHeartRate; garmin = snapshot.restingHeartRate
+        }
+        if Calendar.current.isDateInToday(snapshot.measurementDay),
+           let reading = WearableDisplaySourcePolicy.garminReading(metric: metric, apple: apple,
+            garmin: garmin, preference: store.preference(for: metric, account: accountID)) {
+            return reading.formattedValue + " · " + reading.sourceLabel
+        }
+        if let apple, apple.isFinite, apple >= 0, metric == .steps || apple > 0 {
+            let reading = GarminDisplayReading(metric: metric, value: apple)
+            return reading.formattedValue + " · Apple Health"
+        }
+        return tr("No data available", "Ingen tilgjengelige data")
     }
 }
 #endif

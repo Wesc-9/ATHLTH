@@ -1006,6 +1006,7 @@ settingsSection(ATHLTHLocalization.choose(
         }
     }
 
+    @ViewBuilder
     private var connectionsSettingsSection: some View {
 settingsSection("Connections") {
                         PremiumSettingsCard {

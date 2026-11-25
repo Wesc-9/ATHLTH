@@ -11,6 +11,7 @@ final class GarminPersonalLocalStore: ObservableObject {
     @Published private(set) var connected = false
     @Published private(set) var needsKeyRemoval = false
     @Published private(set) var displayPreference: WearableDisplayPreference = .automatic
+    @Published private var metricPreferences: [String: String] = [:]
     @Published private(set) var busy = false
     @Published private(set) var message: String?
     struct SyncEvent: Identifiable {
@@ -37,6 +38,9 @@ final class GarminPersonalLocalStore: ObservableObject {
             UserDefaults.standard.string(forKey: preferenceKey($0))
                 .flatMap(WearableDisplayPreference.init(rawValue:))
         } ?? .automatic
+        metricPreferences = account.flatMap {
+            UserDefaults.standard.dictionary(forKey: preferenceKey($0) + ".metrics") as? [String: String]
+        } ?? [:]
         if let account {
             do { connected = try GarminPersonalKeychain.read(account) != nil }
             catch { message = "Unable to access the local Keychain." }
@@ -53,6 +57,18 @@ final class GarminPersonalLocalStore: ObservableObject {
         guard accountID == account else { return }
         displayPreference = value
         UserDefaults.standard.set(value.rawValue, forKey: preferenceKey(account))
+    }
+
+    func preference(for metric: WearableDisplayMetric, account: UUID) -> WearableDisplayPreference {
+        guard accountID == account else { return .automatic }
+        return metricPreferences[metric.rawValue].flatMap(WearableDisplayPreference.init(rawValue:))
+            ?? displayPreference
+    }
+
+    func setPreference(_ value: WearableDisplayPreference, metric: WearableDisplayMetric, account: UUID) {
+        guard accountID == account else { return }
+        metricPreferences[metric.rawValue] = value.rawValue
+        UserDefaults.standard.set(metricPreferences, forKey: preferenceKey(account) + ".metrics")
     }
 
     func isConnected(to account: UUID) -> Bool {

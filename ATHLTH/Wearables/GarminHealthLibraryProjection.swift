@@ -41,7 +41,16 @@ extension GarminPersonalLocalStore {
         let zeroAllowed = metric == .steps || metric == .activeEnergy || metric == .sleepDeep ||
                           metric == .sleepREM || metric == .sleepAwake
         guard zeroAllowed || value > 0 else { return nil }
-        if preference(for: account) != .garmin,
+        let sourceMetric: WearableDisplayMetric?
+        switch metric {
+        case .sleepDuration, .sleepDeep, .sleepREM, .sleepAwake: sourceMetric = .sleep
+        case .steps: sourceMetric = .steps
+        case .hrv: sourceMetric = .hrv
+        case .restingHeartRate: sourceMetric = .restingHeartRate
+        default: sourceMetric = nil
+        }
+        let choice = sourceMetric.map { preference(for: $0, account: account) } ?? preference(for: account)
+        if choice != .garmin,
            let apple, apple.isFinite, apple >= 0, (zeroAllowed || apple > 0) { return nil }
         return GarminLibraryReading(value: value, source: metric == .hrv ? "Garmin natt-HRV" : "Garmin")
     }

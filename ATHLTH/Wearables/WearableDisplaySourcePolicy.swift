@@ -1,6 +1,17 @@
 import Foundation
 
-enum WearableDisplayMetric { case sleep, steps, hrv, restingHeartRate }
+enum WearableDisplayMetric: String, CaseIterable, Identifiable {
+    case sleep, steps, hrv, restingHeartRate
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .sleep: return "Søvn"
+        case .steps: return "Skritt"
+        case .hrv: return "HRV"
+        case .restingHeartRate: return "Hvilepuls"
+        }
+    }
+}
 
 enum WearableDisplayPreference: String, CaseIterable, Identifiable {
     case automatic, appleHealth, garmin
