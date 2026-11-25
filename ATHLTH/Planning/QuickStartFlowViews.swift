@@ -1721,7 +1721,9 @@ struct RunQuickStartSheet: View {
 
         // Planned indoor and treadmill workouts must never inherit GPS
         // even when launched from an existing route or interval card.
-        let plannedEnvironment = RunEnvironment.forPlannedSession(plannedSession)
+        let plannedEnvironment = plannedSession == nil
+            ? (initialWorkout?.launchRunEnvironment ?? .outdoor)
+            : RunEnvironment.forPlannedSession(plannedSession)
         let initialMode: RunQuickStartMode =
             initialWorkout != nil ? .structured :
             (initialRoute != nil && plannedEnvironment == .outdoor ? .route : .free)
@@ -1910,6 +1912,10 @@ struct RunQuickStartSheet: View {
                     ) { workout in
                         advancedWorkout = nil
                         selectedWorkout = workout
+                        if let importedEnvironment = workout.launchRunEnvironment {
+                            environment = importedEnvironment
+                            if importedEnvironment != .outdoor { selectedRoute = nil }
+                        }
                         basicGoalSelected = false
                         basicGhostSelected = false
                         mode = .structured
