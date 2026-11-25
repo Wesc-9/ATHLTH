@@ -760,6 +760,14 @@ struct StrengthRepPersonalRecord: Identifiable, Hashable {
     }
 }
 
+/// Explicit execution order, scoped to one active workout and stable set IDs.
+struct StrengthLiveQueueEntry: Identifiable, Codable, Hashable {
+    var id: UUID = UUID()
+    let exerciseID: UUID
+    // nil means all remaining sets of the exercise.
+    let setID: UUID?
+}
+
 struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     let id: UUID
     var plannedSessionID: UUID?
@@ -784,6 +792,7 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var isOutdoorHybrid: Bool? = nil
     var exercises: [StrengthExerciseLog]
     var healthMetrics: LinkedHealthWorkoutMetrics
+    var liveExecutionQueue: [StrengthLiveQueueEntry]? = nil
     var advancedConfiguration:
         StrengthAdvancedConfiguration? = nil
     // True only when the athlete explicitly starts a no-plan strength
