@@ -3536,87 +3536,64 @@ struct ATHLTHPrivacyCenterView: View {
 /// migrated, reset, duplicated or silently changed by this navigation split.
 struct ATHLTHAccountAIConsentView: View {
     @EnvironmentObject private var session: AppSessionStore
-
+    @State private var historyConsent = false
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
     var body: some View {
-        Form {
-            Section("Health Data") {
-                Label(
-                    "Health data is private by default",
-                    systemImage: "heart.text.square.fill"
-                )
-                .foregroundStyle(ATHLTHTheme.accent)
-
-                Text(
-                    "Heart rate, sleep, weight and other Apple Health values are never attached automatically when you share a workout, route or plan."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        ATHLTHSettingsScreen(title: tr("AI & data consent", "AI og datasamtykker"),
+                             subtitle: tr("You choose what Coach can use.", "Du velger hva Coach får bruke.")) {
+            ATHLTHSettingsGroup(title: tr("ATHLTH Coach", "ATHLTH Coach")) {
+                PremiumSettingsCard {
+                    consentRow("clock.arrow.circlepath", tr("Training history", "Treningshistorikk"),
+                               tr("Summary of up to 28 days", "Sammendrag av opptil 28 dager"),
+                               Binding(get: { historyConsent }, set: { enabled in
+                                   guard session.signedIn else { return }
+                                   AccountLocalStorage.write(enabled, name: "coachHistoryConsent", userID: session.profile.userID)
+                                   historyConsent = enabled
+                               }))
+                    detail(tr("When you request a plan, an optional workout summary is sent to Groq. Routes, sleep, heart rate and other raw health readings are excluded from this history summary.", "Når du ber om en plan, kan et valgfritt øktsammendrag sendes til Groq. Ruter, søvn, puls og andre rå helsemålinger er utelatt fra dette historikksammendraget."))
+                    SettingsDivider()
+                    consentRow("heart.text.square", tr("Health context", "Helseopplysninger"),
+                               tr("Separate permission for AI", "Eget samtykke til AI"),
+                               Binding(get: { session.aiHealthDataSharingEnabled }, set: { session.setAIHealthDataSharingEnabled($0) }))
+                    detail(tr("If enabled, minimum relevant health context such as sleep, HRV, heart rate and workout metrics may be sent through ATHLTH's backend to the AI provider. Off by default. You can revoke either permission at any time.", "Hvis aktivert, kan et minimum av relevant helsekontekst som søvn, HRV, puls og treningsmålinger sendes gjennom ATHLTHs backend til AI-leverandøren. Av som standard. Begge samtykker kan trekkes tilbake når som helst."))
+                }
             }
-
-            Section("ATHLTH Coach & AI") {
-                Toggle(
-                    "Allow Coach to use health data",
-                    isOn: Binding(
-                        get: {
-                            session.aiHealthDataSharingEnabled
-                        },
-                        set: { enabled in
-                            session.setAIHealthDataSharingEnabled(
-                                enabled
-                            )
+            ATHLTHSettingsGroup(title: tr("Personalization", "Personalisering")) {
+                PremiumSettingsCard {
+                    consentRow("sparkles", tr("Personalized ATHLTH offers", "Personlige ATHLTH-tilbud"),
+                               tr("Based on selected goals and interests", "Basert på valgte mål og interesser"),
+                               Binding(get: { session.onboardingProfile?.personalizedOfferConsent == .granted },
+                                       set: { session.setPersonalizedOfferConsent($0 ? .granted : .declined) }))
+                    detail(tr("Apple Health / HealthKit data is excluded from offer targeting.", "Apple Health-data brukes ikke til målretting av tilbud."))
+                }
+            }
+            ATHLTHSettingsGroup(title: tr("Privacy", "Personvern")) {
+                PremiumSettingsCard {
+                    detail(tr("These permissions are separate from Apple Health access, private account synchronization and backup. Raw Apple Health values are not automatically attached to shared workouts, routes or plans.", "Disse samtykkene er separate fra Apple Health-tilgang, privat kontosynkronisering og sikkerhetskopi. Rådata fra Apple Health legges ikke automatisk ved delte økter, ruter eller planer."))
+                    NavigationLink { LegalDocumentView(kind: .privacy) } label: {
+                        PremiumSettingsRow(icon: "lock.shield", title: tr("Privacy policy", "Personvernerklæring")) {
+                            Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
                         }
-                    )
-                )
-
-                Text(
-                    session.aiHealthDataSharingEnabled
-                        ? ATHLTHLocalization.choose(
-                            english: "ATHLTH Coach may send the minimum relevant health context, such as sleep, HRV, heart rate and workout metrics, through ATHLTH's backend to the configured AI provider. You can turn this off at any time.",
-                            norwegian: "ATHLTH Coach kan sende et minimum av relevant helsekontekst, som søvn, HRV, puls og treningsmålinger, gjennom ATHLTHs backend til den konfigurerte AI-leverandøren. Du kan slå dette av når som helst."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Off by default. Recovery and workout insights stay local and deterministic until you explicitly allow health data to be used by ATHLTH Coach.",
-                            norwegian: "Av som standard. Restitusjons- og treningsinnsikt forblir lokal og deterministisk til du uttrykkelig tillater at helsedata brukes av ATHLTH Coach."
-                        )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                Label(
-                    "This is separate from Apple Health permission, cloud backup and personalized offers.",
-                    systemImage: "lock.shield.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    }.buttonStyle(.plain)
+                }
             }
-
-            Section("Personalization") {
-                Toggle(
-                    "Personalized ATHLTH offers",
-                    isOn: Binding(
-                        get: {
-                            session.onboardingProfile?
-                                .personalizedOfferConsent == .granted
-                        },
-                        set: { enabled in
-                            session.setPersonalizedOfferConsent(
-                                enabled ? .granted : .declined
-                            )
-                        }
-                    )
-                )
-
-                Text(
-                    "Uses only goals and interests you choose in ATHLTH. Apple Health / HealthKit data is excluded from offer targeting."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
         }
-        .navigationTitle(ATHLTHLocalization.choose(
-            english: "AI & data consent", norwegian: "AI og datasamtykker"
-        ))
+        .task(id: session.profile.userID) {
+            historyConsent = session.signedIn && (AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: session.profile.userID) ?? false)
+        }
+    }
+    private func consentRow(_ icon: String, _ title: String, _ subtitle: String, _ binding: Binding<Bool>) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep, iconBackground: ATHLTHTheme.premiumGoldSoft,
+                           title: title, subtitle: subtitle) {
+            Toggle(title, isOn: binding).labelsHidden().tint(ATHLTHTheme.premiumGold).fixedSize()
+                .disabled(!session.signedIn)
+        }
+    }
+    private func detail(_ value: String) -> some View {
+        Text(value).font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.bottom, 14)
     }
 }
 
@@ -3797,7 +3774,7 @@ struct ATHLTHAccountSecurityView: View {
                         NavigationLink {
                             TrainingDataSettingsView()
                         } label: {
-                            accountLinkRow(icon: "icloud", title: tr("Training data & Coach", "Treningsdata og Coach"),
+                            accountLinkRow(icon: "icloud", title: tr("Training data & sync", "Treningsdata og synkronisering"),
                                            subtitle: tr("Cloud storage and backup", "Skylagring og sikkerhetskopi"))
                         }
                         .buttonStyle(.plain)
