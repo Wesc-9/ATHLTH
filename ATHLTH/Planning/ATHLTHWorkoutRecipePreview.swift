@@ -12,13 +12,7 @@ enum ATHLTHWorkoutStepCopy {
         guard block.kind != .exercise else {
             return ATHLTHWorkoutNameSuggestion.displayStepTitle(block)
         }
-        let source = ATHLTHWorkoutSearch.normalized(block.title)
-        if block.kind == .run && block.resolvedPhase == .warmup &&
-            ["oppvarming", "warm up", "warmup"].contains(source) {
-            return block.cardioActivity == .walking
-                ? ATHLTHLocalization.choose(english: "Walking", norwegian: "Gange")
-                : ATHLTHLocalization.choose(english: "Jogging", norwegian: "Jogging")
-        }
+        if let activityTitle = ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(block) { return activityTitle }
         if isFourByFour(workoutTitle) && block.resolvedPhase == .main && block.kind == .run {
             let pieces = block.title.components(separatedBy: "·")
             let base = ATHLTHWorkoutSearch.normalized(pieces[0])
@@ -1768,6 +1762,7 @@ extension RunningWorkoutTemplate {
             targetIntensityType: fractionalRPE,
             targetEffortRPE: wholeRPE
         )
+        preview.cardioActivity = .running
         if let environment = launchRunEnvironment {
             preview.isIndoor = environment != .outdoor
             preview.treadmillInclinePercent = environment == .treadmill
