@@ -85,7 +85,7 @@ for page in range(1, 6):
 else:
     print("::error::Build job list exceeds verification limit.")
     sys.exit(1)
-for name in (["build"] if os.environ["GITHUB_REF_NAME"] in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1") else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
+for name in (["build"] if os.environ["GITHUB_REF_NAME"] in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1", "release/v3.0.2") else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
     matches = [job for job in jobs if job["name"] == name]
     if len(matches) != 1 or matches[0]["conclusion"] != "success":
         print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
@@ -100,7 +100,7 @@ for page in range(1, 6):
 else:
     print("::error::Build artifact list exceeds verification limit.")
     sys.exit(1)
-for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] not in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1") else ()):
+for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] not in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1", "release/v3.0.2") else ()):
     name = f"athlth-ipad-smoke-screenshots-{size}"
     matched = [
         artifact for artifact in artifacts

@@ -51,6 +51,7 @@ on:
       - release/v2.3.0
       - release/v3.0.0
       - release/v3.0.1
+      - release/v3.0.2
       # Run an independent iPad smoke check on v2.2.5 as well as the
       # 11/13-inch checks that follow the complete XCTest build. This
       # detects iPad compile/launch regressions without waiting for the
@@ -89,7 +90,7 @@ jobs:
     steps:
       - name: Locate exact-commit universal simulator artifact
         id: resolve
-        if: github.ref == 'refs/heads/release/v3.0.1'
+        if: github.ref == 'refs/heads/release/v3.0.2'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

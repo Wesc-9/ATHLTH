@@ -64,6 +64,7 @@ on:
       - release/v2.3.0
       - release/v3.0.0
       - release/v3.0.1
+      - release/v3.0.2
     paths:
       - .github/testflight-trigger
 
@@ -79,13 +80,13 @@ permissions:
 
 jobs:
   release-checks:
-    if: github.ref != 'refs/heads/release/v3.0.1'
+    if: github.ref != 'refs/heads/release/v3.0.2'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - name: Verify full release gate before legacy signing and archive
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1"]'), github.ref) && github.ref != 'refs/heads/release/v3.0.1'
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1","refs/heads/release/v3.0.2"]'), github.ref) && github.ref != 'refs/heads/release/v3.0.2'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -93,7 +94,7 @@ jobs:
 
   testflight:
     needs: release-checks
-    if: ${{ !cancelled() && (needs.release-checks.result == 'success' || (github.ref == 'refs/heads/release/v3.0.1' && needs.release-checks.result == 'skipped')) }}
+    if: ${{ !cancelled() && (needs.release-checks.result == 'success' || (github.ref == 'refs/heads/release/v3.0.2' && needs.release-checks.result == 'skipped')) }}
     runs-on: xcode-27
     timeout-minutes: 240
     env:
@@ -108,7 +109,7 @@ jobs:
       # Refuse an obsolete checkout before doing any release work. The full
       # exact-commit gate is checked again before signing and upload.
       - name: Recheck release branch before signing
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1","refs/heads/release/v3.0.2"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -250,13 +251,13 @@ jobs:
         run: xcodegen generate
 
       - name: Archive unsigned release in parallel with acceptance tests
-        if: github.ref == 'refs/heads/release/v3.0.1'
+        if: github.ref == 'refs/heads/release/v3.0.2'
         shell: bash
         timeout-minutes: 120
         run: bash scripts/archive_testflight_release.sh
 
       - name: Verify full exact-commit release gate before signing
-        if: github.ref == 'refs/heads/release/v3.0.1'
+        if: github.ref == 'refs/heads/release/v3.0.2'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -326,7 +327,7 @@ jobs:
           retention-days: 90
 
       - name: Archive without creating development certificates
-        if: github.ref != 'refs/heads/release/v3.0.1'
+        if: github.ref != 'refs/heads/release/v3.0.2'
         shell: bash
         run: |
           set -euo pipefail
@@ -674,7 +675,7 @@ jobs:
           EOF
 
       - name: Recheck legacy same-commit release status before upload
-        if: github.ref != 'refs/heads/release/v3.0.1'
+        if: github.ref != 'refs/heads/release/v3.0.2'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -722,7 +723,7 @@ jobs:
           done
 
       - name: Recheck full exact-commit release gate before upload
-        if: github.ref == 'refs/heads/release/v3.0.1'
+        if: github.ref == 'refs/heads/release/v3.0.2'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -779,7 +780,7 @@ jobs:
       # Create a GitHub release only when the version is explicitly locked.
 
       - name: Preserve unsigned Release compiler timing log
-        if: always() && github.ref == 'refs/heads/release/v3.0.1'
+        if: always() && github.ref == 'refs/heads/release/v3.0.2'
         uses: actions/upload-artifact@v4
         with:
           name: athlth-release-archive-timing

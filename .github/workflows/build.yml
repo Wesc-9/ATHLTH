@@ -88,6 +88,7 @@ on:
       - release/v2.3.0
       - release/v3.0.0
       - release/v3.0.1
+      - release/v3.0.2
       - fix/v1.4.2-swift6-release
   pull_request:
     branches:
