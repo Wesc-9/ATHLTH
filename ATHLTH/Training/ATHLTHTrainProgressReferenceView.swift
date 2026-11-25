@@ -317,6 +317,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 case .overview:
                     editorialOverview
                 case .trends:
+                    detailPeriodPicker
                     editorialMetrics
                     editorialTrend
                     if area == .running { ATHLTHRunningSpeedProgressCard() }
@@ -324,8 +325,10 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 case .records:
                     editorialRecords
                 case .zones:
+                    detailPeriodPicker
                     pulseZoneCard
                 case .sessions:
+                    detailPeriodPicker
                     editorialSessions
                 }
                 if isLoading || isHistoryLoading {
@@ -541,7 +544,8 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             } else {
                 continuityCard
                 overviewCoachCard
-                if area == .general, let plan = session.activePlan { overviewPlanCard(plan) }
+                if area == .general { overviewTrainingMixCard }
+                if area != .walking, let plan = session.activePlan { overviewPlanCard(plan) }
                 overviewGoalsCard
                 if let milestone = latestOverviewMilestone { overviewMilestoneCard(milestone) }
             }
@@ -630,6 +634,42 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
+    private var overviewTrainingMixCard: some View {
+        let days = Set(overviewDays)
+        let calendar = Calendar.current
+        let workouts = rangeWorkouts.filter { days.contains(calendar.startOfDay(for: $0.startDate)) }
+        let localStrength = unlinkedLifts.filter { days.contains(calendar.startOfDay(for: $0.startedAt)) }
+        let localPhone = unlinkedPhoneWorkouts.filter { days.contains(calendar.startOfDay(for: $0.start)) }
+        let running = workouts.filter { $0.activity == .running }.count + localPhone.filter { !$0.walking }.count
+        let walking = workouts.filter { $0.activity == .walking || $0.activity == .hiking }.count + localPhone.filter { $0.walking }.count
+        let lifting = workouts.filter { $0.activity == .strength }.count + localStrength.count
+        let total = workouts.count + localStrength.count + localPhone.count
+        let groups = [
+            (tr("Running", "Løping"), running),
+            (tr("Walking", "Gåing"), walking),
+            (tr("Strength", "Styrke"), lifting),
+            (tr("Other", "Annet"), max(0, total - running - walking - lifting))
+        ]
+        return section(title: tr("Training variety", "Treningsfordeling"),
+                       subtitle: tr("Share of recorded sessions · last 28 days", "Andel registrerte økter · siste 28 dager")) {
+            if total == 0 {
+                emptyLine(tr("Your training distribution will appear here.", "Treningsfordelingen din vises her."))
+            } else {
+                ForEach(groups.indices, id: \.self) { index in
+                    let group = groups[index]
+                    HStack {
+                        Text(group.0).font(.caption).foregroundStyle(ink)
+                        Spacer()
+                        Text("\(Int((Double(group.1) / Double(total) * 100).rounded())) %")
+                            .font(.caption.monospacedDigit()).foregroundStyle(muted)
+                    }
+                    ProgressView(value: Double(group.1), total: Double(total))
+                        .tint(ATHLTHTrainDesign.gold)
+                }
+            }
+        }
+    }
+
     private func overviewPlanCard(_ plan: TrainingPlan) -> some View {
         let report = ATHLTHPlanActualProgress.inspect(plan: plan, store: session,
             healthWorkouts: allHealthWorkouts, strengthHistory: strength.workoutHistory)
@@ -637,10 +677,10 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         // through the program, not an adherence score or a 28-day metric.
         return section(title: tr("Active training plan", "Aktiv treningsplan"),
                        subtitle: plan.title) {
-            let planned = report.totalPlanned
-            let completed = report.totalCompleted
+            let planned = area == .running ? report.running.planned : area == .strength ? report.strength.planned : report.totalPlanned
+            let completed = area == .running ? report.running.completed : area == .strength ? report.strength.completed : report.totalCompleted
             if planned > 0 {
-                overviewFigure("\(completed)/\(planned)", label: tr("Completed in entire plan", "Gjennomført i hele planen"))
+                overviewFigure("\(completed)/\(planned)", label: tr("Completed in selected training type · entire plan", "Gjennomført for valgt treningsform · hele planen"))
                 ProgressView(value: Double(completed), total: Double(planned))
                     .tint(ATHLTHTrainDesign.gold)
             } else {
@@ -893,13 +933,10 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
-    private var editorialTrend: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Text(tr("Development", "Utvikling"))
-                    .font(.system(size: 22, weight: .medium, design: .serif))
-                    .foregroundStyle(ink)
-                Spacer(minLength: 0)
+    private var detailPeriodPicker: some View {
+        HStack {
+            Text(tr("Period", "Periode")).font(.subheadline).foregroundStyle(muted)
+            Spacer(minLength: 0)
                 HStack(spacing: 1) {
                     ForEach([Period.month, .threeMonths, .year]) { option in
                         Button { period = option } label: {
@@ -925,10 +962,23 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 .padding(2)
                 .background(ATHLTHTrainDesign.canvas,
                             in: RoundedRectangle(cornerRadius: 9))
+        }
+        .padding(12)
+        .referenceProgressCard()
+    }
+
+    private var editorialTrend: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Text(tr("Development", "Utvikling"))
+                    .font(.system(size: 22, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Spacer(minLength: 0)
+
             }
             HStack(spacing: 14) {
                 if area == .strength {
-                    Label(tr("Working weight · kg", "Arbeidsvekt · kg"), systemImage: "square.fill")
+                    Label(tr("Training volume · kg", "Treningsvolum · kg"), systemImage: "square.fill")
                 } else if area == .walking {
                     Label(tr("Distance · km", "Distanse · km"), systemImage: "square.fill")
                 } else {
@@ -1017,13 +1067,22 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     .frame(height: 157)
                 }
             } else if area == .strength {
-                if liftPoints.isEmpty {
-                    emptyLine(tr("Complete weighted sets to see your progress.",
-                                 "Fullfør vektsett for å se utviklingen."))
+                let calendar = Calendar.current
+                let component: Calendar.Component = period == .year ? .month : .weekOfYear
+                let grouped = Dictionary(grouping: lifts) {
+                    calendar.dateInterval(of: component, for: $0.startedAt)?.start
+                        ?? calendar.startOfDay(for: $0.startedAt)
+                }
+                if grouped.isEmpty {
+                    emptyLine(tr("Complete strength sessions to see your training volume.",
+                                 "Fullfør styrkeøkter for å se treningsvolumet."))
                 } else {
-                    Chart(liftPoints) { item in
-                        BarMark(x: .value("Dato", item.month), y: .value("Kg", item.kg))
-                            .foregroundStyle(ATHLTHTrainDesign.gold).cornerRadius(2)
+                    Chart {
+                        ForEach(grouped.keys.sorted(), id: \.self) { date in
+                            BarMark(x: .value("Dato", date),
+                                    y: .value("Kg", grouped[date, default: []].reduce(0.0) { $0 + $1.totalVolumeKilograms }))
+                                .foregroundStyle(ATHLTHTrainDesign.gold).cornerRadius(2)
+                        }
                     }
                     .frame(height: 157)
                 }
@@ -1384,9 +1443,6 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     }
                 }
             }
-        }
-        .task(id: area) {
-            await loadPulseZones()
         }
     }
 
