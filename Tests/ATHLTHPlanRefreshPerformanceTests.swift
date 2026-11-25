@@ -86,6 +86,21 @@ final class ATHLTHPlanRefreshPerformanceTests: XCTestCase {
         XCTAssertNil(memo.cachedValue(for: 1))
     }
 
+    func testIndexedPlanCompletionInvalidatesOnPlanReplacement() throws {
+        let suite = "ATHLTHPlanIndex.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var plan = samplePlan()
+        let workout = PlannedSession(id: UUID(), title: "Strength", kind: .strength)
+        plan.weeks[0].days[0].sessions = [workout]
+        let store = AppSessionStore(activePlan: plan, defaults: defaults)
+        store.setPlanSessionManuallyCompleted(planID: plan.id, sessionID: workout.id, completed: true)
+        XCTAssertTrue(store.isPlanSessionCompleted(planID: plan.id, sessionID: workout.id, healthWorkouts: [], strengthHistory: []))
+        plan.weeks[0].days[0].sessions = []
+        store.activePlan = plan
+        XCTAssertFalse(store.isPlanSessionCompleted(planID: plan.id, sessionID: workout.id, healthWorkouts: [], strengthHistory: []))
+    }
+
     func testEmptyPlansRefreshDoesNotPublish() throws {
         let suite = "ATHLTHNoPlansPerformance.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

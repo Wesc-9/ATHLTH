@@ -75,16 +75,47 @@ struct AccountTrainingContent: Codable {
 
 @MainActor
 final class AppSessionStore: ObservableObject {
-    @Published var profile: UserProfile
+    @Published var profile: UserProfile {
+        didSet {
+            if oldValue.userID != profile.userID {
+                planSessionIndexes.clear()
+                structuredCompletionMemo.clear()
+            }
+        }
+    }
+    // Derived indexes are not observable state. A live progress tick must
+    // not rebuild or publish them when the plan itself has not changed.
+    private let planSessionIndexes = ATHLTHBoundedProjectionMemo<UUID, [UUID: PlannedSession]>(capacity: 4)
+    private struct StructuredHistoryRevision: Equatable {
+        let account: UUID
+        let data: Data?
+    }
+    private let structuredCompletionMemo = ATHLTHProjectionMemo<StructuredHistoryRevision, [StructuredWorkoutCompletion]>()
+
+    private func structuredCompletions() -> [StructuredWorkoutCompletion] {
+        let owner = profile.userID
+        let revision = StructuredHistoryRevision(
+            account: owner, data: StructuredWorkoutCompletionStore.storageRevision(userID: owner)
+        )
+        return structuredCompletionMemo.value(for: revision) {
+            let signpost = ATHLTHPerformance.begin("StructuredHistoryDecode")
+            defer { ATHLTHPerformance.end("StructuredHistoryDecode", id: signpost) }
+            return StructuredWorkoutCompletionStore.load(userID: owner)
+        }
+    }
+
     /// Never report a failed training save as a successful data change.
     /// Keep the in-memory edits visible so the athlete can retry.
     @Published private(set) var trainingStorageError: String?
     @Published var activePlan: TrainingPlan? {
         didSet {
+            planSessionIndexes.clear()
             persistActivePlan()
         }
     }
-    @Published private(set) var scheduledPlans: [TrainingPlan]
+    @Published private(set) var scheduledPlans: [TrainingPlan] {
+        didSet { planSessionIndexes.clear() }
+    }
     @Published private(set) var pausedTrainingPlanIDs: Set<UUID>
     @Published private(set) var deactivatedTrainingPlanIDs: Set<UUID>
     @Published private(set) var planTemplates: [TrainingPlan]
@@ -839,9 +870,7 @@ final class AppSessionStore: ObservableObject {
         completed: Bool
     ) {
         if completed {
-            guard let workout = trainingPlan(withID: planID)?
-                .weeks.flatMap(\.days).flatMap(\.sessions)
-                .first(where: { $0.id == sessionID }),
+            guard let workout = indexedPlanSession(planID: planID, sessionID: sessionID),
                 !workout.isExplicitRestDay else { return }
         }
         let key = Self.manualCompletionKey(
@@ -884,9 +913,7 @@ final class AppSessionStore: ObservableObject {
         if skipped {
             // A stale row, foreign plan ID, or rest day must never create
             // a phantom skipped workout in progress/weekly adherence.
-            guard let planned = trainingPlan(withID: planID)?
-                .weeks.flatMap(\.days).flatMap(\.sessions)
-                .first(where: { $0.id == sessionID }),
+            guard let planned = indexedPlanSession(planID: planID, sessionID: sessionID),
                 !planned.isExplicitRestDay else { return }
             skippedPlanSessions.insert(key)
             manuallyCompletedPlanSessions.remove(key)
@@ -953,11 +980,7 @@ final class AppSessionStore: ObservableObject {
         toPlan planID: UUID,
         sessionID: UUID
     ) -> Bool {
-        guard let plan = trainingPlan(withID: planID),
-              let planned = plan.weeks
-                .flatMap(\.days)
-                .flatMap(\.sessions)
-                .first(where: { $0.id == sessionID }),
+        guard let planned = indexedPlanSession(planID: planID, sessionID: sessionID),
               Self.healthWorkout(workout, matches: planned) else {
             return false
         }
@@ -1009,6 +1032,21 @@ final class AppSessionStore: ObservableObject {
         ]
     }
 
+    /// The first occurrence remains authoritative if legacy data contains
+    /// duplicate IDs. Never traverse the entire plan for each visible card.
+    private func indexedPlanSession(planID: UUID, sessionID: UUID) -> PlannedSession? {
+        guard let plan = trainingPlan(withID: planID) else { return nil }
+        let index = planSessionIndexes.value(for: planID) {
+            let signpost = ATHLTHPerformance.begin("PlanSessionIndex")
+            defer { ATHLTHPerformance.end("PlanSessionIndex", id: signpost) }
+            return Dictionary(
+                plan.weeks.flatMap(\.days).flatMap(\.sessions).map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+        }
+        return index[sessionID]
+    }
+
     func isPlanSessionCompleted(
         planID: UUID,
         sessionID: UUID,
@@ -1017,10 +1055,7 @@ final class AppSessionStore: ObservableObject {
     ) -> Bool {
         // A completion belongs to an existing workout in this exact plan.
         // Stale history or a reused session ID must not credit another plan.
-        guard let plan = trainingPlan(withID: planID),
-              let planned = plan.weeks
-                .flatMap(\.days).flatMap(\.sessions)
-                .first(where: { $0.id == sessionID })
+        guard let planned = indexedPlanSession(planID: planID, sessionID: sessionID)
         else { return false }
         guard !planned.isExplicitRestDay else { return false }
         if isPlanSessionSkipped(planID: planID, sessionID: sessionID) {
@@ -1033,7 +1068,7 @@ final class AppSessionStore: ObservableObject {
         // original session ID. Credit that recorded completion automatically
         // rather than requiring a second manual completion or Health link.
         if planned.isStructuredWorkout,
-           StructuredWorkoutCompletionStore.load(userID: profile.userID)
+           structuredCompletions()
                 .contains(where: {
                     $0.sourceWorkoutID == sessionID &&
                     ($0.sourcePlanID == nil || $0.sourcePlanID == planID) &&
@@ -1687,7 +1722,7 @@ final class AppSessionStore: ObservableObject {
         // Keep the overview in sync with isPlanSessionCompleted: the latter
         // already credits completed structured sessions with an explicit origin.
         let finishedStructuredSessionIDs = Set(
-            (structuredHistory ?? StructuredWorkoutCompletionStore.load(userID: profile.userID))
+            (structuredHistory ?? structuredCompletions())
                 .filter {
                     $0.totalBlockCount > 0 &&
                     $0.completedBlockCount == $0.totalBlockCount &&

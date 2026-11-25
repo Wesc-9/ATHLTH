@@ -145,6 +145,12 @@ enum StructuredWorkoutCompletionStore {
     private static let storageName =
         "structuredWorkoutHistory"
 
+    // The actual stored payload is the revision, not a wall-clock TTL.
+    // Account changes, writes and deletes invalidate the consumer's memo.
+    static func storageRevision(userID: UUID) -> Data? {
+        UserDefaults.standard.data(forKey: AccountLocalStorage.key(storageName, userID: userID))
+    }
+
     static func load(
         userID: UUID
     ) -> [StructuredWorkoutCompletion] {
