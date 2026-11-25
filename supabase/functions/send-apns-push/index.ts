@@ -192,6 +192,9 @@ function localizedAlert(
       body: "Hvis det ikke var deg, sjekk innloggede enheter under Konto og sikkerhet.",
     } : { title: event.title, body: event.message };
   }
+  if (event.kind === "mention" && event.entity_type === "direct_conversation") {
+    return { title: actorName ?? event.title, body: event.message };
+  }
   const isPlusGrant = event.kind === "athlth_plus_granted";
   if (isPlusGrant) {
     if (languageCode !== "nb") {
