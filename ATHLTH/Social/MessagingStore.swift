@@ -3,8 +3,21 @@ import UserNotifications
 
 @MainActor
 final class MessagingStore: ObservableObject {
-    @Published private(set) var conversations: [DirectConversationRecord] = []
-    @Published private(set) var recentMessages: [DirectMessageRecord] = []
+    @Published private(set) var conversations: [DirectConversationRecord] = [] {
+        didSet { inboxMemo.clear() }
+    }
+    @Published private(set) var recentMessages: [DirectMessageRecord] = [] {
+        didSet { inboxMemo.clear() }
+    }
+    private let inboxMemo = ATHLTHProjectionMemo<UUID, ATHLTHInboxProjection>()
+
+    private func inboxProjection(for owner: UUID) -> ATHLTHInboxProjection {
+        inboxMemo.value(for: owner) {
+            let signpost = ATHLTHPerformance.begin("InboxProjection")
+            defer { ATHLTHPerformance.end("InboxProjection", id: signpost) }
+            return ATHLTHInboxProjection(owner: owner, conversations: conversations, messages: recentMessages)
+        }
+    }
     @Published private(set) var messagesByConversation: [UUID: [DirectMessageRecord]] = [:]
     @Published private(set) var pinnedConversationIDs: Set<UUID> = []
     @Published private(set) var archivedConversationIDs: Set<UUID> = []
@@ -87,62 +100,28 @@ final class MessagingStore: ObservableObject {
     }
 
     var unreadCount: Int {
-        guard let currentUserID else { return 0 }
-        let acceptedConversationIDs = Set(
-            conversations
-                .filter { $0.requestStatus == .accepted }
-                .map(\.id)
-        )
-
-        return recentMessages.filter {
-            acceptedConversationIDs.contains($0.conversationID) &&
-            $0.recipientID == currentUserID &&
-            $0.readAt == nil &&
-            $0.deletedAt == nil
-        }.count
+        guard let owner = currentUserID, preferenceAccountID == owner else { return 0 }
+        return inboxProjection(for: owner).unreadCount
     }
 
     var incomingMessageRequests: [DirectConversationRecord] {
-        guard let currentUserID else { return [] }
-        return conversations
-            .filter {
-                $0.requestStatus == .pending &&
-                $0.requestedBy != nil &&
-                $0.requestedBy != currentUserID
-            }
-            .sorted {
-                ($0.lastMessageAt ?? $0.createdAt) >
-                ($1.lastMessageAt ?? $1.createdAt)
-            }
+        guard let owner = currentUserID, preferenceAccountID == owner else { return [] }
+        return inboxProjection(for: owner).incoming
     }
 
     var outgoingMessageRequests: [DirectConversationRecord] {
-        guard let currentUserID else { return [] }
-        return conversations
-            .filter {
-                $0.requestStatus == .pending &&
-                $0.requestedBy == currentUserID
-            }
-            .sorted {
-                ($0.lastMessageAt ?? $0.createdAt) >
-                ($1.lastMessageAt ?? $1.createdAt)
-            }
+        guard let owner = currentUserID, preferenceAccountID == owner else { return [] }
+        return inboxProjection(for: owner).outgoing
     }
 
     var messageRequestCount: Int {
-        incomingMessageRequests.filter {
-            lastMessage(for: $0.id) != nil
-        }.count
+        guard let owner = currentUserID, preferenceAccountID == owner else { return 0 }
+        return inboxProjection(for: owner).requestCount
     }
 
     func unreadCount(for conversationID: UUID) -> Int {
-        guard let currentUserID else { return 0 }
-        return recentMessages.filter {
-            $0.conversationID == conversationID &&
-            $0.recipientID == currentUserID &&
-            $0.readAt == nil &&
-            $0.deletedAt == nil
-        }.count
+        guard let owner = currentUserID, preferenceAccountID == owner else { return 0 }
+        return inboxProjection(for: owner).unreadByConversation[conversationID] ?? 0
     }
 
     func conversation(with userID: UUID) -> DirectConversationRecord? {
@@ -153,9 +132,8 @@ final class MessagingStore: ObservableObject {
     }
 
     func lastMessage(for conversationID: UUID) -> DirectMessageRecord? {
-        recentMessages
-            .filter { $0.conversationID == conversationID && $0.deletedAt == nil }
-            .max { $0.createdAt < $1.createdAt }
+        guard let owner = currentUserID, preferenceAccountID == owner else { return nil }
+        return inboxProjection(for: owner).latestByConversation[conversationID]
     }
 
     func switchAccount(_ userID: UUID?) {
@@ -941,5 +919,40 @@ enum MessagingStoreError: LocalizedError {
         case .requestDeclined:
             return "This message request was declined."
         }
+    }
+}
+
+/// A pure projection of the existing recent-message window. No new reads,
+/// changes to unread semantics, or persistent copies of private messages.
+struct ATHLTHInboxProjection {
+    let unreadByConversation: [UUID: Int]
+    let latestByConversation: [UUID: DirectMessageRecord]
+    let incoming: [DirectConversationRecord]
+    let outgoing: [DirectConversationRecord]
+    let unreadCount: Int
+    let requestCount: Int
+
+    init(owner: UUID, conversations: [DirectConversationRecord], messages: [DirectMessageRecord]) {
+        var unread: [UUID: Int] = [:]
+        var latest: [UUID: DirectMessageRecord] = [:]
+        for message in messages where message.deletedAt == nil {
+            if message.recipientID == owner && message.readAt == nil {
+                unread[message.conversationID, default: 0] += 1
+            }
+            if latest[message.conversationID].map({ $0.createdAt < message.createdAt }) ?? true {
+                latest[message.conversationID] = message
+            }
+        }
+        let pending = conversations.filter { $0.requestStatus == .pending }.sorted {
+            ($0.lastMessageAt ?? $0.createdAt) > ($1.lastMessageAt ?? $1.createdAt)
+        }
+        let incoming = pending.filter { $0.requestedBy != nil && $0.requestedBy != owner }
+        self.incoming = incoming
+        outgoing = pending.filter { $0.requestedBy == owner }
+        unreadByConversation = unread
+        latestByConversation = latest
+        requestCount = incoming.filter { latest[$0.id] != nil }.count
+        let accepted = Set(conversations.filter { $0.requestStatus == .accepted }.map(\.id))
+        unreadCount = accepted.reduce(0) { $0 + (unread[$1] ?? 0) }
     }
 }

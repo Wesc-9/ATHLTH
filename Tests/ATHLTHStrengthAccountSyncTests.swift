@@ -117,6 +117,29 @@ final class ATHLTHStrengthAccountSyncTests: XCTestCase {
     }
 
     @MainActor
+    func testRecordProjectionsInvalidateWhenHistoryOrAccountChanges() throws {
+        let owner = UUID(), other = UUID()
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        defer {
+            store.switchAccount(nil)
+            UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key("strengthHistory", userID: owner))
+            UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key("strengthHistory", userID: other))
+        }
+        XCTAssertTrue(store.personalRecords.isEmpty)
+        XCTAssertTrue(store.repPersonalRecords.isEmpty)
+        _ = try store.mergeAccountSyncedWorkouts([makeWorkout()], for: owner)
+        XCTAssertFalse(store.personalRecords.isEmpty)
+        XCTAssertFalse(store.repPersonalRecords.isEmpty)
+        store.switchAccount(other)
+        XCTAssertTrue(store.personalRecords.isEmpty)
+        XCTAssertTrue(store.repPersonalRecords.isEmpty)
+        store.switchAccount(owner)
+        XCTAssertFalse(store.personalRecords.isEmpty)
+        XCTAssertFalse(store.repPersonalRecords.isEmpty)
+    }
+
+    @MainActor
     func testAccountMergeIsAutomaticDeduplicatedAndDoesNotReplaceLocalHealth() throws {
         let owner = UUID()
         let store = StrengthWorkoutStore()

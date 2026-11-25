@@ -4379,18 +4379,20 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedWorkoutStatus(
         _ workout: StrengthWorkoutLog
     ) -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+        // These values depend on the workout snapshot, not the clock.
+        let totalSets = max(
+            workout.exercises.reduce(0) {
+                $0 + $1.sets.filter { $0.hybridPhaseKind == nil }.count
+                    + ($1.skippedPlannedSetCount ?? 0)
+            }, 1
+        )
+        let completed = min(max(workout.totalCompletedSets, 0), totalSets)
+        let skipped = workout.exercises.reduce(0) { $0 + ($1.skippedPlannedSetCount ?? 0) }
+        let workoutComplete = workout.exercises.allSatisfy { $0.isCompleted }
+        return TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let timer = strength.currentTimedSetCountdown
-            let totalSets = max(
-                workout.exercises.reduce(0) {
-                    $0 + $1.sets.filter {
-                        $0.hybridPhaseKind == nil
-                    }.count + ($1.skippedPlannedSetCount ?? 0)
-                }, 1
-            )
-            let completed = min(max(workout.totalCompletedSets, 0), totalSets)
             let phase = ATHLTHPhoneStrengthPhaseResolver.resolve(
-                workoutComplete: workout.exercises.allSatisfy { $0.isCompleted },
+                workoutComplete: workoutComplete,
                 exerciseComplete: strength.currentExerciseAllSetsCompleted,
                 isResting: strength.isResting,
                 restEndsAt: strength.restEndsAt,
@@ -4444,9 +4446,6 @@ struct ActiveStrengthWorkoutView: View {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         .monospacedDigit()
-                        let skipped = workout.exercises.reduce(0) {
-                            $0 + ($1.skippedPlannedSetCount ?? 0)
-                        }
                         if skipped > 0 {
                             Text(ATHLTHLocalization.choose(
                                 english: "\(skipped) skipped",

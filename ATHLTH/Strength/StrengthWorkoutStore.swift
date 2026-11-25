@@ -212,7 +212,14 @@ final class StrengthWorkoutStore: ObservableObject {
     }
     @Published private(set) var completedWorkout: StrengthWorkoutLog?
     @Published private(set) var completionSaveError: String?
-    @Published private(set) var workoutHistory: [StrengthWorkoutLog] = []
+    @Published private(set) var workoutHistory: [StrengthWorkoutLog] = [] {
+        didSet {
+            personalRecordMemo.clear()
+            repRecordMemo.clear()
+        }
+    }
+    private let personalRecordMemo = ATHLTHProjectionMemo<String, [StrengthPersonalRecord]>()
+    private let repRecordMemo = ATHLTHProjectionMemo<String, [StrengthRepPersonalRecord]>()
     /// Completed workouts imported from the signed-in account are merged
     /// into the same local journal, without replacing existing results.
     @Published private(set) var lastPhoneDraftMutationAt:
@@ -768,6 +775,14 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     var personalRecords: [StrengthPersonalRecord] {
+        personalRecordMemo.value(for: Locale.current.identifier) {
+            let signpost = ATHLTHPerformance.begin("StrengthPersonalRecords")
+            defer { ATHLTHPerformance.end("StrengthPersonalRecords", id: signpost) }
+            return calculatePersonalRecords()
+        }
+    }
+
+    private func calculatePersonalRecords() -> [StrengthPersonalRecord] {
         var bestSetByExercise: [String: (name: String, weight: Double, reps: Int, date: Date)] = [:]
         var bestEstimatedOneRepMax: (name: String, value: Double, weight: Double, reps: Int, date: Date)?
         var highestVolumeWorkout: StrengthWorkoutLog?
@@ -896,6 +911,14 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     var repPersonalRecords: [StrengthRepPersonalRecord] {
+        repRecordMemo.value(for: Locale.current.identifier) {
+            let signpost = ATHLTHPerformance.begin("StrengthRepRecords")
+            defer { ATHLTHPerformance.end("StrengthRepRecords", id: signpost) }
+            return calculateRepPersonalRecords()
+        }
+    }
+
+    private func calculateRepPersonalRecords() -> [StrengthRepPersonalRecord] {
         struct Candidate {
             let exerciseName: String
             let weightKilograms: Double
