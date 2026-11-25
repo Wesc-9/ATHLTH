@@ -1872,7 +1872,8 @@ struct RunQuickStartSheet: View {
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
                         ATHLTHRunQuickStartPlanPreview(
-                            workout: nil, plannedSession: plannedSession
+                            workout: nil, plannedSession: plannedSession,
+                            compactBasic: !isAdvancedSetup
                         )
                     }
 
