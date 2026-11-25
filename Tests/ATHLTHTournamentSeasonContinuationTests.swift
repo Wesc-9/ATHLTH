@@ -195,6 +195,38 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
         XCTAssertEqual(ATHLTHTournamentSeasonContinuation.history(current: first, visible: [second]).map(\.id), [secondID, firstID])
     }
 
+    func testSeasonMetadataWinsOverEditedTitleAndCannotOverflow() {
+        let policy = ATHLTHTournamentSeasonContinuation.self
+        XCTAssertEqual(policy.nextTitle(from: "Ny liga", seasonNumber: 4), "Ny liga · Sesong 5")
+        XCTAssertEqual(policy.nextTitle(from: "Liga · Sesong 2", seasonNumber: 7), "Liga · Sesong 8")
+        XCTAssertEqual(policy.nextTitle(from: "Liga · Sesong \(Int.max)"), "Liga · Sesong 999")
+        var rules = ATHLTHCompetitionRaceRules()
+        rules.seasonNumber = Int.max
+        XCTAssertNil(policy.nextDraft(from: tournament(format: .league, status: "completed", rules: rules),
+            entries: [entry(owner, response: "accepted", seed: 1), entry(rival, response: "accepted", seed: 2)],
+            athleteNames: [:], currentUserID: owner))
+    }
+
+    func testRematchOnlyCarriesScoringForSelectedExercises() throws {
+        let old = UUID(), retained = UUID(), added = UUID()
+        var rules = ATHLTHCompetitionRaceRules()
+        rules.duelMode = true
+        rules.scoringMode = .target
+        rules.scoringGoals = [ATHLTHCompetitionRaceRules.key(old): 10, ATHLTHCompetitionRaceRules.key(retained): 20]
+        rules.exerciseWeights = [ATHLTHCompetitionRaceRules.key(old): 3, ATHLTHCompetitionRaceRules.key(retained): 2]
+        let previous = tournament(format: .league, status: "completed", rules: rules, singleEvent: true)
+        let draft = try XCTUnwrap(ATHLTHDuelRematch.draft(from: previous,
+            entries: [entry(owner, response: "accepted", seed: 1), entry(rival, response: "accepted", seed: 2)],
+            names: [:], userID: rival, exerciseIDs: [retained, added]))
+        XCTAssertEqual(draft.ownerID, rival)
+        XCTAssertEqual(draft.competitionSettings.race.previousCompetitionID, previous.id)
+        XCTAssertNil(draft.competitionSettings.race.goal(for: old))
+        XCTAssertEqual(draft.competitionSettings.race.goal(for: retained), 20)
+        XCTAssertNil(draft.competitionSettings.race.goal(for: added))
+        XCTAssertEqual(draft.competitionSettings.race.weight(for: old), 1)
+        XCTAssertEqual(draft.competitionSettings.race.weight(for: retained), 2)
+    }
+
     func testActiveTournamentCannotRenewAndOwnerMustRemainEligible() {
         let entries = [
             entry(owner, response: "accepted", seed: 1),
