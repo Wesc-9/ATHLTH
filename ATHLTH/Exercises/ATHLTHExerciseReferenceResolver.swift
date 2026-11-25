@@ -82,7 +82,17 @@ enum ATHLTHExerciseReferenceResolver {
         "athlth-native-single-leg-romanian-deadlift": "single-leg-romanian-deadlift",
         "athlth-native-cable-curl": "cable-curl",
         "athlth-native-chin-up": "chin-ups",
-        "athlth-native-skullcrusher": "skull-crusher"
+        "athlth-native-skullcrusher": "skull-crusher",
+        "athlth-native-incline-dumbbell-bench-press": "incline-db-press",
+        "athlth-native-hollow-body-hold": "hollow-body-hold",
+        "athlth-native-six-inch-hold": "six-inch-hold",
+        "athlth-native-chest-press-machine": "chest-press-machine",
+        "athlth-native-glute-bridge": "glute-bridge",
+        "athlth-native-mountain-climber": "mountain-climbers",
+        "athlth-native-hanging-knee-raise": "hanging-knee-raise",
+        "athlth-native-hanging-leg-raise": "hanging-leg-raise",
+        "athlth-native-russian-twist": "russian-twist",
+        "athlth-native-bulgarian-split-squat": "bulgarian-split-squat"
     ]
     private static let reviewedStationDuplicates: [String: String] = [
         "athlth:skierg": "ski-erg",
@@ -615,6 +625,7 @@ enum ATHLTHExerciseReferenceResolver {
         }
         let exactName = key(source.canonicalName)
         let equipment = Set(source.exercise.equipment.map(key))
+        guard !equipment.isEmpty, !equipment.contains("") else { return source }
         let identical = library.filter { entry in
             entry.source == .repDB &&
                 key(entry.canonicalName) == exactName &&

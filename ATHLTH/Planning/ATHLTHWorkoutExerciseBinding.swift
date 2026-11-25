@@ -181,7 +181,8 @@ enum ATHLTHWorkoutExerciseBinding {
         var cache: [LookupKey: ExerciseLibraryEntry] = [:]
         var misses = Set<LookupKey>()
         return bind(
-            &workout, library: library, cache: &cache, misses: &misses
+            &workout, library: library, cache: &cache, misses: &misses,
+            duplicateIndex: DuplicateIndex(library: library)
         )
     }
 
@@ -189,11 +190,12 @@ enum ATHLTHWorkoutExerciseBinding {
         _ workout: inout PlannedSession,
         library: [ExerciseLibraryEntry],
         cache: inout [LookupKey: ExerciseLibraryEntry],
-        misses: inout Set<LookupKey>
+        misses: inout Set<LookupKey>,
+        duplicateIndex: DuplicateIndex
     ) -> Report {
         var report = Report()
         if needsDuplicateMigration(workout) {
-            workout = DuplicateIndex(library: library).migrate(workout)
+            workout = duplicateIndex.migrate(workout)
         }
 
         if var blocks = workout.workoutBlocks {
@@ -308,12 +310,14 @@ enum ATHLTHWorkoutExerciseBinding {
         // than repeating full-library scans for every week's prescription.
         var cache: [LookupKey: ExerciseLibraryEntry] = [:]
         var misses = Set<LookupKey>()
+        let duplicateIndex = DuplicateIndex(library: library)
         for weekIndex in plan.weeks.indices {
             for dayIndex in plan.weeks[weekIndex].days.indices {
                 for sessionIndex in plan.weeks[weekIndex].days[dayIndex].sessions.indices {
                     let current = bind(
                         &plan.weeks[weekIndex].days[dayIndex].sessions[sessionIndex],
-                        library: library, cache: &cache, misses: &misses
+                        library: library, cache: &cache, misses: &misses,
+                        duplicateIndex: duplicateIndex
                     )
                     report.linked += current.linked
                     report.unresolved.append(contentsOf: current.unresolved)

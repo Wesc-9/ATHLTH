@@ -69,6 +69,24 @@ final class ATHLTHWorkoutExerciseBindingTests: XCTestCase {
         XCTAssertEqual(ATHLTHExerciseReferenceResolver.resolvePublicName("Roing", in: library)?.id, rower.id)
     }
 
+    func testAllReviewedNativeDuplicatesHaveUniqueTargetsInCurrentCatalog() throws {
+        let store = ExerciseLibraryStore()
+        let library = store.allExercises
+        let visible = Set(store.selectableExercises.map(\.id))
+        for (source, target) in ATHLTHExerciseReferenceResolver.reviewedNativeDuplicates {
+            let old = try XCTUnwrap(library.first { $0.sourceIdentifier == source }, source)
+            let matches = library.filter { $0.source == .repDB && $0.sourceIdentifier == target }
+            // Older offline datasets may not include a newly reviewed target;
+            // never remove the legacy identity unless the replacement exists.
+            guard !matches.isEmpty else { continue }
+            XCTAssertEqual(matches.count, 1, target)
+            let replacement = try XCTUnwrap(matches.first)
+            XCTAssertEqual(ATHLTHExerciseReferenceResolver.canonicalReviewedID(old.id), replacement.id)
+            XCTAssertFalse(visible.contains(old.id), source)
+            XCTAssertTrue(visible.contains(replacement.id), target)
+        }
+    }
+
     func testReviewedStationAndNativeDuplicatesUseCanonicalRepDBIdentity() throws {
         let store = ExerciseLibraryStore()
         let library = store.allExercises

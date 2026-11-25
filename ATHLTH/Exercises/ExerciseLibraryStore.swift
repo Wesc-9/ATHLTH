@@ -1016,7 +1016,9 @@ final class ExerciseLibraryStore: ObservableObject {
                 }
                 guard let slug = entry.sourceIdentifier else { return false }
                 if Self.featuredNativeExerciseSlugs.contains(slug) {
-                    return true
+                    return ATHLTHExerciseReferenceResolver.visibleEquivalent(
+                        of: entry, in: completeLibrary
+                    ).id == entry.id
                 }
                 guard Self.referencedNativeExerciseSlugs.contains(slug) ||
                       Self.referencedFallbackExerciseSlugs.contains(slug)
