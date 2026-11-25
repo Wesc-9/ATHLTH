@@ -312,6 +312,7 @@ struct DirectConversationParams: Encodable {
 }
 
 struct DirectMessageInsert: Encodable {
+    var id: UUID = UUID()
     let conversationID: UUID
     let senderID: UUID
     let recipientID: UUID
@@ -325,6 +326,7 @@ struct DirectMessageInsert: Encodable {
     let sourceOwnerID: UUID?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case conversationID = "conversation_id"
         case senderID = "sender_id"
         case recipientID = "recipient_id"
