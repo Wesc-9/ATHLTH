@@ -126,7 +126,7 @@ struct ATHLTHSideMenuDeepLinkView: View {
         case .clubs:
             ATHLTHCommunityV5View(initialTab: .clubs)
 
-        case .home, .search, .inbox, .notifications,
+        case .home, .trainNow, .search, .inbox, .notifications,
              .trainingLibrary, .myExercises, .myRoutes,
              .myTrainingPlans, .myWorkouts, .ghostRace, .settings:
             ContentUnavailableView(

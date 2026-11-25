@@ -3,33 +3,20 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHSideMenuDestinationTests: XCTestCase {
-    func testHomeQuickActionsRemainReachableFromSideMenu() {
-        XCTAssertEqual(
-            [
-                ATHLTHSideMenuDestination.search.rawValue,
-                ATHLTHSideMenuDestination.inbox.rawValue,
-                ATHLTHSideMenuDestination.notifications.rawValue
-            ],
-            ["search", "inbox", "notifications"]
-        )
+    func testPhoneUtilityRowsAreStaticAndOrdered() {
+        XCTAssertEqual(ATHLTHSideMenuDestination.phoneUtilityRows.map(\.rawValue),
+                       ["search", "notifications", "inbox"])
     }
 
-    func testSideMenuLinksToDeepToolsRatherThanMainTabs() {
-        let destinations: [ATHLTHSideMenuDestination] = [
-            .trainingLibrary,
-            .trainTogether,
-            .ghostRace,
-            .challenges,
-            .arena,
-            .clubs
-        ]
-        XCTAssertEqual(Set(destinations.map(\.id)).count, destinations.count)
-
-        for duplicatedTab in [
-            "calendar", "train", "plans", "insights", "explore", "community"
-        ] {
-            XCTAssertNil(ATHLTHSideMenuDestination(rawValue: duplicatedTab))
-        }
+    func testPhonePrimaryRowsAreStaticAndOrdered() {
+        XCTAssertEqual(ATHLTHSideMenuDestination.phonePrimaryRows.map(\.rawValue),
+                       ["trainNow", "trainingLibrary", "clubs", "arena"])
+        let visible = ATHLTHSideMenuDestination.phoneUtilityRows + ATHLTHSideMenuDestination.phonePrimaryRows
+        XCTAssertEqual(Set(visible.map(\.id)).count, 7)
+        XCTAssertFalse(visible.contains(.home))
+        XCTAssertFalse(visible.contains(.myExercises))
+        XCTAssertFalse(visible.contains(.trainTogether))
+        XCTAssertFalse(visible.contains(.challenges))
     }
 
     func testExerciseProgressIsNotASideMenuDestination() {

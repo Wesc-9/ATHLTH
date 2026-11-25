@@ -1,9 +1,10 @@
 import Foundation
 
-/// iPhone side navigation intentionally exposes deeper ATHLTH tools, not
-/// duplicates of the five main tabs. Existing feature views remain canonical.
+/// Shared navigation identifiers; the phone drawer exposes only its static
+/// approved shortcuts. Existing feature views remain canonical.
 enum ATHLTHSideMenuDestination: String, Identifiable {
     case home
+    case trainNow
     case search
     case inbox
     case notifications
@@ -21,4 +22,9 @@ enum ATHLTHSideMenuDestination: String, Identifiable {
     case settings
 
     var id: String { rawValue }
+
+    // Only these shortcuts are displayed in the iPhone drawer. Other
+    // destinations remain valid for legacy links and iPad navigation.
+    static let phoneUtilityRows: [Self] = [.search, .notifications, .inbox]
+    static let phonePrimaryRows: [Self] = [.trainNow, .trainingLibrary, .clubs, .arena]
 }

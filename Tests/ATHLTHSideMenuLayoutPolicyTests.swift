@@ -58,15 +58,6 @@ final class ATHLTHSideMenuLayoutPolicyTests: XCTestCase {
         )
     }
 
-    func testExpandedSearchStaysInsideDrawerAndKeepsDismissEdge() {
-        for width: CGFloat in [280, 320, 375, 393, 440] {
-            let expanded = ATHLTHSideMenuLayoutPolicy.searchWidth(for: width)
-            XCTAssertEqual(expanded, width * 0.94, accuracy: 0.01)
-            XCTAssertGreaterThan(expanded, ATHLTHSideMenuLayoutPolicy.width(for: width))
-            XCTAssertLessThan(expanded, width)
-        }
-    }
-
     func testGlobalSearchHasExplicitPeopleAndExerciseFilters() {
         XCTAssertTrue(ATHLTHGlobalSearchScope.allCases.contains(.users))
         XCTAssertTrue(ATHLTHGlobalSearchScope.allCases.contains(.exercises))

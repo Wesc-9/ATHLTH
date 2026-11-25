@@ -952,12 +952,11 @@ struct ProductRootTabView: View {
         case .home:
             selectedTab = 0
 
-        case .search:
-            // The search cell expands inside ATHLTHSideMenuView.
-            // No separate modal is presented for search.
-            showingSideMenu = true
+        case .trainNow:
+            trainNavigationRequest = .today
+            selectedTab = 1
 
-        case .inbox, .notifications:
+        case .search, .inbox, .notifications:
             pushedWorkoutInviteID = nil
             sideMenuUtilityDestination = destination
 

@@ -27,9 +27,8 @@ struct ATHLTHSideMenuUtilitiesView: View {
                     }
                 }
         }
-        // Presentation type belongs to the caller: full screen for
-        // Inbox and Notifications, a sheet only for Search.
-        // Never give the content a detent that leaves Home visible above it.
+        // All three static phone shortcuts open their canonical full-screen
+        // destination. Search never expands or resizes the drawer.
         .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
     }
 

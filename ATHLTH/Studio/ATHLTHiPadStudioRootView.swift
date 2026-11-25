@@ -218,9 +218,9 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var showingPlanSync = false
     @State private var showingPresentation = false
 
-    private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
-    private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
-    private let gold = Color(red: 0.69, green: 0.54, blue: 0.32)
+    private let canvas = ATHLTHSidebarPalette.canvas
+    private let ink = ATHLTHSidebarPalette.ink
+    private let gold = ATHLTHSidebarPalette.gold
 
     private var messagePanelAnimation: Animation? {
         reduceMessagePanelMotion ? nil : .easeInOut(duration: 0.20)

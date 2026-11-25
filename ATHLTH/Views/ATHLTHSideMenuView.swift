@@ -14,12 +14,6 @@ enum ATHLTHSideMenuLayoutPolicy {
         return min(viewportWidth * ratio, maximum)
     }
 
-    /// Search stays inside the drawer, but needs room for filters and results.
-    /// A small visible margin preserves the swipe/tap-to-dismiss affordance.
-    static func searchWidth(for viewportWidth: CGFloat) -> CGFloat {
-        max(0, viewportWidth * 0.94)
-    }
-
     static func shouldDismiss(translation: CGSize) -> Bool {
         translation.width <= -60 &&
             abs(translation.height) <= abs(translation.width) * 0.65
@@ -75,6 +69,13 @@ enum ATHLTHSideMenuBadgePolicy {
     }
 }
 
+/// One palette for the phone drawer and native iPad Studio sidebar.
+enum ATHLTHSidebarPalette {
+    static let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
+    static let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
+    static let gold = Color(red: 0.69, green: 0.54, blue: 0.32)
+}
+
 /// Subtle touch feedback with no permanent colored tiles around each item.
 private struct ATHLTHSideMenuPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -100,21 +101,16 @@ struct ATHLTHSideMenuView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .subheadline) private var rowTextSize: CGFloat = 15.5
-    @ScaledMetric(relativeTo: .caption) private var headingTextSize: CGFloat = 10.5
     @GestureState private var closingDragX: CGFloat = 0
-    @SceneStorage("athlth.sideMenu.trainingLibraryExpanded")
-    private var isTrainingLibraryExpanded = false
-    @State private var isSearchExpanded = false
 
     let selectedTab: Int
     let onSelect: (ATHLTHSideMenuDestination) -> Void
     let onDismiss: () -> Void
 
-    // Use canonical app colors; avoid slightly different hand-written whites.
-    private let menuSurface = ATHLTHTheme.canvasTop
-    private let menuInk = ATHLTHTheme.primaryText
+    private let menuSurface = ATHLTHSidebarPalette.canvas
+    private let menuInk = ATHLTHSidebarPalette.ink
     private let menuMuted = ATHLTHTrainDesign.secondary
-    private let menuBronze = ATHLTHTrainDesign.bronze
+    private let menuBronze = ATHLTHSidebarPalette.gold
 
     private var badges: (inbox: Int, notifications: Int, total: Int) {
         ATHLTHSideMenuBadgePolicy.counts(
@@ -128,93 +124,43 @@ struct ATHLTHSideMenuView: View {
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
-                if isSearchExpanded {
-                    ATHLTHGlobalSearchView(
-                        embeddedInSideMenu: true,
-                        onClose: {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
-                                isSearchExpanded = false
-                            }
+                header
+                    .padding(.horizontal, 18)
+                    .padding(.top, max(geometry.safeAreaInsets.top, 48) + 4)
+                    .padding(.bottom, 16)
+
+                // Only the container scrolls on small screens / large text.
+                // Individual rows never expand or reveal submenus.
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(ATHLTHSideMenuDestination.phoneUtilityRows) { destination in
+                            staticRow(destination)
                         }
-                    )
-                    .accessibilityIdentifier("athlth-side-menu-inline-search")
-                } else {
-                    header
-                        .padding(.horizontal, 18)
-                        .padding(.top, max(geometry.safeAreaInsets.top, 48) + 4)
-                        .padding(.bottom, 16)
-
-                    homeUtilityActions
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 11)
-
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 23) {
-                            menuSection(
-                                english: "TRAINING", norwegian: "TRENING"
-                            ) {
-                                trainingLibraryMenu
-                                menuRow(
-                                    .trainTogether,
-                                    english: "Train Together",
-                                    norwegian: "Tren sammen",
-                                    icon: "person.2"
-                                )
-                                menuRow(
-                                    .ghostRace,
-                                    english: "Ghost Race",
-                                    norwegian: "Ghost Race",
-                                    icon: "figure.run"
-                                )
-                            }
-
-                            menuSection(
-                                english: "COMMUNITY", norwegian: "FELLESSKAP"
-                            ) {
-                                menuRow(
-                                    .challenges,
-                                    english: "Challenges",
-                                    norwegian: "Challenges",
-                                    icon: "bolt"
-                                )
-                                menuRow(
-                                    .arena,
-                                    english: "Competition",
-                                    norwegian: "Konkurranse",
-                                    icon: "trophy"
-                                )
-                                menuRow(
-                                    .clubs,
-                                    english: "Clubs",
-                                    norwegian: "Klubber",
-                                    icon: "person.3"
-                                )
-                            }
+                        Divider().padding(.vertical, 12).padding(.horizontal, 7)
+                        ForEach(ATHLTHSideMenuDestination.phonePrimaryRows) { destination in
+                            staticRow(destination)
                         }
-                        .padding(.horizontal, 13)
-                        .padding(.top, 23)
-                        .padding(.bottom, 18)
                     }
-                    .scrollIndicators(.hidden)
-
-                    footer
-                        .padding(.horizontal, 13)
-                        .padding(.top, 11)
-                        .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20) + 4)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
                 }
+                .scrollIndicators(.hidden)
+
+                Divider().padding(.horizontal, 18)
+                footer
+                    .padding(.horizontal, 13)
+                    .padding(.top, 11)
+                    .padding(.bottom, max(geometry.safeAreaInsets.bottom, 20) + 4)
             }
             .frame(
-                width: isSearchExpanded
-                    ? ATHLTHSideMenuLayoutPolicy.searchWidth(for: geometry.size.width)
-                    : ATHLTHSideMenuLayoutPolicy.width(
-                        for: geometry.size.width,
-                        accessibilitySize: dynamicTypeSize.isAccessibilitySize
-                    ),
+                width: ATHLTHSideMenuLayoutPolicy.width(
+                    for: geometry.size.width,
+                    accessibilitySize: dynamicTypeSize.isAccessibilitySize
+                ),
                 height: geometry.size.height
             )
             .background(menuSurface.ignoresSafeArea(edges: .vertical))
             .shadow(color: .black.opacity(0.09), radius: 18, x: 5, y: 0)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: isSearchExpanded)
             .offset(x: reduceMotion ? 0 : closingDragX)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 12)
@@ -241,8 +187,8 @@ struct ATHLTHSideMenuView: View {
         HStack(alignment: .center, spacing: 6) {
             ATHLTHBrandMark(
                 size: .compact,
-                wordmarkWeight: .semibold,
-                markStrokeScale: 0.85
+                wordmarkWeight: .medium,
+                markStrokeScale: 0.70
             )
             .foregroundStyle(menuInk)
 
@@ -262,97 +208,6 @@ struct ATHLTHSideMenuView: View {
                 english: "Close navigation menu",
                 norwegian: "Lukk sidemenyen"
             ))
-        }
-    }
-
-    private func menuSection<Content: View>(
-        english: String,
-        norwegian: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(ATHLTHLocalization.choose(english: english, norwegian: norwegian))
-                .font(.system(size: headingTextSize, weight: .bold))
-                .tracking(1.55)
-                .foregroundStyle(menuBronze)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.leading, 8)
-                .padding(.bottom, 2)
-                .accessibilityAddTraits(.isHeader)
-
-            VStack(spacing: 1, content: content)
-        }
-    }
-
-    /// Row opens the library; separate trailing button expands its shortcuts.
-    /// Both interactions have comfortable, independent touch targets.
-    private var trainingLibraryMenu: some View {
-        VStack(spacing: 1) {
-            HStack(spacing: 0) {
-                Button {
-                    onSelect(.trainingLibrary)
-                } label: {
-                    HStack(spacing: 12) {
-                        menuIcon("books.vertical")
-                        menuLabel(
-                            english: "Library", norwegian: "Bibliotek"
-                        )
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.leading, 8)
-                    .frame(minHeight: rowHeight)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(ATHLTHSideMenuPressStyle())
-                .accessibilityIdentifier("athlth-side-menu-training-library-open")
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Open the complete training library",
-                    norwegian: "Åpne hele treningsbiblioteket"
-                ))
-
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                        isTrainingLibraryExpanded.toggle()
-                    }
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(menuBronze)
-                        .rotationEffect(.degrees(isTrainingLibraryExpanded ? 180 : 0))
-                        .frame(width: 44, height: max(44, rowHeight))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: isTrainingLibraryExpanded
-                        ? "Collapse library shortcuts" : "Expand library shortcuts",
-                    norwegian: isTrainingLibraryExpanded
-                        ? "Skjul bibliotek-snarveier" : "Vis bibliotek-snarveier"
-                ))
-                .accessibilityIdentifier("athlth-side-menu-training-library-expand")
-            }
-            .background {
-                if isTrainingLibraryExpanded {
-                    RoundedRectangle(cornerRadius: 12).fill(ATHLTHTheme.premiumGoldSoft)
-                }
-            }
-
-            if isTrainingLibraryExpanded {
-                VStack(spacing: 1) {
-                    menuRow(.myExercises, english: "Exercises", norwegian: "Øvelser", icon: "dumbbell")
-                    menuRow(.myRoutes, english: "Routes", norwegian: "Ruter", icon: "map")
-                    menuRow(.myTrainingPlans, english: "Training plans", norwegian: "Treningsplaner", icon: "calendar")
-                    menuRow(.myWorkouts, english: "Workouts", norwegian: "Treningsøkter", icon: "bookmark")
-                }
-                .padding(.leading, 5)
-                .overlay(alignment: .leading) {
-                    menuBronze.opacity(0.20)
-                        .frame(width: 2)
-                        .padding(.vertical, 6)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
     }
 
@@ -378,111 +233,57 @@ struct ATHLTHSideMenuView: View {
             .multilineTextAlignment(.leading)
     }
 
-    private func menuRow(
-        _ destination: ATHLTHSideMenuDestination,
-        english: String,
-        norwegian: String,
-        icon: String
-    ) -> some View {
-        Button {
-            onSelect(destination)
-        } label: {
-            HStack(spacing: 0) {
-                HStack(spacing: 11) {
-                    menuIcon(icon)
-                    menuLabel(english: english, norwegian: norwegian)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(menuMuted.opacity(0.82))
-                    .frame(width: 44, height: rowHeight)
+    private func staticRow(_ destination: ATHLTHSideMenuDestination) -> some View {
+        let item: (english: String, norwegian: String, icon: String, identifier: String)
+        switch destination {
+        case .search: item = ("Search", "Søk", "magnifyingglass", "search")
+        case .notifications: item = ("Notifications", "Varsler", "bell", "notifications")
+        case .inbox: item = ("Messages", "Meldinger", "bubble.left.and.bubble.right", "inbox")
+        case .trainNow: item = ("Train now", "Tren nå", "play.circle", "train-now")
+        case .trainingLibrary: item = ("Library", "Bibliotek", "books.vertical", "training-library-open")
+        case .clubs: item = ("Club", "Klubb", "person.3", "clubs")
+        case .arena: item = ("Competition", "Konkurranse", "trophy", "competition")
+        default: item = ("", "", "circle", destination.rawValue)
+        }
+        let count = destination == .notifications ? badges.notifications :
+            destination == .inbox ? badges.inbox : 0
+        let selected = destination == .trainNow && selectedTab == 1
+        let title = ATHLTHLocalization.choose(english: item.english, norwegian: item.norwegian)
+        return Button { onSelect(destination) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: item.icon)
+                    .font(.system(size: 17, weight: .regular))
+                    .frame(width: 24)
                     .accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: rowTextSize, weight: selected ? .semibold : .regular))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                if count > 0 {
+                    Text(count > 99 ? "99+" : "\(count)")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(menuInk)
+                        .padding(.horizontal, 6)
+                        .frame(minWidth: 22, minHeight: 22)
+                        .background(menuBronze.opacity(0.14), in: Capsule())
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(.leading, 8)
-            .frame(minHeight: rowHeight)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(selected ? menuInk : menuInk.opacity(0.78))
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: dynamicTypeSize.isAccessibilitySize ? 64 : 46, alignment: .leading)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 11).fill(.white)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(ATHLTHSideMenuPressStyle())
-    }
-
-    private var homeUtilityActions: some View {
-        HStack(spacing: 4) {
-            Button {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
-                    isSearchExpanded = true
-                }
-            } label: {
-                HStack(spacing: 11) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(menuBronze)
-                    Text(ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"))
-                        .font(.system(size: rowTextSize, weight: .medium))
-                        .foregroundStyle(menuInk)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                }
-                .padding(.leading, 8)
-                .frame(maxWidth: .infinity, minHeight: 46)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("athlth-side-menu-search")
-
-            utilityIcon(
-                .inbox,
-                symbol: "tray",
-                english: "Inbox",
-                norwegian: "Innboks",
-                count: badges.inbox
-            )
-            utilityIcon(
-                .notifications,
-                symbol: "bell",
-                english: "Notifications",
-                norwegian: "Varsler",
-                count: badges.notifications
-            )
-        }
-        .accessibilityIdentifier("athlth-side-menu-home-utilities")
-    }
-
-    private func utilityIcon(
-        _ destination: ATHLTHSideMenuDestination,
-        symbol: String,
-        english: String,
-        norwegian: String,
-        count: Int
-    ) -> some View {
-        let title = ATHLTHLocalization.choose(english: english, norwegian: norwegian)
-        return Button { onSelect(destination) } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 19, weight: .regular))
-                .foregroundStyle(menuBronze)
-                .frame(width: 44, height: 46)
-                .overlay(alignment: .topTrailing) {
-                    if count > 0 {
-                        Text(count > 99 ? "99+" : "\(count)")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 4)
-                            .frame(minHeight: 16)
-                            .background(.red, in: Capsule())
-                            .offset(x: 2, y: -1)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
         .accessibilityLabel(count > 0 ? "\(title), \(count)" : title)
-        .accessibilityIdentifier(
-            destination == .inbox
-                ? "athlth-side-menu-inbox"
-                : "athlth-side-menu-notifications"
-        )
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("athlth-side-menu-" + item.identifier)
     }
 
     @ViewBuilder
