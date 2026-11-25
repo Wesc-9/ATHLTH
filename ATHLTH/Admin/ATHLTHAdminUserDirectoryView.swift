@@ -117,6 +117,7 @@ struct ATHLTHAdminUserDirectoryView: View {
         let adminPlusGrantActive: Bool
         let adminPlusGrantExpiresAt: Date?
         let joinedAt: Date
+        let lastSignInAt: Date?
         let totalCount: Int
 
         var id: UUID { userID }
@@ -133,6 +134,7 @@ struct ATHLTHAdminUserDirectoryView: View {
             case adminPlusGrantActive = "admin_plus_grant_active"
             case adminPlusGrantExpiresAt = "admin_plus_grant_expires_at"
             case joinedAt = "joined_at"
+            case lastSignInAt = "last_sign_in_at"
             case totalCount = "total_count"
         }
     }
@@ -475,6 +477,8 @@ struct ATHLTHAdminUserDirectoryView: View {
                 registeredDetail(user)
             }
 
+            lastSignInDetail(user)
+
             if showPlusControls && user.adminPlusGrantActive {
                 plusGrantControls(for: user)
             }
@@ -573,6 +577,17 @@ struct ATHLTHAdminUserDirectoryView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityLabel(tr("Registered", "Registrert") + ": " + date)
+    }
+
+    private func lastSignInDetail(_ user: DirectoryUser) -> some View {
+        let date = ATHLTHAdminDirectoryPresentation.lastSignInLabel(
+            user.lastSignInAt, norwegian: norwegian
+        )
+        return Label(tr("Last sign-in", "Sist innlogget") + ": " + date, systemImage: "clock")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("admin-last-sign-in")
     }
 
     @ViewBuilder
@@ -917,7 +932,7 @@ struct ATHLTHAdminUserDirectoryView: View {
         defer { isLoading = false }
         do {
             let result: [DirectoryUser] = try await SupabaseEnvironment.client
-                .rpc("athlth_admin_directory_v3", params: Query(
+                .rpc("athlth_admin_directory_v4", params: Query(
                     p_search: submittedSearch,
                     p_sort: directorySort.rawValue,
                     p_limit: pageSize,
