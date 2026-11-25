@@ -127,21 +127,24 @@ final class SupabaseMessagingService: Sendable {
         conversationID: UUID,
         limit: Int = 300
     ) async throws -> [DirectMessageRecord] {
-        try await client
+        let messages: [DirectMessageRecord] = try await client
             .from("athlth_direct_messages_visible")
             .select()
             .eq("conversation_id", value: conversationID)
-            .order("created_at", ascending: true)
+            .order("created_at", ascending: false)
+            .order("id", ascending: false)
             .limit(limit)
             .execute()
             .value
+        return Array(messages.reversed())
     }
 
     func sendMessage(
         conversationID: UUID,
         to recipientID: UUID,
         body: String?,
-        attachment: MessageShareDraft?
+        attachment: MessageShareDraft?,
+        messageID: UUID = UUID()
     ) async throws {
         guard let senderID = currentUserID else {
             throw SocialServiceError.notAuthenticated
@@ -151,6 +154,7 @@ final class SupabaseMessagingService: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         let insert = DirectMessageInsert(
+            id: messageID,
             conversationID: conversationID,
             senderID: senderID,
             recipientID: recipientID,
@@ -164,10 +168,38 @@ final class SupabaseMessagingService: Sendable {
             sourceOwnerID: attachment?.sourceOwnerID
         )
 
-        try await client
-            .from("direct_messages")
-            .insert(insert)
-            .execute()
+        do {
+            try await client
+                .from("direct_messages")
+                .insert(insert)
+                .execute()
+        } catch {
+            // A connection may fail after the insert has been committed.
+            // Confirm the exact immutable row, never a matching text alone.
+            let insertError = error
+            guard !Task.isCancelled, currentUserID == senderID else { throw insertError }
+            let confirmed: [DirectMessageRecord]
+            do {
+                confirmed = try await client
+                    .from("athlth_direct_messages_visible")
+                    .select()
+                    .eq("id", value: messageID)
+                    .eq("conversation_id", value: conversationID)
+                    .eq("sender_id", value: senderID)
+                    .limit(1)
+                    .execute()
+                    .value
+            } catch { throw insertError }
+            guard currentUserID == senderID, let row = confirmed.first,
+                  row.deletedAt == nil, row.recipientID == recipientID,
+                  row.body == insert.body, row.attachmentKindRaw == insert.attachmentKind,
+                  row.attachmentTitle == insert.attachmentTitle,
+                  row.attachmentSubtitle == insert.attachmentSubtitle,
+                  row.attachmentPayload == insert.attachmentPayload,
+                  row.shareVersion == insert.shareVersion,
+                  row.sourceObjectID == insert.sourceObjectID,
+                  row.sourceOwnerID == insert.sourceOwnerID else { throw insertError }
+        }
     }
 
     func respondToMessageRequest(
@@ -269,6 +301,7 @@ final class SupabaseMessagingService: Sendable {
                     value:
                         conversationID
                 )
+                .in("direct_message_id", values: messageIDs)
                 .execute()
         }
     }
