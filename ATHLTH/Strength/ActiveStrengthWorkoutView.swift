@@ -3059,8 +3059,8 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedBetweenExerciseRestCard(
         _ workout: StrengthWorkoutLog
     ) -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { timeline in
-            let ended = workout.exercises.compactMap(\.completedAt).max()
+        let ended = workout.exercises.compactMap(\.completedAt).max()
+        return TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let restStart = strength.restStartedAt ?? ended ?? timeline.date
             let seconds = max(0, timeline.date.timeIntervalSince(restStart))
             HStack(spacing: 10) {
@@ -3444,25 +3444,42 @@ struct ActiveStrengthWorkoutView: View {
     /// Finished workout metrics never need a 1-second timeline. Keeping
     /// one active only during a live finish preview avoids repeated grid
     /// layout and formatting for historical strength workouts on iPad.
+    private struct SummaryStaticMetrics {
+        let recordedRest: TimeInterval
+        let volume: Double
+        let repetitions: Int
+        let workingSets: Int
+
+        init(_ workout: StrengthWorkoutLog) {
+            recordedRest = workout.totalActualRestSeconds
+            volume = workout.totalVolumeKilograms
+            repetitions = workout.totalCompletedReps
+            workingSets = workout.totalWorkingSets
+        }
+    }
+
     @ViewBuilder
     private func focusedWorkoutSummaryMetrics(
         _ workout: StrengthWorkoutLog
     ) -> some View {
+        // Recalculate recorded set totals on a workout update, never just
+        // because the live finish clock advanced by one second.
+        let metrics = SummaryStaticMetrics(workout)
         if workout.isFinished {
             focusedWorkoutSummaryMetricGrid(
-                workout, at: workout.endedAt ?? Date()
+                workout, metrics: metrics, at: workout.endedAt ?? Date()
             )
         } else {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 focusedWorkoutSummaryMetricGrid(
-                    workout, at: context.date
+                    workout, metrics: metrics, at: context.date
                 )
             }
         }
     }
 
     private func focusedWorkoutSummaryMetricGrid(
-        _ workout: StrengthWorkoutLog, at now: Date
+        _ workout: StrengthWorkoutLog, metrics: SummaryStaticMetrics, at now: Date
     ) -> some View {
         let ongoingRestSeconds: TimeInterval =
             strength.activeWorkout?.id == workout.id
@@ -3475,7 +3492,9 @@ struct ActiveStrengthWorkoutView: View {
             elapsedSeconds: strength.elapsedSessionSeconds(
                 for: workout, at: now
             ),
-            ongoingRestSeconds: ongoingRestSeconds
+            ongoingRestSeconds: ongoingRestSeconds,
+            recordedRestSeconds: metrics.recordedRest,
+            includeSegments: false
         )
         let totalDuration = breakdown.totalSeconds
         let restDuration = breakdown.restSeconds
@@ -3544,8 +3563,7 @@ struct ActiveStrengthWorkoutView: View {
                     ),
                 value:
                     formatWorkoutVolume(
-                        workout
-                            .totalVolumeKilograms
+                        metrics.volume
                     ),
                 icon: "scalemass.fill"
             )
@@ -3558,7 +3576,7 @@ struct ActiveStrengthWorkoutView: View {
                             "Repetisjoner"
                     ),
                 value:
-                    "\(workout.totalCompletedReps)",
+                    "\(metrics.repetitions)",
                 icon: "repeat"
             )
 
@@ -3571,7 +3589,7 @@ struct ActiveStrengthWorkoutView: View {
                             "Arbeidssett"
                     ),
                 value:
-                    "\(workout.totalWorkingSets)",
+                    "\(metrics.workingSets)",
                 icon: "list.number"
             )
         }
