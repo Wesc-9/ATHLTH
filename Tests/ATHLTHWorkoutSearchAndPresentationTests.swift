@@ -60,7 +60,11 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         let steps = workout.recipePreviewBlocks
         XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
             for: steps[0], workoutTitle: workoutTitle, compact: true
-        ), "Jogging")
+        ), ATHLTHLocalization.choose(english: "Run", norwegian: "Løping"))
+        let cooldown = try XCTUnwrap(steps.last(where: { $0.resolvedPhase == .cooldown }))
+        XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
+            for: cooldown, workoutTitle: workoutTitle, compact: true
+        ), ATHLTHLocalization.choose(english: "Run", norwegian: "Løping"))
         XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
             for: steps[1], workoutTitle: workoutTitle, compact: true
         ), ATHLTHLocalization.choose(

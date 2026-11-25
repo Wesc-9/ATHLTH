@@ -101,6 +101,13 @@ final class ATHLTHStudioBlockReorderTests: XCTestCase {
         )
         XCTAssertTrue(name.contains("20 min"))
         XCTAssertEqual(ATHLTHWorkoutNameSuggestion.displayStepTitle(run),
+                       ATHLTHLocalization.choose(english: "Run", norwegian: "Løping"))
+        let cooldown = step("Nedjogging", phase: .cooldown)
+        XCTAssertEqual(ATHLTHWorkoutNameSuggestion.displayStepTitle(cooldown),
+                       ATHLTHLocalization.choose(english: "Run", norwegian: "Løping"))
+        XCTAssertEqual(run.title, "Running")
+        XCTAssertEqual(cooldown.title, "Nedjogging")
+        XCTAssertEqual(ATHLTHWorkoutNameSuggestion.displayStepTitle(step("Running", phase: .main)),
                        ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"))
     }
     func testFreeStrengthCanMoveFromWarmupToMainWithoutGainingSets() {

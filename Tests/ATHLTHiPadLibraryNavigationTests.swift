@@ -56,7 +56,9 @@ final class ATHLTHiPadLibraryNavigationTests: XCTestCase {
             destination: .arena, onBack: {}
         )
         XCTAssertEqual(ghost.title, "Ghost Race")
-        XCTAssertEqual(arena.title, "Arena")
+        XCTAssertEqual(arena.title, ATHLTHLocalization.choose(
+            english: "Competition", norwegian: "Konkurranse"
+        ))
         XCTAssertFalse(profile.title.isEmpty)
         XCTAssertNotEqual(profile.title, ghost.title)
     }
