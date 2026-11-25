@@ -151,8 +151,15 @@ struct ATHLTHTrainLibraryPremiumView: View {
             exerciseStartIndex = 0
             exerciseVisibleLimit = ATHLTHLibraryPagination.pageSize
         }
-        .task { await catalog.refresh() }
-        .task { await exerciseLibrary.refresh() }
+        .task(id: section) {
+            // The library is split into separate resources. Opening plans
+            // must not automatically initiate the exercise catalog request.
+            switch section {
+            case .plans: await catalog.refresh()
+            case .exercises: await exerciseLibrary.refresh()
+            case .workouts: break
+            }
+        }
         .task(id: queryInput) {
             do {
                 try await Task.sleep(for: .milliseconds(180))

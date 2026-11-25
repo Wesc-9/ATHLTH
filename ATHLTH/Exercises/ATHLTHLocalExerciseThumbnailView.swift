@@ -30,16 +30,23 @@ actor ATHLTHLocalExerciseThumbnailLoader {
     func thumbnail(for url: URL, maxPixels: Int) -> ATHLTHPreparedExerciseThumbnail? {
         guard url.isFileURL, !Task.isCancelled else { return nil }
         let pixels = max(64, min(maxPixels, 640))
-        let modification = try? url.resourceValues(
-            forKeys: [.contentModificationDateKey]
-        )
-        let revision = modification?.contentModificationDate?
-            .timeIntervalSince1970 ?? 0
+        // Bundled RepDB media is immutable for the process lifetime. Avoid
+        // repeated filesystem metadata queries for every cached scrolling row.
+        let bundled = url.path.hasPrefix(Bundle.main.bundleURL.path + "/")
+        let revision: TimeInterval
+        if bundled {
+            revision = 0
+        } else {
+            revision = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))
+                ?.contentModificationDate?.timeIntervalSince1970 ?? 0
+        }
         let key = "\(url.path)|\(pixels)|\(revision)" as NSString
         if let cached = thumbnails.object(forKey: key) {
             return ATHLTHPreparedExerciseThumbnail(image: cached)
         }
 
+        let signpost = ATHLTHPerformance.begin("ExerciseThumbnailDecode")
+        defer { ATHLTHPerformance.end("ExerciseThumbnailDecode", id: signpost) }
         guard let source = CGImageSourceCreateWithURL(
             url as CFURL,
             [kCGImageSourceShouldCache: false] as CFDictionary

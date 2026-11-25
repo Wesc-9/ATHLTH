@@ -1252,6 +1252,7 @@ struct ATHLTHHomeView: View {
     #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
     #endif
+    @State private var homeRecordingProjection = ATHLTHRecordedWorkoutProjection()
     @State private var homeStreakDays: [Date]?
     @State private var homeStreakRefreshTask: Task<Void, Never>?
     @State private var homeArenaLoadAccountID: UUID?
@@ -2444,19 +2445,17 @@ struct ATHLTHHomeView: View {
     /// strength sessions remain visible while their HealthKit export is pending.
     /// The shared projection de-duplicates linked and time-matched recordings.
     private var homeRecordedWorkouts: [WorkoutSummary] {
-        ATHLTHStudioRecordedWorkouts.merged(
+        homeRecordingProjection.recordings(
+            account: session.profile.userID,
             health: health.workouts,
-            localStrength: strengthWorkout.workoutHistory
+            strength: strengthWorkout.workoutHistory
         )
     }
 
     private var homeWorkoutsThisWeek:
         [WorkoutSummary] {
-        homeRecordedWorkouts.filter {
-            homeWeekInterval.contains(
-                $0.startDate
-            )
-        }
+        let interval = homeWeekInterval
+        return homeRecordedWorkouts.filter { interval.contains($0.startDate) }
     }
 
     private var homeWeeklyRunningDistanceKilometers:

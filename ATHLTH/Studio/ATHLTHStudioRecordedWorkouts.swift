@@ -93,3 +93,23 @@ extension WorkoutSummary {
         isIndoor = nil
     }
 }
+
+
+/// Home and Studio can retain this owner-local projection while rendering.
+/// The result is recomputed on real changes, never on unrelated timer ticks.
+final class ATHLTHRecordedWorkoutProjection {
+    private struct Key: Equatable {
+        let account: UUID
+        let health: [WorkoutSummary]
+        let strength: [StrengthWorkoutLog]
+    }
+    private let memo = ATHLTHProjectionMemo<Key, [WorkoutSummary]>()
+
+    func recordings(account: UUID, health: [WorkoutSummary], strength: [StrengthWorkoutLog]) -> [WorkoutSummary] {
+        memo.value(for: Key(account: account, health: health, strength: strength)) {
+            let signpost = ATHLTHPerformance.begin("RecordedWorkoutProjection")
+            defer { ATHLTHPerformance.end("RecordedWorkoutProjection", id: signpost) }
+            return ATHLTHStudioRecordedWorkouts.merged(health: health, localStrength: strength)
+        }
+    }
+}

@@ -2001,7 +2001,7 @@ struct ExerciseDetailView: View {
     @State private var shareError: String?
 
     private var currentEntry: ExerciseLibraryEntry {
-        library.allExercises.first(where: { $0.id == entry.id }) ?? entry
+        library.entry(withID: entry.id) ?? entry
     }
 
     private var displayedSummary: String? {
@@ -2217,10 +2217,9 @@ struct ExerciseDetailView: View {
                     detailCard(ATHLTHLocalization.choose(
                         english: "Demonstration", norwegian: "Demonstrasjon"
                     )) {
-                        VideoPlayer(player: AVPlayer(url: videoURL))
+                        ATHLTHExerciseVideoPlayer(url: videoURL)
                             .frame(height: 220)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .id(videoURL)
 
                         if !videoURL.isFileURL {
                             Link(destination: videoURL) {
@@ -3547,10 +3546,9 @@ struct CustomExerciseEditorView: View {
                     }
 
                     if let previewVideoURL {
-                        VideoPlayer(player: AVPlayer(url: previewVideoURL))
+                        ATHLTHExerciseVideoPlayer(url: previewVideoURL)
                             .frame(height: 210)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .id(previewVideoURL)
 
                         Button(role: .destructive) {
                             ExerciseStudioVideoStorage.discardOwnedVideo(importedVideoURL)
@@ -4337,5 +4335,38 @@ struct ExerciseMuscleOverview: View {
                     : ATHLTHPlanDesign.outline.opacity(0.30),
                 in: Capsule()
             )
+    }
+}
+
+
+/// Own the player for the visible video's lifetime rather than constructing
+/// AVPlayer/AVPlayerItem in body on every translation or store update.
+private struct ATHLTHExerciseVideoPlayer: View {
+    let url: URL
+    @State private var player: AVPlayer?
+    @State private var loadedURL: URL?
+
+    var body: some View {
+        Group {
+            if let player, loadedURL == url {
+                VideoPlayer(player: player)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task(id: url) {
+            guard !Task.isCancelled else { return }
+            if loadedURL != url || player == nil {
+                player?.pause()
+                player = AVPlayer(url: url)
+                loadedURL = url
+            }
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+            loadedURL = nil
+        }
     }
 }

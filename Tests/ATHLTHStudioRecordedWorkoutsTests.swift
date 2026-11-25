@@ -30,6 +30,18 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
         )
     }
 
+    func testRecordedProjectionInvalidatesOnHealthStrengthAndAccountChanges() {
+        let projection = ATHLTHRecordedWorkoutProjection()
+        let account = UUID()
+        let local = strength()
+        XCTAssertEqual(projection.recordings(account: account, health: [], strength: [local]).first?.id, local.id)
+        XCTAssertEqual(projection.recordings(account: account, health: [], strength: [local]).count, 1)
+        let health = WorkoutSummary(localStrengthWorkout: local)
+        XCTAssertEqual(projection.recordings(account: account, health: [health], strength: [local]).count, 1)
+        XCTAssertTrue(projection.recordings(account: account, health: [], strength: []).isEmpty)
+        XCTAssertTrue(projection.recordings(account: UUID(), health: [], strength: []).isEmpty)
+    }
+
     func testLocallyCompletedStrengthWorkoutAppearsWithoutAppleHealth() {
         let local = strength()
         let result = ATHLTHStudioRecordedWorkouts.merged(

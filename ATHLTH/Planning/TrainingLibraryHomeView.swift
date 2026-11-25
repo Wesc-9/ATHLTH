@@ -1785,15 +1785,21 @@ final class TrainingPlanLibraryStore: ObservableObject {
                     .execute()
                     .value
 
-            entries = Self.mergeValidatedCatalog(remote: remote)
+            guard !Task.isCancelled else { return }
+            let merged = Self.mergeValidatedCatalog(remote: remote)
+            if entries != merged { entries = merged }
             loadedRemote = true
-            errorMessage = nil
+            if errorMessage != nil { errorMessage = nil }
         } catch {
             // Keep all local plans available even without the database.
+            guard !Task.isCancelled else { return }
             if !loadedRemote {
-                entries = TrainingPlanCatalogEntry.bundledCatalog
+                let bundled = TrainingPlanCatalogEntry.bundledCatalog
+                if entries != bundled { entries = bundled }
             }
-            errorMessage = error.localizedDescription
+            if errorMessage != error.localizedDescription {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }
