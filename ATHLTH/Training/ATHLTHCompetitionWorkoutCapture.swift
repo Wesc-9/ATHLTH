@@ -203,15 +203,30 @@ struct ATHLTHCompetitionLocalResult: Identifiable {
         return 100 * difference / baseline
     }
 
+    /// Local classification is not server attestation. Unknown and mixed
+    /// environments never satisfy a restricted cardio venue.
+    static func matchesVenue(_ venue: ATHLTHCompetitionEnvironment, indoor: Bool?,
+                             phoneEnvironment: RunEnvironment?, mixed: Bool) -> Bool {
+        if venue == .any { return true }
+        if mixed { return false }
+        switch venue {
+        case .any: return true
+        case .outdoor: return indoor == false && (phoneEnvironment == nil || phoneEnvironment == .outdoor)
+        case .indoor: return indoor == true && phoneEnvironment != .outdoor
+        case .treadmill: return indoor == true && phoneEnvironment == .treadmill
+        case .gym: return false // a cardio record does not establish a gym location
+        }
+    }
+
     static func personalBaseline(exercise: ATHLTHSharedEventExerciseRow, libraryExerciseID: UUID?,
                                  health: [WorkoutSummary], phone: [PhoneWorkout],
-                                 strength: [StrengthWorkoutLog]) -> Self? {
+                                 strength: [StrengthWorkoutLog], venue: ATHLTHCompetitionEnvironment = .any) -> Self? {
         guard let opened = exercise.opensAt, opened <= Date() else { return nil }
         let cutoff = opened.addingTimeInterval(-0.001)
         let lower = opened.addingTimeInterval(-90 * 86_400)
         let candidates = suggestions(exercise: exercise, libraryExerciseID: libraryExerciseID,
                                      health: health, phone: phone, strength: strength,
-                                     historicalWindow: lower...cutoff)
+                                     historicalWindow: lower...cutoff, venue: venue)
             .filter { $0.value > 0 }
         return candidates.sorted {
             if $0.value == $1.value { return $0.date > $1.date }
@@ -222,13 +237,14 @@ struct ATHLTHCompetitionLocalResult: Identifiable {
     static func suggestions(exercise: ATHLTHSharedEventExerciseRow, libraryExerciseID: UUID?,
                             health: [WorkoutSummary], phone: [PhoneWorkout],
                             strength: [StrengthWorkoutLog],
-                            historicalWindow: ClosedRange<Date>? = nil) -> [Self] {
+                            historicalWindow: ClosedRange<Date>? = nil,
+                            venue: ATHLTHCompetitionEnvironment = .any) -> [Self] {
         guard let start = historicalWindow?.lowerBound ?? exercise.opensAt,
               let end = historicalWindow?.upperBound ?? exercise.deadlineAt else { return [] }
         if exercise.activity == "strength" {
             // Match the actual library exercise identity, not just a name.
             // Templates without a stable identity require manual entry.
-            guard let libraryExerciseID else { return [] }
+            guard venue != .treadmill, venue != .outdoor, let libraryExerciseID else { return [] }
             return strength.compactMap { log in
                 guard log.isFinished, let finished = log.endedAt,
                       log.startedAt >= start, finished <= end, finished <= Date(),
@@ -255,6 +271,11 @@ struct ATHLTHCompetitionLocalResult: Identifiable {
             (phone.filter { $0.end != nil }.map(SocialPublishableWorkout.init(phoneWorkout:)) +
              health.map(SocialPublishableWorkout.init(summary:))).sorted { $0.endDate > $1.endDate })
         return history.compactMap { workout in
+            let original = phone.first { ($0.healthID ?? $0.id) == workout.id }
+            let mixed = original?.indoorSwitchActiveSeconds != nil ||
+                original?.gpsDistanceBeforeIndoorSwitchMeters != nil
+            guard matchesVenue(venue, indoor: workout.isIndoor,
+                               phoneEnvironment: original?.runEnvironment, mixed: mixed) else { return nil }
             guard workout.startDate >= start, workout.endDate <= end, workout.endDate <= Date(),
                   workout.endDate > workout.startDate,
                   ATHLTHArenaLocalEvidenceCheck.verify(workout, health: health, phone: phone, strength: strength).isUsable,
