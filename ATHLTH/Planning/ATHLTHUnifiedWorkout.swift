@@ -13,7 +13,14 @@ enum ATHLTHUnifiedWorkout {
     /// template as two separate recordings.
     static func editorBlocks(from workout: PlannedSession) -> [WorkoutTemplateBlock] {
         if !workout.resolvedWorkoutBlocks.isEmpty {
-            return workout.resolvedWorkoutBlocks
+            return workout.resolvedWorkoutBlocks.map { source in
+                guard source.kind == .run, source.cardioActivity == nil,
+                      source.resolvedPhase == .warmup || source.resolvedPhase == .cooldown,
+                      workout.kind == .running || workout.kind == .walking else { return source }
+                var block = source
+                block.cardioActivity = workout.kind == .walking ? .walking : .running
+                return block
+            }
         }
 
         var blocks: [WorkoutTemplateBlock] = []
@@ -55,6 +62,14 @@ enum ATHLTHUnifiedWorkout {
             )
             effort.cardioActivity = workout.kind == .walking ? .walking : .running
             blocks.append(effort)
+        }
+
+        if workout.kind == .running {
+            for index in blocks.indices where blocks[index].kind == .run &&
+                blocks[index].cardioActivity == nil &&
+                (blocks[index].resolvedPhase == .warmup || blocks[index].resolvedPhase == .cooldown) {
+                blocks[index].cardioActivity = .running
+            }
         }
 
         // Old walking plans may store run-shaped interval targets without
