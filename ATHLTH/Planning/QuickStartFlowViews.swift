@@ -1810,7 +1810,6 @@ struct RunQuickStartSheet: View {
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
-    @State private var showingCompetition = false
     @State private var openEditorAfterLibrary = false
     @State private var showingDetailedWorkoutBuilder = false
 
@@ -2046,12 +2045,6 @@ struct RunQuickStartSheet: View {
                     onHistorySave: { treadmillInitialSpeed = $0 }
                 )
                 .presentationDetents([.large])
-            }
-            .sheet(isPresented: $showingCompetition) {
-                ATHLTHCompetitionCreationView(
-                    initialActivity: .running,
-                    advanced: isAdvancedSetup
-                )
             }
             .sheet(isPresented: $showingSpotifyPicker) {
                 SpotifyPlaylistPickerView(
@@ -2330,7 +2323,6 @@ struct RunQuickStartSheet: View {
             advanced: isAdvancedSetup,
             selection: Binding(
                 get: {
-                    if showingCompetition { return .competition }
                     switch mode {
                     case .free: return .free
                     case .route: return .route
@@ -2356,7 +2348,7 @@ struct RunQuickStartSheet: View {
                 mode = .structured
                 showingRunningLibrary = true
             case .competition:
-                showingCompetition = true
+                break
             case .exercises:
                 break
             }
@@ -2442,12 +2434,28 @@ struct RunQuickStartSheet: View {
                 .buttonStyle(.plain)
                 ATHLTHRunQuickStartPlanPreview(workout: selectedWorkout, plannedSession: advancedWorkout, compactBasic: true)
             }
+        } else if mode == .route, environment == .outdoor, let selectedRoute {
+            VStack(alignment: .leading, spacing: 10) {
+                if selectedRoute.coordinates.count >= 2 {
+                    RouteMapSnapshotThumbnail(route: selectedRoute, height: 152)
+                        .accessibilityIdentifier("athlth-quick-basic-route-map")
+                }
+                basicSelectedRowContent
+            }
+            .padding(12)
+            .athlthTrainPaper()
         } else {
             basicSelectedRow
         }
     }
 
     private var basicSelectedRow: some View {
+        basicSelectedRowContent
+            .padding(12)
+            .athlthTrainPaper()
+    }
+
+    private var basicSelectedRowContent: some View {
         HStack(spacing: 10) {
             Image(systemName: mode == .route ? "map" : "list.bullet.rectangle")
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
@@ -2462,7 +2470,7 @@ struct RunQuickStartSheet: View {
                       ))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHTrainDesign.ink)
-                .lineLimit(1)
+                .lineLimit(mode == .route ? 2 : 1)
                 if mode == .route, let selectedRoute {
                     Text(String(format: "%.1f km", selectedRoute.distanceKilometers))
                         .font(.caption)
@@ -2479,8 +2487,6 @@ struct RunQuickStartSheet: View {
             .buttonStyle(.bordered)
             .tint(ATHLTHTrainDesign.bronze)
         }
-        .padding(12)
-        .athlthTrainPaper()
     }
 
     @ViewBuilder
@@ -3899,7 +3905,6 @@ struct WalkQuickStartSheet: View {
     @State private var isAdvancedSetup = false
     @State private var showingWalkDetails = false
     @State private var showingWalkingRoutes = false
-    @State private var showingCompetition = false
     @State private var selectedWalkingRoute: TrainingRoute?
     @State private var walkingRouteChoiceTouched = false
     @State private var autoPausePreference:
@@ -3964,6 +3969,10 @@ struct WalkQuickStartSheet: View {
 
                     if let route = selectedWalkingRoute {
                         ATHLTHPlanSurface(density: .compact) {
+                            if !isAdvancedSetup && route.coordinates.count >= 2 {
+                                RouteMapSnapshotThumbnail(route: route, height: 152)
+                                    .accessibilityIdentifier("athlth-quick-basic-route-map")
+                            }
                             HStack(spacing: 12) {
                                 Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                                     .foregroundStyle(ATHLTHTrainDesign.bronze)
@@ -4057,12 +4066,6 @@ struct WalkQuickStartSheet: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingCompetition) {
-                ATHLTHCompetitionCreationView(
-                    initialActivity: .walking,
-                    advanced: isAdvancedSetup
-                )
-            }
             .sheet(isPresented: $showingWalkingRoutes) {
                 NavigationStack {
                     SavedRoutesView(
@@ -4149,7 +4152,6 @@ struct WalkQuickStartSheet: View {
             advanced: isAdvancedSetup,
             selection: Binding(
                 get: {
-                    if showingCompetition { return .competition }
                     return selectedWalkingRoute == nil ? .free : .route
                 },
                 set: { _ in }
@@ -4162,7 +4164,7 @@ struct WalkQuickStartSheet: View {
             case .route:
                 showingWalkingRoutes = true
             case .competition:
-                showingCompetition = true
+                break
             case .workout, .exercises:
                 break
             }
