@@ -2103,7 +2103,7 @@ if session.currentRole.canAccessControlCenter {
             )
         }
 
-        if let lastRefresh = health.lastSuccessfulRefreshAt {
+        if let lastRefresh = health.lastSuccessfulRefreshAt, health.hasCompletedHealthReadThisLaunch {
             let synced = healthSyncTimestamp(lastRefresh)
 
             if health.hasTrainingHealthData {
@@ -2333,6 +2333,8 @@ if session.currentRole.canAccessControlCenter {
             return "Sjekker"
         case "Setup":
             return "Oppsett"
+        case "Unavailable":
+            return "Utilgjengelig"
         case "Connection issue":
             return "Tilkoblingsproblem"
         case "Needs setup":
@@ -2351,8 +2353,8 @@ if session.currentRole.canAccessControlCenter {
         guard settings.appleHealthIntegrationEnabled,
               !healthRequestInProgress else { return }
 
+        healthRequestInProgress = true
         Task {
-            healthRequestInProgress = true
             defer { healthRequestInProgress = false }
 
             await health.requestAuthorization()

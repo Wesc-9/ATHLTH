@@ -241,6 +241,7 @@ final class HealthKitManager: ObservableObject {
 
     var hasTrainingHealthData: Bool {
         !workouts.isEmpty ||
+        !pendingWorkoutImports.isEmpty ||
         sleep.totalAsleep > 0 ||
         heart.latestHeartRate != nil ||
         heart.restingHeartRate != nil ||
@@ -248,7 +249,15 @@ final class HealthKitManager: ObservableObject {
         training.stepsToday != nil ||
         training.activeEnergyKilocaloriesToday != nil ||
         training.exerciseMinutesToday != nil ||
-        training.distanceWalkingRunningMetersToday != nil
+        training.distanceWalkingRunningMetersToday != nil ||
+        training.basalEnergyKilocaloriesToday != nil ||
+        training.distanceCyclingMetersToday != nil ||
+        training.distanceSwimmingMetersToday != nil ||
+        training.flightsClimbedToday != nil ||
+        training.vo2Max != nil ||
+        training.walkingHeartRateAverage != nil ||
+        training.oxygenSaturationPercent != nil ||
+        training.respiratoryRate != nil
     }
 
     var hasReadableHealthData: Bool {
@@ -272,6 +281,11 @@ final class HealthKitManager: ObservableObject {
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
     private var backgroundRefreshPending = false
+    private var healthReadRetryNeeded = false
+
+    var hasPendingHealthRead: Bool {
+        healthReadRetryNeeded || backgroundRefreshPending || workoutImportError != nil
+    }
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var allWorkoutsCacheEpoch = ATHLTHHealthHistoryCacheEpoch()
     // Coalesce profile, trophy and performance consumers sharing an expired
@@ -1105,7 +1119,8 @@ final class HealthKitManager: ObservableObject {
            Date().timeIntervalSince(lastSuccessfulRefreshAt) < maxAge,
            hasCompletedHealthReadThisLaunch,
            hasReadableHealthData,
-           workoutImportError == nil {
+           !hasPendingHealthRead,
+           authorizationError == nil {
             return
         }
 
@@ -1128,6 +1143,7 @@ final class HealthKitManager: ObservableObject {
 
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
+            defer { self.backgroundRefreshTask = nil }
             // Drain events that arrive during an in-flight batch rather than
             // clearing their flags after the first Health query completes.
             while self.backgroundRefreshPending && !Task.isCancelled {
@@ -1135,7 +1151,12 @@ final class HealthKitManager: ObservableObject {
                 guard !Task.isCancelled,
                       self.integrationEnabled, self.backgroundSyncPreferenceEnabled,
                       UIApplication.shared.isProtectedDataAvailable,
-                      !self.shouldDeferAutomaticHealthWork else { break }
+                      !self.shouldDeferAutomaticHealthWork else {
+                    if self.integrationEnabled && self.backgroundSyncPreferenceEnabled {
+                        self.healthReadRetryNeeded = true
+                    }
+                    break
+                }
                 guard await self.waitForHealthRefreshSlot() else { break }
 
                 let full = self.backgroundRefreshNeedsFull
@@ -1172,7 +1193,6 @@ final class HealthKitManager: ObservableObject {
 
         backgroundRefreshTask = task
         await task.value
-        backgroundRefreshTask = nil
     }
 
     /// Manual and observer requests may arrive during a light/full read.
@@ -1181,10 +1201,16 @@ final class HealthKitManager: ObservableObject {
         for _ in 0..<100 {
             guard !Task.isCancelled, integrationEnabled,
                   UIApplication.shared.isProtectedDataAvailable,
-                  !shouldDeferAutomaticHealthWork else { return false }
-            if !isRefreshing && !homeWorkoutRefreshInProgress { return true }
+                  !shouldDeferAutomaticHealthWork else {
+                if integrationEnabled && hasRequestedAuthorization { healthReadRetryNeeded = true }
+                return false
+            }
+            if !isRefreshing && !homeWorkoutRefreshInProgress && !workoutImportRefreshInProgress {
+                return true
+            }
             try? await Task.sleep(for: .milliseconds(200))
         }
+        healthReadRetryNeeded = true
         return false
     }
 
@@ -1335,6 +1361,14 @@ final class HealthKitManager: ObservableObject {
 
         isRefreshing = true
         authorizationError = nil
+        healthReadRetryNeeded = false
+        // A deferred observer batch from before unlock is covered by this
+        // full read. New callbacks arriving during it still queue normally.
+        if backgroundRefreshTask == nil {
+            backgroundRefreshPending = false
+            backgroundRefreshNeedsFull = false
+            backgroundRefreshReceivedWhileBackgrounded = false
+        }
         defer {
             isRefreshing = false
             defaults.set(
@@ -1348,7 +1382,10 @@ final class HealthKitManager: ObservableObject {
         // This also catches external workouts when background delivery is off.
         _ = await refreshWorkoutImportInbox()
         guard integrationEnabled, !Task.isCancelled,
-              UIApplication.shared.isProtectedDataAvailable else { return }
+              UIApplication.shared.isProtectedDataAvailable else {
+            if integrationEnabled { healthReadRetryNeeded = true }
+            return
+        }
 
         let end = Date()
         let start =
@@ -1449,7 +1486,10 @@ final class HealthKitManager: ObservableObject {
         }
 
         guard integrationEnabled, !Task.isCancelled,
-              UIApplication.shared.isProtectedDataAvailable else { return }
+              UIApplication.shared.isProtectedDataAvailable else {
+            if integrationEnabled { healthReadRetryNeeded = true }
+            return
+        }
 
         var completedRead = false
         var recentWorkoutsChanged = false
@@ -1575,6 +1615,7 @@ final class HealthKitManager: ObservableObject {
 
         if let firstFailure =
                 failures.first {
+            healthReadRetryNeeded = true
             authorizationError =
                 failures.count == 1
                     ? firstFailure
@@ -6495,10 +6536,20 @@ final class HealthKitManager: ObservableObject {
             latestValue = nil
         }
 
-        let restingValue =
-            try? await resting
-        let hrvValue =
-            try? await hrv
+        let restingValue: (Double, Date)?
+        do {
+            restingValue = try await resting
+        } catch {
+            if Self.isTemporarilyUnavailableHealthRead(error) { throw error }
+            restingValue = nil
+        }
+        let hrvValue: (Double, Date)?
+        do {
+            hrvValue = try await hrv
+        } catch {
+            if Self.isTemporarilyUnavailableHealthRead(error) { throw error }
+            hrvValue = nil
+        }
 
         let validLatest =
             latestValue.flatMap {

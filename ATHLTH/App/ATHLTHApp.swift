@@ -2113,6 +2113,15 @@ struct AppRootView: View {
     private var lifecycleHealthSyncContent: AnyView {
         AnyView(
             lifecycleSessionContent
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
+            guard scenePhase == .active, settings.appleHealthIntegrationEnabled,
+                  health.hasRequestedAuthorization,
+                  !workoutMirroring.hasActiveMirroredWorkout,
+                  !health.shouldDeferAutomaticHealthWork else { return }
+            Task { @MainActor in
+                await health.refreshIfStale(maxAge: 60)
+            }
+        }
         .onReceive(phoneWorkout.$active) { workout in
             handlePhoneWorkoutLiveUpdate(workout)
             // The live workout publishes frequently; training presence only
@@ -3202,7 +3211,7 @@ struct AppRootView: View {
             if settings.appleHealthIntegrationEnabled, health.hasRequestedAuthorization,
                !health.shouldDeferAutomaticHealthWork,
                !workoutMirroring.hasActiveMirroredWorkout,
-               !health.hasCompletedHealthReadThisLaunch || health.workoutImportError != nil {
+               !health.hasCompletedHealthReadThisLaunch || health.hasPendingHealthRead {
                 await health.refreshIfStale(maxAge: 0)
             }
             return
