@@ -343,6 +343,7 @@ private struct ATHLTHSharedEventProgressView: View {
     @State private var errorMessage: String?
     @State private var busy = false
     @State private var reportedCompletion = false
+    @State private var reviewing = false
     @State private var autoReporting = false
     private let cloud = ATHLTHTournamentSingleEventCloud()
 
@@ -350,6 +351,31 @@ private struct ATHLTHSharedEventProgressView: View {
         rows.filter { $0.userID == userID }.sorted { $0.sortOrder < $1.sortOrder }
     }
     private var decided: Int { ownExercises.filter { ["approved", "auto_approved", "missed"].contains($0.progress) }.count }
+
+    private var nextAction: (title: String, detail: String, symbol: String)? {
+        guard tournament.status == "active", !ownExercises.isEmpty else { return nil }
+        if let own = ownExercises.first(where: { exercise in
+            rows.contains { $0.candidateID == exercise.candidateID && mayReview($0, own: exercise) }
+        }) {
+            return ("Godkjenn resultat", own.title, "checkmark.seal")
+        }
+        let available = ownExercises.filter(\.canSubmit)
+        if let first = available.first {
+            return (first.progress == "rejected" ? "Lever resultat på nytt" : "Registrer resultat",
+                    available.count > 1 ? "\(available.count) øvelser tilgjengelig · \(first.title)" : first.title,
+                    "figure.run")
+        }
+        if ownExercises.contains(where: { $0.progress == "submitted" }) {
+            return ("Venter på godkjenning", "Resultatet er sendt inn.", "hourglass")
+        }
+        if let upcoming = ownExercises.compactMap(\.opensAt).filter({ $0 > Date() }).min() {
+            return ("Neste øvelse åpner", upcoming.formatted(date: .abbreviated, time: .shortened), "calendar")
+        }
+        if decided == ownExercises.count {
+            return ("Dine øvelser er avgjort", "Venter på at konkurransen avsluttes.", "flag.checkered")
+        }
+        return ("Venter på neste øvelse", "Oppdater når neste øvelse blir tilgjengelig.", "clock")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -364,6 +390,20 @@ private struct ATHLTHSharedEventProgressView: View {
                 if !ownExercises.isEmpty {
                     ProgressView(value: Double(decided), total: Double(ownExercises.count))
                         .tint(ATHLTHTrainDesign.gold)
+                }
+                if let action = nextAction {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: action.symbol).foregroundStyle(ATHLTHTrainDesign.bronze)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("NESTE HANDLING").font(ATHLTHTrainDesign.cardEyebrow)
+                            Text(action.title).font(.subheadline.weight(.semibold))
+                            Text(action.detail).font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 12))
                 }
                 if !rows.isEmpty { participantProgress }
                 if let end = tournament.raceRules.endDate {
@@ -421,6 +461,7 @@ private struct ATHLTHSharedEventProgressView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
                 if Task.isCancelled { break }
+                guard scenePhase == .active else { continue }
                 await reload()
             }
         }
@@ -497,7 +538,7 @@ private struct ATHLTHSharedEventProgressView: View {
                         HStack {
                             Button("Godkjenn") { Task { await review(result, approve: true) } }
                             Button("Avslå") { Task { await review(result, approve: false) } }
-                        }.font(.caption.weight(.semibold)).tint(ATHLTHTrainDesign.bronze).disabled(busy)
+                        }.font(.caption.weight(.semibold)).tint(ATHLTHTrainDesign.bronze).disabled(busy || reviewing)
                     }
                 }
                 Divider()
@@ -523,8 +564,11 @@ private struct ATHLTHSharedEventProgressView: View {
         busy = true
         defer { busy = false }
         do {
-            rows = try await cloud.sharedState(tournamentID: tournament.id)
-            standings = try await cloud.statuses(tournamentID: tournament.id)
+            let refreshedRows = try await cloud.sharedState(tournamentID: tournament.id)
+            let refreshedStandings = try await cloud.statuses(tournamentID: tournament.id)
+            guard !Task.isCancelled else { return }
+            rows = refreshedRows
+            standings = refreshedStandings
             if !reportedCompletion && tournament.status == "active" &&
                 (standings.contains(where: { $0.rank != nil }) ||
                  (!rows.isEmpty && rows.allSatisfy { $0.progress == "missed" })) {
@@ -535,7 +579,9 @@ private struct ATHLTHSharedEventProgressView: View {
         } catch { errorMessage = error.localizedDescription }
     }
     @MainActor private func review(_ row: ATHLTHSharedEventExerciseRow, approve: Bool) async {
-        guard !busy else { return }
+        guard !busy, !reviewing else { return }
+        reviewing = true
+        defer { reviewing = false }
         do {
             try await cloud.reviewShared(tournamentID: tournament.id, candidateID: row.candidateID,
                 athleteID: row.userID, approve: approve)
