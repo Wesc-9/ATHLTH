@@ -13,6 +13,8 @@ struct ATHLTHTournamentGroupConversationView: View {
     @State private var current: ATHLTHTournamentRemote?
     @State private var entries: [ATHLTHTournamentRemoteEntry] = []
     @State private var messages: [ATHLTHTournamentLobbyMessageRemote] = []
+    @State private var receipts: [UUID: [String]] = [:]
+    private let receiptService = SupabaseMessagingService()
     @State private var draft = ""
     @State private var announcing = false
     @State private var isLoading = true
@@ -255,6 +257,12 @@ struct ATHLTHTournamentGroupConversationView: View {
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    if isMine, let names = receipts[message.id], !names.isEmpty {
+                        Text("Lest av " + names.joined(separator: ", "))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(13)
                 .background(isMine ? ATHLTHArenaV3Style.cream : Color.white,
@@ -350,6 +358,7 @@ struct ATHLTHTournamentGroupConversationView: View {
             current = latest
             entries = athletes
             messages = timeline
+            receipts = (try? await receiptService.groupReadReceipts(kind: "tournament", messageIDs: timeline.filter { $0.kind != "system" }.map(\.id), markRead: scenePhase == .active)) ?? [:]
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
