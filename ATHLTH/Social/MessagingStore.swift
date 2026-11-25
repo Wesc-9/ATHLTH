@@ -19,6 +19,12 @@ final class MessagingStore: ObservableObject {
     private var preferenceSyncTask: Task<Void, Never>?
     private var isPreferencesSyncing = false
     private var withdrawalsInFlight: Set<UUID> = []
+    private var accountGeneration = UUID()
+
+    private func ownsRequest(_ owner: UUID, generation: UUID) -> Bool {
+        !Task.isCancelled && accountGeneration == generation &&
+            preferenceAccountID == owner && currentUserID == owner
+    }
 
     init(service: SupabaseMessagingService = SupabaseMessagingService()) {
         self.service = service
@@ -105,6 +111,9 @@ final class MessagingStore: ObservableObject {
         preferenceSyncTask?.cancel()
         preferenceSyncTask = nil
         preferenceAccountID = userID
+        accountGeneration = UUID()
+        isRefreshing = false
+        errorMessage = nil
         lastRefreshAt = nil
         preferenceSyncError = nil
         conversations = []
@@ -314,7 +323,7 @@ final class MessagingStore: ObservableObject {
     func refresh(
         force: Bool = false
     ) async {
-        guard currentUserID != nil,
+        guard let owner = currentUserID, preferenceAccountID == owner,
               !isRefreshing
         else {
             return
@@ -326,9 +335,10 @@ final class MessagingStore: ObservableObject {
             return
         }
 
+        let generation = accountGeneration
         isRefreshing = true
         errorMessage = nil
-        defer { isRefreshing = false }
+        defer { if accountGeneration == generation { isRefreshing = false } }
 
         do {
             async let conversationsTask = service.loadConversations()
@@ -338,6 +348,7 @@ final class MessagingStore: ObservableObject {
                 try await conversationsTask
             let refreshedMessages =
                 try await messagesTask
+            guard ownsRequest(owner, generation: generation) else { return }
 
             if conversations !=
                 refreshedConversations {
@@ -351,11 +362,12 @@ final class MessagingStore: ObservableObject {
             }
             lastRefreshAt = Date()
             await syncApplicationIconBadge()
+            guard ownsRequest(owner, generation: generation) else { return }
             await refreshPreferences()
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else { return }
+            guard ownsRequest(owner, generation: generation) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -469,10 +481,11 @@ final class MessagingStore: ObservableObject {
     }
 
     func refreshConversation(_ conversationID: UUID) async {
+        guard let owner = currentUserID, preferenceAccountID == owner else { return }
+        let generation = accountGeneration
         do {
-            let owner = currentUserID
             let messages = try await service.loadMessages(conversationID: conversationID)
-            guard !Task.isCancelled, currentUserID == owner else { return }
+            guard ownsRequest(owner, generation: generation) else { return }
 
             if let currentUserID {
                 let unread = messages.filter {
@@ -484,7 +497,7 @@ final class MessagingStore: ObservableObject {
                     // concurrent successful retraction must not appear here.
                     try await service.markConversationRead(conversationID, messageIDs: unread)
                     let confirmed = try await service.loadMessages(conversationID: conversationID)
-                    guard !Task.isCancelled, self.currentUserID == owner else { return }
+                    guard ownsRequest(owner, generation: generation) else { return }
                     let loadedIDs = Set(messages.map(\.id))
                     messagesByConversation[conversationID] = confirmed.filter {
                         loadedIDs.contains($0.id) || $0.senderID == currentUserID
@@ -504,7 +517,9 @@ final class MessagingStore: ObservableObject {
             // Force this refresh. A normal refresh may be throttled for
             // 60 seconds, which previously left the inbox unread badge stuck
             // after the thread had already been marked read on the backend.
+            guard ownsRequest(owner, generation: generation) else { return }
             await refresh(force: true)
+            guard ownsRequest(owner, generation: generation) else { return }
 
             // Full inbox refreshes must not make a just-created pending
             // request disappear locally before its first message is sent.
@@ -513,6 +528,7 @@ final class MessagingStore: ObservableObject {
                         .loadConversation(
                             id: conversationID
                         ) {
+                guard ownsRequest(owner, generation: generation) else { return }
                 upsertConversation(
                     conversation
                 )
@@ -520,7 +536,7 @@ final class MessagingStore: ObservableObject {
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else { return }
+            guard ownsRequest(owner, generation: generation) else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -658,19 +674,21 @@ final class MessagingStore: ObservableObject {
     }
 
     func retractTextMessage(_ message: DirectMessageRecord) async -> Bool {
-        guard let owner = currentUserID, message.senderID == owner,
+        guard let owner = currentUserID, preferenceAccountID == owner, message.senderID == owner,
               message.attachmentKindRaw == nil, message.readAt == nil,
               message.deletedAt == nil, !withdrawalsInFlight.contains(message.id) else { return false }
+        let generation = accountGeneration
         withdrawalsInFlight.insert(message.id)
         defer { withdrawalsInFlight.remove(message.id) }
         do {
             let removed = try await service.retractUnreadMessage(message.id)
-            guard currentUserID == owner else { return false }
+            guard ownsRequest(owner, generation: generation) else { return false }
             if removed {
                 recentMessages.removeAll { $0.id == message.id }
                 messagesByConversation[message.conversationID]?.removeAll { $0.id == message.id }
             }
             await refreshConversation(message.conversationID)
+            guard ownsRequest(owner, generation: generation) else { return false }
             if !removed {
                 errorMessage = ATHLTHLocalization.choose(
                     english: "The message can no longer be withdrawn.",
@@ -678,7 +696,7 @@ final class MessagingStore: ObservableObject {
             }
             return removed
         } catch {
-            guard currentUserID == owner else { return false }
+            guard ownsRequest(owner, generation: generation) else { return false }
             errorMessage = ATHLTHLocalization.choose(english: "Could not withdraw the message.", norwegian: "Kunne ikke trekke tilbake meldingen.")
             return false
         }
@@ -694,6 +712,8 @@ final class MessagingStore: ObservableObject {
         body: String?,
         attachment: MessageShareDraft? = nil
     ) async -> Bool {
+        guard let owner = currentUserID, preferenceAccountID == owner else { return false }
+        let generation = accountGeneration
         errorMessage = nil
 
         let cleanBody = body?
@@ -710,9 +730,11 @@ final class MessagingStore: ObservableObject {
                 body: cleanBody,
                 attachment: attachment
             )
+            guard ownsRequest(owner, generation: generation) else { return false }
             await refreshConversation(conversationID)
-            return true
+            return ownsRequest(owner, generation: generation)
         } catch {
+            guard ownsRequest(owner, generation: generation) else { return false }
             errorMessage = error.localizedDescription
             return false
         }
