@@ -766,6 +766,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
     private let client = SupabaseEnvironment.client
     private var lastPublishedID: UUID?
     private var lastPresencePublished = false
+    private var lastPublishedPresenceSessionID: UUID?
+    private var lastPublishedPresenceSource: String?
+    private var lastPublishedPresenceAt: Date?
     private var lastSpotifySpectatorRefreshAt: Date?
     private var lastPresenceCleanupAt: Date?
     private var lastPresenceExpiry: Date?
@@ -833,6 +836,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         structuredSession = nil
         lastPresenceExpiry = nil
         lastPresencePublished = false
+        lastPublishedPresenceSessionID = nil
+        lastPublishedPresenceSource = nil
+        lastPublishedPresenceAt = nil
         lastPresenceCleanupAt = nil
         lastSpotifySpectatorRefreshAt = nil
         lastPublishedID = nil
@@ -1541,6 +1547,8 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 expiresAt: now.addingTimeInterval(30)
             )
             do {
+                let signpost = ATHLTHPerformance.begin("CrossDeviceWorkoutPublish")
+                defer { ATHLTHPerformance.end("CrossDeviceWorkoutPublish", id: signpost) }
                 try await client.from("private_active_workout_status")
                     .upsert(row, onConflict: "user_id")
                     .execute()
@@ -1799,9 +1807,17 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
         guard ownsTracking(accountID, generation: generation) else { return }
         if let snapshot {
             let now = Date()
+            let source = snapshot.sourceDevice == "watch" ? "watch" : "iphone"
+            // Presence has a 30-second TTL, independent of 4-second metric and
+            // command polling. Refresh sooner on every source/session change.
+            if lastPresencePublished, lastPublishedPresenceSessionID == snapshot.id,
+               lastPublishedPresenceSource == source, let lastPublishedPresenceAt,
+               (0..<12).contains(now.timeIntervalSince(lastPublishedPresenceAt)) { return }
+            let signpost = ATHLTHPerformance.begin("CrossDevicePresenceWrite")
+            defer { ATHLTHPerformance.end("CrossDevicePresenceWrite", id: signpost) }
             let row = ATHLTHCrossDevicePresenceRow(
                 userID: accountID,
-                sourceDevice: snapshot.sourceDevice == "watch" ? "watch" : "iphone",
+                sourceDevice: source,
                 updatedAt: now,
                 expiresAt: now.addingTimeInterval(30)
             )
@@ -1811,6 +1827,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                     .execute()
                 guard ownsTracking(accountID, generation: generation) else { return }
                 lastPresencePublished = true
+                lastPublishedPresenceSessionID = snapshot.id
+                lastPublishedPresenceSource = source
+                lastPublishedPresenceAt = now
                 lastPresenceCleanupAt = nil
             } catch {
                 // A failed heartbeat never interrupts Watch or phone recording.
@@ -1828,6 +1847,9 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                         .execute()
                     guard ownsTracking(accountID, generation: generation) else { return }
                     lastPresencePublished = false
+                    lastPublishedPresenceSessionID = nil
+                    lastPublishedPresenceSource = nil
+                    lastPublishedPresenceAt = nil
                 } catch {
                     // Expiring the heartbeat is the offline safety fallback.
                 }
