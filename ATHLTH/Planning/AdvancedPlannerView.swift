@@ -6992,7 +6992,8 @@ struct SessionEditorView: View {
         // The obsolete "Plan extra workout" Form must never be presented
         // from a friend's Train Together entry, including the first frame
         // before the full-screen unified builder is attached.
-        if directPartnerID != nil && isStandalone && existingWorkout == nil {
+        if directPartnerID != nil && isStandalone && existingWorkout == nil &&
+            !partnerScratchReadyForInvite {
             ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
                 .toolbar(.hidden, for: .navigationBar)
         } else if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
@@ -7703,7 +7704,18 @@ struct SessionEditorView: View {
                 isPresented: $showingScratchTypePicker,
                 onDismiss: {
                     guard openScratchComposerAfterPickerDismiss else {
-                        if scenePhase == .active && !draftFinalized {
+                        if directPartnerID != nil && selectedScratchWorkoutType == nil {
+                            // Back/cancel returns to the friend, not the blank
+                            // compatibility host. A background dismissal is
+                            // restored on activation instead.
+                            if scenePhase == .active {
+                                draftFinalized = true
+                                Task { @MainActor in
+                                    await Task.yield()
+                                    dismiss()
+                                }
+                            }
+                        } else if scenePhase == .active && !draftFinalized {
                             persistOpenNavigationStage(.source)
                         }
                         return
@@ -7914,17 +7926,17 @@ struct SessionEditorView: View {
                 if directPartnerID != nil && isStandalone &&
                     existingWorkout == nil && onPreparedWorkout == nil &&
                     !draftRestored {
-                    // Friend profile -> Train Together must open the shared
-                    // full-screen workout builder directly. Never show the
-                    // obsolete "Plan extra workout" Form first.
+                    // Friend profile -> Train Together starts at the same
+                    // activity picker as solo planning. Keep the preselected
+                    // friend and meeting details, but never assume running.
                     draftRestored = true
-                    prepareBlankWorkout(for: .running)
                     Task { @MainActor in
                         await Task.yield()
                         guard !draftFinalized,
-                              selectedScratchWorkoutType == .running,
-                              !showingUnifiedWorkoutComposer else { return }
-                        showingUnifiedWorkoutComposer = true
+                              selectedScratchWorkoutType == nil,
+                              !showingUnifiedWorkoutComposer,
+                              !showingScratchTypePicker else { return }
+                        showingScratchTypePicker = true
                     }
                 } else if restoreOpenNavigationStageIfNeeded() {
                     // The account-scoped route owns this presentation.
@@ -8026,6 +8038,12 @@ struct SessionEditorView: View {
                     // iOS can tear down a sheet without tearing down the
                     // editor view. Re-present its saved destination on wake.
                     presentQueuedNavigationIfNeeded()
+                    if directPartnerID != nil && isStandalone &&
+                        !draftFinalized && selectedScratchWorkoutType == nil &&
+                        !showingScratchTypePicker && !showingUnifiedWorkoutComposer &&
+                        !openScratchComposerAfterPickerDismiss {
+                        showingScratchTypePicker = true
+                    }
                     if shouldTrackOpenNavigation && queuedNavigationStage == nil,
                        let stage = ATHLTHStandaloneWorkoutDraftStore.navigationStage(
                             for: session.profile.userID
