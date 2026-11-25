@@ -1391,10 +1391,10 @@ private struct ATHLTHRunQuickStartPlanPreview: View {
 
     private var compactRecipe: [WorkoutTemplateBlock] {
         if let plannedSession {
-            return ATHLTHUnifiedWorkout.editorBlocks(from: plannedSession).expandedForExecution()
+            return ATHLTHUnifiedWorkout.editorBlocks(from: plannedSession)
         }
         if let workout {
-            return ATHLTHQuickRunTimelineAdapter.editorBlocks(from: workout).expandedForExecution()
+            return ATHLTHQuickRunTimelineAdapter.editorBlocks(from: workout)
         }
         return []
     }
@@ -1404,14 +1404,15 @@ private struct ATHLTHRunQuickStartPlanPreview: View {
         let title = plannedSession?.title ?? workout?.title ?? ""
         let maximum = ATHLTHHeartRateZones.resolvedMaximumBPM(
             configured: session.onboardingProfile?.maximumHeartRateBPM, dateOfBirth: nil)
-        let stages = ATHLTHSimpleWorkoutOutline.stages(for: recipe, workoutTitle: title, maximumBPM: maximum, includePace: true)
-        let duration = ATHLTHWorkoutDurationEstimator.minutes(for: recipe)
+        let stages = ATHLTHSimpleWorkoutOutline.stages(for: recipe.expandedForExecution(), workoutTitle: title, maximumBPM: maximum, includePace: true)
+        let duration = ATHLTHWorkoutDurationEstimator.previewSeconds(for: recipe,
+            defaultActivity: plannedSession?.kind == .walking ? .walking : .running)
         return ATHLTHPlanSurface(density: .compact) {
             header(title: title)
             HStack(spacing: 11) {
                 Label("\(stages.flatMap(\.items).count) " + tr("parts", "deler"), systemImage: "list.number")
                 if let duration, duration > 0 {
-                    Label("~\(duration) min", systemImage: "clock")
+                    Label("~" + ATHLTHWorkoutDurationEstimator.conciseDuration(duration), systemImage: "clock")
                 }
             }
             .font(.caption.weight(.medium))
