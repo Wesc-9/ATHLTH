@@ -110,13 +110,17 @@ struct ATHLTHTournamentLobbyRulesView: View {
                 HStack(spacing: 12) {
                     compactValue("Øvelser",
                         tournament.rotationMode.title)
-                    compactValue("Poeng",
-                        "\(tournament.winPoints) seier · \(tournament.drawPoints) uavgjort")
+                    if tournament.raceRules.scoringMode != nil && tournament.singleEventMode {
+                        compactValue("Øvelsespoeng", tournament.raceRules.scoringSummary)
+                    } else {
+                        compactValue(tournament.raceRules.scoringMode != nil ? "Tabellpoeng" : "Poeng",
+                            "\(tournament.winPoints) seier · \(tournament.drawPoints) uavgjort")
+                    }
                 }
                 if !tournament.restWeekdays.isEmpty {
                     Text("Hviledager: " +
-                         tournament.restWeekdays.map {
-                            ["Man","Tir","Ons","Tor","Fre","Lør","Søn"][$0-1]
+                         tournament.restWeekdays.compactMap { day in
+                            (1...7).contains(day) ? ["Man","Tir","Ons","Tor","Fre","Lør","Søn"][day-1] : nil
                          }.joined(separator: " · "))
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
