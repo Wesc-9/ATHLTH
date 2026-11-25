@@ -25,6 +25,51 @@ final class SupabaseMessagingService: Sendable {
         client.auth.currentUser?.id
     }
 
+    /// Subscribe to content-free, account-scoped server invalidations.
+    /// REST remains authoritative and the caller retains fallback polling.
+    @MainActor
+    func observeThreadChanges(
+        owner: UUID, conversation: UUID,
+        onChange: @MainActor @Sendable () -> Void,
+        onStatus: @MainActor @Sendable (Bool) -> Void
+    ) async {
+        guard currentUserID == owner, !Task.isCancelled else { return }
+        let topic = "athlth-direct:\(owner.uuidString.lowercased()):\(conversation.uuidString.lowercased())"
+        let channel = await client.channel(topic) { $0.isPrivate = true }
+        let changes = await channel.broadcastStream(event: "refresh")
+        let statuses = channel.statusChange
+        do {
+            try await channel.subscribeWithError()
+            guard !Task.isCancelled, currentUserID == owner else {
+                await channel.unsubscribe()
+                return
+            }
+            onStatus(channel.status == .subscribed)
+            onChange() // Cover the fetch-to-subscribe gap.
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { @MainActor in
+                    for await _ in changes {
+                        guard !Task.isCancelled, self.currentUserID == owner else { break }
+                        onChange()
+                    }
+                }
+                group.addTask { @MainActor in
+                    for await status in statuses {
+                        guard !Task.isCancelled, self.currentUserID == owner else { break }
+                        onStatus(status == .subscribed)
+                        if status == .subscribed { onChange() }
+                    }
+                }
+                await group.next()
+                group.cancelAll()
+            }
+        } catch {
+            // Missing permissions, network loss or older backend: poll normally.
+        }
+        onStatus(false)
+        await channel.unsubscribe()
+    }
+
     func unreadInboxEventCount()
         async throws -> Int {
         guard let currentUserID else {
