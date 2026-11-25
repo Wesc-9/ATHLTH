@@ -104,6 +104,43 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     func handicap(for id: UUID) -> Int { handicapPercentages?[Self.key(id)] ?? 0 }
     func goal(for id: UUID) -> Double? { scoringGoals?[Self.key(id)] }
     func weight(for id: UUID) -> Int { exerciseWeights?[Self.key(id)] ?? 1 }
+    /// Illustrative points only. The server remains authoritative for real results.
+    /// "distance" means elapsed seconds over a fixed distance; "duration"
+    /// means meters in a fixed time, and "time" means hold duration in seconds.
+    static func previewPoints(mode: ATHLTHCompetitionScoringMode, metric: String,
+                              values: [Double], handicaps: [Int],
+                              basePoints: Int, weight: Int, goal: Double?) -> [Int]? {
+        guard ["distance", "duration", "time", "repetitions"].contains(metric),
+              !values.isEmpty, values.count == handicaps.count, values.count <= 21,
+              values.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 100_000_000 }),
+              handicaps.allSatisfy({ (0...30).contains($0) }),
+              (1...10).contains(basePoints), (1...5).contains(weight) else { return nil }
+        if mode.needsGoal {
+            guard let goal, goal.isFinite, goal > 0, goal <= 100_000_000 else { return nil }
+        }
+        let lowerIsBetter = metric == "distance"
+        let adjusted = zip(values, handicaps).map { value, handicap in
+            let factor = 1 + (lowerIsBetter ? -1.0 : 1.0) * Double(handicap) / 100
+            return (value * factor * 1_000_000).rounded() / 1_000_000
+        }
+        let order = adjusted.map { value -> Double in
+            if mode == .closest, let goal { return abs(value - goal) }
+            return lowerIsBetter ? value : -value
+        }
+        return adjusted.indices.map { i in
+            let rank = 1 + order.filter { $0 < order[i] }.count
+            let multiplier: Int
+            switch mode {
+            case .ranking: multiplier = max(0, values.count - rank + 1)
+            case .winner, .closest: multiplier = rank == 1 ? 1 : 0
+            case .target:
+                multiplier = goal.map { lowerIsBetter ? adjusted[i] <= $0 : adjusted[i] >= $0 } == true ? 1 : 0
+            case .completion: multiplier = 1
+            }
+            return multiplier * basePoints * weight
+        }
+    }
+
     var discipline: ATHLTHCompetitionDiscipline = .workout
     // Absent in legacy events: only new exercise-scored events opt in.
     var exerciseScoringVersion: Int? = nil
