@@ -171,6 +171,30 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         ))
     }
 
+    func testImportedRunningRecipeCarriesSelectedVenueWithoutPersistingItToLibrary() throws {
+        let source = RunningWorkoutTemplate(id: UUID(), title: "4 × 4 intervaller",
+            type: .intervals, summary: "Test", blocks: [
+                RunningWorkoutBlock(kind: .work, title: "Intervall", repetitions: 4,
+                    work: RunningStepTarget(measure: .time, distanceMeters: nil, durationSeconds: 240,
+                        intensity: RunningIntensityTarget(kind: .pace, paceMinSecondsPerKilometer: 257,
+                            paceMaxSecondsPerKilometer: 257, heartRateZone: 4, rpe: nil)))
+            ], routeID: nil, isBuiltIn: true, createdAt: Date(), updatedAt: Date())
+        var chosen = source
+        chosen.launchRunEnvironment = .treadmill
+        let blocks = ATHLTHQuickRunTimelineAdapter.editorBlocks(from: chosen)
+        XCTAssertFalse(blocks.isEmpty)
+        XCTAssertTrue(blocks.allSatisfy { $0.isIndoor == true && $0.treadmillInclinePercent == 0 })
+        XCTAssertEqual(blocks.first?.targetPaceSecondsPerKilometer, 257)
+        XCTAssertEqual(blocks.first?.targetHeartRateZone, 4)
+        let decoded = try JSONDecoder().decode(RunningWorkoutTemplate.self, from: JSONEncoder().encode(chosen))
+        XCTAssertNil(decoded.launchRunEnvironment)
+        XCTAssertNil(source.launchRunEnvironment)
+        chosen.launchRunEnvironment = .indoor
+        XCTAssertTrue(ATHLTHQuickRunTimelineAdapter.editorBlocks(from: chosen).allSatisfy {
+            $0.isIndoor == true && $0.treadmillInclinePercent == nil
+        })
+    }
+
     func testPlannedIndoorRunRemainsIndoorAfterQuickStart() {
         var run = block("Indoor", phase: .main, seconds: 1_200)
         run.isIndoor = true
