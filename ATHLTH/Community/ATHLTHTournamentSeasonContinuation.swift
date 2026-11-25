@@ -15,6 +15,41 @@ enum ATHLTHTournamentSeasonContinuation {
             [.league, .groups, .cup].contains(format)
     }
 
+    /// Follow only explicit, visible season links, never titles or club IDs.
+    /// Missing ancestors remain private; a cycle cannot cause an infinite walk.
+    static func history(
+        current: ATHLTHTournamentRemote,
+        visible: [ATHLTHTournamentRemote]
+    ) -> [ATHLTHTournamentRemote] {
+        guard !current.singleEventMode, !current.isDuel else { return [] }
+        var byID: [UUID: ATHLTHTournamentRemote] = [current.id: current]
+        for season in visible where !season.singleEventMode && !season.isDuel &&
+            season.ownerID == current.ownerID && season.format == current.format {
+            if byID[season.id] == nil { byID[season.id] = season }
+        }
+        var neighbors: [UUID: [UUID]] = [:]
+        for season in byID.values {
+            guard let previous = season.raceRules.previousCompetitionID,
+                  byID[previous] != nil else { continue }
+            neighbors[season.id, default: []].append(previous)
+            neighbors[previous, default: []].append(season.id)
+        }
+        var visited: Set<UUID> = [current.id]
+        var pending = [current.id]
+        while let id = pending.popLast() {
+            for neighbor in neighbors[id, default: []] {
+                if visited.insert(neighbor).inserted { pending.append(neighbor) }
+            }
+        }
+        return visited.compactMap { byID[$0] }.sorted {
+            let lhs = $0.raceRules.seasonNumber ?? 1
+            let rhs = $1.raceRules.seasonNumber ?? 1
+            if lhs != rhs { return lhs > rhs }
+            if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+    }
+
     static func nextTitle(from previous: String) -> String {
         let clean = previous.trimmingCharacters(in: .whitespacesAndNewlines)
         let pattern = #"(?i)(?:\s*[·—-]\s*)?sesong\s+([0-9]+)\s*$"#
