@@ -21,6 +21,21 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
         )
     }
 
+    func testLiveStrengthMusclePageFollowsStartAndPeakPhotos() {
+        let start = URL(fileURLWithPath: "/tmp/start.png")
+        let peak = URL(fileURLWithPath: "/tmp/peak.png")
+        let extra = URL(fileURLWithPath: "/tmp/extra.png")
+        XCTAssertEqual(ATHLTHLiveStrengthGalleryPage.pages(
+            urls: [start, peak, extra], hasMuscles: true),
+            [.artwork(start), .artwork(peak), .muscles, .artwork(extra)])
+        XCTAssertEqual(ATHLTHLiveStrengthGalleryPage.pages(
+            urls: [start], hasMuscles: true), [.artwork(start), .muscles])
+        XCTAssertEqual(ATHLTHLiveStrengthGalleryPage.pages(
+            urls: [], hasMuscles: true), [.placeholder, .muscles])
+        XCTAssertEqual(ATHLTHLiveStrengthGalleryPage.pages(
+            urls: [start, peak], hasMuscles: false), [.artwork(start), .artwork(peak)])
+    }
+
     func testThumbnailSizingUsesScreenScaleAndBoundedBuckets() {
         XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: 68, scale: 2), 160)
         XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: 68, scale: 3), 224)

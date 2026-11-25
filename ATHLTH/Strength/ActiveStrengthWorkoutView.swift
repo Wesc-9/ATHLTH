@@ -3,6 +3,21 @@ import SwiftUI
 import Translation
 import UIKit
 
+enum ATHLTHLiveStrengthGalleryPage: Equatable {
+    case artwork(URL)
+    case placeholder
+    case muscles
+
+    static func pages(urls: [URL], hasMuscles: Bool) -> [Self] {
+        var pages: [Self] = urls.map { .artwork($0) }
+        if pages.isEmpty { pages = [.placeholder] }
+        // Preserve every real exercise photo. The muscle atlas follows the
+        // start and peak frames (or the sole available photo).
+        if hasMuscles { pages.insert(.muscles, at: min(2, pages.count)) }
+        return pages
+    }
+}
+
 struct ActiveStrengthWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -4583,10 +4598,13 @@ struct ActiveStrengthWorkoutView: View {
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
     ) -> some View {
-        let mediaURLs =
-            focusedExerciseMediaURLs(
-                exercise
-            )
+        let pages = ATHLTHLiveStrengthGalleryPage.pages(
+            urls: focusedExerciseMediaURLs(exercise),
+            hasMuscles: !exercise.exercise.primaryMuscles.isEmpty ||
+                !(exercise.exercise.secondaryMuscles ?? []).isEmpty
+        )
+        let selectedPage = min(max(focusedExerciseMediaIndex, 0), pages.count - 1)
+        let showingMusclePage = pages[selectedPage] == .muscles
 
         return VStack(spacing: 0) {
             ZStack(
@@ -4595,7 +4613,7 @@ struct ActiveStrengthWorkoutView: View {
             ) {
                 focusedExerciseMediaCarousel(
                     exercise,
-                    urls: mediaURLs
+                    pages: pages
                 )
                 .frame(height: 205)
                 .frame(
@@ -4603,81 +4621,86 @@ struct ActiveStrengthWorkoutView: View {
                 )
                 .clipped()
 
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        Color.black
-                            .opacity(0.66)
-                    ],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                .allowsHitTesting(false)
+                // The anatomy page must remain fully readable; keep the
+                // existing photo gradient and title only on movement photos.
+                if !showingMusclePage {
+                    LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.black
+                                .opacity(0.66)
+                        ],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-                    Text(
-                        ATHLTHLocalization.format(
-                            english:
-                                "Exercise %d of %d",
-                            norwegian:
-                                "Øvelse %d av %d",
-                            strength
-                                .currentExerciseIndex +
-                                1,
-                            workout.exercises.count
-                        )
-                    )
-                    .font(
-                        .caption
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.78)
-                    )
-
-                    Text(
-                        exercise.exercise.displayName
-                    )
-                    .font(
-                        .title2
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-
-                    if !exercise
-                        .exercise
-                        .primaryMuscles
-                        .isEmpty {
+                    VStack(
+                        alignment: .leading,
+                        spacing: 5
+                    ) {
                         Text(
-                            exercise
-                                .exercise
-                                .primaryMuscles
-                                .prefix(3)
-                                .joined(
-                                    separator: " · "
-                                )
+                            ATHLTHLocalization.format(
+                                english:
+                                    "Exercise %d of %d",
+                                norwegian:
+                                    "Øvelse %d av %d",
+                                strength
+                                    .currentExerciseIndex +
+                                    1,
+                                workout.exercises.count
+                            )
                         )
-                        .font(.caption)
+                        .font(
+                            .caption
+                                .weight(.semibold)
+                        )
                         .foregroundStyle(
                             .white.opacity(0.78)
                         )
-                        .lineLimit(1)
-                    }
-                }
-                .padding(16)
-                .allowsHitTesting(false)
 
-                if mediaURLs.count > 1 {
+                        Text(
+                            exercise.exercise.displayName
+                        )
+                        .font(
+                            .title2
+                                .weight(.bold)
+                        )
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+
+                        if !exercise
+                            .exercise
+                            .primaryMuscles
+                            .isEmpty {
+                            Text(
+                                exercise
+                                    .exercise
+                                    .primaryMuscles
+                                    .prefix(3)
+                                    .joined(
+                                        separator: " · "
+                                    )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(
+                                .white.opacity(0.78)
+                            )
+                            .lineLimit(1)
+                        }
+                    }
+                    .padding(16)
+                    .allowsHitTesting(false)
+
+                }
+
+                if pages.count > 1 {
                     VStack {
                         HStack {
                             Spacer()
 
                             Text(
-                                "\(min(focusedExerciseMediaIndex + 1, mediaURLs.count)) / \(mediaURLs.count)"
+                                "\(selectedPage + 1) / \(pages.count)"
                             )
                             .font(
                                 .caption2
@@ -4710,21 +4733,21 @@ struct ActiveStrengthWorkoutView: View {
                             Spacer()
 
                             ForEach(
-                                mediaURLs.indices,
+                                pages.indices,
                                 id: \.self
                             ) { index in
                                 Capsule()
                                     .fill(
                                         index ==
-                                            focusedExerciseMediaIndex
-                                            ? Color.white
-                                            : Color.white
+                                            selectedPage
+                                            ? (showingMusclePage ? ATHLTHPlanDesign.ink : Color.white)
+                                            : (showingMusclePage ? ATHLTHPlanDesign.ink : Color.white)
                                                 .opacity(0.42)
                                     )
                                     .frame(
                                         width:
                                             index ==
-                                                focusedExerciseMediaIndex
+                                                selectedPage
                                                 ? 15
                                                 : 5,
                                         height: 5
@@ -4990,41 +5013,47 @@ struct ActiveStrengthWorkoutView: View {
     @ViewBuilder
     private func focusedExerciseMediaCarousel(
         _ exercise: StrengthExerciseLog,
-        urls: [URL]
+        pages: [ATHLTHLiveStrengthGalleryPage]
     ) -> some View {
-        if urls.count > 1 {
-            TabView(
-                selection:
-                    $focusedExerciseMediaIndex
-            ) {
-                ForEach(
-                    Array(
-                        urls.enumerated()
-                    ),
-                    id: \.offset
-                ) { index, url in
-                    focusedExerciseArtwork(
-                        url: url,
-                        exercise: exercise
-                    )
-                    .tag(index)
+        if pages.count > 1 {
+            TabView(selection: $focusedExerciseMediaIndex) {
+                ForEach(pages.indices, id: \.self) { index in
+                    focusedExerciseGalleryPage(pages[index], exercise: exercise)
+                        .tag(index)
                 }
             }
-            .tabViewStyle(
-                .page(
-                    indexDisplayMode: .never
-                )
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .onChange(of: pages.count) { _, count in
+                if focusedExerciseMediaIndex >= count {
+                    focusedExerciseMediaIndex = max(0, count - 1)
+                }
+            }
+        } else if let page = pages.first {
+            focusedExerciseGalleryPage(page, exercise: exercise)
+        }
+    }
+
+    @ViewBuilder
+    private func focusedExerciseGalleryPage(
+        _ page: ATHLTHLiveStrengthGalleryPage,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        switch page {
+        case .artwork(let url):
+            focusedExerciseArtwork(url: url, exercise: exercise)
+        case .placeholder:
+            focusedExerciseArtworkFallback(exercise)
+        case .muscles:
+            // Reuse the library's existing front/back muscle illustration.
+            // No additional image download or duplicate instruction card.
+            ExerciseMuscleGalleryTile(
+                primaryMuscles: exercise.exercise.primaryMuscles,
+                secondaryMuscles: exercise.exercise.secondaryMuscles ?? [],
+                size: 190
             )
-        } else if let url =
-                    urls.first {
-            focusedExerciseArtwork(
-                url: url,
-                exercise: exercise
-            )
-        } else {
-            focusedExerciseArtworkFallback(
-                exercise
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(ExerciseMuscleGalleryTile.skyBlue)
+            .accessibilityIdentifier("athlth-live-strength-muscle-gallery")
         }
     }
 
@@ -5406,119 +5435,6 @@ struct ActiveStrengthWorkoutView: View {
             focusedExerciseLibraryEntry(exercise)?.exercise.videoURL
     }
 
-    /// The same native front/back atlas used by ATHLTH Insights, scoped to
-    /// the selected exercise rather than accumulated training history.
-    private func focusedExerciseMuscleDetail(
-        _ exercise: StrengthExerciseLog
-    ) -> some View {
-        let primary = focusedExerciseRegions(
-            exercise.exercise.primaryMuscles,
-            fallbackName: exercise.exercise.name
-        )
-        let secondary = focusedExerciseRegions(
-            exercise.exercise.secondaryMuscles ?? [],
-            fallbackName: nil
-        ).subtracting(primary)
-        let regions = primary.union(secondary)
-        let profile = StrengthMuscleProfile(
-            activations: regions.map {
-                StrengthMuscleActivation(
-                    region: $0,
-                    score: primary.contains($0) ? 4.5 : 2.1
-                )
-            },
-            primaryRegions: primary,
-            secondaryRegions: secondary
-        )
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "figure.strengthtraining.traditional")
-                Text(ATHLTHLocalization.choose(
-                    english: "Muscles used",
-                    norwegian: "Muskelgrupper som trenes"
-                ))
-                .font(.subheadline.weight(.semibold))
-            }
-            .foregroundStyle(ATHLTHPlanDesign.ink)
-            if !regions.isEmpty {
-                StrengthMuscleMapView(
-                    profile: profile,
-                    compact: true,
-                    activationTint: ATHLTHTheme.vitality
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: 142)
-            }
-            if !exercise.exercise.primaryMuscles.isEmpty {
-                let primaryMuscles = exercise.exercise.primaryMuscles
-                Text(ATHLTHLocalization.choose(
-                    english: "Primary: ", norwegian: "Primær: "
-                ) + primaryMuscles.joined(separator: " · "))
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-            }
-            if let secondaryMuscles = exercise.exercise.secondaryMuscles,
-               !secondaryMuscles.isEmpty {
-                Text(ATHLTHLocalization.choose(
-                    english: "Secondary: ", norwegian: "Sekundær: "
-                ) + secondaryMuscles.joined(separator: " · "))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ATHLTHPlanDesign.warmSurface,
-                    in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func focusedExerciseRegions(
-        _ labels: [String],
-        fallbackName: String?
-    ) -> Set<StrengthMuscleRegion> {
-        var regions: Set<StrengthMuscleRegion> = []
-        for name in labels {
-            let lower = name.lowercased()
-            for region in StrengthMuscleRegion.allCases {
-                let raw = region.rawValue.lowercased()
-                if lower == raw || lower == region.title.lowercased() {
-                    regions.insert(region)
-                }
-            }
-            if lower.contains("quad") || lower.contains("forside lår") {
-                regions.insert(.quads)
-            }
-            if lower.contains("glute") || lower.contains("setemus") {
-                regions.insert(.glutes)
-            }
-            if lower.contains("hamstring") || lower.contains("bakside lår") {
-                regions.insert(.hamstrings)
-            }
-            if lower.contains("chest") || lower.contains("bryst") {
-                regions.insert(.chest)
-            }
-            if lower.contains("back") || lower.contains("rygg") {
-                regions.insert(.upperBack)
-            }
-            if lower.contains("shoulder") || lower.contains("skulder") {
-                regions.insert(.frontDelts)
-            }
-            if lower.contains("calf") || lower.contains("legg") {
-                regions.insert(.calves)
-            }
-            if lower.contains("tricep") { regions.insert(.triceps) }
-            if lower.contains("bicep") { regions.insert(.biceps) }
-        }
-        if regions.isEmpty, let fallbackName {
-            regions.formUnion(
-                StrengthMuscleResolver.fallbackRegions(
-                    forExerciseName: fallbackName
-                )
-            )
-        }
-        return regions
-    }
-
     private func focusedExerciseInstructionDisclosure(
         _ exercise: StrengthExerciseLog
     ) -> some View {
@@ -5668,7 +5584,6 @@ struct ActiveStrengthWorkoutView: View {
                     alignment: .leading,
                     spacing: 12
                 ) {
-                    focusedExerciseMuscleDetail(exercise)
                     if let demoURL {
                         VStack(alignment: .leading, spacing: 8) {
                             Label(
