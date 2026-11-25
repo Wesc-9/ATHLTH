@@ -2016,6 +2016,8 @@ struct TrainingPlanLibraryView: View {
     }
 
     private var filteredEntries: [TrainingPlanCatalogEntry] {
+        let signpost = ATHLTHPerformance.begin("PlanCatalogFilter")
+        defer { ATHLTHPerformance.end("PlanCatalogFilter", id: signpost) }
         let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let results = catalog.entries.filter { entry in
             let categoryMatches =
@@ -2058,13 +2060,6 @@ struct TrainingPlanLibraryView: View {
     }
 
 
-    private var listedEntries: [TrainingPlanCatalogEntry] {
-        // Search and all filters run over the complete catalog first.
-        ATHLTHLibraryAlphabetWindow.visible(
-            filteredEntries, start: visibleStartIndex, limit: visibleLimit
-        )
-    }
-
     private var pageFilterKey: String {
         [query, selectedCategory, selectedMuscle?.rawValue ?? "",
          sessionsPerWeekFilter.map(String.init) ?? "",
@@ -2074,6 +2069,9 @@ struct TrainingPlanLibraryView: View {
 
     var body: some View {
         let results = filteredEntries
+        let listedEntries = ATHLTHLibraryAlphabetWindow.visible(
+            results, start: visibleStartIndex, limit: visibleLimit
+        )
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: results, id: { $0.id }, title: { $0.title }
         )
@@ -2081,7 +2079,7 @@ struct TrainingPlanLibraryView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
-                        Text(tr("\(filteredEntries.count) plans", "\(filteredEntries.count) planer"))
+                        Text(tr("\(results.count) plans", "\(results.count) planer"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ink)
 
@@ -2127,7 +2125,7 @@ struct TrainingPlanLibraryView: View {
                     }
                     .id("all-training-plans")
 
-                    if filteredEntries.isEmpty {
+                    if results.isEmpty {
                         ContentUnavailableView(
                             favoritePlansOnly
                                 ? tr("No favorite plans yet", "Ingen favorittplaner ennå")
