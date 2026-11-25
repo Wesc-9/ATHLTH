@@ -5,7 +5,6 @@ import SwiftUI
 struct ATHLTHPlannedPaceTargetView: View {
     @Binding var targetPaceSecondsPerKilometer: Double?
     @AppStorage("athlth.running.paceUnitPreference.v1") private var preferredUnit = "auto"
-    @AppStorage("athlth.running.treadmillInputMode.v1") private var treadmillInputMode = "treadmill"
     @AppStorage("settings.measurement") private var measurementRaw = "metric"
     @Environment(\.locale) private var locale
     let prefersSpeed: Bool
@@ -31,14 +30,8 @@ struct ATHLTHPlannedPaceTargetView: View {
     private var measurement: MeasurementPreference {
         MeasurementPreference(rawValue: measurementRaw) ?? .metric
     }
-    private var treadmillMode: Binding<ATHLTHTreadmillInputMode> {
-        Binding(
-            get: { ATHLTHTreadmillInputMode(rawValue: treadmillInputMode) ?? .treadmill },
-            set: { treadmillInputMode = $0.rawValue }
-        )
-    }
     private var isPaceMode: Bool {
-        treadmillDisplay ? treadmillMode.wrappedValue == .pace : !showingSpeed.wrappedValue
+        !treadmillDisplay && !showingSpeed.wrappedValue
     }
 
     private var showingSpeed: Binding<Bool> {
@@ -122,22 +115,14 @@ struct ATHLTHPlannedPaceTargetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle(
-                treadmillDisplay ? tr("Treadmill tempo", "Mølletempo")
+                treadmillDisplay ? tr("Treadmill speed", "Møllehastighet")
                     : tr("Target pace / speed", "Måltempo / hastighet"),
                 isOn: isEnabled
             )
                 .tint(ATHLTHTrainDesign.bronze)
 
             if targetPaceSecondsPerKilometer != nil {
-                if treadmillDisplay {
-                    Picker(tr("Treadmill tempo or speed", "Mølletempo eller hastighet"),
-                           selection: treadmillMode) {
-                        ForEach(ATHLTHTreadmillInputMode.allCases) { mode in
-                            Text(mode.title(measurement: measurement)).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                } else {
+                if !treadmillDisplay {
                     Picker(tr("Pace unit", "Enhet for tempo"), selection: showingSpeed) {
                         Text(measurement.runningPaceUnit).tag(false)
                         Text(measurement.runningSpeedUnit).tag(true)
@@ -147,8 +132,8 @@ struct ATHLTHPlannedPaceTargetView: View {
 
                 if !isPaceMode {
                     HStack(spacing: 10) {
-                        Text(treadmillDisplay && treadmillMode.wrappedValue == .treadmill
-                            ? tr("Treadmill tempo", "Mølletempo")
+                        Text(treadmillDisplay
+                            ? tr("Treadmill speed", "Møllehastighet")
                             : tr("Speed", "Hastighet"))
                             .font(.subheadline)
                         Spacer(minLength: 4)
@@ -160,11 +145,11 @@ struct ATHLTHPlannedPaceTargetView: View {
                         .multilineTextAlignment(.trailing)
                         .font(.subheadline.monospacedDigit().weight(.semibold))
                         .frame(width: 76)
-                        .accessibilityLabel(tr("Speed in km/h", "Fart i km/t"))
+                        .accessibilityLabel(tr("Speed", "Hastighet") + " " + measurement.runningSpeedUnit)
                         Text(measurement.runningSpeedUnit)
                             .font(.caption)
                         Stepper("", value: speed,
-                                in: 1...(measurement == .metric ? 25 : 15.5), step: 0.1)
+                                in: ATHLTHPlannedTreadmillTargets.displaySpeed(1, measurement: measurement)...ATHLTHPlannedTreadmillTargets.displaySpeed(25, measurement: measurement), step: 0.1)
                             .labelsHidden()
                             .fixedSize()
                     }
@@ -201,7 +186,7 @@ struct ATHLTHPlannedPaceTargetView: View {
                     }
                 }
 
-                if let savedPace = targetPaceSecondsPerKilometer, savedPace > 0 {
+                if !treadmillDisplay, let savedPace = targetPaceSecondsPerKilometer, savedPace > 0 {
                     let displaySpeed = ATHLTHPlannedTreadmillTargets.displaySpeed(
                         ATHLTHPlannedTreadmillTargets.speed(forPace: savedPace),
                         measurement: measurement
