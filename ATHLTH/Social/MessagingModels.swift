@@ -356,6 +356,12 @@ struct DirectMessageRequestResponseParams: Encodable {
 /// Push is an invalidation hint only; authenticated REST is still the source
 /// of truth for messages and private read receipts.
 enum ATHLTHDirectMessageRefreshPolicy {
+    /// Four-second loop remains for legacy/offline servers; a connected
+    /// socket only needs a safety reconciliation every 16 seconds.
+    static func shouldPoll(realtimeConnected: Bool, elapsed: TimeInterval) -> Bool {
+        !realtimeConnected || !elapsed.isFinite || elapsed < 0 || elapsed >= 16
+    }
+
     static func matches(_ payload: [AnyHashable: Any], owner: UUID, conversation: UUID) -> Bool {
         guard payload["athlth_entity_type"] as? String == "direct_conversation",
               let recipient = payload["athlth_recipient_id"] as? String,
