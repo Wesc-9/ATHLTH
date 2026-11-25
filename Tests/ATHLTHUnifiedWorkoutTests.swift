@@ -73,6 +73,36 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         XCTAssertEqual(workout.durationMinutes, 15)
     }
 
+    func testRunningWarmupAndCooldownShowRunningRatherThanPhaseName() {
+        let template = RunningWorkoutTemplate(
+            id: UUID(), title: "Intervals", type: .intervals, summary: "",
+            blocks: [
+                RunningWorkoutBlock(kind: .warmup, title: "Oppvarming", work: .time(600)),
+                RunningWorkoutBlock(kind: .work, title: "Intervall", work: .time(240)),
+                RunningWorkoutBlock(kind: .cooldown, title: "Nedjogging", work: .time(600))
+            ], routeID: nil, isBuiltIn: false, createdAt: Date(), updatedAt: Date()
+        )
+        var workout = makeWorkout(kind: .running)
+        workout.runningWorkout = template
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        XCTAssertEqual(blocks.map(\.resolvedPhase), [.warmup, .main, .cooldown])
+        XCTAssertEqual(blocks.map(\.durationSeconds), [600, 240, 600])
+        for index in [0, 2] {
+            XCTAssertEqual(blocks[index].cardioActivity, .running)
+            XCTAssertEqual(ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(blocks[index]), WorkoutCardioActivity.running.title)
+            XCTAssertEqual(ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(template.recipePreviewBlocks[index]), WorkoutCardioActivity.running.title)
+        }
+        var walk = blocks[0]
+        walk.cardioActivity = .walking
+        XCTAssertEqual(ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(walk), WorkoutCardioActivity.walking.title)
+        var named = blocks[0]
+        named.title = "Bakkedrag"
+        XCTAssertNil(ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(named))
+        var strength = blocks[0]
+        strength.kind = .exercise
+        XCTAssertNil(ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(strength))
+    }
+
     func testRunningIntervalRecoveryTurnsIntoExplicitTimelineSteps() {
         let running = RunningWorkoutBlock(
             kind: .work, title: "Intervall", repetitions: 3,
