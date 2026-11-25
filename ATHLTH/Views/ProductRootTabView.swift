@@ -5507,6 +5507,9 @@ struct ATHLTHTrainView: View {
         ATHLTHTrainNavigationRequest?
     // True only while the global Train tab is selected.
     private let isActive: Bool
+    private let studioLanding: Bool
+    private let onStudioPlanWorkout: () -> Void
+    private let onStudioTrainTogether: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
@@ -5610,18 +5613,29 @@ struct ATHLTHTrainView: View {
             Binding<ATHLTHTrainNavigationRequest?> =
             .constant(nil),
         isActive: Bool = true,
-        deferInitialDashboard: Bool = false
+        deferInitialDashboard: Bool = false,
+        studioLanding: Bool = false,
+        onStudioPlanWorkout: @escaping () -> Void = {},
+        onStudioTrainTogether: @escaping () -> Void = {}
     ) {
         _navigationRequest = navigationRequest
         self.isActive = isActive
+        self.studioLanding = studioLanding
+        self.onStudioPlanWorkout = onStudioPlanWorkout
+        self.onStudioTrainTogether = onStudioTrainTogether
         // A standalone Train workspace is already selected; it does not need
         // to wait for a native tab animation that will never take place.
         _trainDashboardReady = State(initialValue: isActive && !deferInitialDashboard)
     }
 
     var body: some View {
-        NavigationStack {
-            trainLifecycleContent
+        Group {
+            if studioLanding {
+                // Studio already owns the detail NavigationStack.
+                trainLifecycleContent
+            } else {
+                NavigationStack { trainLifecycleContent }
+            }
         }
         .onAppear {
             ATHLTHTrainSmokeTrace.record("navigation-appeared")
@@ -5653,7 +5667,9 @@ struct ATHLTHTrainView: View {
             } else if !trainDashboardReady {
                 // The selected tab must never be invisible while mounting.
                 VStack(spacing: 20) {
-                    ATHLTHTrainHeaderRow(selection: $selectedSection)
+                    if !studioLanding {
+                        ATHLTHTrainHeaderRow(selection: $selectedSection)
+                    }
                     ProgressView()
                         .tint(ATHLTHTheme.accentDeep)
                         .accessibilityLabel(ATHLTHLocalization.choose(
@@ -5663,6 +5679,9 @@ struct ATHLTHTrainView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            } else if studioLanding {
+                studioTrainLanding
+                    .athlthStablePresentationBoundary()
             } else if selectedSection == .progress {
                 ATHLTHTrainProgressReferenceView(
                     onReturnToToday: { selectedSection = .today },
@@ -5690,7 +5709,7 @@ struct ATHLTHTrainView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.22),
                    value: selectedSection)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(studioLanding ? .automatic : .hidden, for: .navigationBar)
         // Keep root Train navigation metadata small regardless of which
         // Today/Plan/Progress section is selected.
         .athlthStablePresentationBoundary()
@@ -6417,6 +6436,7 @@ struct ATHLTHTrainView: View {
             restoreDelayedPlanStartIfNeeded()
         }
         .onChange(of: selectedSection) { _, section in
+            guard !studioLanding else { return }
             let account = session.profile.userID.uuidString
             if persistedTrainSectionAccount != account {
                 persistedTrainSectionAccount = account
@@ -6572,7 +6592,35 @@ struct ATHLTHTrainView: View {
         }
     }
 
-    @ViewBuilder
+    private var studioTrainLanding: some View {
+        ATHLTHStudioTrainLandingView(
+            activeWorkout: makeTodayActiveWorkoutCard(),
+            occupied: hasOngoingTrainWorkout,
+            onActivity: { category in
+                guard !hasOngoingTrainWorkout else { return }
+                social.quickTrainFriendIDs.removeAll()
+                social.discardPreparedQuickTrainFriends()
+                switch category {
+                case .walking: handleQuickStart(.walking)
+                case .running: handleQuickStart(.running)
+                case .strength: handleQuickStart(.strength)
+                default: break
+                }
+            },
+            onAll: { if !hasOngoingTrainWorkout { showingAllWorkoutCategories = true } },
+            onFree: { if !hasOngoingTrainWorkout { startFreeTrainingQuick() } },
+            onRoute: { personalLibrarySection = .routes },
+            onWorkout: { personalLibrarySection = .workouts },
+            onGhost: { showingGhostHub = true },
+            onCompetition: { showingCompetitionHub = true },
+            onLibrary: { showingLibrary = true },
+            onPlan: onStudioPlanWorkout,
+            onCustom: { if !hasOngoingTrainWorkout { startCustomQuick(as: .other) } },
+            onTogether: onStudioTrainTogether
+        )
+        .onAppear { recordTrainDashboardSmokeReadiness() }
+    }
+
     private func trainRootScroll(for section: ATHLTHTrainSection) -> some View {
         let readingWidth: CGFloat = studioFullscreenEditing && section == .today
             ? 980 : ATHLTHTrainDesign.readingWidth
@@ -7257,6 +7305,11 @@ struct ATHLTHTrainView: View {
     }
 
     private func restoreTrainSection(for userID: UUID) {
+        if studioLanding {
+            restoredTrainSectionAccount = userID
+            selectedSection = .today
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview") {
             // Compatibility launches explicitly verify the Today dashboard.
             restoredTrainSectionAccount = userID
@@ -7290,7 +7343,7 @@ struct ATHLTHTrainView: View {
     /// Runs once on a cold Train mount. It MUST NOT run again merely because
     /// the scene returns from background, since that would change navigation.
     private func restoreInterruptedPlanDestinationIfNeeded() {
-        guard isActive, session.signedIn else { return }
+        guard isActive, session.signedIn, !studioLanding else { return }
         let userID = session.profile.userID
         let isFirstMount = coldPlanRestoreCheckedAccount != userID
         guard isFirstMount else { return }

@@ -15,12 +15,13 @@ enum ATHLTHStudioSidebarLayoutPolicy {
 }
 
 private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
-    case overview, planner, insights, history, explore, community, coach, settings
+    case overview, train, planner, insights, history, explore, community, coach, settings
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .overview: return ATHLTHLocalization.choose(english: "Overview", norwegian: "Oversikt")
+        case .train: return ATHLTHLocalization.choose(english: "Train now", norwegian: "Tren nå")
         case .planner: return ATHLTHLocalization.choose(english: "Plan Studio", norwegian: "Plan Studio")
         case .insights: return ATHLTHLocalization.choose(english: "Insights Lab", norwegian: "Innsiktslab")
         case .history: return ATHLTHLocalization.choose(english: "Workout history", norwegian: "Treningshistorikk")
@@ -34,6 +35,7 @@ private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .overview: "square.grid.2x2"
+        case .train: "play.circle"
         case .planner: "calendar"
         case .insights: "chart.xyaxis.line"
         case .history: "clock.arrow.circlepath"
@@ -469,7 +471,8 @@ struct ATHLTHiPadStudioRootView: View {
             }
             #if targetEnvironment(simulator)
             if ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-preview"),
-               ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-train-today") {
+               ProcessInfo.processInfo.arguments.contains("--athlth-compatibility-train-today"),
+               selection != .train {
                 openTrainToday()
             }
             #endif
@@ -617,7 +620,7 @@ struct ATHLTHiPadStudioRootView: View {
                     .navigationTitle(
                         libraryPage?.title ??
                             (sidebarPage != nil ? "" :
-                                (selection == .overview ? "" : selection.label))
+                                (selection == .overview || selection == .train ? "" : selection.label))
                     )
                     .navigationBarTitleDisplayMode(.inline)
                     // Keep the Overview scroll edge clean: a visible bar
@@ -754,7 +757,7 @@ struct ATHLTHiPadStudioRootView: View {
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Train now", norwegian: "Tren nå"),
                         symbol: "play.circle",
-                        selected: false
+                        selected: selection == .train && libraryPage == nil && sidebarPage == nil
                     ) {
                         openTrainToday()
                     }
@@ -1133,12 +1136,10 @@ struct ATHLTHiPadStudioRootView: View {
         // Back navigation leaves the sidebar unchanged.
     }
 
-    /// One explicit route to the same Today surface as iPhone.
-    /// No activity chooser sheet or dismissal-triggered second presentation.
+    /// The native Studio destination keeps the sidebar visible; only
+    /// workout setup/live editors take over the full screen.
     private func openTrainToday() {
-        guard !showingTrain else { return }
-        trainRequest = .today
-        showingTrain = true
+        openStudio(.train)
     }
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
@@ -1219,6 +1220,20 @@ struct ATHLTHiPadStudioRootView: View {
                 selectedDate: $selectedHomeWeekDate,
                 scrollToTopRequest: homeScrollRequest
             )
+        case .train:
+            ATHLTHTrainView(
+                navigationRequest: .constant(nil),
+                isActive: true,
+                deferInitialDashboard: true,
+                studioLanding: true,
+                onStudioPlanWorkout: {
+                    openStudio(.overview)
+                    planFromWeekDay(.now)
+                },
+                onStudioTrainTogether: { openSidebarPage(.trainTogether) }
+            )
+            .environment(\.athlthStudioFullscreenEditing, true)
+            .athlthStablePresentationBoundary()
         case .planner:
             ATHLTHStudioPlannerView(
                 onStartWorkout: { planID, workoutID in
