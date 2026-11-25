@@ -71,7 +71,25 @@ struct ATHLTHTrainingProfile: Codable, Equatable {
     }
 
     func latest(_ metric: ATHLTHBodyMetric) -> ATHLTHBodyMeasurement? {
-        readings(for: metric).last
+        // Only the newest value is needed here, not a sorted history.
+        measurements.reduce(nil as ATHLTHBodyMeasurement?) { newest, reading in
+            guard reading.metric == metric else { return newest }
+            guard let newest, newest.date > reading.date else { return reading }
+            return newest
+        }
+    }
+
+    /// All metric tiles are derived in one pass instead of filtering and
+    /// sorting the entire history independently for each displayed metric.
+    func latestByMetric() -> [ATHLTHBodyMetric: ATHLTHBodyMeasurement] {
+        var latest: [ATHLTHBodyMetric: ATHLTHBodyMeasurement] = [:]
+        for reading in measurements {
+            if let previous = latest[reading.metric], previous.date > reading.date {
+                continue
+            }
+            latest[reading.metric] = reading
+        }
+        return latest
     }
 }
 
