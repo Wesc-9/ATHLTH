@@ -1,6 +1,7 @@
 import Combine
 import CoreLocation
 import Foundation
+import UIKit
 @preconcurrency import HealthKit
 
 /// Prevent an older, still-running all-history query from repopulating a
@@ -177,6 +178,28 @@ struct ATHLTHManualStrengthWorkoutWriteGate {
     }
 }
 
+/// Registration acceptance is not proof that iOS has delivered an event.
+enum ATHLTHBackgroundDeliveryStatus: Equatable {
+    case notChecked, registering, active, partial, unavailable, disabled, deferred
+
+    static func registrationResult(accepted: Int, total: Int) -> Self {
+        guard total > 0, accepted > 0 else { return .unavailable }
+        return accepted >= total ? .active : .partial
+    }
+
+    var title: String {
+        switch self {
+        case .notChecked: ATHLTHLocalization.choose(english: "Not checked", norwegian: "Ikke kontrollert")
+        case .registering: ATHLTHLocalization.choose(english: "Registering", norwegian: "Registrerer")
+        case .active: ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
+        case .partial: ATHLTHLocalization.choose(english: "Partially active", norwegian: "Delvis aktiv")
+        case .unavailable: ATHLTHLocalization.choose(english: "Unavailable", norwegian: "Utilgjengelig")
+        case .disabled: ATHLTHLocalization.choose(english: "Disabled", norwegian: "Deaktivert")
+        case .deferred: ATHLTHLocalization.choose(english: "Deferred", norwegian: "Utsatt")
+        }
+    }
+}
+
 @MainActor
 final class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
@@ -194,6 +217,11 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var routeCapabilityTestResult: String?
     @Published private(set) var lastSuccessfulRefreshAt: Date?
     @Published private(set) var backgroundSyncError: String?
+    @Published private(set) var backgroundDeliveryRegistrationStatus: ATHLTHBackgroundDeliveryStatus = .notChecked
+    @Published private(set) var lastSuccessfulBackgroundRefreshAt: Date?
+    private var backgroundRegistrationGeneration = 0
+    private var backgroundRegistrationInProgress = false
+    private var backgroundRefreshReceivedWhileBackgrounded = false
     @Published private(set) var automaticRefreshSuspended = false
     @Published private(set) var deferFullRefreshUntilNextLaunch = false
     @Published private(set) var authorizationReviewNeeded = false
@@ -297,6 +325,7 @@ final class HealthKitManager: ObservableObject {
     private let safeRefreshVersionKey = "athlth.healthSafeRefreshVersion"
     private let currentSafeRefreshVersion = 2
     private let lastSuccessfulRefreshKey = "athlth.healthLastSuccessfulRefreshAt"
+    private let lastSuccessfulBackgroundRefreshKey = "athlth.healthLastSuccessfulBackgroundRefreshAt"
     private let workoutImportCutoverKey = "athlth.health.workoutImport.cutover.v1"
     private let workoutImportAnchorKey = "athlth.health.workoutImport.anchor.v1"
     private let workoutImportPendingIDsKey = "athlth.health.workoutImport.pendingIDs.v1"
@@ -365,6 +394,9 @@ final class HealthKitManager: ObservableObject {
 
         lastSuccessfulRefreshAt = defaults.object(
             forKey: lastSuccessfulRefreshKey
+        ) as? Date
+        lastSuccessfulBackgroundRefreshAt = defaults.object(
+            forKey: lastSuccessfulBackgroundRefreshKey
         ) as? Date
 
         let interruptedRefresh = defaults.bool(forKey: refreshInProgressKey)
@@ -844,16 +876,42 @@ final class HealthKitManager: ObservableObject {
         }
     }
 
+    private var backgroundSyncPreferenceEnabled: Bool {
+        UserDefaults.standard.object(forKey: "settings.backgroundHealthSyncEnabled") as? Bool ?? true
+    }
+
+    var backgroundDeliveryStatus: ATHLTHBackgroundDeliveryStatus {
+        guard integrationEnabled, backgroundSyncPreferenceEnabled else { return .disabled }
+        guard healthDataAvailable else { return .unavailable }
+        guard hasRequestedAuthorization else { return .notChecked }
+        if shouldDeferAutomaticHealthWork { return .deferred }
+        return backgroundDeliveryRegistrationStatus
+    }
+
+    private func recordSuccessfulBackgroundRefresh() {
+        guard integrationEnabled, backgroundSyncPreferenceEnabled, !Task.isCancelled else { return }
+        let now = Date()
+        lastSuccessfulBackgroundRefreshAt = now
+        UserDefaults.standard.set(now, forKey: lastSuccessfulBackgroundRefreshKey)
+    }
+
     func configureBackgroundSync(allowed: Bool) async {
         // Opt-out must take effect even when normal refreshes are deferred.
         guard allowed, integrationEnabled else {
             await disableBackgroundSync()
             return
         }
-        guard healthDataAvailable,
-              !shouldDeferAutomaticHealthWork
-        else { return }
-
+        guard healthDataAvailable else {
+            backgroundDeliveryRegistrationStatus = .unavailable
+            return
+        }
+        guard hasRequestedAuthorization, !shouldDeferAutomaticHealthWork else { return }
+        guard !backgroundRegistrationInProgress else { return }
+        backgroundRegistrationInProgress = true
+        defer { backgroundRegistrationInProgress = false }
+        backgroundRegistrationGeneration += 1
+        let generation = backgroundRegistrationGeneration
+        backgroundDeliveryRegistrationStatus = .registering
         backgroundSyncError = nil
 
         startBackgroundObservers()
@@ -901,6 +959,7 @@ final class HealthKitManager: ObservableObject {
         var successfulRegistrations = 0
 
         for (type, frequency) in registrations {
+            guard generation == backgroundRegistrationGeneration else { return }
             let result: (Bool, String?) = await withCheckedContinuation { continuation in
                 healthStore.enableBackgroundDelivery(for: type, frequency: frequency) { success, error in
                     continuation.resume(
@@ -909,6 +968,14 @@ final class HealthKitManager: ObservableObject {
                 }
             }
 
+            guard generation == backgroundRegistrationGeneration else {
+                // A user opt-out may race an already in-flight HealthKit call.
+                // Disable again after it completes so it cannot re-enable delivery.
+                if backgroundDeliveryRegistrationStatus == .disabled {
+                    await disableBackgroundSync()
+                }
+                return
+            }
             if result.0 {
                 successfulRegistrations += 1
             } else {
@@ -921,12 +988,20 @@ final class HealthKitManager: ObservableObject {
         // A user can intentionally deny individual Health types. Treat that as
         // partial availability rather than a global sync failure. Surface an
         // issue only when HealthKit could not enable any background delivery.
+        backgroundDeliveryRegistrationStatus = .registrationResult(
+            accepted: successfulRegistrations, total: registrations.count
+        )
         if successfulRegistrations == 0, !failures.isEmpty {
             backgroundSyncError = failures.joined(separator: "\n")
         }
     }
 
     func disableBackgroundSync() async {
+        backgroundRegistrationGeneration += 1
+        backgroundDeliveryRegistrationStatus = .disabled
+        backgroundSyncError = nil
+        backgroundRefreshReceivedWhileBackgrounded = false
+        backgroundRefreshTask?.cancel()
         for query in observerQueries {
             healthStore.stop(query)
         }
@@ -987,6 +1062,8 @@ final class HealthKitManager: ObservableObject {
                     }
                     guard let self else { return }
 
+                    guard self.integrationEnabled, self.backgroundSyncPreferenceEnabled else { return }
+                    let receivedInBackground = UIApplication.shared.applicationState == .background
                     let isWorkoutEvent =
                         type.identifier ==
                         HKObjectType.workoutType().identifier
@@ -996,7 +1073,8 @@ final class HealthKitManager: ObservableObject {
                     }
 
                     await self.coalescedBackgroundRefresh(
-                        requireFullRefresh: isWorkoutEvent
+                        requireFullRefresh: isWorkoutEvent,
+                        receivedInBackground: receivedInBackground
                     )
                 }
             }
@@ -1023,8 +1101,10 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func coalescedBackgroundRefresh(
-        requireFullRefresh: Bool
+        requireFullRefresh: Bool,
+        receivedInBackground: Bool
     ) async {
+        if receivedInBackground { backgroundRefreshReceivedWhileBackgrounded = true }
         if requireFullRefresh {
             backgroundRefreshNeedsFull = true
         }
@@ -1063,10 +1143,13 @@ final class HealthKitManager: ObservableObject {
             self.backgroundRefreshNeedsFull =
                 false
 
+            let recordBackgroundSync = self.backgroundRefreshReceivedWhileBackgrounded
+            self.backgroundRefreshReceivedWhileBackgrounded = false
+
             if fullRefresh {
-                await self.refreshAll()
+                await self.performFullRefresh(recordBackgroundSync: recordBackgroundSync)
             } else {
-                await self.refreshHealthSignals()
+                await self.refreshHealthSignals(recordBackgroundSync: recordBackgroundSync)
             }
 
             let healthSnapshotChanged =
@@ -1095,7 +1178,7 @@ final class HealthKitManager: ObservableObject {
         backgroundRefreshTask = nil
     }
 
-    private func refreshHealthSignals() async {
+    private func refreshHealthSignals(recordBackgroundSync: Bool) async {
         guard integrationEnabled,
               healthDataAvailable,
               !shouldDeferAutomaticHealthWork,
@@ -1200,9 +1283,17 @@ final class HealthKitManager: ObservableObject {
         if personalDetails != fetchedProfile {
             personalDetails = fetchedProfile
         }
+        if recordBackgroundSync &&
+            (fetchedSleep != nil || fetchedHeart != nil || fetchedTraining != nil) {
+            recordSuccessfulBackgroundRefresh()
+        }
     }
 
     func refreshAll() async {
+        await performFullRefresh(recordBackgroundSync: false)
+    }
+
+    private func performFullRefresh(recordBackgroundSync: Bool) async {
         guard integrationEnabled else { return }
         let performanceID =
             ATHLTHPerformance.begin("HealthRefresh")
@@ -1447,6 +1538,10 @@ final class HealthKitManager: ObservableObject {
                 forKey:
                     lastSuccessfulRefreshKey
             )
+        }
+
+        if recordBackgroundSync && completedRead {
+            recordSuccessfulBackgroundRefresh()
         }
 
         if let firstFailure =
