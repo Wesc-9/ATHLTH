@@ -38,6 +38,15 @@ final class ATHLTHDirectMessageDeliveryTests: XCTestCase {
         XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: owner, conversation: thread))
     }
 
+    func testRealtimePollingFallbackIsImmediateOnDisconnect() {
+        XCTAssertTrue(ATHLTHDirectMessageRefreshPolicy.shouldPoll(realtimeConnected: false, elapsed: 0))
+        XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.shouldPoll(realtimeConnected: true, elapsed: 4))
+        XCTAssertFalse(ATHLTHDirectMessageRefreshPolicy.shouldPoll(realtimeConnected: true, elapsed: 15.9))
+        XCTAssertTrue(ATHLTHDirectMessageRefreshPolicy.shouldPoll(realtimeConnected: true, elapsed: 16))
+        XCTAssertTrue(ATHLTHDirectMessageRefreshPolicy.shouldPoll(realtimeConnected: true, elapsed: -1))
+        XCTAssertTrue(ATHLTHDirectMessageRefreshPolicy.shouldPoll(realtimeConnected: true, elapsed: .nan))
+    }
+
     func testIndependentMessageInsertsDoNotShareIdentity() {
         XCTAssertNotEqual(message().id, message().id)
     }
