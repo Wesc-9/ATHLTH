@@ -136,14 +136,12 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         ))
     }
 
-    func testSingleEventAllowsTwoOrMoreAthletes() {
-        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.single), 1)
-        for activity in [ATHLTHQuickStartActivity.running, .walking, .strength] {
-            let metric = ATHLTHCompetitionCreationPolicy.defaultScoring(for: activity)
-            XCTAssertFalse(valid(activity: activity, format: .single, opponents: [], metric: metric))
-            XCTAssertFalse(valid(activity: activity, format: .single, opponents: [owner], metric: metric))
-            XCTAssertTrue(valid(activity: activity, format: .single, opponents: [rival], metric: metric))
-        }
+    func testSingleEventHasExactlyOneSharedEventWithThreeOrMoreAthletes() {
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.minOpponents(.single), 2)
+        XCTAssertFalse(valid(
+            activity: .running, format: .single,
+            opponents: [rival], metric: .fastestDistance
+        ))
         XCTAssertTrue(valid(
             activity: .running, format: .single,
             opponents: [rival, UUID()], metric: .fastestDistance

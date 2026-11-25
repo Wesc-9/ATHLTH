@@ -21,8 +21,8 @@ enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
             english: "One opponent. One challenge.",
             norwegian: "Én motstander. Én utfordring.")
         case .single: return ATHLTHLocalization.choose(
-            english: "One event for two or more athletes.",
-            norwegian: "Én konkurranse med minst to deltakere.")
+            english: "One event for three or more athletes.",
+            norwegian: "Én konkurranse med minst tre deltakere.")
         case .league: return ATHLTHLocalization.choose(
             english: "Everyone competes; a league table determines the winner.",
             norwegian: "Alle møter alle. En tabell avgjør.")
@@ -103,7 +103,7 @@ enum ATHLTHCompetitionCreationPolicy {
     static func minOpponents(_ format: ATHLTHCompetitionFormat) -> Int {
         switch format {
         case .duel: 1
-        case .single: 1
+        case .single: 2
         case .league: 1
         case .cup: 3
         }

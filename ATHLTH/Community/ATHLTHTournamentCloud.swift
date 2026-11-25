@@ -542,7 +542,7 @@ struct ATHLTHTournamentCloudService {
         title: String, activity: ATHLTHTournamentActivity,
         invitees: [UUID], startsAt: Date?
     ) async throws -> UUID {
-        guard Set(invitees).count >= 1 else {
+        guard invitees.count >= 2 else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
         return try await client.rpc(
@@ -560,7 +560,7 @@ struct ATHLTHTournamentCloudService {
     }
 
     func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
-        guard draft.participants.count >= (draft.format == .cup ? 4 : 2) else {
+        guard draft.participants.count >= (draft.singleEventMode ? 3 : 2) else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
         guard draft.competitionSettings.isValid else {
