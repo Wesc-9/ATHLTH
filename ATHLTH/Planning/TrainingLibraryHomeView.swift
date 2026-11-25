@@ -921,7 +921,32 @@ struct LibraryFavoriteRecord: Codable, Hashable, Identifiable {
 
 @MainActor
 final class LibraryFavoritesStore: ObservableObject {
-    @Published private(set) var favorites: [LibraryFavoriteRecord] = []
+    // Keep remote IDs and pending mutations intact. Expose a canonical,
+    // deduplicated favorite list without deleting server rows during upgrade.
+    @Published private var storedFavorites: [LibraryFavoriteRecord] = []
+
+    private static func canonicalItemID(_ kind: LibraryFavoriteKind, _ itemID: String) -> String {
+        guard kind == .exercise, let id = UUID(uuidString: itemID) else { return itemID }
+        return ATHLTHExerciseReferenceResolver.canonicalReviewedID(id).uuidString
+    }
+
+    var favorites: [LibraryFavoriteRecord] {
+        var seen = Set<String>()
+        // Prefer existing canonical metadata when both records are saved.
+        return storedFavorites.sorted { lhs, rhs in
+            let left = Self.canonicalItemID(lhs.itemType, lhs.itemID) == lhs.itemID
+            let right = Self.canonicalItemID(rhs.itemType, rhs.itemID) == rhs.itemID
+            if left != right { return left }
+            return lhs.createdAt > rhs.createdAt
+        }.compactMap { row in
+            let itemID = Self.canonicalItemID(row.itemType, row.itemID)
+            let canonical = LibraryFavoriteRecord(
+                userID: row.userID, itemType: row.itemType, itemID: itemID,
+                title: row.title, subtitle: row.subtitle, icon: row.icon, createdAt: row.createdAt
+            )
+            return seen.insert(canonical.id).inserted ? canonical : nil
+        }.sorted { $0.createdAt > $1.createdAt }
+    }
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var pendingSyncCount = 0
@@ -950,7 +975,7 @@ final class LibraryFavoritesStore: ObservableObject {
         pendingSyncCount = pendingChanges.count
         // Reapply durable offline edits immediately after app relaunch or
         // account switch, before any remote refresh can complete.
-        favorites = mergePendingChanges(into: favorites)
+        storedFavorites = mergePendingChanges(into: storedFavorites)
     }
 
     private func mergePendingChanges(
@@ -1028,7 +1053,7 @@ final class LibraryFavoritesStore: ObservableObject {
     func refresh(force: Bool = false) async {
         guard let user = client.auth.currentUser else {
             activeUserID = nil
-            favorites = []
+            storedFavorites = []
             pendingChanges = [:]
             pendingSyncCount = 0
             refreshRequestID = nil
@@ -1040,7 +1065,7 @@ final class LibraryFavoritesStore: ObservableObject {
 
         if activeUserID != user.id {
             activeUserID = user.id
-            favorites =
+            storedFavorites =
                 AccountLocalStorage.read(
                     [LibraryFavoriteRecord].self,
                     name: "libraryFavorites",
@@ -1086,7 +1111,7 @@ final class LibraryFavoritesStore: ObservableObject {
                     .value
 
             // A slow response from account A must never replace account B's
-            // favorites after sign-out or a rapid account switch.
+            // storedFavorites after sign-out or a rapid account switch.
             guard activeUserID == user.id,
                   refreshRequestID == requestID,
                   client.auth.currentUser?.id == user.id else { return }
@@ -1095,7 +1120,7 @@ final class LibraryFavoritesStore: ObservableObject {
             guard requestedRevision == localMutationRevision else { return }
             // Preserve locally requested changes if the server is still
             // unavailable; retry them at the next refresh.
-            favorites = mergePendingChanges(into: rows)
+            storedFavorites = mergePendingChanges(into: rows)
             lastRefreshAt = pendingChanges.isEmpty ? Date() : nil
             persistLocal()
             if pendingChanges.isEmpty { errorMessage = nil }
@@ -1113,9 +1138,10 @@ final class LibraryFavoritesStore: ObservableObject {
         _ kind: LibraryFavoriteKind,
         itemID: String
     ) -> Bool {
-        favorites.contains {
+        let canonical = Self.canonicalItemID(kind, itemID)
+        return storedFavorites.contains {
             $0.itemType == kind &&
-            $0.itemID == itemID
+            Self.canonicalItemID(kind, $0.itemID) == canonical
         }
     }
 
@@ -1138,7 +1164,7 @@ final class LibraryFavoritesStore: ObservableObject {
 
         if activeUserID != user.id {
             activeUserID = user.id
-            favorites =
+            storedFavorites =
                 AccountLocalStorage.read(
                     [LibraryFavoriteRecord].self,
                     name: "libraryFavorites",
@@ -1151,19 +1177,38 @@ final class LibraryFavoritesStore: ObservableObject {
             loadPendingChanges(for: user.id)
         }
 
+        let canonical = Self.canonicalItemID(kind, itemID)
+        let aliases = storedFavorites.filter {
+            $0.itemType == kind && Self.canonicalItemID(kind, $0.itemID) == canonical
+        }
+        if aliases.isEmpty {
+            setFavorite(kind, itemID: canonical, title: title, subtitle: subtitle, icon: icon, userID: user.id, remove: false)
+        } else {
+            // Remove every actual saved alias, including a possible duplicate,
+            // using the existing per-item durable offline write queue.
+            for id in Set(aliases.map(\.itemID)) {
+                setFavorite(kind, itemID: id, title: title, subtitle: subtitle, icon: icon, userID: user.id, remove: true)
+            }
+        }
+    }
+
+    private func setFavorite(
+        _ kind: LibraryFavoriteKind, itemID: String, title: String,
+        subtitle: String?, icon: String?, userID: UUID, remove: Bool
+    ) {
         localMutationRevision += 1
         lastRefreshAt = nil
-        let key = "\(user.id)|\(kind.rawValue)|\(itemID)"
+        let key = "\(userID)|\(kind.rawValue)|\(itemID)"
         let previous = pendingFavoriteWrites[key]
         let record: LibraryFavoriteRecord?
-        if isFavorite(kind, itemID: itemID) {
-            favorites.removeAll {
+        if remove {
+            storedFavorites.removeAll {
                 $0.itemType == kind && $0.itemID == itemID
             }
             record = nil
         } else {
             let added = LibraryFavoriteRecord(
-                userID: user.id,
+                userID: userID,
                 itemType: kind,
                 itemID: itemID,
                 title: title,
@@ -1171,7 +1216,7 @@ final class LibraryFavoritesStore: ObservableObject {
                 icon: icon,
                 createdAt: Date()
             )
-            favorites.insert(added, at: 0)
+            storedFavorites.insert(added, at: 0)
             record = added
         }
         persistLocal()
@@ -1179,7 +1224,7 @@ final class LibraryFavoritesStore: ObservableObject {
             revision: UUID(), kind: kind, itemID: itemID, record: record
         )
         pendingChanges[key] = change
-        persistPendingChanges(for: user.id)
+        persistPendingChanges(for: userID)
 
         pendingFavoriteWrites[key] = Task {
             // Wait for the preceding write to complete before applying the
@@ -1187,19 +1232,19 @@ final class LibraryFavoritesStore: ObservableObject {
             await previous?.value
             // Never dispatch an old account's queued write after switching
             // users; its desired state remains in that account's local queue.
-            guard activeUserID == user.id,
-                  client.auth.currentUser?.id == user.id else { return }
+            guard activeUserID == userID,
+                  client.auth.currentUser?.id == userID else { return }
             do {
-                try await sendChange(change, userID: user.id)
-                acknowledgeChange(change, key: key, userID: user.id)
-                guard activeUserID == user.id,
-                      client.auth.currentUser?.id == user.id else { return }
+                try await sendChange(change, userID: userID)
+                acknowledgeChange(change, key: key, userID: userID)
+                guard activeUserID == userID,
+                      client.auth.currentUser?.id == userID else { return }
                 // One successful item must not hide a different item's
                 // outstanding sync failure.
                 if pendingChanges.isEmpty { errorMessage = nil }
             } catch {
-                guard activeUserID == user.id,
-                      client.auth.currentUser?.id == user.id else { return }
+                guard activeUserID == userID,
+                      client.auth.currentUser?.id == userID else { return }
                 // Keep the desired change on disk for the next refresh.
                 errorMessage = error.localizedDescription
             }
@@ -1209,7 +1254,7 @@ final class LibraryFavoritesStore: ObservableObject {
     private func persistLocal() {
         guard let activeUserID else { return }
         AccountLocalStorage.write(
-            favorites,
+            storedFavorites,
             name: "libraryFavorites",
             userID: activeUserID
         )

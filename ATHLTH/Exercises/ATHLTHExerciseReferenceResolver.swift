@@ -112,8 +112,12 @@ enum ATHLTHExerciseReferenceResolver {
         return result
     }()
 
+    private static let canonicalReviewedIDs = reviewedLegacyIDs.mapValues {
+        stableCatalogID("repdb:" + $0)
+    }
+
     static func canonicalReviewedID(_ id: UUID) -> UUID {
-        reviewedLegacyIDs[id].map { stableCatalogID("repdb:" + $0) } ?? id
+        canonicalReviewedIDs[id] ?? id
     }
 
     static func areReviewedAliases(_ lhs: UUID, _ rhs: UUID) -> Bool {

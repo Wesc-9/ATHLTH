@@ -595,6 +595,19 @@ final class ExerciseLibraryStore: ObservableObject {
         "hip flexors": ["hoftebøyer", "hoftebøyere"]
     ]
 
+    // Reuse all reviewed historical names for RepDB search, including the
+    // Norwegian names on old ATHLTH plan steps. Build once, not per keystroke.
+    private static let reviewedDuplicateSearchTerms: [String: [String]] = {
+        var result: [String: [String]] = [:]
+        for seed in nativeSeeds {
+            let slug = "athlth-native-" + seed.slug
+            if let target = ATHLTHExerciseReferenceResolver.reviewedNativeDuplicates[slug] {
+                result[target, default: []].append(contentsOf: [seed.name, seed.norwegianName])
+            }
+        }
+        return result
+    }()
+
     static func searchableNorwegianTerms(
         sourceIdentifier: String?,
         englishName: String = "",
@@ -625,6 +638,7 @@ final class ExerciseLibraryStore: ObservableObject {
             words.append("Rumensk markløft")
         }
         if let sourceIdentifier {
+            words.append(contentsOf: reviewedDuplicateSearchTerms[sourceIdentifier] ?? [])
             if let localized = norwegianExerciseNames[sourceIdentifier] {
                 words.append(localized)
             }

@@ -45,8 +45,14 @@ enum ATHLTHCoachStrengthComparableHistory {
         }
 
         func matches(_ other: Signature) -> Bool {
-            guard !equipment.isEmpty,
-                  equipment == other.equipment else { return false }
+            guard !equipment.isEmpty, !other.equipment.isEmpty else { return false }
+            let reviewedAlias: Bool
+            if let lhs = libraryExerciseID, let rhs = other.libraryExerciseID {
+                reviewedAlias = ATHLTHExerciseReferenceResolver.areReviewedAliases(lhs, rhs)
+            } else {
+                reviewedAlias = false
+            }
+            guard equipment == other.equipment || reviewedAlias else { return false }
             // A known load basis must match on both sides; one unknown
             // record cannot be assumed to use the same per-hand/total kg.
             if loadBasis != nil || other.loadBasis != nil {
@@ -59,7 +65,7 @@ enum ATHLTHCoachStrengthComparableHistory {
                 // Catalog identity is authoritative. Muscle labels and the
                 // display name can change over time without splitting history.
                 return libraryExerciseID != nil &&
-                    libraryExerciseID == other.libraryExerciseID
+                    (libraryExerciseID == other.libraryExerciseID || reviewedAlias)
             }
             guard !name.isEmpty, name == other.name else { return false }
             // For legacy records without an ID, explicit muscle conflicts
