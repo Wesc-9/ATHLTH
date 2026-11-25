@@ -1690,16 +1690,18 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         reachable: Bool,
         activation: String
     ) {
-        state = newState
-        self.paired = paired
-        watchAppInstalled = installed
-        self.reachable = reachable
-        activationStateText = activation
+        if state != newState { state = newState }
+        if self.paired != paired { self.paired = paired }
+        if watchAppInstalled != installed { watchAppInstalled = installed }
+        if self.reachable != reachable { self.reachable = reachable }
+        if activationStateText != activation { activationStateText = activation }
 
         if newState != .ready {
-            verificationInProgress = false
-            deviceDiagnostics = nil
-            if newState == .notPaired || newState == .unsupported { linkCheckHistory = [] }
+            if verificationInProgress { verificationInProgress = false }
+            if deviceDiagnostics != nil { deviceDiagnostics = nil }
+            if (newState == .notPaired || newState == .unsupported), !linkCheckHistory.isEmpty {
+                linkCheckHistory = []
+            }
         }
     }
 

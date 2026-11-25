@@ -420,12 +420,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               let progress = routeProgressPercent, progress >= 85,
               let latitude = routeNavigationLatitude,
               let longitude = routeNavigationLongitude else { return false }
-        let sorted = route.points.sorted { $0.sequence < $1.sequence }
-        guard let start = sorted.first, let finish = sorted.last else {
-            return false
-        }
-        let startPoint = CLLocation(latitude: start.latitude, longitude: start.longitude)
-        let finishPoint = CLLocation(latitude: finish.latitude, longitude: finish.longitude)
+        // Geometry is already sorted and prepared when the route changes.
+        // Do not sort thousands of route points for each live view/snapshot.
+        guard let startPoint = plannedRouteLocations.first,
+              let finishPoint = plannedRouteLocations.last else { return false }
         let current = CLLocation(latitude: latitude, longitude: longitude)
         return startPoint.distance(from: finishPoint) > 60 &&
             current.distance(from: finishPoint) <= 100
@@ -3776,9 +3774,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        lastReportedWorkoutActivity =
-            activity
-
         guard
             WCSession.isSupported(),
             let data =
@@ -3810,16 +3805,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     .timeIntervalSince1970
         ]
 
-        session.transferUserInfo(
-            payload
-        )
+        session.transferUserInfo(payload)
+        // Mark as reported only after the durable delivery has been queued.
+        lastReportedWorkoutActivity = activity
 
         if session.isReachable {
-            session.sendMessage(
-                payload,
-                replyHandler: nil,
-                errorHandler: nil
-            )
+            session.sendMessage(payload, replyHandler: nil, errorHandler: nil)
         }
     }
 
@@ -6436,8 +6427,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         audioCoachRollingKilometer.record(
             distanceMeters: distanceMeters, activeSeconds: elapsedTime
         )
-        lastKilometerPaceSecondsPerKilometer =
-            audioCoachRollingKilometer.paceSecondsPerKilometer
+        let pace = audioCoachRollingKilometer.paceSecondsPerKilometer
+        if lastKilometerPaceSecondsPerKilometer != pace {
+            lastKilometerPaceSecondsPerKilometer = pace
+        }
     }
 
     private func updateOutdoorMetrics(
@@ -9691,19 +9684,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             let average = statistics.averageQuantity()?.doubleValue(for: unit)
             let maximum = statistics.maximumQuantity()?.doubleValue(for: unit)
 
+            // Keep the sample's freshness even when its value is identical.
+            // Only changed observable values need to invalidate SwiftUI.
             publish {
-                self.heartRate = latest
-                self.averageHeartRate = average ?? self.averageHeartRate
-                self.maxHeartRate = maximum ?? self.maxHeartRate
+                if self.heartRate != latest { self.heartRate = latest }
+                if let average, self.averageHeartRate != average { self.averageHeartRate = average }
+                if let maximum, self.maxHeartRate != maximum { self.maxHeartRate = maximum }
             }
         }
 
         if let energyType, types.contains(energyType),
            let statistics = builder.statistics(for: energyType),
            let quantity = statistics.sumQuantity() {
-            publish {
-                self.activeCalories = quantity.doubleValue(for: .kilocalorie())
-            }
+            let calories = quantity.doubleValue(for: .kilocalorie())
+            if activeCalories != calories { activeCalories = calories }
         }
 
         if let distanceType, types.contains(distanceType),
@@ -9715,8 +9709,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             healthKitDistanceMeters = max(healthDistance, 0)
             healthKitDistanceLastUpdatedAt = Date()
 
-            publish {
-                self.distanceMeters = self.healthKitDistanceMeters
+            if distanceMeters != healthKitDistanceMeters {
+                distanceMeters = healthKitDistanceMeters
             }
             recordRollingKilometerPace()
         }

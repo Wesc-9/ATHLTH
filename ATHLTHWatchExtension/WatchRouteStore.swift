@@ -427,9 +427,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
     private func storeTodayWorkout(
         _ workout: WatchTodayWorkoutTransfer?
     ) {
-        todayWorkout = workout.flatMap {
+        let visible = workout.flatMap {
             wasTodaySessionLaunched($0.workoutID) ? nil : $0
         }
+        if todayWorkout != visible { todayWorkout = visible }
 
         guard let workout else {
             UserDefaults.standard.removeObject(
@@ -444,10 +445,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return
         }
 
-        UserDefaults.standard.set(
-            data,
-            forKey: todayWorkoutDefaultsKey
-        )
+        if UserDefaults.standard.data(forKey: todayWorkoutDefaultsKey) != data {
+            UserDefaults.standard.set(data, forKey: todayWorkoutDefaultsKey)
+        }
     }
 
     private func loadTodayWorkouts() {
@@ -468,9 +468,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
     }
 
     private func storeTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer]) {
-        todayWorkouts = workouts.filter {
+        let visible = workouts.filter {
             !wasTodaySessionLaunched($0.workoutID)
         }
+        if todayWorkouts != visible { todayWorkouts = visible }
         let snapshot = WatchTodaySnapshot(
             workout: workouts.first, updatedAt: Date(), workouts: workouts)
         if let data = try? JSONEncoder().encode(snapshot) {
@@ -1050,23 +1051,29 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 from: data
             )
 
-            if let index = routes.firstIndex(
-                where: { $0.id == route.id }
-            ) {
-                routes[index] = route
+            var updated = routes
+            if let index = updated.firstIndex(where: { $0.id == route.id }) {
+                if updated[index] != route {
+                    updated[index] = route
+                }
             } else {
-                routes.insert(route, at: 0)
+                updated.insert(route, at: 0)
             }
 
-            routes.sort {
-                $0.updatedAt > $1.updatedAt
+            updated.sort { $0.updatedAt > $1.updatedAt }
+            if routes != updated {
+                routes = updated
+                persistRoutes()
             }
-            connectionText = "Route received"
-            persistRoutes()
+            if connectionText != "Route received" {
+                connectionText = "Route received"
+            }
 
-            if pendingWorkoutRouteID == route.id {
-                WatchWorkoutManager.shared
-                    .configurePlannedRoute(route)
+            // A duplicate transport delivery must not reset live navigation.
+            // A pending route that is not yet configured still gets applied.
+            if pendingWorkoutRouteID == route.id,
+               WatchWorkoutManager.shared.plannedRoute != route {
+                WatchWorkoutManager.shared.configurePlannedRoute(route)
             }
         } catch {
             connectionText =
