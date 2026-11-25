@@ -744,7 +744,7 @@ struct ActiveStrengthWorkoutView: View {
                        exercise.sets.contains(where: { $0.id == id && $0.isCompleted })
                    }) == true {
                     isolatedSetID = nil
-                    if !finishInProgress { showingExerciseQueue = true }
+                    if !finishInProgress && strength.pendingExecutionQueue.isEmpty { showingExerciseQueue = true }
                 }
             }
             .onChange(
@@ -10900,6 +10900,105 @@ private struct StrengthActiveExerciseQueueView: View {
         }
     }
 
+    private func queueMenu(_ exercise: StrengthExerciseLog, set: StrengthSetLog? = nil) -> some View {
+        Menu {
+            Button {
+                strength.enqueueStrength(exerciseID: exercise.id, setID: set?.id, next: true)
+                onContinuousTraining()
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Play next", norwegian: "Ta neste"), systemImage: "text.line.first.and.arrowtriangle.forward")
+            }
+            Button {
+                strength.enqueueStrength(exerciseID: exercise.id, setID: set?.id)
+                onContinuousTraining()
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Add to queue", norwegian: "Legg i kø"), systemImage: "text.append")
+            }
+        } label: {
+            Image(systemName: "text.badge.plus")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 44, height: 44)
+                .background(ATHLTHPlanDesign.warmSurface, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: set == nil ? "Queue exercise" : "Queue set",
+            norwegian: set == nil ? "Sett øvelse i kø" : "Sett sett i kø"
+        ))
+    }
+
+    private func executionQueueCard(_ workout: StrengthWorkoutLog) -> some View {
+        let entries = strength.pendingExecutionQueue
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(ATHLTHLocalization.choose(english: "Up next", norwegian: "Neste i kø"), systemImage: "list.number")
+                    .font(.headline)
+                Spacer()
+                if !entries.isEmpty {
+                    Button(ATHLTHLocalization.choose(english: "Clear", norwegian: "Tøm")) {
+                        strength.clearStrengthQueue()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .buttonStyle(.plain)
+                }
+            }
+            if entries.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Queue an exercise or a specific set. Queued work takes priority at the next safe set boundary.",
+                    norwegian: "Legg en øvelse eller et bestemt sett i kø. Køen prioriteres ved neste trygge settbytte."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                if let exercise = workout.exercises.first(where: { $0.id == entry.exerciseID }) {
+                    HStack(spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .frame(width: 26, height: 26)
+                            .background(ATHLTHPlanDesign.warmSurface, in: Circle())
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(exercise.exercise.displayName)
+                                .font(.subheadline.weight(.semibold))
+                            if let set = exercise.sets.first(where: { $0.id == entry.setID }) {
+                                Text(ATHLTHLocalization.choose(english: "Set \(set.setNumber)", norwegian: "Sett \(set.setNumber)"))
+                                    .font(.caption)
+                            } else {
+                                let remaining = exercise.sets.filter { !$0.isResolved }.count
+                                Text(ATHLTHLocalization.choose(english: "\(remaining) remaining sets", norwegian: "\(remaining) gjenstående sett"))
+                                    .font(.caption)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        Menu {
+                            Button {
+                                strength.moveQueuedStrengthToFront(entry.id)
+                            } label: {
+                                Label(ATHLTHLocalization.choose(english: "Move first", norwegian: "Flytt først"), systemImage: "arrow.up.to.line")
+                            }
+                            Button(role: .destructive) {
+                                strength.removeQueuedStrength(entry.id)
+                            } label: {
+                                Label(ATHLTHLocalization.choose(english: "Remove from queue", norwegian: "Fjern fra kø"), systemImage: "xmark")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.title3)
+                                .frame(width: 44, height: 44)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+            }
+        }
+        .padding(15)
+        .athlthTrainPaper()
+    }
+
     private func queueHeader(_ workout: StrengthWorkoutLog) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -11184,6 +11283,10 @@ private struct StrengthActiveExerciseQueueView: View {
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
+                            executionQueueCard(workout)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                         }
                         Section {
                             ForEach(workout.exercises) { exercise in
@@ -11303,6 +11406,7 @@ private struct StrengthActiveExerciseQueueView: View {
                                 }
 
                                 if let next = exercise.sets.first(where: { !$0.isResolved }) {
+                                    HStack(spacing: 8) {
                                     Button {
                                         trainSingleSet(exercise, set: next)
                                     } label: {
@@ -11318,6 +11422,8 @@ private struct StrengthActiveExerciseQueueView: View {
                                         .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
                                     }
                                     .buttonStyle(.plain)
+                                    if exercise.groupID == nil { queueMenu(exercise) }
+                                    }
                                 }
 
                                 DisclosureGroup(
@@ -11384,6 +11490,7 @@ private struct StrengthActiveExerciseQueueView: View {
                                 ) {
                                     VStack(spacing: 0) {
                                         ForEach(exercise.sets) { set in
+                                            HStack(spacing: 6) {
                                             Button {
                                                 if set.isCompleted {
                                                     if set.resolvedLoadKind == .weightKilograms {
@@ -11450,6 +11557,10 @@ private struct StrengthActiveExerciseQueueView: View {
                                                       norwegian: "Velg dette settet for å trene det nå."
                                                     )
                                             )
+                                            if !set.isResolved && exercise.groupID == nil {
+                                                queueMenu(exercise, set: set)
+                                            }
+                                            }
                                             if set.id != exercise.sets.last?.id {
                                                 Divider()
                                             }
