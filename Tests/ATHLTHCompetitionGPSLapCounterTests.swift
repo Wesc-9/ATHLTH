@@ -91,6 +91,31 @@ final class ATHLTHCompetitionGPSLapCounterTests: XCTestCase {
         XCTAssertEqual(state.laps, 1)
     }
 
+    func testSignalGapAndTeleportInvalidateUnfinishedLap() {
+        for inboundTime in [21.0, 55.0] {
+            var state = ATHLTHCompetitionGPSLapState()
+            for (lon, time) in [(0.0, 2.0), (0.00062, 16.0), (0.00063, 20.0),
+                                (0.00015, inboundTime), (0.00014, inboundTime + 20)] {
+                state = ATHLTHCompetitionGPSLapCounter.update(
+                    state, fix: fix(lon: lon, time: time),
+                    startLatitude: 0, startLongitude: 0, startSignalAt: start, limit: 3)
+            }
+            XCTAssertEqual(state.laps, 0)
+            XCTAssertFalse(state.leftStartZone)
+        }
+    }
+
+    func testPersonalImprovementRespectsMetricDirection() {
+        let policy = ATHLTHCompetitionLocalResult.self
+        XCTAssertEqual(policy.improvementPercent(metric: "distance", baseline: 1000, current: 900), 10)
+        XCTAssertEqual(policy.improvementPercent(metric: "duration", baseline: 1000, current: 1100), 10)
+        XCTAssertEqual(policy.improvementPercent(metric: "time", baseline: 100, current: 90), -10)
+        XCTAssertEqual(policy.improvementPercent(metric: "repetitions", baseline: 20, current: 25), 25)
+        XCTAssertNil(policy.improvementPercent(metric: "distance", baseline: 0, current: 10))
+        XCTAssertNil(policy.improvementPercent(metric: "distance", baseline: 10, current: .nan))
+        XCTAssertNil(policy.improvementPercent(metric: "unknown", baseline: 10, current: 20))
+    }
+
     func testRaceOverlayRoundTripPreservesOriginalWorkoutIdentity() throws {
         let raceID = UUID()
         var race = ATHLTHCompetitionRaceRules()
