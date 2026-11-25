@@ -311,7 +311,7 @@ enum ATHLTHSimpleWorkoutOutline {
 
     /// Recovery belongs to the preceding main exercise for display only.
     /// The source retains its actual recovery phase and execution sequence.
-    static func stages(for blocks: [WorkoutTemplateBlock], workoutTitle: String? = nil, maximumBPM: Double? = nil) -> [Stage] {
+    static func stages(for blocks: [WorkoutTemplateBlock], workoutTitle: String? = nil, maximumBPM: Double? = nil, includePace: Bool = false) -> [Stage] {
         var groups: [(phase: WorkoutPhaseKind, steps: [IndexedBlock])] = []
         var lastWorkPhase: WorkoutPhaseKind = .main
         for (index, block) in blocks.enumerated() {
@@ -336,12 +336,21 @@ enum ATHLTHSimpleWorkoutOutline {
                 phase: group.phase,
                 sourceStepCount: group.steps.count,
                 plannedSeconds: sum > 0 ? sum : nil,
-                items: compactItems(group.steps, workoutTitle: workoutTitle, maximumBPM: maximumBPM)
+                items: compactItems(group.steps, workoutTitle: workoutTitle, maximumBPM: maximumBPM, includePace: includePace)
             )
         }
     }
 
-    private static func compactItems(_ steps: [IndexedBlock], workoutTitle: String?, maximumBPM: Double?) -> [Item] {
+    private static func compactItems(_ steps: [IndexedBlock], workoutTitle: String?, maximumBPM: Double?, includePace: Bool) -> [Item] {
+        func paceText(for block: WorkoutTemplateBlock) -> String {
+            guard includePace, let pace = block.targetPaceSecondsPerKilometer,
+                  pace.isFinite, (1...3600).contains(pace) else { return "" }
+            if block.isIndoor == true && block.treadmillInclinePercent != nil {
+                return " · " + String(format: "%.1f km/t", 3600 / pace)
+            }
+            let seconds = Int(pace.rounded())
+            return " · " + String(format: "%d:%02d/km", seconds / 60, seconds % 60)
+        }
         func zoneText(for block: WorkoutTemplateBlock) -> String {
             let suggestion = workoutTitle.flatMap { ATHLTHWorkoutStepCopy.suggestedZone(for: block, workoutTitle: $0) }
             let zone = ATHLTHWorkoutStepTargetSummary.zoneLabel(for: block)
@@ -403,8 +412,8 @@ enum ATHLTHSimpleWorkoutOutline {
             // Compact previews must show executable targets, not only the
             // prose title. Zoned's 1-minute efforts therefore read as
             // "1 min · Z5 arbeid · 1 min · Z1 pause".
-            let workZone = zoneText(for: work.block)
-            let recoveryZone = recovery.map { zoneText(for: $0.block) } ?? ""
+            let workZone = paceText(for: work.block) + zoneText(for: work.block)
+            let recoveryZone = recovery.map { paceText(for: $0.block) + zoneText(for: $0.block) } ?? ""
             let detail: String
             if let recoveryText {
                 detail = ATHLTHLocalization.choose(
