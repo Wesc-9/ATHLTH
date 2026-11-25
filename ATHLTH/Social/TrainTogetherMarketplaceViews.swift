@@ -2687,13 +2687,19 @@ struct TrainTogetherPostCreateView:
     @State private var publishedSuccessfully = false
     @State private var selectedSourceID:
         UUID?
-    /// The same structured workout prepared by SessionEditorView.
+    /// The universal builder prepares the recipe; this sheet owns invitations.
     @State private var preparedWorkout: PlannedSession?
-    @State private var workoutToEdit: PlannedSession?
-    @State private var showingSharedWorkoutEditor = false
+    private struct SharedEditorSelection: Identifiable {
+        let id = UUID()
+        let activity: ATHLTHPlannedWorkoutType
+        let source: PlannedSession?
+    }
+    @State private var sharedWorkoutEditor: SharedEditorSelection?
+    @State private var queuedSharedWorkoutEditor: SharedEditorSelection?
     @State private var showingPlannedWorkoutPicker = false
-    // Avoid presenting two sheets in the same SwiftUI transaction.
-    @State private var queuedEditorAfterWorkoutPicker = false
+    @State private var sharedPickerPurpose: ATHLTHWorkoutTypePickerPurpose = .useExisting
+    @State private var sharedEditorDate = Date()
+    @State private var sharedEditorDraftID = UUID()
     @State private var title = ""
     @State private var kind:
         WorkoutKind = .running
@@ -2909,32 +2915,34 @@ struct TrainTogetherPostCreateView:
         .onAppear { normalizeGuestCapacity() }
         .onChange(of: selectedInviteeIDs) { _, _ in normalizeGuestCapacity() }
         .onChange(of: maxGuests) { _, _ in normalizeGuestCapacity() }
-        .sheet(isPresented: $showingSharedWorkoutEditor) {
-            SessionEditorView(
-                standaloneDate: scheduledStart,
-                initialSourceWorkout: workoutToEdit,
-                onPreparedWorkout: { workout in
-                    applyPreparedWorkout(workout)
-                }
-            )
+        .fullScreenCover(item: $sharedWorkoutEditor) { selection in
+            sharedWorkoutBuilder(selection)
+                .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $showingPlannedWorkoutPicker, onDismiss: {
-            // The underlying picker has fully released its presentation
-            // before we open the shared workout editor.
-            guard ATHLTHScratchComposerPresentationPolicy
-                .opensQueuedEditorAfterPickerDismiss(
-                    queued: queuedEditorAfterWorkoutPicker,
-                    pickerIsPresented: showingPlannedWorkoutPicker
-                ) else { return }
-            queuedEditorAfterWorkoutPicker = false
-            showingSharedWorkoutEditor = true
+            // Present the same full-screen builder as solo planning only
+            // after the type/library picker has completely dismissed.
+            guard let selection = queuedSharedWorkoutEditor,
+                  ATHLTHScratchComposerPresentationPolicy
+                    .opensQueuedEditorAfterPickerDismiss(
+                        queued: true, pickerIsPresented: showingPlannedWorkoutPicker
+                    ) else { return }
+            queuedSharedWorkoutEditor = nil
+            sharedWorkoutEditor = selection
         }) {
-            ATHLTHPlannedWorkoutTypePickerView { workout, _ in
-                selectedSourceID = workout.id
-                workoutToEdit = workout
-                queuedEditorAfterWorkoutPicker = true
-                showingPlannedWorkoutPicker = false
-            }
+            ATHLTHPlannedWorkoutTypePickerView(
+                purpose: sharedPickerPurpose,
+                onCreateNew: { activity in
+                    queueSharedWorkoutEditor(activity: activity, source: nil)
+                },
+                onSelect: { workout, _ in
+                    queueSharedWorkoutEditor(
+                        activity: ATHLTHPlannedWorkoutType.from(workout),
+                        source: workout
+                    )
+                }
+            )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
@@ -3048,13 +3056,77 @@ struct TrainTogetherPostCreateView:
                 norwegian: "Velg eller bygg en økt før du inviterer deltakere."
             ),
             onCreateNew: {
-                selectedSourceID = nil
-                workoutToEdit = nil
-                showingSharedWorkoutEditor = true
+                openSharedWorkoutPicker(.createFromScratch)
             },
             onUsePlanned: {
-                showingPlannedWorkoutPicker = true
+                openSharedWorkoutPicker(.useExisting)
             }
+        )
+    }
+
+    private func openSharedWorkoutPicker(_ purpose: ATHLTHWorkoutTypePickerPurpose) {
+        queuedSharedWorkoutEditor = nil
+        sharedPickerPurpose = purpose
+        showingPlannedWorkoutPicker = true
+    }
+
+    private func queueSharedWorkoutEditor(
+        activity: ATHLTHPlannedWorkoutType,
+        source: PlannedSession?
+    ) {
+        sharedEditorDate = source?.scheduledStart.flatMap { $0 > Date() ? $0 : nil }
+            ?? scheduledStart
+        queuedSharedWorkoutEditor = SharedEditorSelection(activity: activity, source: source)
+        showingPlannedWorkoutPicker = false
+    }
+
+    private func sharedWorkoutBuilder(_ selection: SharedEditorSelection) -> some View {
+        let source = selection.source
+        let extras = ATHLTHWorkoutPlannerExtras(
+            gearIDs: source?.gearIDs,
+            spotifyPlaylist: source?.spotifyPlaylist,
+            spotifyAutoplayOnStart: source?.spotifyAutoplayOnStart,
+            spotifyIntervalTrack: source?.spotifyIntervalTrack,
+            audioCoachConfiguration: source?.audioCoachConfiguration,
+            routeAlertConfiguration: source?.routeAlertConfiguration,
+            ghostTargetDurationSeconds: source?.ghostTargetDurationSeconds,
+            ghostUpdates: source?.ghostUpdates,
+            intervalGhostConfiguration: source?.resolvedWorkoutBlocks.compactMap(\.intervalGhostConfiguration).first
+        )
+        return WorkoutTemplateBuilderView(
+            initialTitle: source?.title ?? "",
+            initialBlocks: source.map { ATHLTHUnifiedWorkout.editorBlocks(from: $0) } ?? [],
+            initialRouteID: source?.routeID,
+            initialDurationOverrideMinutes: source?.durationMinutes,
+            initialExtras: extras,
+            draftContext: "train-together-create.\(session.profile.userID.uuidString).\(sharedEditorDraftID.uuidString).\(source?.id.uuidString ?? selection.activity.rawValue)",
+            resumeSavedScratchDraft: true,
+            sourceTemplateID: source?.id,
+            plannedDate: sharedEditorDate,
+            initialActivity: selection.activity,
+            initialStudioAdvanced: source == nil ? nil : true,
+            onScheduledTimeChanged: { sharedEditorDate = $0 },
+            onAddStandalone: { edited in
+                // This callback only prepares an invitation. Never insert
+                // a standalone calendar workout or publish automatically.
+                var prepared = edited
+                prepared.scheduledStart = sharedEditorDate
+                if let source {
+                    prepared.notes = source.notes
+                    prepared.workoutTemplateID = source.workoutTemplateID
+                    prepared.targetAlertConfiguration = source.targetAlertConfiguration
+                    prepared.autoPauseEnabled = source.autoPauseEnabled
+                    prepared.reminderMinutesBefore = source.reminderMinutesBefore
+                    prepared.targetDistanceKilometers = edited.targetDistanceKilometers ?? source.targetDistanceKilometers
+                    prepared.targetPaceSecondsPerKilometer = edited.targetPaceSecondsPerKilometer ?? source.targetPaceSecondsPerKilometer
+                }
+                selectedSourceID = source?.id
+                applyPreparedWorkout(prepared)
+                return true
+            },
+            saveButtonTitle: ATHLTHLocalization.choose(
+                english: "Save and continue", norwegian: "Lagre og fortsett"
+            )
         )
     }
 
