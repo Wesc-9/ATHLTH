@@ -363,14 +363,27 @@ struct WatchRunGhostFocusPage: View {
                               ? ATHLTHLocalization.choose(
                                 english: "Workout paused", norwegian: "Økten er pauset"
                               )
-                              : message(state),
-                              systemImage: paused ? "pause.fill" : "wifi.exclamationmark")
+                              : isRecordedGhost
+                                ? ATHLTHLocalization.choose(
+                                    english: "Waiting for local GPS comparison",
+                                    norwegian: "Venter på lokal GPS-sammenligning"
+                                  )
+                                : message(state),
+                              systemImage: paused ? "pause.fill" : isRecordedGhost ? "location.slash" : "wifi.exclamationmark")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(WatchTheme.warning)
                         .lineLimit(3)
                     }
                     Spacer(minLength: 0)
                     if isRecordedGhost {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Saved opponent · local comparison",
+                            norwegian: "Lagret motstander · lokal sammenligning"
+                        ), systemImage: "internaldrive")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(WatchTheme.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         Button {
                             workout.disableGhostDuringWorkout()
                         } label: {
