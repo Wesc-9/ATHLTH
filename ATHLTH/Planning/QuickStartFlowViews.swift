@@ -1386,13 +1386,76 @@ private struct PlannedQuickStartContextCard: View {
 private struct ATHLTHRunQuickStartPlanPreview: View {
     let workout: RunningWorkoutTemplate?
     let plannedSession: PlannedSession?
+    var compactBasic = false
+    @EnvironmentObject private var session: AppSessionStore
+
+    private var compactRecipe: [WorkoutTemplateBlock] {
+        if let plannedSession {
+            return ATHLTHUnifiedWorkout.editorBlocks(from: plannedSession).expandedForExecution()
+        }
+        if let workout {
+            return ATHLTHQuickRunTimelineAdapter.editorBlocks(from: workout).expandedForExecution()
+        }
+        return []
+    }
+
+    private var compactOverview: some View {
+        let recipe = compactRecipe
+        let title = plannedSession?.title ?? workout?.title ?? ""
+        let maximum = ATHLTHHeartRateZones.resolvedMaximumBPM(
+            configured: session.onboardingProfile?.maximumHeartRateBPM, dateOfBirth: nil)
+        let stages = ATHLTHSimpleWorkoutOutline.stages(for: recipe, workoutTitle: title, maximumBPM: maximum, includePace: true)
+        let duration = ATHLTHWorkoutDurationEstimator.minutes(for: recipe)
+        return ATHLTHPlanSurface(density: .compact) {
+            header(title: title)
+            HStack(spacing: 11) {
+                Label("\(stages.flatMap(\.items).count) " + tr("parts", "deler"), systemImage: "list.number")
+                if let duration, duration > 0 {
+                    Label("~\(duration) min", systemImage: "clock")
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            ForEach(stages) { stage in
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(stage.phase.title)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    ForEach(stage.items) { item in
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: item.symbol)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 20)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                if !item.detail.isEmpty {
+                                    Text(item.detail)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                }
+                .padding(.vertical, 5)
+            }
+        }
+        .accessibilityIdentifier("athlth-quick-basic-workout-overview")
+    }
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
     var body: some View {
-        if let workout {
+        if compactBasic {
+            compactOverview
+        } else if let workout {
             ATHLTHPlanSurface(density: .compact) {
                 header(title: workout.title)
                 HStack(spacing: 11) {
@@ -1919,7 +1982,7 @@ struct RunQuickStartSheet: View {
                         basicGoalSelected = false
                         basicGhostSelected = false
                         mode = .structured
-                        openEditorAfterLibrary = true
+                        openEditorAfterLibrary = isAdvancedSetup
                         showingRunningLibrary = false
                     }
                 }
@@ -2344,7 +2407,45 @@ struct RunQuickStartSheet: View {
         }
     }
 
+    @ViewBuilder
     private var basicSelectedContent: some View {
+        if mode == .structured && (advancedWorkout != nil || selectedWorkout != nil) {
+            ATHLTHPlanSurface(density: .compact) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(advancedWorkout?.title ?? selectedWorkout?.title ?? "")
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        if let summary = selectedWorkout?.summary, !summary.isEmpty {
+                            Text(summary)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    Button(ATHLTHLocalization.choose(english: "Change", norwegian: "Endre")) {
+                        showingRunningLibrary = true
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHTrainDesign.bronze)
+                }
+                Button {
+                    showingDetailedWorkoutBuilder = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Customize every phase", norwegian: "Tilpass hver enkelt del"), systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                ATHLTHRunQuickStartPlanPreview(workout: selectedWorkout, plannedSession: advancedWorkout, compactBasic: true)
+            }
+        } else {
+            basicSelectedRow
+        }
+    }
+
+    private var basicSelectedRow: some View {
         HStack(spacing: 10) {
             Image(systemName: mode == .route ? "map" : "list.bullet.rectangle")
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
@@ -3888,6 +3989,9 @@ struct WalkQuickStartSheet: View {
 
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
+                        if !isAdvancedSetup {
+                            ATHLTHRunQuickStartPlanPreview(workout: nil, plannedSession: plannedSession, compactBasic: true)
+                        }
                     }
 
                     ATHLTHQuickStartToolsRow(
