@@ -60,6 +60,7 @@ struct ATHLTHApp: App {
 /// App.body, the crash site observed in iOS 27 / ATHLTH 1.7.6 build 83.
 private struct ATHLTHSceneRootView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(ATHLTHAppLock.preferenceKey) private var appLockOwner = ""
     @StateObject private var health = HealthKitManager.shared
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
     @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
@@ -267,6 +268,15 @@ private struct ATHLTHSceneRootView: View {
                     Text(appSession.trainingStorageError ?? "")
                 }
             }
+        }
+        .background {
+            ATHLTHAppLockBridge(
+                owner: appSession.signedIn && !appSession.previewModeEnabled ? appSession.profile.userID : nil,
+                enabled: appSession.signedIn && !appSession.previewModeEnabled &&
+                    appLockOwner == appSession.profile.userID.uuidString,
+                phase: scenePhase
+            )
+            .frame(width: 0, height: 0)
         }
         .onAppear {
             installBackgroundRefreshHandlersIfNeeded()
