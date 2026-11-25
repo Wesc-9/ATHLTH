@@ -520,4 +520,61 @@ final class StrengthSkipSetWatchTests: XCTestCase {
     }
 
 
+
+    @MainActor
+    func testExecutionQueuePreservesSetIDsAndUsesExplicitNextSet() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        store.appendExercise(exercise(), sets: 3, reps: 8, restSeconds: 0)
+        store.appendExercise(exercise(), sets: 3, reps: 10, restSeconds: 0)
+        let exercises = try XCTUnwrap(store.activeWorkout?.exercises)
+        let a = exercises[0], b = exercises[1]
+        XCTAssertTrue(store.selectSetForNow(exerciseID: a.id, setID: a.sets[0].id))
+        XCTAssertTrue(store.enqueueStrengthSets(exerciseID: b.id, setIDs: [b.sets[1].id, b.sets[2].id]))
+        XCTAssertEqual(store.pendingExecutionQueue.compactMap(\.setID), [b.sets[1].id, b.sets[2].id])
+        let queue = store.pendingExecutionQueue
+        XCTAssertTrue(store.moveQueuedStrength(queue[1].id, before: queue[0].id))
+        store.completeCurrentDraftSet()
+        XCTAssertEqual(store.currentSet?.id, b.sets[2].id)
+        XCTAssertEqual(store.activeWorkout?.exercises.map(\.id), exercises.map(\.id))
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        store.completeCurrentDraftSet()
+        XCTAssertEqual(store.currentSet?.id, b.sets[1].id)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 2)
+    }
+
+    @MainActor
+    func testPendingTargetEditAndUndoNeverRewriteOtherRecordedSets() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        store.appendExercise(exercise(), sets: 3, reps: 8, restSeconds: 0)
+        let item = try XCTUnwrap(store.activeWorkout?.exercises.first)
+        store.completeCurrentDraftSet()
+        XCTAssertTrue(store.updatePendingStrengthSet(exerciseID: item.id, setID: item.sets[2].id,
+            reps: 12, duration: nil, weight: 35, rest: 25, resistance: nil))
+        XCTAssertFalse(store.updatePendingStrengthSet(exerciseID: item.id, setID: item.sets[0].id,
+            reps: 1, duration: nil, weight: 1, rest: 1, resistance: nil))
+        XCTAssertTrue(store.undoLatestStrengthSet())
+        XCTAssertEqual(store.currentSet?.id, item.sets[0].id)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets[2].plannedReps, 12)
+        XCTAssertEqual(store.activeWorkout?.exercises.first?.sets[2].restSeconds, 25)
+    }
+
+    @MainActor
+    func testQueueRoundEditDoesNotTouchActiveOrCompletedSlots() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        store.appendExercise(exercise(), sets: 3, reps: 8, restSeconds: 0)
+        store.appendExercise(exercise(), sets: 3, reps: 10, restSeconds: 0)
+        let items = try XCTUnwrap(store.activeWorkout?.exercises)
+        store.groupExercises(ids: items.map(\.id), style: .circuit)
+        let group = try XCTUnwrap(store.activeWorkout?.exercises.first?.groupID)
+        XCTAssertFalse(store.editFutureStrengthRound(groupID: group, round: store.currentSetIndex))
+        XCTAssertTrue(store.editFutureStrengthRound(groupID: group, round: 1, moveTo: 2))
+        XCTAssertEqual(store.activeWorkout?.exercises[0].sets[1].id, items[0].sets[2].id)
+        XCTAssertTrue(store.editFutureStrengthRound(groupID: group, round: 2))
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 0)
+        XCTAssertEqual(store.activeWorkout?.exercises[1].sets[2].isResolved, true)
+    }
 }
