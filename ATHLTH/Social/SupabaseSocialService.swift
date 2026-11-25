@@ -663,7 +663,10 @@ final class SupabaseSocialService: Sendable {
 
         let activityIDs = activities.map(\.id)
 
-        async let cardsTask = loadVisibleProfileCards()
+        // Only actor cards are used in the feed projection below. Query the
+        // exact actors rather than downloading up to 500 unrelated profiles.
+        // The existing profile view and RLS remain the authorization boundary.
+        async let cardsTask = loadProfileCards(for: Set(activities.map(\.actorID)))
         async let reactionsTask: [SocialActivityReactionRecord] = client
             .from("social_activity_reactions")
             .select()

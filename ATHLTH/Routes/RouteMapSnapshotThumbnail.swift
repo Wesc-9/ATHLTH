@@ -606,9 +606,10 @@ struct RouteMapSnapshotThumbnail: View {
     var body: some View {
         GeometryReader { proxy in
             let size = CGSize(width: max(proxy.size.width, 88), height: height)
+            let accountID = session.profile.userID
             let requestID = RouteMapSnapshotIdentity.key(
                 route: route, size: size, scale: UIScreen.main.scale
-            )
+            ) + "|" + accountID.uuidString
             ZStack {
                 RoundedRectangle(
                     cornerRadius: 18,
@@ -652,9 +653,13 @@ struct RouteMapSnapshotThumbnail: View {
                     lineWidth: 0.8
                 )
             }
-            .task(id: requestID + (allowsLiveSnapshot ? "|live" : "|scroll")
-                  + "|" + session.profile.userID.uuidString) {
-                guard proxy.size.width > 20 else { return }
+            .task(id: requestID + (allowsLiveSnapshot ? "|live" : "|scroll")) {
+                guard proxy.size.width > 20, !Task.isCancelled else { return }
+                if imageRequestID != requestID {
+                    image = nil
+                    imageRequestID = nil
+                }
+                if imageRequestID == requestID, image != nil { return }
 
                 // Cached map previews are displayed even while scrolling;
                 // the async MapKit snapshotter is not started during motion.
@@ -666,21 +671,20 @@ struct RouteMapSnapshotThumbnail: View {
                     return
                 }
                 if let prepared = AthleteOfflinePackStore.cachedRouteSnapshot(
-                    routeID: route.id, userID: session.profile.userID
+                    routeID: route.id, userID: accountID
                 ) {
                     image = prepared
                     imageRequestID = requestID
                 }
-                guard allowsLiveSnapshot, !Task.isCancelled else {
-                    imageRequestID = requestID
-                    return
-                }
+                guard allowsLiveSnapshot, !Task.isCancelled else { return }
                 let loaded = await RouteMapSnapshotCache.image(
                     for: route, size: size, requestID: requestID
                 )
-                guard !Task.isCancelled else { return }
-                if let loaded { image = loaded }
-                imageRequestID = requestID
+                guard !Task.isCancelled, session.profile.userID == accountID else { return }
+                if let loaded {
+                    image = loaded
+                    imageRequestID = requestID
+                }
             }
         }
         .frame(height: height)
@@ -691,6 +695,7 @@ struct RouteMapSnapshotThumbnail: View {
 
 struct GhostReplayRouteThumbnail: View {
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var session: AppSessionStore
     let workoutID: UUID
     let ownerID: UUID
     var height: CGFloat = 86
@@ -703,8 +708,9 @@ struct GhostReplayRouteThumbnail: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let size = CGSize(width: max(width, 1), height: height)
+            let accountID = session.profile.userID
             let key = [
-                "replay-map-v1", ownerID.uuidString, workoutID.uuidString,
+                "replay-map-v2", accountID.uuidString, ownerID.uuidString, workoutID.uuidString,
                 String(Int(width.rounded())), String(Int(height.rounded()))
             ].joined(separator: "|")
             ZStack {
@@ -721,7 +727,13 @@ struct GhostReplayRouteThumbnail: View {
             .frame(width: width, height: height)
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .task(id: key) {
-                guard width > 20 else { return }
+                guard width > 20, !Task.isCancelled else { return }
+                if let cached = RouteMapSnapshotCache.cachedImage(requestID: key) {
+                    image = cached
+                    resolvedID = key
+                    loading = false
+                    return
+                }
                 image = nil
                 resolvedID = nil
                 loading = true
@@ -733,6 +745,7 @@ struct GhostReplayRouteThumbnail: View {
                     requestID: key
                 )
                 guard !Task.isCancelled else { return }
+                guard session.profile.userID == accountID else { return }
                 image = result
                 resolvedID = key
                 loading = false

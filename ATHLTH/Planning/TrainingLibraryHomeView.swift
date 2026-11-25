@@ -924,8 +924,16 @@ final class LibraryFavoritesStore: ObservableObject {
     // Keep remote IDs and pending mutations intact. Expose a canonical,
     // deduplicated favorite list without deleting server rows during upgrade.
     private var storedFavorites: [LibraryFavoriteRecord] = [] {
-        didSet { favorites = Self.canonicalFavorites(storedFavorites) }
+        didSet {
+            guard oldValue != storedFavorites else { return }
+            let projected = Self.canonicalFavorites(storedFavorites)
+            favoriteKeys = Set(projected.map(\.id))
+            favoriteCounts = Dictionary(grouping: projected, by: { $0.itemType }).mapValues(\.count)
+            if favorites != projected { favorites = projected }
+        }
     }
+    private var favoriteKeys: Set<String> = []
+    private var favoriteCounts: [LibraryFavoriteKind: Int] = [:]
     @Published private(set) var favorites: [LibraryFavoriteRecord] = []
 
     private static func canonicalItemID(_ kind: LibraryFavoriteKind, _ itemID: String) -> String {
@@ -1142,14 +1150,11 @@ final class LibraryFavoritesStore: ObservableObject {
         itemID: String
     ) -> Bool {
         let canonical = Self.canonicalItemID(kind, itemID)
-        return storedFavorites.contains {
-            $0.itemType == kind &&
-            Self.canonicalItemID(kind, $0.itemID) == canonical
-        }
+        return favoriteKeys.contains("\(kind.rawValue)|\(canonical)")
     }
 
     func count(for kind: LibraryFavoriteKind) -> Int {
-        favorites.filter { $0.itemType == kind }.count
+        favoriteCounts[kind] ?? 0
     }
 
     // Serialize writes per favorite. Otherwise rapid star/unstar actions can

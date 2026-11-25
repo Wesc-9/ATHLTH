@@ -52,6 +52,9 @@ final class SocialStore: ObservableObject {
 
     private let service: SupabaseSocialService
     private var lastHomeFeedRefreshAt: Date?
+    private var lastHomeFeedAccountID: UUID?
+    private var lastHomeContextRefreshAt: Date?
+    private var lastHomeContextAccountID: UUID?
     private var lastHomeFriendsRefreshAt: Date?
     private var lastHomeFriendsAccountID: UUID?
     private var lastHomeSocialStatusRefreshAt: Date?
@@ -530,9 +533,9 @@ final class SocialStore: ObservableObject {
         }
 
         if !force,
-           let lastHomeFeedRefreshAt,
-           Date().timeIntervalSince(lastHomeFeedRefreshAt) < 120,
-           !feed.isEmpty,
+           lastHomeContextAccountID == currentUserID,
+           let lastHomeContextRefreshAt,
+           Date().timeIntervalSince(lastHomeContextRefreshAt) < 120,
            privacy != nil {
             return
         }
@@ -558,6 +561,7 @@ final class SocialStore: ObservableObject {
             let loadedPrivacy = try await privacyTask
             let loadedFeed = try await feedTask
             let loadedInbox = try await inboxTask
+            guard !Task.isCancelled, service.currentUserID == currentUserID else { return }
 
             let refreshedFollowingIDs =
                 Set(
@@ -588,7 +592,11 @@ final class SocialStore: ObservableObject {
                 inboxEvents = loadedInbox
             }
             syncApplicationIconBadge()
-            lastHomeFeedRefreshAt = Date()
+            let refreshedAt = Date()
+            lastHomeFeedRefreshAt = refreshedAt
+            lastHomeFeedAccountID = currentUserID
+            lastHomeContextRefreshAt = refreshedAt
+            lastHomeContextAccountID = currentUserID
 
             if let notificationStore {
                 importInboxEvents(
@@ -697,9 +705,9 @@ final class SocialStore: ObservableObject {
         }
 
         if !force,
+           lastHomeFeedAccountID == currentUserID,
            let lastHomeFeedRefreshAt,
-           Date().timeIntervalSince(lastHomeFeedRefreshAt) < 120,
-           !feed.isEmpty {
+           Date().timeIntervalSince(lastHomeFeedRefreshAt) < 120 {
             return
         }
 
@@ -715,6 +723,7 @@ final class SocialStore: ObservableObject {
                         .loadFollowing(
                             for: currentUserID
                         )
+                guard !Task.isCancelled, service.currentUserID == currentUserID else { return }
                 let refreshedFollowingIDs =
                     Set(
                         followingRows.map(
@@ -732,6 +741,7 @@ final class SocialStore: ObservableObject {
                 try await service.loadFeed(
                     limit: 18
                 )
+            guard !Task.isCancelled, service.currentUserID == currentUserID else { return }
             let refreshedFeed =
                 loadedFeed.filter { item in
                     item.activity.actorID ==
@@ -744,6 +754,7 @@ final class SocialStore: ObservableObject {
                 feed = refreshedFeed
             }
             lastHomeFeedRefreshAt = Date()
+            lastHomeFeedAccountID = currentUserID
         } catch {
             // A lightweight Home refresh must not overwrite a more important
             // social error state or clear already cached activity.
@@ -3744,6 +3755,10 @@ final class SocialStore: ObservableObject {
         discoverResults = []
         challengeSearchResults = []
         visibleProfiles = []
+        lastHomeFeedRefreshAt = nil
+        lastHomeFeedAccountID = nil
+        lastHomeContextRefreshAt = nil
+        lastHomeContextAccountID = nil
         lastHomeFriendsAccountID = nil
         lastHomeFriendsRefreshAt = nil
         lastHomeSocialStatusAccountID = nil
