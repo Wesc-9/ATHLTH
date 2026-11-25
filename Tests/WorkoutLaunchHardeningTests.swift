@@ -2,6 +2,22 @@ import XCTest
 @testable import ATHLTH
 
 final class WorkoutLaunchHardeningTests: XCTestCase {
+    @MainActor
+    func testNewWorkoutPreferencesPersistWithoutChangingExistingDefaults() {
+        let suite = "ATHLTHTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSettingsStore(defaults: defaults)
+        XCTAssertEqual(store.defaultFreeRunEnvironment, .outdoor)
+        XCTAssertEqual(store.quickRunStartCountdown, .immediate)
+        XCTAssertTrue(store.keepWorkoutScreenAwake)
+        store.defaultFreeRunEnvironment = .treadmill
+        store.quickRunStartCountdown = .ten
+        let reloaded = AppSettingsStore(defaults: defaults)
+        XCTAssertEqual(reloaded.defaultFreeRunEnvironment, .treadmill)
+        XCTAssertEqual(reloaded.quickRunStartCountdown, .ten)
+    }
+
     func testPreparedWatchWorkoutRemainsManualAfterCoding() throws {
         let prepared = WatchPreparedWorkoutTransfer(
             id: UUID(), title: "Strength", summary: "5 exercises",
