@@ -88,6 +88,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var liveHistoryReferenceID: UUID?
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
+    @State private var isolatedSetID: UUID?
     @State private var showingSpotifyControls = false
     @State private var showingLiveAddActions = false
     @State private var showingStrengthAudioCoachSettings = false
@@ -319,7 +320,7 @@ struct ActiveStrengthWorkoutView: View {
                 }
             }
             .sheet(isPresented: $showingExerciseQueue.keepingPresentedWhenInactive(scenePhase)) {
-                StrengthActiveExerciseQueueView()
+                StrengthActiveExerciseQueueView(onSingleSet: { isolatedSetID = $0 }, onContinuousTraining: { isolatedSetID = nil })
                     .environmentObject(strength)
             }
             .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
@@ -630,6 +631,7 @@ struct ActiveStrengthWorkoutView: View {
                         .id
             ) { oldValue, newValue in
                 updateScreenAwakeState()
+                isolatedSetID = nil
 
                 guard oldValue != nil,
                       newValue == nil
@@ -737,6 +739,13 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 announceCompletedSetIfNeeded()
+                if let id = isolatedSetID,
+                   strength.activeWorkout?.exercises.contains(where: { exercise in
+                       exercise.sets.contains(where: { $0.id == id && $0.isCompleted })
+                   }) == true {
+                    isolatedSetID = nil
+                    if !finishInProgress { showingExerciseQueue = true }
+                }
             }
             .onChange(
                 of: strength.restEndsAt
@@ -10093,6 +10102,7 @@ private struct StrengthExerciseGroupBuilderView: View {
     init(
         workout: StrengthWorkoutLog,
         currentExerciseID: UUID,
+        initialStyle: StrengthExerciseGroupStyle = .superset,
         onSave: @escaping (
             [UUID],
             StrengthExerciseGroupStyle
@@ -10134,7 +10144,7 @@ private struct StrengthExerciseGroupBuilderView: View {
         // circuits. Timed modes and drop sets retain their planned identity.
         _style = State(
             initialValue:
-                current?.groupStyle == .circuit ? .circuit : .superset
+                current?.groupStyle == .circuit ? .circuit : initialStyle
         )
     }
 
@@ -10852,6 +10862,10 @@ private struct StrengthActiveExerciseQueueView: View {
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
+    let onSingleSet: (UUID) -> Void
+    let onContinuousTraining: () -> Void
+    @State private var showingGroupBuilder = false
+    @State private var showingSelectionBlocked = false
     @State private var showingExerciseLibrary = false
     @State private var showingAppendWorkout = false
     @State private var showingCustomExerciseEditor = false
@@ -10865,6 +10879,70 @@ private struct StrengthActiveExerciseQueueView: View {
         (exerciseID: UUID, targetCount: Int, correctedSets: Int)?
     @State private var showingSetCountCorrection = false
     @State private var showingSetCountEditBlocked = false
+
+    private var groupingWorkout: StrengthWorkoutLog? {
+        guard var workout = strength.activeWorkout else { return nil }
+        // Ad-hoc circuits must not overwrite existing timed groups or warm-ups.
+        workout.exercises = workout.exercises.filter {
+            !$0.isCompleted && !$0.isWarmUpExercise && $0.groupID == nil &&
+            $0.isEmbeddedRunningInterval != true &&
+            $0.sets.contains(where: { !$0.isResolved })
+        }
+        return workout.exercises.count >= 2 ? workout : nil
+    }
+
+    private func trainSingleSet(_ exercise: StrengthExerciseLog, set: StrengthSetLog) {
+        if strength.selectSetForNow(exerciseID: exercise.id, setID: set.id) {
+            onSingleSet(set.id)
+            dismiss()
+        } else {
+            showingSelectionBlocked = true
+        }
+    }
+
+    private func queueHeader(_ workout: StrengthWorkoutLog) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(english: "Your workout", norwegian: "Din økt"))
+                        .font(.title2.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(workout.exercises.count) exercises · \(workout.totalCompletedSets) sets completed",
+                        norwegian: "\(workout.exercises.count) øvelser · \(workout.totalCompletedSets) sett utført"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer()
+                Image(systemName: "list.number")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            Button {
+                showingGroupBuilder = true
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(english: "Circuit / superset", norwegian: "Sirkeltrening / supersett"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(english: "One set at each station", norwegian: "Ett sett per øvelse om gangen"))
+                            .font(.caption)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .padding(12)
+                .background(ATHLTHPlanDesign.warmSurface, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .disabled(groupingWorkout == nil)
+        }
+        .padding(15)
+        .athlthTrainPaper()
+    }
 
     private var exercisePendingRemovalName: String {
         guard let id = pendingRemovalID,
@@ -11102,6 +11180,12 @@ private struct StrengthActiveExerciseQueueView: View {
                 if let workout = strength.activeWorkout {
                     List {
                         Section {
+                            queueHeader(workout)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+                        Section {
                             ForEach(workout.exercises) { exercise in
                                 VStack(alignment: .leading, spacing: 9) {
                                 HStack(spacing: 10) {
@@ -11173,7 +11257,10 @@ private struct StrengthActiveExerciseQueueView: View {
 
                                     Spacer(minLength: 6)
 
-                                    if exercise.id ==
+                                    if exercise.isCompleted {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                                    } else if exercise.id ==
                                         strength.currentExercise?.id {
                                         Label(
                                             ATHLTHLocalization.choose(
@@ -11184,9 +11271,6 @@ private struct StrengthActiveExerciseQueueView: View {
                                         )
                                         .font(.caption.weight(.bold))
                                         .foregroundStyle(ATHLTHTheme.premiumGold)
-                                    } else if exercise.isCompleted {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(ATHLTHTheme.premiumGold)
                                     } else {
                                         Button(
                                             ATHLTHLocalization.choose(
@@ -11195,6 +11279,7 @@ private struct StrengthActiveExerciseQueueView: View {
                                             )
                                         ) {
                                             if strength.selectExerciseForNow(exercise.id) {
+                                                onContinuousTraining()
                                                 dismiss()
                                             }
                                         }
@@ -11211,6 +11296,36 @@ private struct StrengthActiveExerciseQueueView: View {
                                             norwegian: "Hold og dra for å flytte øvelsen"
                                         ))
                                 }
+                                if let style = exercise.groupStyle {
+                                    Label(style.title, systemImage: "arrow.triangle.2.circlepath")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                }
+
+                                if let next = exercise.sets.first(where: { !$0.isResolved }) {
+                                    Button {
+                                        trainSingleSet(exercise, set: next)
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Train only set \(next.setNumber)",
+                                                norwegian: "Tren kun sett \(next.setNumber)"
+                                            ),
+                                            systemImage: "play.circle"
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+
+                                DisclosureGroup(
+                                    ATHLTHLocalization.choose(
+                                        english: "Sets and settings",
+                                        norwegian: "Sett og innstillinger"
+                                    )
+                                ) {
                                 if StrengthBarbellExercisePolicy.usesBar(exercise) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "scalemass")
@@ -11283,10 +11398,8 @@ private struct StrengthActiveExerciseQueueView: View {
                                                                     set.completedWeightKilograms
                                                             )
                                                     }
-                                                } else if strength.selectSetForNow(
-                                                    exerciseID: exercise.id, setID: set.id
-                                                ) {
-                                                    dismiss()
+                                                } else {
+                                                    trainSingleSet(exercise, set: set)
                                                 }
                                             } label: {
                                             HStack(spacing: 9) {
@@ -11356,8 +11469,14 @@ private struct StrengthActiveExerciseQueueView: View {
                                 .font(.caption.weight(.semibold))
                                 .tint(ATHLTHPlanDesign.accentInk)
                                 }
-                                .padding(.vertical, 9)
-                                .listRowBackground(ATHLTHTheme.card)
+                                .font(.caption.weight(.semibold))
+                                .tint(ATHLTHPlanDesign.accentInk)
+                                }
+                                .padding(14)
+                                .athlthTrainPaper()
+                                .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                                 // Drag the exercise itself; no Edit button
                                 // or mutation to the saved training plan.
                                 .draggable(exercise.id.uuidString)
@@ -11382,6 +11501,20 @@ private struct StrengthActiveExerciseQueueView: View {
                                     }
                                 }
                                 .contextMenu {
+                                    if let index = workout.exercises.firstIndex(where: { $0.id == exercise.id }) {
+                                        Button {
+                                            strength.reorderActiveExercises(fromOffsets: IndexSet(integer: index), toOffset: index - 1)
+                                        } label: {
+                                            Label(ATHLTHLocalization.choose(english: "Move up", norwegian: "Flytt opp"), systemImage: "arrow.up")
+                                        }
+                                        .disabled(index == 0)
+                                        Button {
+                                            strength.reorderActiveExercises(fromOffsets: IndexSet(integer: index), toOffset: index + 2)
+                                        } label: {
+                                            Label(ATHLTHLocalization.choose(english: "Move down", norwegian: "Flytt ned"), systemImage: "arrow.down")
+                                        }
+                                        .disabled(index == workout.exercises.count - 1)
+                                    }
                                     Button {
                                         _ = strength.setWarmUpExercise(
                                             exercise.id,
@@ -11442,8 +11575,8 @@ private struct StrengthActiveExerciseQueueView: View {
             }
             .navigationTitle(
                 ATHLTHLocalization.choose(
-                    english: "Exercise order",
-                    norwegian: "Øvelsesrekkefølge"
+                    english: "Exercise overview",
+                    norwegian: "Øvelsesoversikt"
                 )
             )
             .scrollContentBackground(.hidden)
@@ -11508,18 +11641,39 @@ private struct StrengthActiveExerciseQueueView: View {
         }
         // A single exercise should not open a half-screen sheet with
         // hundreds of points of unused empty space.
-        .presentationDetents([
-            .height(
-                min(
-                    CGFloat((strength.activeWorkout?.exercises.count ?? 1) * 220 + 205),
-                    660
-                )
-            ),
-            .large
-        ])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(28)
         .presentationBackground(ATHLTHPlanDesign.canvas)
+        .sheet(isPresented: $showingGroupBuilder) {
+            if let workout = groupingWorkout,
+               let first = workout.exercises.first {
+                StrengthExerciseGroupBuilderView(
+                    workout: workout, currentExerciseID: first.id, initialStyle: .circuit
+                ) { ids, style in
+                    let eligible = Set(groupingWorkout?.exercises.map(\.id) ?? [])
+                    guard ids.count >= 2, Set(ids).isSubset(of: eligible) else {
+                        showingGroupBuilder = false
+                        return
+                    }
+                    strength.groupExercises(ids: ids, style: style)
+                    onContinuousTraining()
+                    showingGroupBuilder = false
+                } onUngroup: {
+                    showingGroupBuilder = false
+                }
+            }
+        }
+        .alert(ATHLTHLocalization.choose(
+            english: "Finish the active set first", norwegian: "Avslutt pågående sett først"
+        ), isPresented: $showingSelectionBlocked) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Complete or stop the current set before choosing another.",
+                norwegian: "Fullfør eller stopp det pågående settet før du velger et annet."
+            ))
+        }
         .sheet(isPresented: $showingAppendWorkout) {
             ActiveHybridWorkoutPicker { planned, startNow in
                 strength.appendWorkoutDuringSession(
