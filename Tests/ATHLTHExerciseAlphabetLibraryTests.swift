@@ -21,6 +21,20 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
         )
     }
 
+    func testThumbnailSizingUsesScreenScaleAndBoundedBuckets() {
+        XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: 68, scale: 2), 160)
+        XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: 68, scale: 3), 224)
+        XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: 72, scale: 3), 224)
+        XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: 1000, scale: 3), 640)
+        XCTAssertEqual(ATHLTHExerciseThumbnailSizing.pixels(points: .nan, scale: 2), 64)
+    }
+
+    func testLiveCatalogNameKeyKeepsExistingCaseAndAccentMatching() {
+        let locale = Locale(identifier: "nb_NO")
+        XCTAssertEqual(ExerciseLibraryStore.liveCanonicalNameKey("Bénkpress", locale: locale),
+                       ExerciseLibraryStore.liveCanonicalNameKey("BENKPRESS", locale: locale))
+    }
+
     func testEquipmentFilterUsesStableOriginalIDsAndLocalizedOrder() {
         let options = ATHLTHEquipmentFilterOption.make(
             values: ["Barbell", "Bodyweight", "Barbell", "All", "Cable"],

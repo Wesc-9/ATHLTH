@@ -312,10 +312,7 @@ struct ActiveStrengthWorkoutView: View {
                                 english: "Add to active workout",
                                 norwegian: "Legg til i økten"
                             ),
-                        selectedExerciseCounts: Dictionary(
-                            activeExistingPlannedExercises.compactMap(\.exerciseID).map { ($0, 1) },
-                            uniquingKeysWith: +
-                        ),
+                        selectedExerciseCounts: activeExerciseLibraryCounts,
                         allowsEquipmentScan: true
                     ) { entry in
                         pendingExercise = entry
@@ -5185,7 +5182,7 @@ struct ActiveStrengthWorkoutView: View {
         _ exercise: StrengthExerciseLog
     ) -> ExerciseLibraryEntry? {
         if let id = exercise.exercise.libraryExerciseID {
-            return exerciseLibrary.allExercises.first { $0.id == id }
+            return exerciseLibrary.entry(withID: id)
         }
         let snapshotName =
             exercise.exercise.name
@@ -7452,6 +7449,25 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    private func libraryEntryForActiveExercise(_ exercise: StrengthExerciseLog) -> ExerciseLibraryEntry? {
+        if let id = exercise.exercise.libraryExerciseID,
+           let exact = exerciseLibrary.entry(withID: id) {
+            return exact
+        }
+        return exerciseLibrary.entry(matchingLiveCanonicalName: exercise.exercise.name)
+    }
+
+    private var activeExerciseLibraryCounts: [UUID: Int] {
+        guard let workout = strength.activeWorkout else { return [:] }
+        var counts: [UUID: Int] = [:]
+        for exercise in workout.exercises {
+            if let id = libraryEntryForActiveExercise(exercise)?.id {
+                counts[id, default: 0] += 1
+            }
+        }
+        return counts
+    }
+
     private var activeExistingPlannedExercises:
         [PlannedExercise] {
         guard let workout =
@@ -7460,43 +7476,8 @@ struct ActiveStrengthWorkoutView: View {
             return []
         }
 
-        let entriesByName =
-            Dictionary(
-                grouping:
-                    exerciseLibrary
-                        .allExercises
-            ) {
-                $0.canonicalName
-                    .folding(
-                        options: [
-                            .caseInsensitive,
-                            .diacriticInsensitive
-                        ],
-                        locale: .current
-                    )
-                    .lowercased()
-            }
-
-        return workout.exercises
-            .map {
-                exerciseLog in
-
-                let key =
-                    exerciseLog
-                        .exercise
-                        .name
-                        .folding(
-                            options: [
-                                .caseInsensitive,
-                                .diacriticInsensitive
-                            ],
-                            locale: .current
-                        )
-                        .lowercased()
-
-                let matchedEntry =
-                    entriesByName[key]?
-                        .first
+        return workout.exercises.map { exerciseLog in
+                let matchedEntry = libraryEntryForActiveExercise(exerciseLog)
 
                 let firstSet =
                     exerciseLog
@@ -7504,7 +7485,7 @@ struct ActiveStrengthWorkoutView: View {
                         .first
 
                 return PlannedExercise(
-                    id: UUID(),
+                    id: exerciseLog.id,
                     exerciseID:
                         matchedEntry?.id,
                     embeddedExercise:

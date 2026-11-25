@@ -3,19 +3,31 @@ import ImageIO
 import SwiftUI
 import UIKit
 
+enum ATHLTHExerciseThumbnailSizing {
+    static func pixels(points: CGFloat, scale: CGFloat) -> Int {
+        guard points.isFinite, scale.isFinite, points > 0, scale > 0 else { return 64 }
+        let requested = min(640, max(64, points * scale))
+        return min(640, Int(ceil(requested / 32)) * 32)
+    }
+}
+
+struct ATHLTHPreparedExerciseThumbnail: @unchecked Sendable {
+    let image: UIImage
+}
+
 /// Background downsampling for bundled RepDB and personal exercise photos.
 /// Do not open full-resolution files synchronously in every scrolling cell.
 actor ATHLTHLocalExerciseThumbnailLoader {
     static let shared = ATHLTHLocalExerciseThumbnailLoader()
 
-    private let thumbnails: NSCache<NSString, NSData> = {
-        let cache = NSCache<NSString, NSData>()
+    private let thumbnails: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
         cache.countLimit = 240
         cache.totalCostLimit = 24 * 1_024 * 1_024
         return cache
     }()
 
-    func thumbnailData(for url: URL, maxPixels: Int) -> Data? {
+    func thumbnail(for url: URL, maxPixels: Int) -> ATHLTHPreparedExerciseThumbnail? {
         guard url.isFileURL, !Task.isCancelled else { return nil }
         let pixels = max(64, min(maxPixels, 640))
         let modification = try? url.resourceValues(
@@ -25,7 +37,7 @@ actor ATHLTHLocalExerciseThumbnailLoader {
             .timeIntervalSince1970 ?? 0
         let key = "\(url.path)|\(pixels)|\(revision)" as NSString
         if let cached = thumbnails.object(forKey: key) {
-            return cached as Data
+            return ATHLTHPreparedExerciseThumbnail(image: cached)
         }
 
         guard let source = CGImageSourceCreateWithURL(
@@ -43,16 +55,12 @@ actor ATHLTHLocalExerciseThumbnailLoader {
         ) else { return nil }
 
         guard !Task.isCancelled else { return nil }
-        guard let output = CFDataCreateMutable(nil, 0),
-              let destination = CGImageDestinationCreateWithData(
-                output, "public.png" as CFString, 1, nil
-              ) else { return nil }
-        CGImageDestinationAddImage(destination, thumbnail, nil)
-        guard CGImageDestinationFinalize(destination),
-              let bytes = CFDataGetBytePtr(output) else { return nil }
-        let data = Data(bytes: bytes, count: CFDataGetLength(output))
-        thumbnails.setObject(data as NSData, forKey: key, cost: data.count)
-        return data
+        // Cache the already decoded display-size bitmap; do not encode
+        // PNG and decode it again in the scrolling row.
+        let image = UIImage(cgImage: thumbnail)
+        let cost = thumbnail.bytesPerRow * thumbnail.height
+        thumbnails.setObject(image, forKey: key, cost: cost)
+        return ATHLTHPreparedExerciseThumbnail(image: image)
     }
 }
 
@@ -63,11 +71,20 @@ struct ATHLTHLocalExerciseThumbnailView: View {
     let size: CGFloat
     let fallbackSymbol: String
 
+    @Environment(\.displayScale) private var displayScale
     @State private var thumbnail: UIImage?
+    @State private var loadedRequest: Request?
+
+    private struct Request: Hashable {
+        let url: URL
+        let pixels: Int
+    }
 
     var body: some View {
+        let request = Request(url: url, pixels: ATHLTHExerciseThumbnailSizing.pixels(
+            points: size, scale: displayScale))
         Group {
-            if let thumbnail {
+            if let thumbnail, loadedRequest == request {
                 Image(uiImage: thumbnail)
                     .resizable()
                     .scaledToFill()
@@ -78,13 +95,13 @@ struct ATHLTHLocalExerciseThumbnailView: View {
                     .frame(width: size, height: size)
             }
         }
-        .task(id: url) {
-            thumbnail = nil
-            let pixels = min(640, max(64, Int(size * 3)))
-            guard let data = await ATHLTHLocalExerciseThumbnailLoader.shared
-                .thumbnailData(for: url, maxPixels: pixels),
+        .task(id: request) {
+            if loadedRequest == request, thumbnail != nil { return }
+            guard let prepared = await ATHLTHLocalExerciseThumbnailLoader.shared
+                .thumbnail(for: request.url, maxPixels: request.pixels),
                   !Task.isCancelled else { return }
-            thumbnail = UIImage(data: data)
+            thumbnail = prepared.image
+            loadedRequest = request
         }
     }
 }

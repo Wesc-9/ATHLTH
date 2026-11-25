@@ -889,8 +889,8 @@ struct ExerciseLibraryView: View {
                                                 .buttonStyle(.plain)
                                                 .accessibilityLabel(
                                                     ATHLTHLocalization.choose(
-                                                        english: "Add " + library.localizedExerciseName(entry) + " to workout",
-                                                        norwegian: "Legg til " + library.localizedExerciseName(entry) + " i økten"
+                                                        english: "Add " + library.libraryRowName(entry) + " to workout",
+                                                        norwegian: "Legg til " + library.libraryRowName(entry) + " i økten"
                                                     )
                                                 )
                                                 .padding(8)
@@ -898,7 +898,7 @@ struct ExerciseLibraryView: View {
                                                 LibraryFavoriteButton(
                                                     kind: .exercise,
                                                     itemID: entry.id.uuidString,
-                                                    title: library.localizedExerciseName(entry),
+                                                    title: library.libraryRowName(entry),
                                                     subtitle: [
                                                         entry.bodyPart.map(library.localizedBodyPartTitle),
                                                         entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
@@ -1694,7 +1694,7 @@ struct ExerciseLibraryView: View {
         recents.markUsed(
             .exercise,
             itemID: entry.id.uuidString,
-            title: library.localizedExerciseName(entry),
+            title: library.libraryRowName(entry),
             subtitle: [
                 entry.bodyPart.map(library.localizedBodyPartTitle),
                 entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
@@ -1773,8 +1773,8 @@ struct ExerciseLibraryView: View {
             .background(ATHLTHTheme.cardWarm.opacity(0.5))
             .accessibilityLabel(
                 ATHLTHLocalization.choose(
-                    english: "Add " + library.localizedExerciseName(entry) + " to workout",
-                    norwegian: "Legg til " + library.localizedExerciseName(entry) + " i økten"
+                    english: "Add " + library.libraryRowName(entry) + " to workout",
+                    norwegian: "Legg til " + library.libraryRowName(entry) + " i økten"
                 )
             )
             .accessibilityIdentifier("exercise-grid-add-" + entry.id.uuidString)
@@ -1798,12 +1798,13 @@ struct ExerciseLibraryView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             ExerciseArtwork(entry: entry, size: compact ? 72 : 64)
+                .equatable()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 3)
 
             Text(
                 ATHLTHLibraryName.exerciseCard(
-                    library.localizedExerciseName(entry),
+                    library.libraryRowName(entry),
                     grid: true
                 )
             )
@@ -1816,7 +1817,7 @@ struct ExerciseLibraryView: View {
             .lineLimit(2)
             .minimumScaleFactor(0.87)
             .truncationMode(.tail)
-            .accessibilityLabel(library.localizedExerciseName(entry))
+            .accessibilityLabel(library.libraryRowName(entry))
             .multilineTextAlignment(.leading)
 
             Text(
@@ -1854,14 +1855,15 @@ struct ExerciseLibraryView: View {
     private func exerciseRow(_ entry: ExerciseLibraryEntry) -> some View {
         HStack(spacing: 13) {
             ExerciseArtwork(entry: entry, size: 68)
+                .equatable()
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(ATHLTHLibraryName.exerciseCard(library.localizedExerciseName(entry), grid: false))
+                    Text(ATHLTHLibraryName.exerciseCard(library.libraryRowName(entry), grid: false))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
-                        .accessibilityLabel(library.localizedExerciseName(entry))
+                        .accessibilityLabel(library.libraryRowName(entry))
 
                     if entry.source == .custom {
                         Text(ATHLTHLocalization.choose(
@@ -1962,14 +1964,8 @@ struct ExerciseLibraryView: View {
                 lineWidth: 0.8
             )
         }
-        .shadow(
-            color:
-                ATHLTHTheme.accentDeep
-                    .opacity(0.07),
-            radius: 12,
-            x: 0,
-            y: 6
-        )
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.05),
+                radius: 4, x: 0, y: 2)
     }
 }
 
@@ -4074,9 +4070,18 @@ struct CustomExerciseEditorView: View {
     }
 }
 
-struct ExerciseArtwork: View {
+struct ExerciseArtwork: View, Equatable {
     let entry: ExerciseLibraryEntry
     let size: CGFloat
+    @Environment(\.displayScale) private var displayScale
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.entry.id == rhs.entry.id &&
+        lhs.entry.source == rhs.entry.source &&
+        lhs.entry.sourceIdentifier == rhs.entry.sourceIdentifier &&
+        lhs.entry.imageStartURL == rhs.entry.imageStartURL &&
+        lhs.size == rhs.size
+    }
 
     var body: some View {
         Group {
@@ -4094,7 +4099,11 @@ struct ExerciseArtwork: View {
                             ? "person.crop.circle.badge.plus" : "dumbbell.fill"
                     )
                 } else {
-                    ATHLTHStorageImage(url: url) { phase in
+                    ATHLTHStorageImage(
+                        url: url,
+                        maxPixelSize: ATHLTHExerciseThumbnailSizing.pixels(
+                            points: size, scale: displayScale)
+                    ) { phase in
                         switch phase {
                         case .success(let image):
                             image

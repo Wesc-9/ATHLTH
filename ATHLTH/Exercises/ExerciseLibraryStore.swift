@@ -211,6 +211,10 @@ final class ExerciseLibraryStore: ObservableObject {
     private var accountID: UUID?
     private(set) var catalogRevision = 0
     private var cachedAllExercises: [ExerciseLibraryEntry]?
+    private var cachedEntriesByID: [UUID: ExerciseLibraryEntry]?
+    private var cachedEntriesByCanonicalName: [String: ExerciseLibraryEntry]?
+    private var canonicalLookupLocale: String?
+    private var displayNameRevision = -1
     private var cachedSelectableExercises: [ExerciseLibraryEntry]?
     private var cachedBodyParts: [String]?
     private var cachedEquipmentOptions: [String]?
@@ -518,6 +522,21 @@ final class ExerciseLibraryStore: ObservableObject {
             ?? entry.name
     }
 
+    func libraryRowName(_ entry: ExerciseLibraryEntry) -> String {
+        synchronizeSearchLanguage()
+        let revision = NorwegianExerciseAutoTranslation.shared.revision
+        if displayNameRevision != revision {
+            if lastSearchTranslationRevision != revision {
+                cachedAlphabetSortKeys = [:]
+            }
+            displayNameRevision = revision
+        }
+        if let name = cachedAlphabetSortKeys[entry.id] { return name }
+        let name = localizedExerciseName(entry)
+        cachedAlphabetSortKeys[entry.id] = name
+        return name
+    }
+
     func localizedExerciseSummary(_ entry: ExerciseLibraryEntry) -> String? {
         guard ATHLTHLocalization.isNorwegian else { return entry.summary }
         if let reviewed = NorwegianExerciseText.record(
@@ -659,6 +678,33 @@ final class ExerciseLibraryStore: ObservableObject {
         return resolved
     }
 
+    // Build the identity index once per catalog revision, not per live tick.
+    func entry(withID id: UUID) -> ExerciseLibraryEntry? {
+        if cachedEntriesByID == nil {
+            cachedEntriesByID = Dictionary(uniqueKeysWithValues: allExercises.map { ($0.id, $0) })
+        }
+        return cachedEntriesByID?[id]
+    }
+
+    static func liveCanonicalNameKey(_ name: String, locale: Locale = .current) -> String {
+        name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
+            .lowercased()
+    }
+
+    func entry(matchingLiveCanonicalName name: String) -> ExerciseLibraryEntry? {
+        let locale = Locale.current
+        if cachedEntriesByCanonicalName == nil || canonicalLookupLocale != locale.identifier {
+            var index: [String: ExerciseLibraryEntry] = [:]
+            for entry in allExercises {
+                let key = Self.liveCanonicalNameKey(entry.canonicalName, locale: locale)
+                if index[key] == nil { index[key] = entry }
+            }
+            cachedEntriesByCanonicalName = index
+            canonicalLookupLocale = locale.identifier
+        }
+        return cachedEntriesByCanonicalName?[Self.liveCanonicalNameKey(name, locale: locale)]
+    }
+
     /// The athlete sees only familiar major groups. Detailed RepDB names
     /// remain unchanged in exercise records, muscle maps, saved plans, etc.
     static let commonMuscleFilters: [String] = [
@@ -755,6 +801,10 @@ final class ExerciseLibraryStore: ObservableObject {
     private func invalidateDerivedCaches() {
         catalogRevision &+= 1
         cachedAllExercises = nil
+        cachedEntriesByID = nil
+        cachedEntriesByCanonicalName = nil
+        canonicalLookupLocale = nil
+        displayNameRevision = -1
         cachedSelectableExercises = nil
         cachedBodyParts = nil
         cachedEquipmentOptions = nil
