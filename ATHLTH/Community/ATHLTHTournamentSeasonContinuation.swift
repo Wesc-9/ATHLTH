@@ -98,6 +98,8 @@ enum ATHLTHTournamentSeasonContinuation {
             loserConsequence: completed.loserConsequence
         )
         nextSettings.startsAt = nil
+        nextSettings.endsAt = nil
+        nextSettings.race.competitionEndsAt = nil
         nextSettings.startMode =
             completed.startMode == "scheduled" ? .manual :
             ATHLTHCompetitionStartMode(rawValue: completed.startMode) ?? .manual

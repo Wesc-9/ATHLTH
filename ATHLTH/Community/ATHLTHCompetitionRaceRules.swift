@@ -70,6 +70,8 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     // Absent in legacy events: only new exercise-scored events opt in.
     var exerciseScoringVersion: Int? = nil
     var duelMode: Bool? = nil
+    var competitionEndsAt: String? = nil
+    var endDate: Date? { competitionEndsAt.flatMap { ISO8601DateFormatter().date(from: $0) } }
     var sprintMode: ATHLTHCompetitionSprintMode = .massStart
     var sprintTarget: ATHLTHCompetitionSprintTarget = .distance
     var routeID: UUID? = nil
@@ -97,13 +99,14 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
              recordingDevice, targetDistanceMeters, targetDurationSeconds,
              lapCount, lapVerification, lapCourseName, lapCourseLatitude,
              lapCourseLongitude, countdownSeconds, allowOptInLiveLocation,
-             equipmentRules, exerciseScoringVersion, duelMode
+             equipmentRules, exerciseScoringVersion, duelMode, competitionEndsAt
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         exerciseScoringVersion = try c.decodeIfPresent(Int.self, forKey: .exerciseScoringVersion)
         duelMode = try c.decodeIfPresent(Bool.self, forKey: .duelMode)
+        competitionEndsAt = try c.decodeIfPresent(String.self, forKey: .competitionEndsAt)
         discipline = try c.decodeIfPresent(ATHLTHCompetitionDiscipline.self,
                          forKey: .discipline) ?? .workout
         sprintMode = try c.decodeIfPresent(ATHLTHCompetitionSprintMode.self,

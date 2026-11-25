@@ -125,7 +125,10 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         } ?? "Start når invitasjoner og regler er godkjent",
                         systemImage: "calendar"
                     )
-                    if !tournament.singleEventMode {
+                    if let end = tournament.raceRules.endDate {
+                        Label("Slutt: " + end.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar.badge.clock")
+                    }
+                    if !tournament.singleEventMode || tournament.raceRules.exerciseScoringVersion == 2 {
                     Label(
                         tournament.releaseMode == "everyone_finished"
                             ? "Neste øvelse: når alle er ferdige"

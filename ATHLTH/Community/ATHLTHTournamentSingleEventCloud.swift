@@ -190,3 +190,104 @@ struct ATHLTHTournamentSingleEventCloud {
         ).execute()
     }
 }
+
+struct ATHLTHSharedEventExerciseRow: Decodable, Identifiable {
+    let candidateID: UUID
+    let title: String
+    let metric: String
+    let targetValue: Double?
+    let activity: String
+    let sortOrder: Int
+    let opensAt: Date?
+    let deadlineAt: Date?
+    let userID: UUID
+    let progress: String
+    let score: Double?
+    let evidenceNote: String?
+    var id: String { candidateID.uuidString + userID.uuidString }
+    enum CodingKeys: String, CodingKey {
+        case candidateID = "candidate_id"
+        case title, metric, activity, progress, score
+        case targetValue = "target_value"
+        case sortOrder = "sort_order"
+        case opensAt = "opens_at"
+        case deadlineAt = "deadline_at"
+        case userID = "user_id"
+        case evidenceNote = "evidence_note"
+    }
+    var unit: String {
+        switch metric {
+        case "distance", "time": "sek"
+        case "duration": "m"
+        default: "repetisjoner"
+        }
+    }
+    var instruction: String {
+        switch metric {
+        case "distance": "Lavest tid vinner · " + (targetValue.map { $0.formatted() + " m" } ?? "avtalt distanse")
+        case "duration": "Lengst distanse vinner · " + (targetValue.map { $0.formatted() + " sek" } ?? "avtalt tid")
+        case "time": "Lengst tid vinner"
+        default: "Flest repetisjoner vinner"
+        }
+    }
+    var stateLabel: String {
+        switch progress {
+        case "submitted": "Til godkjenning"
+        case "approved": "Godkjent"
+        case "rejected": "Må leveres på nytt"
+        case "missed": "0 poeng · frist utløpt"
+        default: "Ikke gjennomført"
+        }
+    }
+    var canSubmit: Bool {
+        (progress == "pending" || progress == "rejected") &&
+        opensAt.map { $0 <= Date() } == true && deadlineAt.map { $0 > Date() } == true
+    }
+    func accepts(_ score: Double) -> Bool {
+        score.isFinite && (0...100_000_000).contains(score) &&
+            (metric != "distance" || score > 0) &&
+            (metric != "repetitions" || score.rounded(.towardZero) == score)
+    }
+}
+
+private struct ATHLTHSharedEventSubmitParams: Encodable {
+    let p_tournament: UUID
+    let p_candidate: UUID
+    let p_score: Double?
+    let p_evidence: String
+    let p_source_workout: UUID?
+    enum CodingKeys: String, CodingKey {
+        case p_tournament,p_candidate,p_score,p_evidence,p_source_workout
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(p_tournament, forKey: .p_tournament)
+        try c.encode(p_candidate, forKey: .p_candidate)
+        try c.encode(p_score, forKey: .p_score)
+        try c.encode(p_evidence, forKey: .p_evidence)
+        try c.encode(p_source_workout, forKey: .p_source_workout)
+    }
+}
+private struct ATHLTHSharedEventReviewParams: Encodable {
+    let p_tournament: UUID
+    let p_candidate: UUID
+    let p_athlete: UUID
+    let p_approve: Bool
+}
+extension ATHLTHTournamentSingleEventCloud {
+    func sharedState(tournamentID: UUID) async throws -> [ATHLTHSharedEventExerciseRow] {
+        try await client.rpc("athlth_shared_event_state",
+            params: ATHLTHTournamentSingleEventIDParams(p_tournament: tournamentID)).execute().value
+    }
+    func submitShared(tournamentID: UUID, candidateID: UUID, score: Double?,
+                      evidence: String, sourceWorkoutID: UUID?) async throws {
+        try await client.rpc("athlth_shared_event_submit", params: ATHLTHSharedEventSubmitParams(
+            p_tournament: tournamentID, p_candidate: candidateID, p_score: score,
+            p_evidence: evidence, p_source_workout: sourceWorkoutID)).execute()
+    }
+    func reviewShared(tournamentID: UUID, candidateID: UUID, athleteID: UUID, approve: Bool) async throws {
+        try await client.rpc("athlth_shared_event_review", params: ATHLTHSharedEventReviewParams(
+            p_tournament: tournamentID, p_candidate: candidateID, p_athlete: athleteID,
+            p_approve: approve)).execute()
+    }
+}

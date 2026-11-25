@@ -11,6 +11,18 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         ]
     }
 
+    func testOptionalCompetitionEndMustFollowStart() {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.startMode = .scheduled
+        settings.startsAt = Date().addingTimeInterval(3_600)
+        settings.endsAt = settings.startsAt?.addingTimeInterval(-60)
+        XCTAssertFalse(settings.isValid)
+        settings.endsAt = settings.startsAt?.addingTimeInterval(3_600)
+        XCTAssertTrue(settings.isValid)
+        settings.endsAt = nil
+        XCTAssertTrue(settings.isValid)
+    }
+
     func testEveryIntervalUnitAndEveryoneFinishedAreAvailable() {
         XCTAssertEqual(
             Set(ATHLTHCompetitionIntervalUnit.allCases),

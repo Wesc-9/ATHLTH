@@ -117,6 +117,7 @@ enum ATHLTHCompetitionUnansweredPolicy: String, Codable, CaseIterable, Identifia
 
 struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var startsAt: Date? = nil
+    var endsAt: Date? = nil
     var startMode: ATHLTHCompetitionStartMode = .manual
     var environment: ATHLTHCompetitionEnvironment = .any
     var meetingPlace: String = ""
@@ -145,7 +146,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
             ((meetingLat == nil && meetingLon == nil) ||
              (meetingLat.map { (-90...90).contains($0) } == true &&
               meetingLon.map { (-180...180).contains($0) } == true))
-        return validStart && validVenue && race.isValid &&
+        let validEnd = endsAt.map { $0 > max(now, startsAt ?? now) && $0 <= now.addingTimeInterval(366 * 86_400) } ?? true
+        return validStart && validEnd && validVenue && race.isValid &&
             (1...30).contains(invitationDays) &&
             coachExerciseIDs.count <= 12 &&
             Set(coachExerciseIDs).count == coachExerciseIDs.count &&
@@ -167,7 +169,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     // Decode missing fields to safe defaults instead of discarding a draft.
     init() {}
     private enum CodingKeys: String, CodingKey {
-        case startsAt, startMode, environment, meetingPlace, meetingLat,
+        case startsAt, endsAt, startMode, environment, meetingPlace, meetingLat,
              meetingLon, coachExerciseIDs, race, invitationDays, unansweredPolicy,
              allowFeedPost, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
@@ -175,6 +177,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         startsAt = try c.decodeIfPresent(Date.self, forKey: .startsAt)
+        endsAt = try c.decodeIfPresent(Date.self, forKey: .endsAt)
         startMode = try c.decodeIfPresent(ATHLTHCompetitionStartMode.self,
                                           forKey: .startMode) ?? .manual
         environment = try c.decodeIfPresent(ATHLTHCompetitionEnvironment.self,

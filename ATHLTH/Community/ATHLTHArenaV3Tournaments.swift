@@ -224,6 +224,7 @@ struct ATHLTHTournamentCreator: View {
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
         competitionSettings.race.isOperational &&
+        (!(isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified)) &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
           (exerciseMode == .owner &&
            competitionSettings.coachExerciseIDs.count == exerciseCount)) &&
@@ -281,6 +282,10 @@ struct ATHLTHTournamentCreator: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                     }
+                    if isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified {
+                        Label("Automatisk kildeverifisering dekker ikke alle øvelser ennå. Velg godkjenning av deltaker eller arrangør for å publisere.", systemImage: "info.circle")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
                     if !competitionSettings.race.isOperational {
                         Label("Dette oppsettet kan lagres som mal, men publisering krever videre støtte i den universelle treningsmotoren for valgt utstyr, rute, lagstart eller GPS-runder.",
                               systemImage: "exclamationmark.triangle")
@@ -311,7 +316,8 @@ struct ATHLTHTournamentCreator: View {
                         activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
                         showsStartTiming: fixedStartMode == nil,
                         isDuel: isDuel,
-                        isSharedEvent: isSingleEvent
+                        isSharedEvent: isSingleEvent,
+                        usesIndividualExerciseDeadlines: isSingleEvent && competitionSettings.race.discipline == .workout
                     )
                     if !isSingleEvent { warmupSection }
                     if format == .groups { groupsSection }
@@ -477,7 +483,8 @@ struct ATHLTHTournamentCreator: View {
 
     private func makeDraft() -> ATHLTHTournamentDraft {
         var configured = competitionSettings
-        configured.race.exerciseScoringVersion = isSingleEvent && configured.race.discipline == .workout ? 1 : nil
+        configured.race.exerciseScoringVersion = isSingleEvent && configured.race.discipline == .workout ? 2 : nil
+        configured.race.competitionEndsAt = configured.endsAt.map { ISO8601DateFormatter().string(from: $0) }
         configured.race.duelMode = isDuel ? true : nil
         if isDuel {
             configured.unansweredPolicy = .cancel
@@ -1078,6 +1085,9 @@ struct ATHLTHTournamentCreator: View {
             Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
             if let start = competitionSettings.startsAt {
                 Text(start.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+            }
+            if let end = competitionSettings.endsAt {
+                Label("Slutt: " + end.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar.badge.clock").font(.caption)
             }
             ForEach(athletes, id: \.id) { athlete in
                 Label(athlete.username, systemImage: "person.crop.circle").font(.caption)

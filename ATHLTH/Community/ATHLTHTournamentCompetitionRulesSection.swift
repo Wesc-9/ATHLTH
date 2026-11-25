@@ -9,6 +9,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
     var showsStartTiming = true
     var isDuel = false
     var isSharedEvent = false
+    var usesIndividualExerciseDeadlines = false
     @State private var showingMeetingPoint = false
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
@@ -46,7 +47,27 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 Divider()
                 }
-                if !isSharedEvent {
+                Toggle("Velg sluttdato", isOn: Binding(
+                    get: { settings.endsAt != nil },
+                    set: { enabled in
+                        settings.endsAt = enabled ? max(Date(), settings.startsAt ?? Date()).addingTimeInterval(7 * 86_400) : nil
+                    }))
+                    .tint(ATHLTHArenaV3Style.gold)
+                if settings.endsAt != nil {
+                    DatePicker("Sluttdato og klokkeslett", selection: Binding(
+                        get: { settings.endsAt ?? Date().addingTimeInterval(7 * 86_400) },
+                        set: { settings.endsAt = $0 }),
+                        in: max(Date(), settings.startsAt ?? Date()).addingTimeInterval(60)...,
+                        displayedComponents: [.date, .hourAndMinute])
+                        .font(.subheadline)
+                    Text("Nye resultater kan ikke leveres etter sluttdatoen. Resultater levert innen fristen kan fortsatt godkjennes.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                } else {
+                    Text("Avsluttes automatisk når alle resultater er avgjort.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                Divider()
+                if !isSharedEvent || usesIndividualExerciseDeadlines {
                 Text("Når åpner neste øvelse?")
                     .font(.subheadline.weight(.semibold))
                 Picker("Neste øvelse", selection: $settings.unlock) {
@@ -269,6 +290,11 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 settings.startsAt = Date().addingTimeInterval(86_400)
             }
             if value != .scheduled { settings.startsAt = nil }
+        }
+        .onChange(of: settings.startsAt) { _, start in
+            if let end = settings.endsAt, let start, end <= start {
+                settings.endsAt = start.addingTimeInterval(7 * 86_400)
+            }
         }
         .onChange(of: settings.unit) { _, unit in
             settings.every = min(settings.every, unit.maximumCount)
