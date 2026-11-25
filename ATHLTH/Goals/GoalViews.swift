@@ -77,7 +77,15 @@ struct GoalsHubView: View {
 
     private var achievedCount: Int { goalStore.goals.filter { $0.status == .completed }.count }
     private var archivedCount: Int { goalStore.goals.filter { $0.status == .abandoned }.count }
-    private var completedIDs: Set<UUID> { Set(goalStore.goals.filter { $0.status == .completed }.map(\.id)) }
+    private struct GoalStatusSnapshot: Equatable {
+        let owner: UUID?
+        let statuses: [UUID: GoalStatus]
+    }
+    private var goalStatusSnapshot: GoalStatusSnapshot {
+        GoalStatusSnapshot(owner: goalStore.ownerAccountID,
+            statuses: Dictionary(goalStore.goals.map { ($0.id, $0.status) },
+                                 uniquingKeysWith: { _, latest in latest }))
+    }
     private var sectionTitle: String {
         switch filter {
         case .active: return tr("Active goals", "Aktive mål")
@@ -149,8 +157,13 @@ struct GoalsHubView: View {
             GoalFollowUpSheet(goal: goal)
         }
         .onChange(of: goalStore.ownerAccountID) { _, _ in celebratedGoal = nil }
-        .onChange(of: completedIDs) { old, new in
-            guard let goal = goalStore.goals.first(where: { new.subtracting(old).contains($0.id) }) else { return }
+        .onChange(of: goalStatusSnapshot) { old, new in
+            // Restored achievements are history, not a new completion.
+            guard old.owner != nil, old.owner == new.owner,
+                  let goal = goalStore.goals.first(where: {
+                      new.statuses[$0.id] == .completed &&
+                      (old.statuses[$0.id] == .active || old.statuses[$0.id] == .paused)
+                  }) else { return }
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { celebratedGoal = goal }
         }
         .overlay(alignment: .top) {
