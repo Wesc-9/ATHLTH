@@ -1583,11 +1583,11 @@ final class StrengthWorkoutStore: ObservableObject {
     /// A completed set can be reviewed but is never implicitly repeated.
     @discardableResult
     func selectSetForNow(exerciseID: UUID, setID: UUID) -> Bool {
-        guard var workout = activeWorkout,
-              let exerciseIndex = workout.exercises.firstIndex(where: {
+        guard let initialWorkout = activeWorkout,
+              let exerciseIndex = initialWorkout.exercises.firstIndex(where: {
                   $0.id == exerciseID
               }),
-              let setIndex = workout.exercises[exerciseIndex].sets.firstIndex(
+              let setIndex = initialWorkout.exercises[exerciseIndex].sets.firstIndex(
                   where: { $0.id == setID && !$0.isResolved }
               )
         else { return false }
@@ -1596,7 +1596,10 @@ final class StrengthWorkoutStore: ObservableObject {
             return true
         }
 
+        // Do not discard a started timer or effort when changing stations.
+        guard currentTimedSetCountdown == nil, currentSetEffortClock == nil else { return false }
         finalizeActualRestIfNeeded()
+        guard var workout = activeWorkout, workout.id == initialWorkout.id else { return false }
         // Never carry the timer or draft weight from the previously selected set.
         timedSetCountdown = nil
         restStartedAt = nil
@@ -4422,6 +4425,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         activeWorkout = workout
+        persistCheckpointNow()
     }
 
     func ungroupExercise(
@@ -4449,6 +4453,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         activeWorkout = workout
+        persistCheckpointNow()
     }
 
     func substituteCurrentExercise(
