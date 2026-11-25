@@ -967,7 +967,9 @@ struct StrengthWorkoutResultBreakdown {
     init(
         workout: StrengthWorkoutLog,
         elapsedSeconds: TimeInterval,
-        ongoingRestSeconds: TimeInterval = 0
+        ongoingRestSeconds: TimeInterval = 0,
+        recordedRestSeconds: TimeInterval? = nil,
+        includeSegments: Bool = true
     ) {
         let healthSeconds = workout.healthMetrics.duration
         // A live finish preview continues to use the shared runtime clock.
@@ -983,8 +985,8 @@ struct StrengthWorkoutResultBreakdown {
             ? max(ongoingRestSeconds, 0) : 0
         // Invalid imported rest evidence must never make 'active time'
         // negative or exceed the actual workout duration.
-        restSeconds = min(workout.totalActualRestSeconds + liveRest, totalSeconds)
+        restSeconds = min((recordedRestSeconds ?? workout.totalActualRestSeconds) + liveRest, totalSeconds)
         activeSeconds = max(totalSeconds - restSeconds, 0)
-        segments = workout.exercises.map(StrengthWorkoutResultSegment.init)
+        segments = includeSegments ? workout.exercises.map(StrengthWorkoutResultSegment.init) : []
     }
 }
