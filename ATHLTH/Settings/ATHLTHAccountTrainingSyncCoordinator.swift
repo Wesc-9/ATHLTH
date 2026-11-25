@@ -22,7 +22,7 @@ enum ATHLTHAccountTrainingSyncCoordinator {
         guard session.signedIn, !session.previewModeEnabled else { return }
         let owner = session.profile.userID
         func sameAccount() -> Bool {
-            !Task.isCancelled && session.signedIn && session.profile.userID == owner
+            !Task.isCancelled && session.signedIn && !session.previewModeEnabled && session.profile.userID == owner
         }
         // Sequential on purpose: a manual refresh should not fan out four
         // large writes while a live workout is sharing the device.
