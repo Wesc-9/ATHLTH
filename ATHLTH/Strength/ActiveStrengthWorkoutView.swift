@@ -799,12 +799,12 @@ struct ActiveStrengthWorkoutView: View {
                             dismiss()
                         },
                         onSpotify: {
-                            withAnimation(.easeInOut(duration: 0.22)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
                                 showingSpotifyControls.toggle()
                             }
                         },
                         onAdd: {
-                            withAnimation(.easeOut(duration: 0.16)) {
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
                                 showingLiveAddActions.toggle()
                             }
                         },
@@ -917,7 +917,7 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     private func closeLiveAddMenu() {
-        withAnimation(.easeOut(duration: 0.16)) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
             showingLiveAddActions = false
         }
     }
@@ -5419,11 +5419,7 @@ struct ActiveStrengthWorkoutView: View {
 
         return VStack(spacing: 0) {
             Button {
-                withAnimation(
-                    .easeInOut(
-                        duration: 0.22
-                    )
-                ) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
                     showingExerciseInstructions
                         .toggle()
                 }
@@ -6064,7 +6060,7 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     private func toggleStrengthDockDetails(for workoutID: UUID) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
             hiddenStrengthDockWorkoutID = hiddenStrengthDockWorkoutID == workoutID
                 ? nil : workoutID
         }

@@ -2074,7 +2074,9 @@ struct PerformanceStatsView: View {
     var body: some View {
         ScrollViewReader { _ in
             ScrollView {
-                VStack(spacing: 16) {
+                // Below-fold charts and record cards should not all be
+                // materialized during the initial profile presentation.
+                LazyVStack(spacing: 16) {
                     editorialHero
 
                     editorialFeaturedRecords

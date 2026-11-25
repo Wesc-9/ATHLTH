@@ -806,6 +806,7 @@ private struct ATHLTHOfflineAccountRecoveryView: View {
 
 struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var health: HealthKitManager
@@ -1530,7 +1531,7 @@ struct AppRootView: View {
             }
         }
         .animation(
-            .easeInOut(duration: 0.20),
+            reduceMotion ? nil : .easeInOut(duration: 0.20),
             value: phoneWorkout.showingWorkout
         )
         .fullScreenCover(
@@ -1865,7 +1866,7 @@ struct AppRootView: View {
             }
         }
         .animation(
-            .easeInOut(duration: 0.2),
+            reduceMotion ? nil : .easeInOut(duration: 0.2),
             value:
                 deviceRelay.lastStatusText
         )

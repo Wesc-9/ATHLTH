@@ -231,7 +231,7 @@ struct ProductRootTabView: View {
         sideMenuFullScreenDestination = nil
 
         friendShareToastDismissTask?.cancel()
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
             friendShareToast = kind
         }
         friendShareToastDismissTask = Task { @MainActor in
@@ -240,7 +240,7 @@ struct ProductRootTabView: View {
             } catch {
                 return
             }
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
                 friendShareToast = nil
             }
         }

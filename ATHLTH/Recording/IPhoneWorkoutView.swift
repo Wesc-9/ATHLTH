@@ -1122,6 +1122,7 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var socialCompanion =
         SocialWorkoutCompanionStore()
     @State private var confirmFinish = false
@@ -1896,7 +1897,7 @@ struct IPhoneWorkoutView: View {
                                 dismiss()
                             },
                             onSpotify: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                                     showingSpotifyControls.toggle()
                                 }
                             },
@@ -3326,6 +3327,7 @@ struct IPhoneWorkoutView: View {
 
 
 private struct IPhoneAudioCoachLiveSheet: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var audioOutputName: String?
     @State private var showDetailedOptions = false
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
@@ -3617,7 +3619,7 @@ private struct IPhoneAudioCoachLiveSheet: View {
                                     }
 
                                     Button {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                                             showDetailedOptions.toggle()
                                         }
                                     } label: {
