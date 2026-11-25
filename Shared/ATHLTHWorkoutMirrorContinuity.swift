@@ -88,6 +88,40 @@ enum ATHLTHWorkoutMirrorContinuity {
         snapshot.state == .failed ? .failed : .ending
     }
 
+    /// A scoped durable command may not stop an unrelated recording.
+    /// A legacy strength session can use its journal ID only if the
+    /// original HealthKit recording has not established an identity.
+    static func acceptsScopedCommand(
+        requestedID: UUID, recordingID: UUID?, strengthID: UUID?
+    ) -> Bool {
+        if let recordingID {
+            return recordingID == requestedID &&
+                (strengthID == nil || strengthID == requestedID)
+        }
+        return strengthID == requestedID
+    }
+
+    /// Never send a mirrored END to a different live workout. The durable
+    /// transport still retries when the matching mirror is unavailable.
+    static func canRequestStrengthFinish(
+        snapshot: WatchWorkoutLiveSnapshot,
+        workoutID: UUID,
+        workoutStartedAt: Date
+    ) -> Bool {
+        guard snapshot.kind == .strength,
+              snapshot.state == .running || snapshot.state == .paused,
+              let startedAt = snapshot.startedAt,
+              startedAt.timeIntervalSince1970.isFinite,
+              workoutStartedAt.timeIntervalSince1970.isFinite,
+              abs(startedAt.timeIntervalSince(workoutStartedAt)) <= 15
+        else { return false }
+        return acceptsScopedCommand(
+            requestedID: workoutID,
+            recordingID: snapshot.universalWorkoutID,
+            strengthID: snapshot.strengthWorkoutID
+        )
+    }
+
     /// Only a completed Watch-strength mirror for the same ATHLTH session
     /// may finish the iPhone's strength log. Legacy snapshots have no UUID
     /// and must match the actual Watch start closely; a missing start never

@@ -161,6 +161,45 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
         ))
     }
 
+    func testStrengthFinishCommandRequiresMatchingOriginalRecording() {
+        let id = UUID()
+        var live = snapshot(kind: .strength)
+        live.universalWorkoutID = id
+        live.strengthWorkoutID = id
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canRequestStrengthFinish(
+            snapshot: live, workoutID: id, workoutStartedAt: startedAt))
+        live.state = .paused
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.canRequestStrengthFinish(
+            snapshot: live, workoutID: id, workoutStartedAt: startedAt))
+        live.state = .completed
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canRequestStrengthFinish(
+            snapshot: live, workoutID: id, workoutStartedAt: startedAt))
+        live.state = .running
+        live.strengthWorkoutID = UUID()
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canRequestStrengthFinish(
+            snapshot: live, workoutID: id, workoutStartedAt: startedAt))
+        live.strengthWorkoutID = id
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canRequestStrengthFinish(
+            snapshot: live, workoutID: UUID(), workoutStartedAt: startedAt))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.canRequestStrengthFinish(
+            snapshot: live, workoutID: id,
+            workoutStartedAt: startedAt.addingTimeInterval(120)))
+    }
+
+    func testDurableEndCannotStopAnotherWorkoutAfterReconnect() {
+        let id = UUID()
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsScopedCommand(
+            requestedID: id, recordingID: id, strengthID: nil))
+        XCTAssertTrue(ATHLTHWorkoutMirrorContinuity.acceptsScopedCommand(
+            requestedID: id, recordingID: nil, strengthID: id))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsScopedCommand(
+            requestedID: id, recordingID: UUID(), strengthID: id))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsScopedCommand(
+            requestedID: id, recordingID: id, strengthID: UUID()))
+        XCTAssertFalse(ATHLTHWorkoutMirrorContinuity.acceptsScopedCommand(
+            requestedID: id, recordingID: nil, strengthID: nil))
+    }
+
     func testWatchStrengthMirrorFinishesOnlyMatchingSession() {
         let id = UUID()
         var completed = snapshot(kind: .strength, state: .completed)

@@ -952,15 +952,17 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return
         }
 
-        if let workoutID,
-           let strengthSession =
-                WatchWorkoutManager.shared
-                    .strengthSession,
-           strengthSession.workoutID !=
-                workoutID {
-            // A durable END from an older iPhone strength workout must never
-            // terminate a newer Watch workout after reconnect.
-            return
+        if let workoutID {
+            let manager = WatchWorkoutManager.shared
+            // Prefer the original HealthKit recording identity. The strength
+            // presentation can disappear or change during reconnect; it must
+            // not grant a stale END permission over another recording.
+            guard ATHLTHWorkoutMirrorContinuity.acceptsScopedCommand(
+                requestedID: workoutID,
+                recordingID: manager.activeWorkoutIdentity,
+                strengthID: manager.kind == .strength
+                    ? manager.strengthSession?.workoutID : nil
+            ) else { return }
         }
 
         switch command {

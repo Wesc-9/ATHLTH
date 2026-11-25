@@ -4478,8 +4478,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // Ignore repeated end taps while HealthKit is finishing the same
         // workout. Finishing and route persistence remain owned by the
         // existing session delegate and live workout builder.
-        guard isActive, state != .ending, !finishing,
-              let session = workoutSession else { return }
+        guard !finishing, let session = workoutSession else { return }
+        // A retry may arrive after the UI has entered .ending but before
+        // HealthKit has delivered its terminal delegate callback. Consult the
+        // original session, not just the presentation state. Never start a
+        // second builder save while the first one is in flight.
+        if state == .ending {
+            switch session.state {
+            case .ended:
+                finishWorkout(at: session.endDate ?? Date())
+            case .stopped, .running, .paused:
+                session.end()
+            default:
+                break
+            }
+            return
+        }
+        guard isActive else { return }
         // Preserve existing pre-start cancellation; running/paused sessions
         // must pass the shared lifecycle rule before the original HK end.
         if state == .running || state == .paused {
@@ -9993,7 +10008,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             }
 
+        case .stopped:
+            // A system-initiated stop (including watchOS recovery) can be
+            // delivered before .ended. Complete the original HK session
+            // instead of leaving it stopped forever.
+            guard !finishing, self.state != .completed,
+                  let session = workoutSession else { return }
+            publishState(.ending)
+            persistWorkoutRecoveryState()
+            if session.state == .stopped { session.end() }
+
         case .ended:
+            guard !finishing, self.state != .completed else { return }
             publishState(.ending)
             persistWorkoutRecoveryState()
 

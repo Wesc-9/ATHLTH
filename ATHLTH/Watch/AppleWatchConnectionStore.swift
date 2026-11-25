@@ -1361,13 +1361,14 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         _ command: WatchWorkoutCommand,
         workoutID: UUID? = nil
     ) {
-        guard
-            let session,
-            session.activationState == .activated,
-            state.isReady
-        else {
+        guard let session else { return }
+        guard session.activationState == .activated else {
+            // A retry after reactivation must not depend on a stale UI flag.
+            if command == .end { refreshStatus() }
             return
         }
+        guard state.isReady || (command == .end && workoutID != nil &&
+            session.isPaired && session.isWatchAppInstalled) else { return }
 
         let payload: [String: Any] = [
             WatchTransferMetadataKey.kind:
