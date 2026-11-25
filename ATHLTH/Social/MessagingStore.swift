@@ -23,6 +23,33 @@ final class MessagingStore: ObservableObject {
     // Drafts survive closing a conversation, but never sign-out, account
     // changes or process termination. Do not persist private unsent text.
     private var textDrafts: [UUID: String] = [:]
+    private struct PendingDirectSend: Equatable {
+        let id: UUID
+        let body: String?
+        let attachment: MessageShareDraft?
+    }
+    private var pendingDirectSends: [UUID: PendingDirectSend] = [:]
+    private var directSendsInFlight: Set<UUID> = []
+
+    // Keep the newest messages visible; expand the window only on request.
+    private static let messagePageSize = 300
+    private static let maximumMessageWindow = 900
+    @Published private(set) var messageWindowLimits: [UUID: Int] = [:]
+    private var conversationRefreshInFlight: Set<UUID> = []
+
+    func canLoadOlderMessages(in conversationID: UUID) -> Bool {
+        let limit = messageWindowLimits[conversationID] ?? Self.messagePageSize
+        return limit < Self.maximumMessageWindow &&
+            (messagesByConversation[conversationID]?.count ?? 0) >= limit
+    }
+
+    func loadOlderMessages(in conversationID: UUID) async {
+        guard !conversationRefreshInFlight.contains(conversationID),
+              canLoadOlderMessages(in: conversationID) else { return }
+        let current = messageWindowLimits[conversationID] ?? Self.messagePageSize
+        messageWindowLimits[conversationID] = min(Self.maximumMessageWindow, current + Self.messagePageSize)
+        await refreshConversation(conversationID)
+    }
 
     func textDraft(for recipient: UUID, owner: UUID) -> String {
         guard preferenceAccountID == owner else { return "" }
@@ -130,6 +157,10 @@ final class MessagingStore: ObservableObject {
         preferenceAccountID = userID
         accountGeneration = UUID()
         textDrafts.removeAll()
+        pendingDirectSends.removeAll()
+        directSendsInFlight.removeAll()
+        messageWindowLimits.removeAll()
+        conversationRefreshInFlight.removeAll()
         isRefreshing = false
         isPreferencesSyncing = false
         errorMessage = nil
@@ -514,8 +545,13 @@ final class MessagingStore: ObservableObject {
     func refreshConversation(_ conversationID: UUID) async {
         guard let owner = currentUserID, preferenceAccountID == owner else { return }
         let generation = accountGeneration
+        guard conversationRefreshInFlight.insert(conversationID).inserted else { return }
+        defer {
+            if accountGeneration == generation { conversationRefreshInFlight.remove(conversationID) }
+        }
+        let limit = messageWindowLimits[conversationID] ?? Self.messagePageSize
         do {
-            let messages = try await service.loadMessages(conversationID: conversationID)
+            let messages = try await service.loadMessages(conversationID: conversationID, limit: limit)
             guard ownsRequest(owner, generation: generation) else { return }
 
             if let currentUserID {
@@ -527,7 +563,7 @@ final class MessagingStore: ObservableObject {
                     // Commit actual read state before publishing the text. A
                     // concurrent successful retraction must not appear here.
                     try await service.markConversationRead(conversationID, messageIDs: unread)
-                    let confirmed = try await service.loadMessages(conversationID: conversationID)
+                    let confirmed = try await service.loadMessages(conversationID: conversationID, limit: limit)
                     guard ownsRequest(owner, generation: generation) else { return }
                     let loadedIDs = Set(messages.map(\.id))
                     messagesByConversation[conversationID] = confirmed.filter {
@@ -751,23 +787,41 @@ final class MessagingStore: ObservableObject {
         let cleanBody = body?
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard cleanBody?.isEmpty == false || attachment != nil else {
-            return false
+        guard cleanBody?.isEmpty == false || attachment != nil else { return false }
+
+        // Only interactive composer retries reuse the ID. Independent
+        // invitation and share actions keep their own identities.
+        guard !clearMatchingTextDraft || directSendsInFlight.insert(conversationID).inserted else { return false }
+        defer {
+            if clearMatchingTextDraft, accountGeneration == generation {
+                directSendsInFlight.remove(conversationID)
+            }
         }
+        let prior = pendingDirectSends[conversationID]
+        let pending = clearMatchingTextDraft && prior?.body == cleanBody && prior?.attachment == attachment
+            ? (prior ?? PendingDirectSend(id: UUID(), body: cleanBody, attachment: attachment))
+            : PendingDirectSend(id: UUID(), body: cleanBody, attachment: attachment)
+        if clearMatchingTextDraft { pendingDirectSends[conversationID] = pending }
 
         do {
             try await service.sendMessage(
                 conversationID: conversationID,
                 to: recipientID,
                 body: cleanBody,
-                attachment: attachment
+                attachment: attachment,
+                messageID: pending.id
             )
             // Once the server confirms the insert, a cancelled view refresh
             // must not turn it into an apparent failed send and leave a duplicate draft.
             guard accountGeneration == generation, preferenceAccountID == owner,
                   currentUserID == owner else { return false }
-            if clearMatchingTextDraft, let body, textDrafts[recipientID] == body {
-                textDrafts.removeValue(forKey: recipientID)
+            if clearMatchingTextDraft {
+                if pendingDirectSends[conversationID] == pending {
+                    pendingDirectSends.removeValue(forKey: conversationID)
+                }
+                if let body, textDrafts[recipientID] == body {
+                    textDrafts.removeValue(forKey: recipientID)
+                }
             }
             if !Task.isCancelled { await refreshConversation(conversationID) }
             return accountGeneration == generation && preferenceAccountID == owner && currentUserID == owner
