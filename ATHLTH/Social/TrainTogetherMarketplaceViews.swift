@@ -3074,8 +3074,11 @@ struct TrainTogetherPostCreateView:
         activity: ATHLTHPlannedWorkoutType,
         source: PlannedSession?
     ) {
-        sharedEditorDate = source?.scheduledStart.flatMap { $0 > Date() ? $0 : nil }
-            ?? scheduledStart
+        if let start = source?.scheduledStart, start > Date() {
+            sharedEditorDate = start
+        } else {
+            sharedEditorDate = scheduledStart
+        }
         queuedSharedWorkoutEditor = SharedEditorSelection(activity: activity, source: source)
         showingPlannedWorkoutPicker = false
     }
