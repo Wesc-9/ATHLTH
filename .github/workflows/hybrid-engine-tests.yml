@@ -377,6 +377,9 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHTrainingPlanStructuredAuditTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutDraftRecoveryPolicyTests \
             -only-testing:ATHLTHTests/TrainingPlanBlockTests \
+            -only-testing:ATHLTHTests/ATHLTHDirectMessageDeliveryTests \
+            -only-testing:ATHLTHTests/ATHLTHCompetitionRaceRulesTests \
+            -only-testing:ATHLTHTests/ATHLTHTournamentSeasonContinuationTests \
             -only-testing:ATHLTHTests/ATHLTHHomeWorkoutComposerRecoveryTests \
             CODE_SIGNING_ALLOWED=NO \
             test
