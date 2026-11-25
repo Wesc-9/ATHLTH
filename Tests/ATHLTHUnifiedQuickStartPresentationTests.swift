@@ -2,6 +2,13 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
+    @MainActor
+    func testStudioTrainFeaturedActivitiesMatchApprovedOrder() {
+        let featured = ATHLTHStudioTrainLandingView.featuredActivities
+        XCTAssertEqual(featured.map(\.rawValue), ["walking", "running", "strength"])
+        XCTAssertTrue(featured.allSatisfy(\.isAvailable))
+    }
+
     func testActivityTypeChoicesAreSharedAcrossBasicAndAdvanced() {
         XCTAssertEqual(ATHLTHQuickStartActivity.running.types,
                        [.free, .route, .workout])

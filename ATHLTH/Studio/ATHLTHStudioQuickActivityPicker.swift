@@ -169,6 +169,7 @@ struct ATHLTHStudioQuickActivityPicker: View {
 struct ATHLTHStudioTrainLandingView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var availableWidth: CGFloat = 850
 
     let activeWorkout: AnyView?
     let occupied: Bool
@@ -224,6 +225,11 @@ struct ATHLTHStudioTrainLandingView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .scrollIndicators(.hidden)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            availableWidth = width
+        }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
         .accessibilityIdentifier("athlth-ipad-train-landing")
     }
@@ -247,8 +253,14 @@ struct ATHLTHStudioTrainLandingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func columns(maximum: Int, minimum: CGFloat, spacing: CGFloat = 12) -> [GridItem] {
+        let width = max(0, min(availableWidth, 1240) - 48)
+        let count = max(1, min(maximum, Int((width + spacing) / (minimum + spacing))))
+        return Array(repeating: GridItem(.flexible(minimum: 0), spacing: spacing), count: count)
+    }
+
     private var topActions: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 215), spacing: 12)], spacing: 12) {
+        LazyVGrid(columns: columns(maximum: 3, minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 195), spacing: 12) {
             NavigationLink {
                 if let activeGoal { GoalDetailView(goalID: activeGoal.id) }
                 else { GoalsHubView() }
@@ -307,7 +319,7 @@ struct ATHLTHStudioTrainLandingView: View {
                 .buttonStyle(.plain)
                 .disabled(occupied)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 200), spacing: 13)], spacing: 13) {
+            LazyVGrid(columns: columns(maximum: 3, minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 180, spacing: 13), spacing: 13) {
                 ForEach(Self.featuredActivities) { category in
                     Button { onActivity(category) } label: {
                         activityCard(category)
@@ -352,7 +364,7 @@ struct ATHLTHStudioTrainLandingView: View {
     private var quickSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle(tr("Quick start", "Hurtigstart"))
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 215), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: columns(maximum: 3, minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 195), spacing: 12) {
                 quickButton(tr("Free training", "Fri trening"), tr("Start an open workout.", "Start en økt med egne valg."), "bolt.fill", action: onFree)
                     .disabled(occupied)
                 quickButton(tr("Route", "Rute"), tr("Choose a saved route.", "Tren en lagret rute."), "map", action: onRoute)
@@ -381,7 +393,7 @@ struct ATHLTHStudioTrainLandingView: View {
     }
 
     private var toolsSection: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 200 : 140), spacing: 12)], spacing: 12) {
+        LazyVGrid(columns: columns(maximum: 5, minimum: dynamicTypeSize.isAccessibilitySize ? 200 : 125), spacing: 12) {
             tool("Ghost Race", "flag.checkered", action: onGhost)
             tool(tr("Competition", "Konkurranse"), "trophy", action: onCompetition)
             tool(tr("From library", "Fra bibliotek"), "book", action: onLibrary)
