@@ -106,6 +106,16 @@ final class ATHLTHPlanRefreshPerformanceTests: XCTestCase {
         XCTAssertFalse(store.isPlanSessionCompleted(planID: plan.id, sessionID: workout.id, healthWorkouts: [], strengthHistory: []))
     }
 
+    func testProjectionGateDetectsSameCountMiddleEditsAndReset() {
+        let gate = ATHLTHProjectionChangeGate<[Int]>()
+        XCTAssertTrue(gate.changed([1, 2, 3]))
+        XCTAssertFalse(gate.changed([1, 2, 3]))
+        XCTAssertTrue(gate.changed([1, 8, 3]))
+        XCTAssertFalse(gate.changed([1, 8, 3]))
+        gate.reset()
+        XCTAssertTrue(gate.changed([1, 8, 3]))
+    }
+
     func testRefreshCoalescerCachesSuccessButNotFailureAndResets() async {
         let gate = ATHLTHRefreshCoalescer()
         var reads = 0

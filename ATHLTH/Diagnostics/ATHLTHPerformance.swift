@@ -131,3 +131,19 @@ final class ATHLTHRefreshCoalescer {
         lastSuccess = nil
     }
 }
+
+
+/// Owner-local change detection for derived view state. Unlike endpoint or
+/// count signatures, equal-length edits to the middle of a collection are
+/// observed. Updating the gate itself does not publish SwiftUI changes.
+final class ATHLTHProjectionChangeGate<Key: Equatable> {
+    private var last: Key?
+
+    func changed(_ key: Key) -> Bool {
+        if let last, last == key { return false }
+        last = key
+        return true
+    }
+
+    func reset() { last = nil }
+}

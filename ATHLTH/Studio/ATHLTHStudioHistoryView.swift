@@ -10,20 +10,37 @@ struct ATHLTHStudioHistoryView: View {
     @State private var compared: [WorkoutSummary] = []
     @State private var comparisonMessage: String?
     @State private var showingWorkoutLab = false
-
+    private struct SearchKey: Equatable {
+        let query: String
+        let locale: String
+        let timeZone: String
+        let calendar: Calendar.Identifier
+        let workouts: [WorkoutSummary]
+    }
+    @State private var sortedMemo = ATHLTHProjectionMemo<[WorkoutSummary], [WorkoutSummary]>()
+    @State private var searchMemo = ATHLTHProjectionMemo<SearchKey, [WorkoutSummary]>()
 
     private var workouts: [WorkoutSummary] {
-        let ordered = health.workouts.sorted { $0.startDate > $1.startDate }
+        let source = health.workouts
+        let ordered = sortedMemo.value(for: source) {
+            source.sorted { $0.startDate > $1.startDate }
+        }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return ordered }
-        return ordered.filter {
-            $0.activity.rawValue.localizedCaseInsensitiveContains(query)
-            || $0.startDate.formatted(date: .abbreviated, time: .omitted)
-                .localizedCaseInsensitiveContains(query)
+        let key = SearchKey(query: query, locale: Locale.current.identifier,
+                            timeZone: TimeZone.current.identifier,
+                            calendar: Calendar.current.identifier, workouts: ordered)
+        return searchMemo.value(for: key) {
+            ordered.filter {
+                $0.activity.rawValue.localizedCaseInsensitiveContains(query)
+                || $0.startDate.formatted(date: .abbreviated, time: .omitted)
+                    .localizedCaseInsensitiveContains(query)
+            }
         }
     }
 
     var body: some View {
+        let visibleWorkouts = workouts
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -50,7 +67,7 @@ struct ATHLTHStudioHistoryView: View {
                     )
                 }
                 .buttonStyle(.bordered)
-                Text("\(workouts.count)").foregroundStyle(.secondary)
+                Text("\(visibleWorkouts.count)").foregroundStyle(.secondary)
             }
             .padding(.horizontal, 24)
             .padding(.top, 25)
@@ -65,7 +82,7 @@ struct ATHLTHStudioHistoryView: View {
                 // workout history and strength entries beyond Health summaries.
                 WorkoutHistoryView()
             } else {
-            List(workouts) { workout in
+            List(visibleWorkouts) { workout in
                 HStack(spacing: 10) {
                     Button {
                         onInspect(workout)

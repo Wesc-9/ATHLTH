@@ -111,6 +111,21 @@ final class IPhoneWorkoutLiveRouteMetricsTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testDisplaySamplingKeepsEndpointsAndEnforcesBudget() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = makePoints(count: 601, start: start, secondsBetween: 1,
+                                metersBetween: 1, altitudeStep: 0)
+        let projection = ATHLTHLiveRouteDisplayProjection()
+        let result = projection.recorded(points)
+        XCTAssertEqual(result.count, 600)
+        XCTAssertEqual(result.first?.longitude, points.first?.longitude)
+        XCTAssertEqual(result.last?.longitude, points.last?.longitude)
+        let updated = Array(points.dropLast())
+        XCTAssertEqual(projection.recorded(updated).last?.longitude, updated.last?.longitude)
+        XCTAssertEqual(points.count, 601, "Rendering must not mutate recorded GPS samples")
+    }
+
     private func makePoints(
         count: Int,
         start: Date,

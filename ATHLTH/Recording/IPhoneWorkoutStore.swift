@@ -110,7 +110,7 @@ private enum IPhoneWorkoutHealthError: LocalizedError {
     }
 }
 
-struct PhoneRoutePoint: Codable {
+struct PhoneRoutePoint: Codable, Equatable {
     let latitude: Double
     let longitude: Double
     let altitude: Double

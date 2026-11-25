@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 
@@ -46,18 +47,15 @@ struct ATHLTHInsightsView: View {
     @State private var cachedPersonalFindings: [ATHLTHPersonalInsight] = []
     @State private var lastInsightsRefreshAt: Date?
     @State private var lastInsightsRefreshAccountID: UUID?
-    @State private var lastInsightsWorkoutCount = -1
-    @State private var lastInsightsWorkoutID: UUID?
-    // Derived workout/day and muscle models are expensive to rebuild during
-    // scrolling. Cache their source signatures instead of doing O(n)
-    // reductions for every @Published snapshot on the main thread.
-    @State private var renderedWorkoutsCount = -1
-    @State private var renderedFirstWorkoutID: UUID?
-    @State private var renderedLastWorkoutID: UUID?
-    @State private var renderedFirstWorkoutDuration: TimeInterval?
-    @State private var renderedStrengthHistoryCount = -1
-    @State private var renderedStrengthLatestDate: Date?
-    @State private var renderedStrengthOldestDate: Date?
+    @State private var lastInsightsWorkouts: [WorkoutSummary]?
+    private struct ProjectionInput<Item: Equatable>: Equatable {
+        let account: UUID
+        let day: Date
+        let timeZone: String
+        let items: [Item]
+    }
+    @State private var workoutProjectionGate = ATHLTHProjectionChangeGate<ProjectionInput<WorkoutSummary>>()
+    @State private var muscleProjectionGate = ATHLTHProjectionChangeGate<ProjectionInput<StrengthWorkoutLog>>()
 
     var body: some View {
         NavigationStack {
@@ -138,11 +136,9 @@ struct ATHLTHInsightsView: View {
                 // Keep the already-rendered insight snapshots on quick tab
                 // returns, but invalidate on new workouts/account switches.
                 let accountID = session.profile.userID
-                let currentCount = health.workouts.count
-                let newestID = health.workouts.first?.id
+                let currentWorkouts = health.workouts
                 if lastInsightsRefreshAccountID == accountID,
-                   lastInsightsWorkoutCount == currentCount,
-                   lastInsightsWorkoutID == newestID,
+                   lastInsightsWorkouts == currentWorkouts,
                    let lastInsightsRefreshAt,
                    Date().timeIntervalSince(lastInsightsRefreshAt) < 90 {
                     return
@@ -153,24 +149,23 @@ struct ATHLTHInsightsView: View {
                 async let recoveryLoad: Void = loadRecoverySignals()
                 _ = await (trendLoad, recoveryLoad)
                 ATHLTHPerformance.end("InsightsTabRefresh", id: signpost)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, session.profile.userID == accountID else { return }
                 lastInsightsRefreshAt = Date()
                 lastInsightsRefreshAccountID = accountID
-                lastInsightsWorkoutCount = currentCount
-                lastInsightsWorkoutID = newestID
+                lastInsightsWorkouts = currentWorkouts
             }
-            .onReceive(health.$workouts) { workouts in
+            .onReceive(health.$workouts.removeDuplicates()) { workouts in
                 guard isActive else { return }
                 updateWorkoutProjection(workouts)
             }
-            .onReceive(strength.$workoutHistory) { history in
+            .onReceive(strength.$workoutHistory.removeDuplicates()) { history in
                 guard isActive else { return }
                 updateMuscleProjection(history)
             }
             .onChange(of: session.profile.userID) { _, _ in
-                // Different accounts can have identical workout counts.
-                renderedWorkoutsCount = -1
-                renderedStrengthHistoryCount = -1
+                workoutProjectionGate.reset()
+                muscleProjectionGate.reset()
+                lastInsightsWorkouts = nil
                 trainingDays = []
                 muscleSummary = .empty
                 sessionBaselines = .empty
@@ -178,6 +173,11 @@ struct ATHLTHInsightsView: View {
                 recoverySnapshot = .empty
                 trendSnapshot = nil
                 lastInsightsRefreshAt = nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                guard isActive else { return }
+                updateWorkoutProjection(health.workouts)
+                updateMuscleProjection(strength.workoutHistory)
             }
             .onReceive(NotificationCenter.default.publisher(
                 for: Notification.Name("athlth.dailyCheckInDidUpdate")
@@ -189,36 +189,29 @@ struct ATHLTHInsightsView: View {
     }
 
     private func updateWorkoutProjection(_ workouts: [WorkoutSummary]) {
-        let count = workouts.count
-        let first = workouts.first
-        let last = workouts.last
-        guard renderedWorkoutsCount != count ||
-            renderedFirstWorkoutID != first?.id ||
-            renderedLastWorkoutID != last?.id ||
-            renderedFirstWorkoutDuration != first?.duration else { return }
-        renderedWorkoutsCount = count
-        renderedFirstWorkoutID = first?.id
-        renderedLastWorkoutID = last?.id
-        renderedFirstWorkoutDuration = first?.duration
+        let now = Date()
+        let calendar = Calendar.current
+        let input = ProjectionInput(account: session.profile.userID,
+                                    day: calendar.startOfDay(for: now),
+                                    timeZone: calendar.timeZone.identifier, items: workouts)
+        guard workoutProjectionGate.changed(input) else { return }
         let signpost = ATHLTHPerformance.begin("InsightsWorkoutDerivedData")
         defer { ATHLTHPerformance.end("InsightsWorkoutDerivedData", id: signpost) }
-        let updated = InsightsSessionBaselines.calculate(workouts: workouts, at: Date())
+        let updated = InsightsSessionBaselines.calculate(workouts: workouts, at: now)
         if sessionBaselines != updated { sessionBaselines = updated }
-        trainingDays = ATHLTHInsightsTrainingDay.make(from: workouts)
+        trainingDays = ATHLTHInsightsTrainingDay.make(from: workouts, at: now)
     }
 
     private func updateMuscleProjection(_ history: [StrengthWorkoutLog]) {
-        let latest = history.first?.startedAt
-        let oldest = history.last?.startedAt
-        guard renderedStrengthHistoryCount != history.count ||
-            renderedStrengthLatestDate != latest ||
-            renderedStrengthOldestDate != oldest else { return }
-        renderedStrengthHistoryCount = history.count
-        renderedStrengthLatestDate = latest
-        renderedStrengthOldestDate = oldest
+        let now = Date()
+        let calendar = Calendar.current
+        let input = ProjectionInput(account: session.profile.userID,
+                                    day: calendar.startOfDay(for: now),
+                                    timeZone: calendar.timeZone.identifier, items: history)
+        guard muscleProjectionGate.changed(input) else { return }
         let signpost = ATHLTHPerformance.begin("InsightsMuscleDerivedData")
         defer { ATHLTHPerformance.end("InsightsMuscleDerivedData", id: signpost) }
-        muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
+        muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history, at: now)
     }
 
     // Each tab uses a distinct existing licensed image, following the

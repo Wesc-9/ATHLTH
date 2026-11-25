@@ -1141,6 +1141,7 @@ struct IPhoneWorkoutView: View {
         UUID?
     @State private var routeCamera:
         MapCameraPosition = .automatic
+    @State private var routeDisplayProjection = ATHLTHLiveRouteDisplayProjection()
 
     @ViewBuilder
     private func liveDurationAdjustment(_ workout: PhoneWorkout, at now: Date) -> some View {
@@ -2952,79 +2953,12 @@ struct IPhoneWorkoutView: View {
         }
     }
 
-    private func displayRouteCoordinates(
-        _ coordinates: [RouteCoordinate]
-    ) -> [CLLocationCoordinate2D] {
-        let sorted =
-            coordinates.sorted {
-                $0.sequence < $1.sequence
-            }
-
-        guard sorted.count > 800 else {
-            return sorted.map(\.coordinate)
-        }
-
-        let step =
-            max(
-                sorted.count / 800,
-                1
-            )
-        var sampled =
-            stride(
-                from: 0,
-                to: sorted.count,
-                by: step
-            )
-            .map {
-                sorted[$0].coordinate
-            }
-
-        if let last = sorted.last?.coordinate,
-           sampled.last?.latitude !=
-                last.latitude ||
-            sampled.last?.longitude !=
-                last.longitude {
-            sampled.append(last)
-        }
-
-        return sampled
+    private func displayRouteCoordinates(_ coordinates: [RouteCoordinate]) -> [CLLocationCoordinate2D] {
+        routeDisplayProjection.planned(coordinates)
     }
 
-    private func displayWorkoutCoordinates(
-        _ points: [PhoneRoutePoint]
-    ) -> [CLLocationCoordinate2D] {
-        guard points.count > 600 else {
-            return points.map {
-                $0.location.coordinate
-            }
-        }
-
-        let step =
-            max(
-                points.count / 600,
-                1
-            )
-        var sampled =
-            stride(
-                from: 0,
-                to: points.count,
-                by: step
-            )
-            .map {
-                points[$0]
-                    .location.coordinate
-            }
-
-        if let last =
-            points.last?.location.coordinate,
-           sampled.last?.latitude !=
-                last.latitude ||
-            sampled.last?.longitude !=
-                last.longitude {
-            sampled.append(last)
-        }
-
-        return sampled
+    private func displayWorkoutCoordinates(_ points: [PhoneRoutePoint]) -> [CLLocationCoordinate2D] {
+        routeDisplayProjection.recorded(points)
     }
 
     private func routeDistanceText(
@@ -4496,6 +4430,40 @@ private struct TreadmillSpeedHistoryCorrectionView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+
+/// Rendering only. The recorder retains every original GPS sample for
+/// distance, pace, HealthKit export and replay. No metric uses these points.
+final class ATHLTHLiveRouteDisplayProjection {
+    private let plannedMemo = ATHLTHProjectionMemo<[RouteCoordinate], [CLLocationCoordinate2D]>()
+    private let recordedMemo = ATHLTHProjectionMemo<[PhoneRoutePoint], [CLLocationCoordinate2D]>()
+
+    func planned(_ points: [RouteCoordinate]) -> [CLLocationCoordinate2D] {
+        plannedMemo.value(for: points) {
+            let ordered = points.sorted { $0.sequence < $1.sequence }
+            return Self.sample(ordered, limit: 800) { $0.coordinate }
+        }
+    }
+
+    func recorded(_ points: [PhoneRoutePoint]) -> [CLLocationCoordinate2D] {
+        recordedMemo.value(for: points) {
+            Self.sample(points, limit: 600) {
+                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+            }
+        }
+    }
+
+    private static func sample<Point>(_ points: [Point], limit: Int,
+                                      coordinate: (Point) -> CLLocationCoordinate2D) -> [CLLocationCoordinate2D] {
+        guard points.count > limit else { return points.map(coordinate) }
+        // Uniform sample across the full path, retaining both endpoints
+        // and enforcing the actual display budget even at 601/801 points.
+        return (0..<limit).map { index in
+            let offset = Int((Double(index) * Double(points.count - 1) / Double(limit - 1)).rounded())
+            return coordinate(points[offset])
         }
     }
 }
