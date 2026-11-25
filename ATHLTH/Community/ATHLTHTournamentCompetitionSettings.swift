@@ -3,9 +3,19 @@ import Foundation
 /// Shared safe settings for competition creation and future seasons.
 /// Old locally saved drafts decode with conservative defaults.
 enum ATHLTHCompetitionUnlock: String, Codable, CaseIterable, Identifiable {
-    case interval, everyoneFinished
+    case interval
+    case everyoneFinished = "everyone_finished"
     case allAtStart = "all_at_start"
     var id: String { rawValue }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        if raw == "everyoneFinished" { self = .everyoneFinished; return }
+        guard let value = Self(rawValue: raw) else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown competition progression")
+        }
+        self = value
+    }
     var title: String {
         switch self {
         case .interval: return "Etter valgt tidsrom"

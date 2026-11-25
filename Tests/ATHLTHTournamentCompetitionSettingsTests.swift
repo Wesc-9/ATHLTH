@@ -43,6 +43,8 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         XCTAssertEqual(restored.unlock, .allAtStart)
         XCTAssertTrue(restored.isValid)
         XCTAssertEqual(restored.unlock.rawValue, "all_at_start")
+        XCTAssertEqual(ATHLTHCompetitionUnlock.everyoneFinished.rawValue, "everyone_finished")
+        XCTAssertEqual(try JSONDecoder().decode(ATHLTHCompetitionUnlock.self, from: Data("\"everyoneFinished\"".utf8)), .everyoneFinished)
     }
 
     func testInvalidStartDateCannotBePublished() {
