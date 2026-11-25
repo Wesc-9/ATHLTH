@@ -87,6 +87,32 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
         }
     }
 
+    func testStrengthDockCollapseIsSeparateFromRecordingActions() {
+        var primaryCalls = 0
+        var secondaryCalls = 0
+        var collapseCalls = 0
+        for mode: ATHLTHLiveWorkoutBottomMode in [
+            .strengthReady, .strengthWorking, .strengthRest,
+            .strengthExerciseRest, .strengthNextExercise,
+            .strengthAddExercise, .strengthFinish
+        ] {
+            let dock = ATHLTHLiveWorkoutBottomDock(
+                mode: mode,
+                onPrimary: { primaryCalls += 1 },
+                onSecondary: { secondaryCalls += 1 },
+                onCollapse: { collapseCalls += 1 }
+            ) { EmptyView() }
+            dock.onCollapse?()
+        }
+        XCTAssertEqual(collapseCalls, 7)
+        XCTAssertEqual(primaryCalls, 0)
+        XCTAssertEqual(secondaryCalls, 0)
+        let run = ATHLTHLiveWorkoutBottomDock(
+            mode: .runningFree, onPrimary: {}
+        ) { EmptyView() }
+        XCTAssertNil(run.onCollapse)
+    }
+
     func testSharedDockSupportsStructuredSportActions() {
         let dock = ATHLTHLiveWorkoutBottomDock(
             mode: .structuredActivity(.cycling, isFinalStep: false),

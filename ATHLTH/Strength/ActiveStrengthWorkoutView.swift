@@ -69,6 +69,9 @@ struct ActiveStrengthWorkoutView: View {
         Task<Void, Never>?
     @State private var focusedExerciseMediaIndex = 0
     @State private var showingExerciseInstructions = false
+    // UI preference only, scoped to the original workout. Never pauses,
+    // ends or changes the current set when the card is hidden.
+    @State private var hiddenStrengthDockWorkoutID: UUID?
     @State private var showingLiveExerciseHistory = false
     @State private var liveExerciseHistory: ATHLTHExerciseProgress.Summary?
     @State private var liveHistoryExerciseID: UUID?
@@ -850,7 +853,16 @@ struct ActiveStrengthWorkoutView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let workout = strength.activeWorkout, canLogOnIPhone(workout) {
-                strengthLiveDock(workout: workout)
+                if hiddenStrengthDockWorkoutID == workout.id {
+                    // Embedded running has its own controls; do not show
+                    // an orphan strength launcher during that phase.
+                    if strength.isFreeTrainingBetweenExercises || workout.exercises.isEmpty ||
+                        (strength.currentExercise.map { $0.isEmbeddedRunningInterval != true } ?? false) {
+                        collapsedStrengthDockLauncher
+                    }
+                } else {
+                    strengthLiveDock(workout: workout)
+                }
             }
         }
         // A strength workout is a true full-screen surface. Spotify can
@@ -6098,6 +6110,45 @@ struct ActiveStrengthWorkoutView: View {
         }
     }
 
+    private var collapsedStrengthDockLauncher: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    hiddenStrengthDockWorkoutID = nil
+                }
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Show set controls", norwegian: "Vis settkort"),
+                    systemImage: "chevron.up")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .background(ATHLTHTrainDesign.paper, in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(ATHLTHTheme.premiumGold.opacity(0.35), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-strength-dock-expand")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
+        .frame(maxWidth: 760)
+        .frame(maxWidth: .infinity)
+        // This remains a small safe-area inset, so the scroll content
+        // can reach its last row without being covered by the launcher.
+    }
+
+    private func hideStrengthDock(for workoutID: UUID) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            hiddenStrengthDockWorkoutID = workoutID
+        }
+    }
+
     /// A single shared action surface is used for runs and strength.
     /// Strength-specific load/repetition editors remain inside its content
     /// slot, while the same main and secondary buttons handle progression.
@@ -6110,7 +6161,8 @@ struct ActiveStrengthWorkoutView: View {
             ATHLTHLiveWorkoutBottomDock(
                 mode: .strengthAddExercise,
                 subtitle: workout.title,
-                onPrimary: { showingExerciseLibrary = true }
+                onPrimary: { showingExerciseLibrary = true },
+                onCollapse: { hideStrengthDock(for: workout.id) }
             ) {
                 EmptyView()
             }
@@ -6122,7 +6174,8 @@ struct ActiveStrengthWorkoutView: View {
                     subtitle: workout.title,
                     primaryDisabled: finishInProgress,
                     onPrimary: { showingFinishConfirmation = true },
-                    onSecondary: { showingExerciseQueue = true }
+                    onSecondary: { showingExerciseQueue = true },
+                    onCollapse: { hideStrengthDock(for: workout.id) }
                 ) {
                     EmptyView()
                 }
@@ -6135,7 +6188,8 @@ struct ActiveStrengthWorkoutView: View {
                     subtitle: strength.nextPendingExercise?.exercise.name,
                     primaryDisabled: !strength.hasNextExercise,
                     onPrimary: { strength.moveToNextExercise() },
-                    onSecondary: { strength.addRest(seconds: 30) }
+                    onSecondary: { strength.addRest(seconds: 30) },
+                    onCollapse: { hideStrengthDock(for: workout.id) }
                 ) {
                     strengthRestTimeDetail
                 }
@@ -6145,7 +6199,8 @@ struct ActiveStrengthWorkoutView: View {
                     subtitle: strength.nextPendingExercise?.exercise.name,
                     primaryDisabled: !strength.hasNextExercise,
                     onPrimary: { strength.moveToNextExercise() },
-                    onSecondary: { showingExerciseQueue = true }
+                    onSecondary: { showingExerciseQueue = true },
+                    onCollapse: { hideStrengthDock(for: workout.id) }
                 ) {
                     EmptyView()
                 }
@@ -6167,7 +6222,8 @@ struct ActiveStrengthWorkoutView: View {
                             strength.startOrResumeTimedSet()
                         }
                     },
-                    onSecondary: { strength.addRest(seconds: 30) }
+                    onSecondary: { strength.addRest(seconds: 30) },
+                    onCollapse: { hideStrengthDock(for: workout.id) }
                 ) {
                     strengthRestTimeDetail
                 }
@@ -6195,7 +6251,8 @@ struct ActiveStrengthWorkoutView: View {
                             strength.completeCurrentDraftSet()
                         }
                     },
-                    onSecondary: { showingExerciseQueue = true }
+                    onSecondary: { showingExerciseQueue = true },
+                    onCollapse: { hideStrengthDock(for: workout.id) }
                 ) {
                     strengthEditableSetDetails(exercise: exercise)
                 }

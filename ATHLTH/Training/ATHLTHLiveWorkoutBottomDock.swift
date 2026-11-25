@@ -12,6 +12,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
     let secondaryDisabled: Bool
     let onPrimary: () -> Void
     let onSecondary: (() -> Void)?
+    let onCollapse: (() -> Void)?
     let details: Details
 
     init(
@@ -21,6 +22,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         secondaryDisabled: Bool = false,
         onPrimary: @escaping () -> Void,
         onSecondary: (() -> Void)? = nil,
+        onCollapse: (() -> Void)? = nil,
         @ViewBuilder details: () -> Details
     ) {
         self.mode = mode
@@ -29,6 +31,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         self.secondaryDisabled = secondaryDisabled
         self.onPrimary = onPrimary
         self.onSecondary = onSecondary
+        self.onCollapse = onCollapse
         self.details = details()
     }
 
@@ -59,6 +62,20 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
                     }
                 }
                 Spacer(minLength: 0)
+                if let onCollapse {
+                    Button(action: onCollapse) {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHTrainDesign.rule.opacity(0.22), in: Circle())
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Hide set controls", norwegian: "Skjul settkort"))
+                    .accessibilityIdentifier("athlth-strength-dock-collapse")
+                }
             }
 
             details
