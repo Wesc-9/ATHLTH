@@ -26,3 +26,29 @@ enum RouteMapSnapshotIdentity {
         ].joined(separator: "|")
     }
 }
+
+
+/// View-local identity memo: do not allocate a GPS buffer and hash every
+/// point again merely because a parent view or geometry reader redraws.
+final class RouteMapSnapshotIdentityMemo {
+    private struct Key: Equatable {
+        let account: UUID
+        let owner: UUID
+        let route: UUID
+        let coordinates: [RouteCoordinate]
+        let size: CGSize
+        let scale: CGFloat
+    }
+    private let memo = ATHLTHProjectionMemo<Key, String>()
+
+    func key(route: TrainingRoute, size: CGSize, scale: CGFloat, account: UUID) -> String {
+        let input = Key(account: account, owner: route.ownerID, route: route.id,
+                        coordinates: route.coordinates, size: size, scale: scale)
+        return memo.value(for: input) {
+            let signpost = ATHLTHPerformance.begin("RouteThumbnailIdentity")
+            defer { ATHLTHPerformance.end("RouteThumbnailIdentity", id: signpost) }
+            return RouteMapSnapshotIdentity.key(route: route, size: size, scale: scale)
+                + "|" + account.uuidString
+        }
+    }
+}

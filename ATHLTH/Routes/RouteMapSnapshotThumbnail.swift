@@ -535,6 +535,7 @@ struct RouteMapSnapshotThumbnail: View {
     @State private var image:
         UIImage?
     @State private var imageRequestID: String?
+    @State private var identityMemo = RouteMapSnapshotIdentityMemo()
 
     private func offlineTrace(requestID: String) -> some View {
         let points = RouteMapSnapshotCache.tracePoints(
@@ -607,9 +608,9 @@ struct RouteMapSnapshotThumbnail: View {
         GeometryReader { proxy in
             let size = CGSize(width: max(proxy.size.width, 88), height: height)
             let accountID = session.profile.userID
-            let requestID = RouteMapSnapshotIdentity.key(
-                route: route, size: size, scale: UIScreen.main.scale
-            ) + "|" + accountID.uuidString
+            let requestID = identityMemo.key(
+                route: route, size: size, scale: UIScreen.main.scale, account: accountID
+            )
             ZStack {
                 RoundedRectangle(
                     cornerRadius: 18,

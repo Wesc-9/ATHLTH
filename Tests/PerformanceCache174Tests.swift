@@ -29,6 +29,20 @@ final class PerformanceCache174Tests: XCTestCase {
         XCTAssertEqual(original.coordinates.count, changed.coordinates.count)
     }
 
+    func testMemoizedThumbnailIdentityTracksGeometryAndAccount() {
+        let memo = RouteMapSnapshotIdentityMemo()
+        let account = UUID()
+        let size = CGSize(width: 220, height: 118)
+        let original = route()
+        let key = memo.key(route: original, size: size, scale: 2, account: account)
+        XCTAssertEqual(key, memo.key(route: original, size: size, scale: 2, account: account))
+        var changed = original
+        changed.coordinates[1].longitude += 0.01
+        XCTAssertNotEqual(key, memo.key(route: changed, size: size, scale: 2, account: account))
+        XCTAssertNotEqual(key, memo.key(route: original, size: size, scale: 2, account: UUID()))
+        XCTAssertNotEqual(key, memo.key(route: original, size: size, scale: 3, account: account))
+    }
+
     func testThumbnailIdentityIncludesOwnerSizeAndScaleButIgnoresTitle() {
         let original = route()
         let size = CGSize(width: 220, height: 118)
@@ -60,16 +74,25 @@ final class PerformanceCache174Tests: XCTestCase {
             isVisibleOutsideOwnerLibrary: false
         )
         XCTAssertEqual(library.search(query: "zeta").map(\.id), [entry.id])
+        var legacy = ExerciseSnapshot(name: entry.exercise.name, instructions: [],
+                                      primaryMuscles: ["Chest"], equipment: ["Dumbbell"], imageURL: nil)
+        legacy.libraryExerciseID = nil
+        XCTAssertEqual(library.entryForLiveArtwork(legacy)?.id, entry.id)
+        XCTAssertEqual(library.entryForLiveArtwork(legacy)?.id, entry.id)
         // Exercise the warmed result cache, then edit its indexed text and filters.
         XCTAssertEqual(library.search(query: "zeta").map(\.id), [entry.id])
         var edited = entry.exercise
         edited.name = "Unique Omega Pull"
         edited.equipment = ["Cable"]
         library.updateCustomExercise(edited)
+        XCTAssertNil(library.entryForLiveArtwork(legacy))
+        legacy.name = edited.name
+        XCTAssertEqual(library.entryForLiveArtwork(legacy)?.id, entry.id)
         XCTAssertFalse(library.search(query: "zeta").contains { $0.id == entry.id })
         XCTAssertEqual(library.search(query: "omega", equipment: "Cable").map(\.id), [entry.id])
         XCTAssertTrue(library.search(query: "omega", equipment: "Dumbbell").isEmpty)
         library.switchAccount(other)
+        XCTAssertNil(library.entryForLiveArtwork(legacy))
         XCTAssertFalse(library.search(query: "omega").contains { $0.id == entry.id })
         library.switchAccount(owner)
         XCTAssertEqual(library.search(query: "omega").map(\.id), [entry.id])

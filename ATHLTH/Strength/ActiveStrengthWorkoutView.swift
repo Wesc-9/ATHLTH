@@ -21,6 +21,7 @@ enum ATHLTHLiveStrengthGalleryPage: Equatable {
 struct ActiveStrengthWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -4790,11 +4791,8 @@ struct ActiveStrengthWorkoutView: View {
                                         height: 5
                                     )
                                     .animation(
-                                        .easeOut(
-                                            duration: 0.18
-                                        ),
-                                        value:
-                                            focusedExerciseMediaIndex
+                                        reduceMotion ? nil : .easeOut(duration: 0.18),
+                                        value: focusedExerciseMediaIndex
                                     )
                             }
                         }
@@ -5247,77 +5245,7 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedExerciseLibraryEntry(
         _ exercise: StrengthExerciseLog
     ) -> ExerciseLibraryEntry? {
-        if let id = exercise.exercise.libraryExerciseID {
-            return exerciseLibrary.entry(withID: id)
-        }
-        let snapshotName =
-            exercise.exercise.name
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-                .folding(
-                    options: [
-                        .diacriticInsensitive,
-                        .caseInsensitive
-                    ],
-                    locale: .current
-                )
-                .lowercased()
-
-        if let snapshotURL =
-                exercise.exercise.imageURL,
-           let exactMediaMatch =
-                exerciseLibrary
-                    .allExercises
-                    .first(
-                        where: {
-                            $0.exercise.imageURL ==
-                                snapshotURL ||
-                            $0.imageStartURL ==
-                                snapshotURL ||
-                            $0.imagePeakURL ==
-                                snapshotURL
-                        }
-                    ) {
-            return exactMediaMatch
-        }
-
-        let nameMatches =
-            exerciseLibrary
-                .allExercises
-                .filter {
-                    $0.exercise.name
-                        .trimmingCharacters(
-                            in:
-                                .whitespacesAndNewlines
-                        )
-                        .folding(
-                            options: [
-                                .diacriticInsensitive,
-                                .caseInsensitive
-                            ],
-                            locale: .current
-                        )
-                        .lowercased() ==
-                    snapshotName
-                }
-
-        // Prefer the richer source when duplicate catalog entries exist.
-        return
-            nameMatches.first(
-                where: {
-                    $0.imagePeakURL != nil
-                }
-            ) ??
-            nameMatches.first(
-                where: {
-                    !$0.exercise
-                        .instructions
-                        .isEmpty
-                }
-            ) ??
-            nameMatches.first
+        exerciseLibrary.entryForLiveArtwork(exercise.exercise)
     }
 
     private func focusedExerciseInstructionSteps(

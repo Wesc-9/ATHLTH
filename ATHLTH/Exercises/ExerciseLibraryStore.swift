@@ -231,6 +231,14 @@ final class ExerciseLibraryStore: ObservableObject {
     private var cachedEntriesByID: [UUID: ExerciseLibraryEntry]?
     private var cachedEntriesByCanonicalName: [String: ExerciseLibraryEntry]?
     private var canonicalLookupLocale: String?
+    private struct LiveArtworkKey: Equatable {
+        let name: String
+        let imageURL: URL?
+        let locale: String
+    }
+    // Legacy snapshots without an ID can still display their existing
+    // artwork/instructions without scanning the catalog on every live tick.
+    private let liveArtworkMemo = ATHLTHBoundedProjectionMemo<LiveArtworkKey, ExerciseLibraryEntry?>(capacity: 12)
     private var displayNameRevision = -1
     private var cachedSelectableExercises: [ExerciseLibraryEntry]?
     private var cachedBodyParts: [String]?
@@ -744,6 +752,27 @@ final class ExerciseLibraryStore: ObservableObject {
         return cachedEntriesByID?[canonical] ?? cachedEntriesByID?[id]
     }
 
+    func entryForLiveArtwork(_ snapshot: ExerciseSnapshot) -> ExerciseLibraryEntry? {
+        if let id = snapshot.libraryExerciseID { return entry(withID: id) }
+        let locale = Locale.current
+        func normalized(_ name: String) -> String {
+            Self.liveCanonicalNameKey(name.trimmingCharacters(in: .whitespacesAndNewlines), locale: locale)
+        }
+        let key = LiveArtworkKey(name: normalized(snapshot.name),
+                                 imageURL: snapshot.imageURL, locale: locale.identifier)
+        return liveArtworkMemo.value(for: key) {
+            let entries = allExercises
+            if let url = snapshot.imageURL,
+               let exact = entries.first(where: {
+                   $0.exercise.imageURL == url || $0.imageStartURL == url || $0.imagePeakURL == url
+               }) { return exact }
+            let matches = entries.filter { normalized($0.exercise.name) == key.name }
+            return matches.first { $0.imagePeakURL != nil }
+                ?? matches.first { !$0.exercise.instructions.isEmpty }
+                ?? matches.first
+        }
+    }
+
     static func liveCanonicalNameKey(_ name: String, locale: Locale = .current) -> String {
         name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
             .lowercased()
@@ -865,6 +894,7 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedEntriesByID = nil
         cachedEntriesByCanonicalName = nil
         canonicalLookupLocale = nil
+        liveArtworkMemo.clear()
         displayNameRevision = -1
         cachedSelectableExercises = nil
         cachedBodyParts = nil
