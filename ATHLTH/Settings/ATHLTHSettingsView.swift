@@ -567,6 +567,7 @@ struct ATHLTHSettingsView: View {
         }
     }
 
+    @ViewBuilder
     private var appSettingsSection: some View {
         settingsSection("App") {
             PremiumSettingsCard {
