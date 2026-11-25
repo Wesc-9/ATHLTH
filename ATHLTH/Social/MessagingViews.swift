@@ -3310,6 +3310,7 @@ struct DirectMessageThreadView: View {
     @State private var cancellingChallengeID: UUID?
     @State private var cancellationError: String?
     @State private var undoSendError: String?
+    @State private var sendError: String?
 
     var body: some View {
         ZStack {
@@ -3456,6 +3457,14 @@ struct DirectMessageThreadView: View {
                     )
                 )
             }
+        }
+        .alert(
+            ATHLTHLocalization.choose(english: "Could not send message", norwegian: "Kunne ikke sende meldingen"),
+            isPresented: Binding(get: { sendError != nil }, set: { if !$0 { sendError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(sendError ?? "")
         }
         .alert(
             ATHLTHLocalization.choose(english: "Undo send", norwegian: "Angre sending"),
@@ -5278,7 +5287,8 @@ struct DirectMessageThreadView: View {
             to: friend.userID,
             conversationID: conversationID,
             body: body,
-            attachment: attachment
+            attachment: attachment,
+            clearMatchingTextDraft: true
         ) {
             guard session.signedIn, session.profile.userID == owner, draftOwner == owner else { return }
             // Preserve text typed during the network request.
@@ -5287,6 +5297,10 @@ struct DirectMessageThreadView: View {
                 messaging.setTextDraft("", for: friend.userID, owner: owner)
             }
             selectedShare = nil
+        } else if !Task.isCancelled, session.signedIn, session.profile.userID == owner, draftOwner == owner {
+            sendError = messaging.errorMessage ?? ATHLTHLocalization.choose(
+                english: "The message could not be confirmed. Your text has been kept.",
+                norwegian: "Meldingen kunne ikke bekreftes. Teksten din er beholdt.")
         }
     }
 
