@@ -11,6 +11,35 @@ final class ATHLTHTournamentCompetitionSettingsTests: XCTestCase {
         ]
     }
 
+    func testCompetitionVenueSeparatesTreadmillFromOutdoorGPS() {
+        let treadmill = ATHLTHCompetitionEnvironment.treadmill
+        XCTAssertTrue(treadmill.supports(Set([ATHLTHTournamentActivity.running])))
+        XCTAssertFalse(treadmill.supports(Set([ATHLTHTournamentActivity.running, .strength])))
+        XCTAssertFalse(treadmill.canPublish)
+        XCTAssertFalse(ATHLTHCompetitionEnvironment.indoor.canPublish)
+        var race = ATHLTHCompetitionRaceRules()
+        XCTAssertTrue(treadmill.supports(race))
+        race.discipline = .laps
+        race.lapVerification = .gps
+        XCTAssertFalse(treadmill.supports(race))
+        XCTAssertFalse(ATHLTHCompetitionEnvironment.indoor.supports(race))
+        XCTAssertTrue(ATHLTHCompetitionEnvironment.outdoor.supports(race))
+        race.discipline = .workout
+        race.allowOptInLiveLocation = true
+        XCTAssertFalse(treadmill.supports(race))
+        XCTAssertTrue(ATHLTHCompetitionEnvironment.outdoor.supports(race))
+    }
+
+    func testLocalVenueMatchingNeverInfersTreadmillFromMissingGPS() {
+        let policy = ATHLTHCompetitionLocalResult.self
+        XCTAssertTrue(policy.matchesVenue(.treadmill, indoor: true, phoneEnvironment: .treadmill, mixed: false))
+        XCTAssertFalse(policy.matchesVenue(.treadmill, indoor: true, phoneEnvironment: nil, mixed: false))
+        XCTAssertFalse(policy.matchesVenue(.outdoor, indoor: nil, phoneEnvironment: nil, mixed: false))
+        XCTAssertFalse(policy.matchesVenue(.outdoor, indoor: false, phoneEnvironment: .outdoor, mixed: true))
+        XCTAssertFalse(policy.matchesVenue(.gym, indoor: true, phoneEnvironment: .indoor, mixed: false))
+        XCTAssertTrue(policy.matchesVenue(.indoor, indoor: true, phoneEnvironment: .indoor, mixed: false))
+    }
+
     func testOptionalCompetitionEndMustFollowStart() {
         var settings = ATHLTHTournamentCompetitionSettings()
         settings.startMode = .scheduled
