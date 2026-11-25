@@ -636,6 +636,17 @@ struct ATHLTHSettingsView: View {
                 .buttonStyle(.plain)
             }
         }
+        settingsSection("About") {
+            PremiumSettingsCard {
+                Link(destination: URL(string: "https://repdb.co")!) {
+                    PremiumSettingsRow(icon: "book.closed", title: "RepDB",
+                        subtitle: ATHLTHLocalization.choose(english: "Exercise catalog provider", norwegian: "Leverandør av øvelsesbibliotek")) {
+                        Image(systemName: "arrow.up.right").foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private func settingsChoiceValue(_ value: String) -> some View {
@@ -1213,17 +1224,7 @@ settingsSection("Connections") {
                 .buttonStyle(.plain)
             }
         }
-        settingsSection(ATHLTHLocalization.choose(english: "About exercise data", norwegian: "Om øvelsesdata")) {
-            PremiumSettingsCard {
-                Link(destination: URL(string: "https://repdb.co")!) {
-                    PremiumSettingsRow(icon: "book.closed", title: "RepDB",
-                        subtitle: ATHLTHLocalization.choose(english: "Exercise catalog provider", norwegian: "Leverandør av øvelsesbibliotek")) {
-                        Image(systemName: "arrow.up.right").foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-        }
+
     }
 
     private func trainingPreferenceRow(_ icon: String, _ en: String, _ no: String,
