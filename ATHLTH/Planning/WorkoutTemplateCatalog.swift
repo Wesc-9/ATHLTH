@@ -8873,7 +8873,8 @@ struct WorkoutTemplateBuilderView: View {
 
     private func localizedBlockTitle(_ block: WorkoutTemplateBlock) -> String {
         guard block.kind == .exercise else {
-            return ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block).title
+            let normalized = ATHLTHZonedLocalization.normalizeLegacyAllOutStep(block)
+            return ATHLTHWorkoutNameSuggestion.cardioPhaseTitle(normalized) ?? normalized.title
         }
         if let match = ATHLTHExerciseReferenceResolver.resolve(
             block, in: exerciseLibrary.allExercises
@@ -8901,7 +8902,7 @@ struct WorkoutTemplateBuilderView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 11))
         } else {
             let icon = block.wellnessKind?.symbol ?? (block.kind == .run
-                ? ((block.cardioActivity == .walking || block.resolvedPhase == .cooldown)
+                ? ((block.cardioActivity == .walking)
                     ? "figure.walk" : "figure.run")
                 : block.kind.systemImage)
             Image(systemName: icon)
