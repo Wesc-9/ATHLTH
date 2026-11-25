@@ -11,6 +11,8 @@ struct ATHLTHArenaGroupChatView: View {
     let series: ATHLTHArenaRemoteSeries
 
     @State private var messages: [ATHLTHArenaRemoteMessage] = []
+    @State private var receipts: [UUID: [String]] = [:]
+    private let receiptService = SupabaseMessagingService()
     @State private var membership: ATHLTHArenaRemoteMember?
     @State private var responding = false
 
@@ -243,6 +245,11 @@ struct ATHLTHArenaGroupChatView: View {
                 Text(item.createdAt, style: .time)
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
+                if mine, let names = receipts[item.id], !names.isEmpty {
+                    Text(ATHLTHLocalization.choose(english: "Read by ", norwegian: "Lest av ") + names.joined(separator: ", "))
+                        .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .frame(maxWidth: 300, alignment: .leading)
             .padding(12)
@@ -284,6 +291,7 @@ struct ATHLTHArenaGroupChatView: View {
             membership = allMembers.first { $0.userID == session.profile.userID }
             if isAccepted {
                 messages = try await cloud.loadGroupMessages(seriesID: series.id)
+                receipts = (try? await receiptService.groupReadReceipts(kind: "arena", messageIDs: messages.map(\.id), markRead: scenePhase == .active)) ?? [:]
             } else {
                 messages = []
             }
