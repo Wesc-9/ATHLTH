@@ -1623,6 +1623,15 @@ final class StrengthWorkoutStore: ObservableObject {
     private static func queueTarget(
         _ entry: StrengthLiveQueueEntry, in workout: StrengthWorkoutLog
     ) -> (exercise: Int, set: Int)? {
+        if let groupID = entry.groupID {
+            var target: (exercise: Int, set: Int)?
+            for (index, exercise) in workout.exercises.enumerated() where exercise.groupID == groupID {
+                guard exercise.groupStyle == .circuit || exercise.groupStyle == .superset,
+                      let set = exercise.sets.firstIndex(where: { !$0.isResolved }) else { continue }
+                if target == nil || set < target!.set { target = (index, set) }
+            }
+            return target
+        }
         guard let exercise = workout.exercises.firstIndex(where: {
             $0.id == entry.exerciseID && $0.groupID == nil
         }), let set = workout.exercises[exercise].sets.firstIndex(where: {
@@ -1641,12 +1650,15 @@ final class StrengthWorkoutStore: ObservableObject {
     @discardableResult
     func enqueueStrength(exerciseID: UUID, setID: UUID? = nil, next: Bool = false) -> Bool {
         guard var workout = activeWorkout else { return false }
-        let entry = StrengthLiveQueueEntry(exerciseID: exerciseID, setID: setID)
+        let exercise = workout.exercises.first { $0.id == exerciseID }
+        let groupID = setID == nil ? exercise?.groupID : nil
+        if groupID != nil, exercise?.groupStyle != .circuit && exercise?.groupStyle != .superset { return false }
+        let entry = StrengthLiveQueueEntry(exerciseID: exerciseID, setID: setID, groupID: groupID)
         guard Self.queueTarget(entry, in: workout) != nil else { return false }
         var entries = pendingExecutionQueue
         // A whole exercise already includes its remaining sets.
         if setID == nil {
-            entries.removeAll { $0.exerciseID == exerciseID }
+            entries.removeAll { $0.exerciseID == exerciseID || (groupID != nil && $0.groupID == groupID) }
         } else {
             if let existing = entries.firstIndex(where: {
                 $0.exerciseID == exerciseID && ($0.setID == nil || $0.setID == setID)
@@ -1660,6 +1672,106 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
         persistCheckpointNow()
         return true
+    }
+
+    @discardableResult
+    func enqueueStrengthSets(exerciseID: UUID, setIDs: Set<UUID>) -> Bool {
+        guard var workout = activeWorkout,
+              let exercise = workout.exercises.first(where: { $0.id == exerciseID && $0.groupID == nil })
+        else { return false }
+        var entries = pendingExecutionQueue
+        guard !entries.contains(where: { $0.exerciseID == exerciseID && $0.setID == nil }) else { return false }
+        let existing = Set(entries.compactMap(\.setID))
+        let additions = exercise.sets.filter {
+            !$0.isResolved && setIDs.contains($0.id) && !existing.contains($0.id)
+        }.map { StrengthLiveQueueEntry(exerciseID: exerciseID, setID: $0.id) }
+        guard !additions.isEmpty else { return false }
+        entries.append(contentsOf: additions)
+        workout.liveExecutionQueue = entries
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
+    @discardableResult
+    func moveQueuedStrength(_ id: UUID, before targetID: UUID) -> Bool {
+        guard var workout = activeWorkout, id != targetID else { return false }
+        var entries = pendingExecutionQueue
+        guard let from = entries.firstIndex(where: { $0.id == id }),
+              entries.contains(where: { $0.id == targetID }) else { return false }
+        let entry = entries.remove(at: from)
+        guard let to = entries.firstIndex(where: { $0.id == targetID }) else { return false }
+        entries.insert(entry, at: to)
+        workout.liveExecutionQueue = entries
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
+    @discardableResult
+    func postponeStrengthExercise(_ id: UUID) -> Bool {
+        guard var workout = activeWorkout,
+              let index = workout.exercises.firstIndex(where: { $0.id == id && $0.groupID == nil && !$0.isCompleted }),
+              workout.exercises.contains(where: { $0.id != id && !$0.isCompleted })
+        else { return false }
+        if currentExercise?.id == id {
+            guard currentTimedSetCountdown == nil, currentSetEffortClock == nil,
+                  let next = workout.exercises.first(where: { $0.id != id && !$0.isCompleted }),
+                  selectExerciseForNow(next.id), let fresh = activeWorkout else { return false }
+            workout = fresh
+        }
+        guard let from = workout.exercises.firstIndex(where: { $0.id == id }) else { return false }
+        let selectedID = currentExercise?.id
+        let deferred = workout.exercises.remove(at: from)
+        workout.exercises.append(deferred)
+        var entries = pendingExecutionQueue
+        let moved = entries.filter { $0.exerciseID == id }
+        entries.removeAll { $0.exerciseID == id }
+        entries.append(contentsOf: moved)
+        workout.liveExecutionQueue = entries.isEmpty ? nil : entries
+        currentExerciseIndex = workout.exercises.firstIndex(where: { $0.id == selectedID }) ?? 0
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
+    @discardableResult
+    func updatePendingStrengthSet(exerciseID: UUID, setID: UUID, reps: Int?,
+                                  duration: Int?, weight: Double?, rest: Int, resistance: Int?) -> Bool {
+        guard var workout = activeWorkout,
+              let e = workout.exercises.firstIndex(where: { $0.id == exerciseID }),
+              let i = workout.exercises[e].sets.firstIndex(where: { $0.id == setID && !$0.isResolved }),
+              !(currentSet?.id == setID && (currentSetEffortClock != nil || currentTimedSetCountdown != nil)),
+              workout.exercises[e].groupStyle != .emom && workout.exercises[e].groupStyle != .amrap
+        else { return false }
+        var set = workout.exercises[e].sets[i]
+        if set.resolvedTargetKind == .reps, let reps { set.plannedReps = min(max(reps, 1), 1000) }
+        if set.resolvedTargetKind == .time, let duration { set.plannedDurationSeconds = min(max(duration, 1), 7200) }
+        if set.resolvedLoadKind == .weightKilograms, let weight, weight.isFinite {
+            set.plannedWeightKilograms = min(max(weight, 0), 999.5)
+        }
+        if set.resolvedLoadKind == .resistanceLevel, let resistance {
+            set.plannedResistanceLevel = min(max(resistance, 1), 10)
+        }
+        set.restSeconds = min(max(rest, 0), 600)
+        workout.exercises[e].sets[i] = set
+        activeWorkout = workout
+        if currentSet?.id == setID { reloadDraftFromCurrentSet() }
+        persistCheckpointNow()
+        return true
+    }
+
+    func setLiveGroupRest(exerciseID: UUID, station: Int, round: Int) {
+        guard var workout = activeWorkout,
+              let exercise = workout.exercises.first(where: { $0.id == exerciseID }),
+              let groupID = exercise.groupID,
+              exercise.groupStyle == .circuit || exercise.groupStyle == .superset else { return }
+        for index in workout.exercises.indices where workout.exercises[index].groupID == groupID {
+            workout.exercises[index].groupStationRestSeconds = min(max(station, 0), 600)
+            workout.exercises[index].groupRoundRestSeconds = min(max(round, 0), 600)
+        }
+        activeWorkout = workout
+        persistCheckpointNow()
     }
 
     func removeQueuedStrength(_ id: UUID) {
@@ -1703,6 +1815,7 @@ final class StrengthWorkoutStore: ObservableObject {
            }) { return false }
         guard let entry = entries.first,
               let target = Self.queueTarget(entry, in: workout) else { return false }
+        Self.beginStrengthGroup(&workout, selected: target.exercise, at: date)
         currentExerciseIndex = target.exercise
         currentSetIndex = target.set
         isFreeTrainingBetweenExercises = false
@@ -4980,8 +5093,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 nextSameRound
             currentSetIndex =
                 completedSetIndex
-            restStartedAt = nil
-            restEndsAt = nil
+            let stationRest = workout.exercises[completedExerciseIndex].groupStationRestSeconds ?? 0
+            restStartedAt = automaticRestTimer && stationRest > 0 ? completedAt : nil
+            restEndsAt = restStartedAt?.addingTimeInterval(TimeInterval(stationRest))
             return true
         }
 
@@ -4996,8 +5110,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 currentExerciseIndex = index
                 currentSetIndex =
                     nextSetIndex
+                let roundRest = workout.exercises[completedExerciseIndex].groupRoundRestSeconds ?? restSeconds
                 if automaticRestTimer &&
-                    restSeconds > 0 {
+                    roundRest > 0 {
                     let restStart = completedAt
                     restStartedAt =
                         restStart
@@ -5005,7 +5120,7 @@ final class StrengthWorkoutStore: ObservableObject {
                         restStart
                             .addingTimeInterval(
                                 TimeInterval(
-                                    restSeconds
+                                    roundRest
                                 )
                             )
                 } else {
