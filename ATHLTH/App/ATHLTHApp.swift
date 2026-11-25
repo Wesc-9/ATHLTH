@@ -3194,29 +3194,31 @@ struct AppRootView: View {
         async {
         let now = Date()
 
+        // A warm foreground can be the first unlocked opportunity after
+        // HealthKit background reads were deferred. Do not let unrelated
+        // social/calendar throttling suppress recovery of an empty snapshot.
         if let lastFullLifecycleRefreshAt,
-           now.timeIntervalSince(
-                lastFullLifecycleRefreshAt
-           ) < minimumLifecycleRefreshInterval {
+           now.timeIntervalSince(lastFullLifecycleRefreshAt) < minimumLifecycleRefreshInterval {
+            if settings.appleHealthIntegrationEnabled, health.hasRequestedAuthorization,
+               !health.shouldDeferAutomaticHealthWork,
+               !workoutMirroring.hasActiveMirroredWorkout,
+               !health.hasCompletedHealthReadThisLaunch || health.workoutImportError != nil {
+                await health.refreshIfStale(maxAge: 0)
+            }
             return
         }
 
         lastFullLifecycleRefreshAt = now
 
         if appSession.signedIn {
-            async let socialHome: Void =
-                refreshSocialHomeCore()
-            async let messages: Void =
-                messaging.refresh()
-            async let calendarRefresh: Void =
-                syncCalendarIfAllowed()
-
-            _ = await (
-                socialHome,
-                messages,
-                calendarRefresh
-            )
-            Task { await appSession.refreshRemoteSharedWorkoutUpdates() }
+            // Network services must not hold up local HealthKit refresh.
+            Task { @MainActor in
+                async let socialHome: Void = refreshSocialHomeCore()
+                async let messages: Void = messaging.refresh()
+                async let calendarRefresh: Void = syncCalendarIfAllowed()
+                _ = await (socialHome, messages, calendarRefresh)
+                await appSession.refreshRemoteSharedWorkoutUpdates()
+            }
         }
 
         guard health.hasRequestedAuthorization,

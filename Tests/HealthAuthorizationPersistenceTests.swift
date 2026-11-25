@@ -3,6 +3,14 @@ import XCTest
 
 final class HealthAuthorizationPersistenceTests: XCTestCase {
     @MainActor
+    func testConfiguredConnectionDoesNotDependOnTransientReadResults() {
+        XCTAssertTrue(HealthKitManager.isConfiguredConnection(enabled: true, available: true, requested: true))
+        XCTAssertFalse(HealthKitManager.isConfiguredConnection(enabled: false, available: true, requested: true))
+        XCTAssertFalse(HealthKitManager.isConfiguredConnection(enabled: true, available: false, requested: true))
+        XCTAssertFalse(HealthKitManager.isConfiguredConnection(enabled: true, available: true, requested: false))
+    }
+
+    @MainActor
     func testLegacyAuthorizationMarkerStillCountsAsConfigured() {
         XCTAssertTrue(
             HealthKitManager.hasPersistedAuthorizationMarker(

@@ -225,6 +225,14 @@ final class HealthKitManager: ObservableObject {
     @Published private(set) var automaticRefreshSuspended = false
     @Published private(set) var deferFullRefreshUntilNextLaunch = false
     @Published private(set) var authorizationReviewNeeded = false
+    @Published private(set) var hasCompletedHealthReadThisLaunch = false
+    @Published private(set) var workoutImportError: String?
+
+    // A permission request marker describes setup, not proof of read access.
+    // Empty, cold-start or locked-device snapshots cannot disconnect Health.
+    static func isConfiguredConnection(enabled: Bool, available: Bool, requested: Bool) -> Bool {
+        enabled && available && requested
+    }
 
     // True only for the one-time safe-launch migration path. If the previous
     // process actually died during a Health refresh, keep the stricter
@@ -263,6 +271,7 @@ final class HealthKitManager: ObservableObject {
     private var observerQueries: [HKObserverQuery] = []
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
+    private var backgroundRefreshPending = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var allWorkoutsCacheEpoch = ATHLTHHealthHistoryCacheEpoch()
     // Coalesce profile, trophy and performance consumers sharing an expired
@@ -456,6 +465,7 @@ final class HealthKitManager: ObservableObject {
         guard integrationEnabled,
               healthDataAvailable,
               hasRequestedAuthorization,
+              UIApplication.shared.isProtectedDataAvailable,
               !shouldDeferAutomaticHealthWork
         else {
             return false
@@ -480,6 +490,9 @@ final class HealthKitManager: ObservableObject {
             }
 
             let changes = try await fetchWorkoutImportChanges()
+            guard integrationEnabled, !Task.isCancelled,
+                  UIApplication.shared.isProtectedDataAvailable else { return false }
+            workoutImportError = nil
 
             // Do not advance the persisted HealthKit anchor until the
             // fetched additions/deletions have been reconciled and saved.
@@ -578,6 +591,9 @@ final class HealthKitManager: ObservableObject {
             // Import discovery is deliberately non-blocking. A failed
             // incremental read must never make the rest of ATHLTH unusable;
             // the next foreground/background Health refresh retries it.
+            if !Self.isTemporarilyUnavailableHealthRead(error), integrationEnabled {
+                workoutImportError = error.localizedDescription
+            }
             return false
         }
     }
@@ -1001,6 +1017,8 @@ final class HealthKitManager: ObservableObject {
         backgroundDeliveryRegistrationStatus = .disabled
         backgroundSyncError = nil
         backgroundRefreshReceivedWhileBackgrounded = false
+        backgroundRefreshPending = false
+        backgroundRefreshNeedsFull = false
         backgroundRefreshTask?.cancel()
         for query in observerQueries {
             healthStore.stop(query)
@@ -1068,10 +1086,6 @@ final class HealthKitManager: ObservableObject {
                         type.identifier ==
                         HKObjectType.workoutType().identifier
 
-                    if isWorkoutEvent {
-                        _ = await self.refreshWorkoutImportInbox()
-                    }
-
                     await self.coalescedBackgroundRefresh(
                         requireFullRefresh: isWorkoutEvent,
                         receivedInBackground: receivedInBackground
@@ -1087,13 +1101,11 @@ final class HealthKitManager: ObservableObject {
     func refreshIfStale(
         maxAge: TimeInterval = 60
     ) async {
-        guard !isRefreshing else {
-            return
-        }
-
         if let lastSuccessfulRefreshAt,
            Date().timeIntervalSince(lastSuccessfulRefreshAt) < maxAge,
-           hasReadableHealthData {
+           hasCompletedHealthReadThisLaunch,
+           hasReadableHealthData,
+           workoutImportError == nil {
             return
         }
 
@@ -1104,10 +1116,10 @@ final class HealthKitManager: ObservableObject {
         requireFullRefresh: Bool,
         receivedInBackground: Bool
     ) async {
-        if receivedInBackground { backgroundRefreshReceivedWhileBackgrounded = true }
-        if requireFullRefresh {
-            backgroundRefreshNeedsFull = true
-        }
+        backgroundRefreshPending = true
+        backgroundRefreshNeedsFull = backgroundRefreshNeedsFull || requireFullRefresh
+        backgroundRefreshReceivedWhileBackgrounded =
+            backgroundRefreshReceivedWhileBackgrounded || receivedInBackground
 
         if let existing = backgroundRefreshTask {
             await existing.value
@@ -1115,75 +1127,72 @@ final class HealthKitManager: ObservableObject {
         }
 
         let task = Task { @MainActor [weak self] in
-            try? await Task.sleep(
-                for: .milliseconds(650)
-            )
+            guard let self else { return }
+            // Drain events that arrive during an in-flight batch rather than
+            // clearing their flags after the first Health query completes.
+            while self.backgroundRefreshPending && !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(650))
+                guard !Task.isCancelled,
+                      self.integrationEnabled, self.backgroundSyncPreferenceEnabled,
+                      UIApplication.shared.isProtectedDataAvailable,
+                      !self.shouldDeferAutomaticHealthWork else { break }
+                guard await self.waitForHealthRefreshSlot() else { break }
 
-            guard let self,
-                  !Task.isCancelled
-            else {
-                return
-            }
+                let full = self.backgroundRefreshNeedsFull
+                let background = self.backgroundRefreshReceivedWhileBackgrounded
+                self.backgroundRefreshPending = false
+                self.backgroundRefreshNeedsFull = false
+                self.backgroundRefreshReceivedWhileBackgrounded = false
 
-            let previousWorkouts =
-                self.workouts
-            let previousSleep =
-                self.sleep
-            let previousHeart =
-                self.heart
-            let previousTraining =
-                self.training
-            let previousRecovery =
-                self.recovery
-            let previousPersonalDetails =
-                self.personalDetails
+                let previousWorkouts = self.workouts
+                let previousSleep = self.sleep
+                let previousHeart = self.heart
+                let previousTraining = self.training
+                let previousRecovery = self.recovery
+                let previousPersonalDetails = self.personalDetails
 
-            let fullRefresh =
-                self.backgroundRefreshNeedsFull
-            self.backgroundRefreshNeedsFull =
-                false
+                if full {
+                    await self.performFullRefresh(recordBackgroundSync: background)
+                } else {
+                    await self.refreshHealthSignals(recordBackgroundSync: background)
+                }
 
-            let recordBackgroundSync = self.backgroundRefreshReceivedWhileBackgrounded
-            self.backgroundRefreshReceivedWhileBackgrounded = false
-
-            if fullRefresh {
-                await self.performFullRefresh(recordBackgroundSync: recordBackgroundSync)
-            } else {
-                await self.refreshHealthSignals(recordBackgroundSync: recordBackgroundSync)
-            }
-
-            let healthSnapshotChanged =
-                previousWorkouts !=
-                    self.workouts ||
-                previousSleep !=
-                    self.sleep ||
-                previousHeart !=
-                    self.heart ||
-                previousTraining !=
-                    self.training ||
-                previousRecovery !=
-                    self.recovery ||
-                previousPersonalDetails !=
-                    self.personalDetails
-
-            if healthSnapshotChanged,
-               let handler =
-                    self.backgroundRefreshDidComplete {
-                await handler()
+                if !Task.isCancelled, self.integrationEnabled,
+                   self.backgroundSyncPreferenceEnabled,
+                   previousWorkouts != self.workouts ||
+                    previousSleep != self.sleep ||
+                    previousHeart != self.heart ||
+                    previousTraining != self.training ||
+                    previousRecovery != self.recovery ||
+                    previousPersonalDetails != self.personalDetails {
+                    if let handler = self.backgroundRefreshDidComplete { await handler() }
+                }
             }
         }
 
         backgroundRefreshTask = task
         await task.value
-        // Do not attribute a later foreground refresh to an observer that
-        // arrived after this batch had already started reading.
-        backgroundRefreshReceivedWhileBackgrounded = false
         backgroundRefreshTask = nil
+    }
+
+    /// Manual and observer requests may arrive during a light/full read.
+    /// Wait for the same main-actor slot, without parallel heavy queries.
+    private func waitForHealthRefreshSlot() async -> Bool {
+        for _ in 0..<100 {
+            guard !Task.isCancelled, integrationEnabled,
+                  UIApplication.shared.isProtectedDataAvailable,
+                  !shouldDeferAutomaticHealthWork else { return false }
+            if !isRefreshing && !homeWorkoutRefreshInProgress { return true }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        return false
     }
 
     private func refreshHealthSignals(recordBackgroundSync: Bool) async {
         guard integrationEnabled,
               healthDataAvailable,
+              hasRequestedAuthorization,
+              UIApplication.shared.isProtectedDataAvailable,
               !shouldDeferAutomaticHealthWork,
               !isRefreshing
         else {
@@ -1232,6 +1241,8 @@ final class HealthKitManager: ObservableObject {
             refreshedRecovery = nil
         }
 
+        guard integrationEnabled, !Task.isCancelled,
+              UIApplication.shared.isProtectedDataAvailable else { return }
         let recoveryTrendInputsChanged =
             (
                 fetchedSleep.map {
@@ -1293,6 +1304,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshAll() async {
+        guard await waitForHealthRefreshSlot() else { return }
         await performFullRefresh(recordBackgroundSync: false)
     }
 
@@ -1307,7 +1319,8 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
-        guard healthDataAvailable,
+        guard healthDataAvailable, hasRequestedAuthorization,
+              UIApplication.shared.isProtectedDataAvailable,
               !shouldDeferAutomaticHealthWork
         else {
             return
@@ -1330,6 +1343,12 @@ final class HealthKitManager: ObservableObject {
                     refreshInProgressKey
             )
         }
+
+        // Reconcile anchored additions before filtering accepted workouts.
+        // This also catches external workouts when background delivery is off.
+        _ = await refreshWorkoutImportInbox()
+        guard integrationEnabled, !Task.isCancelled,
+              UIApplication.shared.isProtectedDataAvailable else { return }
 
         let end = Date()
         let start =
@@ -1428,6 +1447,9 @@ final class HealthKitManager: ObservableObject {
                 )
             }
         }
+
+        guard integrationEnabled, !Task.isCancelled,
+              UIApplication.shared.isProtectedDataAvailable else { return }
 
         var completedRead = false
         var recentWorkoutsChanged = false
@@ -1531,8 +1553,12 @@ final class HealthKitManager: ObservableObject {
             personalDetails = fetchedProfile
         }
 
-        if completedRead ||
-            fetchedProfile.hasAnyValue {
+        if completedRead || fetchedProfile.hasAnyValue {
+            hasCompletedHealthReadThisLaunch = true
+        }
+        // A successful empty HealthKit response is not proof that any
+        // personal data was read. Do not advertise it as a successful sync.
+        if (completedRead || fetchedProfile.hasAnyValue) && hasReadableHealthData {
             let refreshedAt = Date()
             lastSuccessfulRefreshAt =
                 refreshedAt
@@ -1543,7 +1569,7 @@ final class HealthKitManager: ObservableObject {
             )
         }
 
-        if recordBackgroundSync && completedRead {
+        if recordBackgroundSync && completedRead && hasReadableHealthData {
             recordSuccessfulBackgroundRefresh()
         }
 
@@ -1768,6 +1794,7 @@ final class HealthKitManager: ObservableObject {
         guard integrationEnabled,
               healthDataAvailable,
               hasRequestedAuthorization,
+              UIApplication.shared.isProtectedDataAvailable,
               !shouldDeferAutomaticHealthWork else {
             return nil
         }
@@ -1793,6 +1820,8 @@ final class HealthKitManager: ObservableObject {
             let fetched = try await fetchWorkouts(
                 startDate: start, endDate: now, limit: 100
             )
+            guard integrationEnabled, !Task.isCancelled,
+                  UIApplication.shared.isProtectedDataAvailable else { return nil }
             let fresh = fetched.map(WorkoutSummary.init)
                 .sorted { $0.startDate > $1.startDate }
 
@@ -4647,9 +4676,11 @@ final class HealthKitManager: ObservableObject {
     }
 
     func refreshPersonalDetails() async {
-        guard integrationEnabled else { return }
+        guard integrationEnabled, UIApplication.shared.isProtectedDataAvailable else { return }
         let fetched =
             await fetchPersonalDetailsSnapshot()
+        guard integrationEnabled, !Task.isCancelled,
+              UIApplication.shared.isProtectedDataAvailable else { return }
         if personalDetails != fetched {
             personalDetails = fetched
         }

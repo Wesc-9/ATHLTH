@@ -189,13 +189,10 @@ struct ATHLTHSettingsView: View {
 
             if settings.appleHealthIntegrationEnabled,
                health.hasRequestedAuthorization,
-               health.lastSuccessfulRefreshAt == nil,
+               !health.hasCompletedHealthReadThisLaunch,
+               !health.shouldDeferAutomaticHealthWork,
                !health.isRefreshing {
-                health.resumeUserInitiatedHealthSync()
-                await health.configureBackgroundSync(
-                    allowed: settings.backgroundHealthSyncEnabled
-                )
-                await health.refreshAll()
+                await health.refreshIfStale(maxAge: 90)
             }
         }
     }
@@ -1028,7 +1025,11 @@ settingsSection(ATHLTHLocalization.choose(
 
     private func connectionIsActive(_ item: ConnectionItem) -> Bool {
         switch item {
-        case .health: return settings.appleHealthIntegrationEnabled && health.hasRequestedAuthorization && health.hasReadableHealthData
+        case .health: return HealthKitManager.isConfiguredConnection(
+            enabled: settings.appleHealthIntegrationEnabled,
+            available: health.healthDataAvailable,
+            requested: health.hasRequestedAuthorization
+        )
         case .calendar: return session.subscriptionAccess.hasPaidAccess && calendarSync.isEnabled && calendarSync.hasFullAccess
         case .watch: return !ATHLTHDeviceRole.isIPad && watchConnection.isReady
         case .spotify: return spotify.isConnected
@@ -1084,12 +1085,13 @@ settingsSection(ATHLTHLocalization.choose(
                     connectionTrailing(
                         !settings.appleHealthIntegrationEnabled
                             ? "Off"
-                            : !health.hasRequestedAuthorization
-                                ? "Connect"
-                                : health.hasReadableHealthData
-                                    ? "Connected"
-                                    : "Configured",
-                        showChevron: true
+                            : !health.healthDataAvailable
+                                ? "Unavailable"
+                                : !health.hasRequestedAuthorization
+                                    ? "Connect"
+                                    : healthSyncStateTitle,
+                        showChevron: true,
+                        loading: healthRequestInProgress || health.isRefreshing
                     )
                 }
             }
@@ -1969,7 +1971,8 @@ if session.currentRole.canAccessControlCenter {
     private var healthSyncHasIssue: Bool {
         let backgroundIssue = !(health.backgroundSyncError?.isEmpty ?? true)
         let readIssue = !(health.authorizationError?.isEmpty ?? true)
-        return backgroundIssue || readIssue
+        let importIssue = !(health.workoutImportError?.isEmpty ?? true)
+        return backgroundIssue || readIssue || importIssue
     }
 
     private var healthSyncStateTitle: String {
@@ -1978,13 +1981,7 @@ if session.currentRole.canAccessControlCenter {
                 english: "Paused", norwegian: "Deaktivert"
             )
         }
-        guard settings.backgroundHealthSyncEnabled else {
-            return ATHLTHLocalization.choose(
-                english: "Off",
-                norwegian: "Av"
-            )
-        }
-        if health.isRefreshing {
+        if healthRequestInProgress || health.isRefreshing {
             return ATHLTHLocalization.choose(
                 english: "Syncing",
                 norwegian: "Synkroniserer"
@@ -1996,13 +1993,16 @@ if session.currentRole.canAccessControlCenter {
                 norwegian: "Ikke tilkoblet"
             )
         }
+        if health.shouldDeferAutomaticHealthWork {
+            return ATHLTHLocalization.choose(english: "Deferred", norwegian: "Utsatt")
+        }
         if healthSyncHasIssue {
             return ATHLTHLocalization.choose(
                 english: "Issue",
                 norwegian: "Problem"
             )
         }
-        if health.lastSuccessfulRefreshAt != nil && !health.hasTrainingHealthData {
+        if health.hasCompletedHealthReadThisLaunch && !health.hasTrainingHealthData {
             return health.personalDetails.hasAnyValue
                 ? ATHLTHLocalization.choose(
                     english: "Profile only",
@@ -2013,15 +2013,14 @@ if session.currentRole.canAccessControlCenter {
                     norwegian: "Ingen data"
                 )
         }
-        if health.lastSuccessfulRefreshAt != nil &&
-            health.hasTrainingHealthData &&
+        if health.hasTrainingHealthData &&
             !health.canWriteWorkouts {
             return ATHLTHLocalization.choose(
                 english: "Read only",
                 norwegian: "Kun lesing"
             )
         }
-        return health.lastSuccessfulRefreshAt != nil
+        return health.hasReadableHealthData
             ? ATHLTHLocalization.choose(
                 english: "Synced",
                 norwegian: "Synkronisert"
@@ -2045,7 +2044,7 @@ if session.currentRole.canAccessControlCenter {
                 english: "Synchronizing…", norwegian: "Synkroniserer…"
             )
         }
-        if let last = health.lastSuccessfulRefreshAt {
+        if let last = health.lastSuccessfulRefreshAt, health.hasReadableHealthData {
             let time = healthSyncTimestamp(last)
             return ATHLTHLocalization.choose(
                 english: "Last synced \(time)",
@@ -2084,6 +2083,12 @@ if session.currentRole.canAccessControlCenter {
             )
         }
 
+        if let error = health.workoutImportError, !error.isEmpty {
+            return ATHLTHLocalization.choose(
+                english: "Workout import needs attention: \(error)",
+                norwegian: "Øktimport krever oppmerksomhet: \(error)"
+            )
+        }
         if let error = health.authorizationError, !error.isEmpty {
             return ATHLTHLocalization.choose(
                 english: "Apple Health read needs attention: \(error)",
@@ -2208,7 +2213,16 @@ if session.currentRole.canAccessControlCenter {
             )
         }
 
-        if health.authorizationReviewNeeded {
+        if healthRequestInProgress || health.isRefreshing {
+            return ATHLTHLocalization.choose(english: "Reading Apple Health data…", norwegian: "Leser data fra Apple Health…")
+        }
+        if health.shouldDeferAutomaticHealthWork {
+            return ATHLTHLocalization.choose(english: "Configured · sync temporarily deferred", norwegian: "Konfigurert · synkronisering midlertidig utsatt")
+        }
+        if healthSyncHasIssue {
+            return ATHLTHLocalization.choose(english: "Configured · synchronization needs attention", norwegian: "Konfigurert · synkronisering krever oppmerksomhet")
+        }
+        if health.authorizationReviewNeeded && health.hasReadableHealthData {
             return ATHLTHLocalization.choose(
                 english: "Connected · optional new Health permissions are available",
                 norwegian: "Tilkoblet · valgfrie nye Health-tillatelser er tilgjengelige"
@@ -2234,7 +2248,7 @@ if session.currentRole.canAccessControlCenter {
             )
         }
 
-        if health.lastSuccessfulRefreshAt != nil {
+        if health.hasCompletedHealthReadThisLaunch {
             return ATHLTHLocalization.choose(
                 english: "Permission configured · no readable data found yet",
                 norwegian: "Tillatelse konfigurert · ingen lesbare data funnet ennå"
@@ -2242,8 +2256,8 @@ if session.currentRole.canAccessControlCenter {
         }
 
         return ATHLTHLocalization.choose(
-            english: "Permission configured · run the first sync",
-            norwegian: "Tillatelse konfigurert · kjør første synkronisering"
+            english: "Permission configured · awaiting data refresh",
+            norwegian: "Tillatelse konfigurert · venter på oppdatering av data"
         )
     }
 
@@ -2348,16 +2362,16 @@ if session.currentRole.canAccessControlCenter {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
-            _ = await health.refreshWorkoutImportInbox()
             await health.refreshAll()
             syncHealthProfileFromAppleHealthIfAppropriate()
         }
     }
 
     private func handleAppleHealthTap() {
-        guard settings.appleHealthIntegrationEnabled else { return }
+        guard settings.appleHealthIntegrationEnabled, !healthRequestInProgress else { return }
+        healthRequestInProgress = true
         Task {
-            healthRequestInProgress = true
+            defer { healthRequestInProgress = false }
 
             let restoredExistingSetup =
                 await health.restoreAuthorizationStateFromSystem()
@@ -2367,6 +2381,7 @@ if session.currentRole.canAccessControlCenter {
                 // review newly introduced permissions. Normal sync never
                 // reopens the Health permission flow.
                 await health.requestAuthorization()
+                guard health.authorizationError == nil else { return }
                 await health.completeAuthorizationSetup()
             } else {
                 health.resumeUserInitiatedHealthSync()
@@ -2375,22 +2390,21 @@ if session.currentRole.canAccessControlCenter {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
-            _ = await health.refreshWorkoutImportInbox()
             await health.refreshAll()
             syncHealthProfileFromAppleHealthIfAppropriate()
-            healthRequestInProgress = false
         }
     }
 
     private func runHealthSync() {
-        guard settings.appleHealthIntegrationEnabled else { return }
+        guard settings.appleHealthIntegrationEnabled, !healthRequestInProgress else { return }
         guard health.hasRequestedAuthorization else {
             handleAppleHealthTap()
             return
         }
 
+        healthRequestInProgress = true
         Task {
-            healthRequestInProgress = true
+            defer { healthRequestInProgress = false }
 
             // Sync with the permissions that are already in place. Do not
             // reopen Health authorization simply because the app was updated
@@ -2401,10 +2415,8 @@ if session.currentRole.canAccessControlCenter {
             await health.configureBackgroundSync(
                 allowed: settings.backgroundHealthSyncEnabled
             )
-            _ = await health.refreshWorkoutImportInbox()
             await health.refreshAll()
             syncHealthProfileFromAppleHealthIfAppropriate()
-            healthRequestInProgress = false
         }
     }
 
