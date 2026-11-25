@@ -9,6 +9,14 @@ struct GarminPersonalSettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var store = GarminPersonalLocalStore.shared
     @State private var key = ""
+    @State private var reviewedLinks = GarminReviewedWorkoutLinks()
+    @State private var review: DuplicateReview?
+
+    private struct DuplicateReview: Identifiable {
+        let activity: GarminImportedActivity
+        let healthWorkout: WorkoutSummary
+        var id: String { activity.workout.id + ":" + healthWorkout.id.uuidString }
+    }
 
     private var accountMatches: Bool {
         scenePhase == .active && session.signedIn && !session.previewModeEnabled &&
@@ -59,7 +67,7 @@ struct GarminPersonalSettingsView: View {
                         .padding(16)
                     }
                 }
-                if store.isConnected(to: accountID) || (store.accountID == accountID && store.needsKeyRemoval) {
+                if store.isConnected(to: accountID) || (store.accountID == accountID && (store.needsKeyRemoval || store.hasStoredKey)) {
                     ATHLTHSettingsGroup(title: tr("Data and sync", "Data og synkronisering")) {
                         PremiumSettingsCard {
                             if store.isConnected(to: accountID) {
@@ -159,8 +167,15 @@ struct GarminPersonalSettingsView: View {
                     }
                     ATHLTHSettingsGroup(title: tr("Recent workouts · 30 days", "Siste økter · 30 dager")) {
                         PremiumSettingsCard {
-                            GarminPersonalHistoryRows(snapshot: snapshot, existing: [], startDate: nil, endDate: nil, healthWorkouts: health.workouts)
-                                .padding(16)
+                            ForEach(snapshot.workouts, id: \.workout.id) { activity in
+                                reviewedWorkoutRow(activity)
+                                if activity.workout.id != snapshot.workouts.last?.workout.id { SettingsDivider() }
+                            }
+                            if snapshot.workouts.isEmpty {
+                                Text(tr("No Garmin workouts found", "Ingen Garmin-økter funnet")).padding(16)
+                            }
+                            Text(tr("Confirmed matches are grouped in this private preview only. Neither original is deleted or imported into totals.", "Bekreftede treff samles kun i denne private visningen. Ingen original slettes eller importeres i totalsummene."))
+                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText).padding(16)
                         }
                     }
                 }
@@ -168,9 +183,25 @@ struct GarminPersonalSettingsView: View {
                 ContentUnavailableView(tr("Developer access required", "Utviklertilgang kreves"), systemImage: "lock")
             }
         }
+        .alert(item: $review) { item in
+            Alert(title: Text(tr("Same workout?", "Samme treningsøkt?")),
+                message: Text("Garmin: " + item.activity.workout.startedAt.formatted() + " · " +
+                    Duration.seconds(item.activity.workout.duration).formatted(.units(allowed: [.hours, .minutes, .seconds])) +
+                    "\nApple Health: " + item.healthWorkout.startDate.formatted() + " · " +
+                    Duration.seconds(item.healthWorkout.duration).formatted(.units(allowed: [.hours, .minutes, .seconds]))),
+                primaryButton: .default(Text(tr("Confirm match", "Bekreft treff"))) {
+                    guard accountMatches else { return }
+                    let ids = Set(health.workouts.filter {
+                        GarminHistoryMatchPolicy.possibleMatch(item.activity.workout, summary: $0)
+                    }.map(\.id))
+                    _ = reviewedLinks.confirm(garminID: item.activity.workout.id, healthID: item.healthWorkout.id, candidates: ids)
+                }, secondaryButton: .cancel())
+        }
         .task(id: accountMatches) {
             guard accountMatches else {
                 key = ""
+                reviewedLinks = GarminReviewedWorkoutLinks()
+                review = nil
                 if store.accountID == accountID { store.activate(account: nil) }
                 return
             }
@@ -183,6 +214,46 @@ struct GarminPersonalSettingsView: View {
             store.suspendPreview(account: accountID)
             #endif
         }
+    }
+
+    @ViewBuilder
+    private func reviewedWorkoutRow(_ activity: GarminImportedActivity) -> some View {
+        let candidates = health.workouts.filter {
+            GarminHistoryMatchPolicy.possibleMatch(activity.workout, summary: $0)
+        }
+        let ids = Set(candidates.map(\.id))
+        let confirmed = reviewedLinks.confirmedMatch(garminID: activity.workout.id, candidates: ids)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(activity.originalActivityType.replacingOccurrences(of: "_", with: " ").capitalized)
+                .font(.headline)
+            Text(activity.workout.startedAt.formatted(date: .abbreviated, time: .shortened))
+                .font(.caption)
+            Text(Duration.seconds(activity.workout.duration).formatted(.units(allowed: [.hours, .minutes, .seconds])))
+                .font(.subheadline)
+            if let distance = activity.workout.distanceMeters {
+                Text((distance / 1000).formatted(.number.precision(.fractionLength(2))) + " km").font(.caption)
+            }
+            if let model = activity.deviceModel {
+                Text("Garmin · " + model).font(.caption)
+            }
+            if confirmed != nil {
+                Label(tr("Confirmed match · Garmin + Apple Health", "Bekreftet treff · Garmin + Apple Health"), systemImage: "checkmark.circle")
+                    .font(.caption.weight(.medium))
+                Button(tr("Undo link", "Angre kobling")) { reviewedLinks.undo(garminID: activity.workout.id) }
+                    .font(.caption)
+            } else if !candidates.isEmpty {
+                Label(tr("Possible duplicate", "Mulig duplikat"), systemImage: "exclamationmark.circle").font(.caption)
+                ForEach(candidates) { candidate in
+                    Button {
+                        review = DuplicateReview(activity: activity, healthWorkout: candidate)
+                    } label: {
+                        Text(tr("Review", "Kontroller") + " · " + candidate.startDate.formatted(date: .omitted, time: .shortened))
+                    }
+                    .font(.caption.weight(.medium))
+                    .disabled(reviewedLinks.links.values.contains(candidate.id))
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
     }
 
     private func preferredReading(_ metric: WearableDisplayMetric, snapshot: GarminPersonalPreview) -> String {

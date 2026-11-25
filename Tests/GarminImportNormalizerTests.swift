@@ -3,6 +3,18 @@ import XCTest
 @testable import ATHLTH
 
 final class GarminImportNormalizerTests: XCTestCase {
+    func testReviewedDuplicateLinksRequireCandidateAndAreOneToOne() {
+        let apple = UUID(), other = UUID()
+        var links = GarminReviewedWorkoutLinks()
+        XCTAssertFalse(links.confirm(garminID: "garmin:1", healthID: apple, candidates: [other]))
+        XCTAssertTrue(links.confirm(garminID: "garmin:1", healthID: apple, candidates: [apple]))
+        XCTAssertFalse(links.confirm(garminID: "garmin:2", healthID: apple, candidates: [apple]))
+        XCTAssertNil(links.confirmedMatch(garminID: "garmin:1", candidates: [other]))
+        XCTAssertEqual(links.confirmedMatch(garminID: "garmin:1", candidates: [apple]), apple)
+        links.undo(garminID: "garmin:1")
+        XCTAssertTrue(links.confirm(garminID: "garmin:2", healthID: apple, candidates: [apple]))
+    }
+
     private let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     private func input(

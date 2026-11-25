@@ -9,6 +9,7 @@ final class GarminPersonalLocalStore: ObservableObject {
     static let shared = GarminPersonalLocalStore()
     @Published private(set) var accountID: UUID?
     @Published private(set) var connected = false
+    @Published private(set) var hasStoredKey = false
     @Published private(set) var needsKeyRemoval = false
     @Published private(set) var displayPreference: WearableDisplayPreference = .automatic
     @Published private var metricPreferences: [String: String] = [:]
@@ -42,7 +43,10 @@ final class GarminPersonalLocalStore: ObservableObject {
             UserDefaults.standard.dictionary(forKey: preferenceKey($0) + ".metrics") as? [String: String]
         } ?? [:]
         if let account {
-            do { connected = try GarminPersonalKeychain.read(account) != nil }
+            do {
+                hasStoredKey = try GarminPersonalKeychain.read(account) != nil
+                connected = hasStoredKey
+            }
             catch { message = "Unable to access the local Keychain." }
         }
     }
@@ -129,6 +133,7 @@ final class GarminPersonalLocalStore: ObservableObject {
         job = nil
         client = nil
         connected = false
+        hasStoredKey = false
         needsKeyRemoval = false
         busy = false
         preview = nil
@@ -159,6 +164,7 @@ final class GarminPersonalLocalStore: ObservableObject {
                 guard let self, self.accountID == account, self.generation == requestID else { return }
                 if replaceKey { try GarminPersonalKeychain.save(key, account: account) }
                 self.connected = true
+                self.hasStoredKey = true
                 self.preview = result
                 self.lastRefresh = Date()
                 self.message = "Garmin data refreshed locally."

@@ -539,6 +539,9 @@ struct ATHLTHSettingsView: View {
         }
         .background(settingsBackground)
         .navigationTitle(category.title)
+        .navigationDestination(for: ConnectionItem.self) { item in
+            connectionDestination(item)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
     }
@@ -1061,9 +1064,7 @@ settingsSection(ATHLTHLocalization.choose(
     private func connectionRow(_ item: ConnectionItem) -> some View {
         switch item {
         case .health:
-            NavigationLink {
-                appleHealthSettingsPage
-            } label: {
+            NavigationLink(value: ConnectionItem.health) {
                 PremiumSettingsRow(
                     icon: "heart.fill",
                     iconTint: .pink,
@@ -1086,9 +1087,7 @@ settingsSection(ATHLTHLocalization.choose(
             .buttonStyle(.plain)
         case .calendar:
             if session.subscriptionAccess.hasPaidAccess {
-                NavigationLink {
-                    AppleCalendarSettingsView()
-                } label: {
+                NavigationLink(value: ConnectionItem.calendar) {
                     PremiumSettingsRow(
                         icon: "calendar",
                         iconTint: .red,
@@ -1099,7 +1098,7 @@ settingsSection(ATHLTHLocalization.choose(
                         connectionTrailing(
                             calendarSync.isSyncing
                                 ? "Syncing"
-                                : calendarSync.isEnabled
+                                : calendarSync.isEnabled && calendarSync.hasFullAccess
                                     ? "Connected"
                                     : calendarSync.hasFullAccess
                                         ? "Ready"
@@ -1171,9 +1170,7 @@ settingsSection(ATHLTHLocalization.choose(
                     )
                 }
             } else {
-                NavigationLink {
-                    AppleWatchConnectionView()
-                } label: {
+                NavigationLink(value: ConnectionItem.watch) {
                     PremiumSettingsRow(
                         icon: "applewatch",
                         iconTint: ATHLTHTheme.primaryText,
@@ -1189,18 +1186,7 @@ settingsSection(ATHLTHLocalization.choose(
                 .buttonStyle(.plain)
             }
         case .garmin:
-            NavigationLink {
-                #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-                if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
-                    GarminPersonalSettingsView(accountID: session.profile.userID)
-                        .id(session.profile.userID)
-                } else {
-                    GarminConnectionSetupView()
-                }
-                #else
-                GarminConnectionSetupView()
-                #endif
-            } label: {
+            NavigationLink(value: ConnectionItem.garmin) {
                 PremiumSettingsRow(
                     icon: "watch.analog",
                     iconTint: ATHLTHTheme.accentDeep,
@@ -1220,9 +1206,7 @@ settingsSection(ATHLTHLocalization.choose(
             }
             .buttonStyle(.plain)
         case .spotify:
-            NavigationLink {
-                SpotifySettingsView()
-            } label: {
+            NavigationLink(value: ConnectionItem.spotify) {
                 PremiumSettingsRow(
                     icon: "music.note",
                     iconTint: spotifyGreen,
@@ -1240,9 +1224,7 @@ settingsSection(ATHLTHLocalization.choose(
             }
             .buttonStyle(.plain)
         case .homeAssistant:
-            NavigationLink {
-                HomeAssistantSettingsView()
-            } label: {
+            NavigationLink(value: ConnectionItem.homeAssistant) {
                 PremiumSettingsRow(
                     icon: "house.fill",
                     iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
@@ -1261,6 +1243,29 @@ settingsSection(ATHLTHLocalization.choose(
                 }
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func connectionDestination(_ item: ConnectionItem) -> some View {
+        switch item {
+        case .health: appleHealthSettingsPage
+        case .calendar: AppleCalendarSettingsView()
+        case .watch: AppleWatchConnectionView()
+        case .spotify: SpotifySettingsView()
+        case .homeAssistant: HomeAssistantSettingsView()
+        case .garmin:
+                #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+                if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
+                    GarminPersonalSettingsView(accountID: session.profile.userID)
+                        .id(session.profile.userID)
+                } else {
+                    GarminConnectionSetupView()
+                }
+                #else
+                GarminConnectionSetupView()
+                #endif
+
         }
     }
 

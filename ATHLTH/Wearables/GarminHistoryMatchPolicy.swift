@@ -87,3 +87,27 @@ enum GarminUnifiedHistoryRow: Identifiable {
         return rows.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
     }
 }
+
+
+/// A reconciliation ledger for the private preview only. One Garmin record
+/// can be linked to one reviewed Apple Health record; no original is erased.
+/// The caller must present the two original records and receive confirmation.
+struct GarminReviewedWorkoutLinks {
+    private(set) var links: [String: UUID] = [:]
+
+    mutating func confirm(garminID: String, healthID: UUID, candidates: Set<UUID>) -> Bool {
+        guard garminID.hasPrefix("garmin:"), candidates.contains(healthID),
+              links[garminID] == nil, !links.values.contains(healthID) else { return false }
+        links[garminID] = healthID
+        return true
+    }
+
+    mutating func undo(garminID: String) {
+        links.removeValue(forKey: garminID)
+    }
+
+    func confirmedMatch(garminID: String, candidates: Set<UUID>) -> UUID? {
+        guard let id = links[garminID], candidates.contains(id) else { return nil }
+        return id
+    }
+}
