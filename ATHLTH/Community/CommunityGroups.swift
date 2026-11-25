@@ -6861,6 +6861,9 @@ struct CommunityGroupDetailView: View {
             initialValue: initialTab == .challenges ? .challenges : .events
         )
     }
+    @Environment(\.scenePhase) private var receiptScenePhase
+    @State private var groupReadReceipts: [UUID: [String]] = [:]
+    private let groupReceiptService = SupabaseMessagingService()
     @State private var messageDraft = ""
     @State private var selectedChatPhoto: PhotosPickerItem?
     @State private var pendingChatImageData: Data?
@@ -10517,6 +10520,18 @@ struct CommunityGroupDetailView: View {
                     .frame(maxWidth: 760)
                     .frame(maxWidth: .infinity)
                 }
+                .task(id: messages.map(\.id)) {
+                    let ids = messages.map(\.id)
+                    let owner = session.profile.userID
+                    while !Task.isCancelled {
+                        if receiptScenePhase == .active {
+                            let result = try? await groupReceiptService.groupReadReceipts(kind: "club", messageIDs: ids)
+                            guard !Task.isCancelled, session.profile.userID == owner else { return }
+                            groupReadReceipts = result ?? [:]
+                        }
+                        try? await Task.sleep(for: .seconds(15))
+                    }
+                }
                 .defaultScrollAnchor(.bottom)
                 .background(
                     ATHLTHTheme.cardWarm.opacity(0.36)
@@ -11909,6 +11924,12 @@ struct CommunityGroupDetailView: View {
                 )
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
+                if mine, let names = groupReadReceipts[message.id], !names.isEmpty {
+                    Text(ATHLTHLocalization.choose(english: "Read by ", norwegian: "Lest av ") + names.joined(separator: ", "))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if mine {
