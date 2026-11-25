@@ -105,7 +105,7 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
-    func testCuratedExercisesRemainSelectableButDuplicateNativeMovementsAreHidden() {
+    func testCuratedExercisesRemainSelectableButDuplicateNativeMovementsAreHidden() throws {
         let library = ExerciseLibraryStore()
         let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
         // The initial three curated IDs remain available; 2.2.2 also
@@ -128,13 +128,16 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
             "athlth-native-incline-dumbbell-bench-press",
             "athlth-native-hollow-body-hold"
         ]))
-        XCTAssertTrue(featured.allSatisfy { slug in
-            guard let native = library.allExercises.first(where: {
-                $0.source == .athlthCatalog && $0.sourceIdentifier == slug
-            }) else { return false }
-            let preferred = ATHLTHExerciseReferenceResolver.reviewedReplacement(of: native, in: library.allExercises) ?? native
-            return library.selectableExercises.contains { $0.id == preferred.id }
-        })
+        let catalog = library.allExercises
+        let selectableIDs = Set(library.selectableExercises.map(\.id))
+        for slug in featured.sorted() {
+            let native = try XCTUnwrap(catalog.first { entry in
+                entry.source == .athlthCatalog && entry.sourceIdentifier == slug
+            }, "Missing native exercise: \(slug)")
+            let replacement = ATHLTHExerciseReferenceResolver.reviewedReplacement(for: native, in: catalog)
+            let preferred = replacement ?? native
+            XCTAssertTrue(selectableIDs.contains(preferred.id), "Missing selectable exercise: \(slug)")
+        }
         for phrase in [
             "Skråbenk med manualer",
             "Situps med beina i 90 grader",
