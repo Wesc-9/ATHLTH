@@ -76,6 +76,7 @@ struct GoalsHubView: View {
     }
 
     private var achievedCount: Int { goalStore.goals.filter { $0.status == .completed }.count }
+    private var archivedCount: Int { goalStore.goals.filter { $0.status == .abandoned }.count }
     private var completedIDs: Set<UUID> { Set(goalStore.goals.filter { $0.status == .completed }.map(\.id)) }
     private var sectionTitle: String {
         switch filter {
@@ -127,6 +128,8 @@ struct GoalsHubView: View {
                         }
                     }
                     if filter == .active && achievedCount > 0 { achievementsShortcut }
+                    if archivedCount > 0 && filter != .archived { archiveShortcut }
+                    if filter == .archived { archiveShortcut }
                 }
             }
             .padding(.horizontal, 18)
@@ -162,6 +165,26 @@ struct GoalsHubView: View {
                     }
             }
         }
+    }
+
+    private var archiveShortcut: some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                filter = filter == .archived ? .active : .archived
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: filter == .archived ? "chevron.left" : "archivebox")
+                Text(filter == .archived
+                     ? tr("Back to active goals", "Tilbake til aktive mål")
+                     : tr("View archive", "Se arkiv"))
+                if filter != .archived { Text("(\(archivedCount))") }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.plain)
     }
 
     private var achievementsShortcut: some View {
@@ -255,29 +278,27 @@ struct GoalsHubView: View {
     }
 
     private var filterControl: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(GoalHubFilter.allCases) { option in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { filter = option }
-                    } label: {
-                        Text(option.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(filter == option ? Color.white : ink)
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 40)
-                            .background(filter == option ? ink : Color.clear,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(filter == option ? .isSelected : [])
+        HStack(spacing: 6) {
+            ForEach([GoalHubFilter.active, .paused, .completed]) { option in
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { filter = option }
+                } label: {
+                    Text(option.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(filter == option ? Color.white : ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(filter == option ? ink : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 13))
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(filter == option ? .isSelected : [])
             }
-            .padding(4)
-            .background(ATHLTHPlanDesign.warmSurface,
-                        in: RoundedRectangle(cornerRadius: 17))
         }
-        .scrollIndicators(.hidden)
+        .padding(4)
+        .background(ATHLTHPlanDesign.warmSurface,
+                    in: RoundedRectangle(cornerRadius: 17))
     }
 
     private func sectionHeading(_ title: String, detail: String) -> some View {
