@@ -24,8 +24,8 @@ enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
             english: "One event for three or more athletes.",
             norwegian: "Én konkurranse med minst tre deltakere.")
         case .league: return ATHLTHLocalization.choose(
-            english: "Everyone competes; a league table determines the winner.",
-            norwegian: "Alle møter alle. En tabell avgjør.")
+            english: "Compete in multiple exercises and collect points in a league table.",
+            norwegian: "Konkurrer i flere øvelser og samle poeng i en ligatabell.")
         case .cup: return ATHLTHLocalization.choose(
             english: "Knockout rounds lead to one champion.",
             norwegian: "Utslagsrunder frem til én vinner.")
