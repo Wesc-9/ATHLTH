@@ -38,8 +38,8 @@ final class MessagingStore: ObservableObject {
     private var conversationRefreshInFlight: Set<UUID> = []
 
     func observeThreadChanges(owner: UUID, conversation: UUID,
-                              onChange: @MainActor @Sendable () -> Void,
-                              onStatus: @MainActor @Sendable (Bool) -> Void) async {
+                              onChange: @escaping @MainActor @Sendable () -> Void,
+                              onStatus: @escaping @MainActor @Sendable (Bool) -> Void) async {
         guard preferenceAccountID == owner, currentUserID == owner else { return }
         await service.observeThreadChanges(owner: owner, conversation: conversation,
                                            onChange: onChange, onStatus: onStatus)

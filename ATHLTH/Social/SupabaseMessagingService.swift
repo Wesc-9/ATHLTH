@@ -30,8 +30,8 @@ final class SupabaseMessagingService: Sendable {
     @MainActor
     func observeThreadChanges(
         owner: UUID, conversation: UUID,
-        onChange: @MainActor @Sendable () -> Void,
-        onStatus: @MainActor @Sendable (Bool) -> Void
+        onChange: @escaping @MainActor @Sendable () -> Void,
+        onStatus: @escaping @MainActor @Sendable (Bool) -> Void
     ) async {
         guard currentUserID == owner, !Task.isCancelled else { return }
         let topic = "athlth-direct:\(owner.uuidString.lowercased()):\(conversation.uuidString.lowercased())"
@@ -47,17 +47,19 @@ final class SupabaseMessagingService: Sendable {
             onStatus(channel.status == .subscribed)
             onChange() // Cover the fetch-to-subscribe gap.
             await withTaskGroup(of: Void.self) { group in
-                group.addTask { @MainActor in
+                // Child tasks consume Sendable streams without inheriting UI
+                // isolation. Only callbacks hop to the main actor.
+                group.addTask { [self, changes, onChange] in
                     for await _ in changes {
                         guard !Task.isCancelled, self.currentUserID == owner else { break }
-                        onChange()
+                        await onChange()
                     }
                 }
-                group.addTask { @MainActor in
+                group.addTask { [self, statuses, onStatus, onChange] in
                     for await status in statuses {
                         guard !Task.isCancelled, self.currentUserID == owner else { break }
-                        onStatus(status == .subscribed)
-                        if status == .subscribed { onChange() }
+                        await onStatus(status == .subscribed)
+                        if status == .subscribed { await onChange() }
                     }
                 }
                 await group.next()
