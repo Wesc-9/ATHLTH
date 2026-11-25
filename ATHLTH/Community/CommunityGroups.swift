@@ -2937,7 +2937,7 @@ final class CommunityGroupStore: ObservableObject {
             let loadedRSVPs =
                 try await rsvpQuery
 
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, currentUserID == userID else {
                 return
             }
 
@@ -2952,18 +2952,22 @@ final class CommunityGroupStore: ObservableObject {
                     by: \.groupID
                 )
 
-            for groupID in groupIDs {
-                eventsByGroup[groupID] =
-                    eventsByID[groupID] ?? []
-                eventRSVPsByGroup[groupID] =
-                    rsvpsByID[groupID] ?? []
+            guard currentUserID == userID else { return }
+            var nextEvents = eventsByGroup
+            var nextRSVPs = eventRSVPsByGroup
+            for groupID in groupIDs where joinedGroupIDs.contains(groupID) {
+                nextEvents[groupID] = eventsByID[groupID] ?? []
+                nextRSVPs[groupID] = rsvpsByID[groupID] ?? []
             }
+            // Publish at most once per collection, and never on a no-op.
+            if nextEvents != eventsByGroup { eventsByGroup = nextEvents }
+            if nextRSVPs != eventRSVPsByGroup { eventRSVPsByGroup = nextRSVPs }
 
             errorMessage = nil
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, currentUserID == userID else {
                 return
             }
             errorMessage =
