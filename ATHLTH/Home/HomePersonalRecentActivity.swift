@@ -1225,6 +1225,15 @@ struct HomePersonalRecentActivitySection:
     #endif
     // A snapshot changes only when actual workout/feed sources publish.
     // Do not sort the social feed from SwiftUI's scrolling/body path.
+    #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+    @State private var visibleGarminItems: [HomeActivityStreamItem] = []
+    @State private var visibleGarminOwner: UUID?
+    private var garminFeedRevision: String {
+        let owner = garminAccount
+        let available = owner.flatMap { garminStore.snapshot(for: $0) } != nil
+        return "\(owner?.uuidString ?? "")|\(available)|\(garminStore.lastRefresh?.timeIntervalSince1970 ?? 0)"
+    }
+    #endif
     @State private var visibleItems: [HomeActivityStreamItem] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var availableFeedWidth: CGFloat = 0
@@ -1270,11 +1279,9 @@ struct HomePersonalRecentActivitySection:
 
     var body: some View {
         #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-        let garminItems = privateGarminItems
-        let recent = garminItems.isEmpty ? visibleItems : HomeActivityStreamBuilder.recentPreview(
-            mine: myWorkouts, social: social, feed: social.feed,
-            privateGarmin: Array(garminItems.prefix(6))
-        )
+        let recent = visibleGarminOwner == garminAccount &&
+            garminAccount.flatMap({ garminStore.snapshot(for: $0) }) != nil &&
+            !visibleGarminItems.isEmpty ? visibleGarminItems : visibleItems
         #else
         let recent = visibleItems
         #endif
@@ -1308,6 +1315,11 @@ struct HomePersonalRecentActivitySection:
         .navigationDestination(isPresented: $showingAllActivities) {
             HomePersonalActivityHistoryView()
         }
+        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+        .onChange(of: garminFeedRevision) { _, _ in
+            rebuildVisibleItems(feed: social.feed)
+        }
+        #endif
         .onChange(of: recentRevision) { _, _ in
             rebuildRecentWorkouts()
         }
@@ -1418,6 +1430,14 @@ struct HomePersonalRecentActivitySection:
         )
         // This work is now on source updates, never on each scroll frame.
         visibleItems = refreshed
+        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+        let garminItems = privateGarminItems
+        visibleGarminOwner = garminAccount
+        visibleGarminItems = garminItems.isEmpty ? [] : HomeActivityStreamBuilder.recentPreview(
+            mine: mine ?? myWorkouts, social: social, feed: feed,
+            privateGarmin: Array(garminItems.prefix(6))
+        )
+        #endif
     }
 
     private var header: some View {
