@@ -132,25 +132,25 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Treningsmiljø og sted")
                     .font(.system(size: 21, design: .serif))
-                Picker("Hvor er trening tillatt?",
-                       selection: $settings.environment) {
-                    Text("Ingen begrensning")
-                        .tag(ATHLTHCompetitionEnvironment.any)
-                    if activities.contains(.running) ||
-                       activities.contains(.walking) ||
-                       activities.contains(.hiking) {
-                        Text("Kun utendørs")
-                            .tag(ATHLTHCompetitionEnvironment.outdoor)
-                    }
-                    if activities.contains(.strength) {
-                        Text("Kun treningssenter")
-                            .tag(ATHLTHCompetitionEnvironment.gym)
+                Picker("Hvor er trening tillatt?", selection: $settings.environment) {
+                    ForEach(ATHLTHCompetitionEnvironment.allCases.filter {
+                        $0.supports(activities) || $0 == settings.environment
+                    }) { venue in
+                        Text(venue.title).tag(venue)
                     }
                 }
                 .pickerStyle(.menu)
-                Text("Treningsmiljø er en konkurranseregel. Dokumentasjonen må kontrolleres; ATHLTH antar ikke at GPS eller Apple Health alene kan bevise treningssted.")
+                Text(settings.environment.detail)
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                if !settings.environment.supports(activities) || !settings.environment.supports(settings.race) {
+                    Label("Treningsmiljøet passer ikke med valgte aktiviteter eller GPS-regler.", systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                if !settings.environment.canPublish {
+                    Text("Kan lagres som mal. Publisering av dette miljøkravet er sperret inntil serveren kan kontrollere det.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 Button {
                     showingMeetingPoint = true
                 } label: {
