@@ -27,6 +27,19 @@ enum ATHLTHPlannedHeartRatePreview {
         return nil
     }
 
+    /// Compact inline estimate, directly after the prescribed or suggested zone.
+    static func inlineRangeText(
+        for block: WorkoutTemplateBlock,
+        maximumBPM: Double?,
+        suggestedZones: ClosedRange<Int>? = nil
+    ) -> String? {
+        guard let range = expectedBPM(for: block, maximumBPM: maximumBPM, suggestedZones: suggestedZones) else { return nil }
+        return ATHLTHLocalization.choose(
+            english: " (~\(range.lowerBound)–\(range.upperBound) bpm)",
+            norwegian: " (ca. \(range.lowerBound)–\(range.upperBound) slag/min)"
+        )
+    }
+
     static func rangeText(
         for block: WorkoutTemplateBlock,
         maximumBPM: Double?,
