@@ -84,8 +84,6 @@ struct ATHLTHSettingsView: View {
     @State private var healthRequestInProgress = false
     @State private var showingAppleHealthPauseConfirmation = false
     @State private var settingsSearchText = ""
-    @AppStorage("athlth.running.treadmillInputMode.v1")
-    private var preferredTreadmillInputMode = "treadmill"
 
     var body: some View {
         ZStack {
@@ -564,276 +562,88 @@ struct ATHLTHSettingsView: View {
     }
 
     private var appSettingsSection: some View {
-settingsSection("App") {
-                        PremiumSettingsCard {
-                            Menu {
-                            ForEach(MeasurementPreference.allCases) { preference in
-                                Button {
-                                    settings.measurementPreference = preference
-                                } label: {
-                                    if settings.measurementPreference == preference {
-                                        Label(preference.title, systemImage: "checkmark")
-                                    } else {
-                                        Text(preference.title)
-                                    }
-                                }
-                            }
-                        } label: {
-                            PremiumSettingsRow(
-                                icon: "ruler",
-                                title: "Measurements",
-                                subtitle: "Units for distance, weight and temperature"
-                            ) {
-                                HStack(spacing: 8) {
-                                    Text(settings.measurementPreference.title)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
-                                }
-                            }
-                            }
-                            .buttonStyle(.plain)
-                            SettingsDivider()
+        settingsSection("App") {
+            PremiumSettingsCard {
+                NavigationLink {
+                    ATHLTHPremiumSettingsChoices(
+                        title: ATHLTHLocalization.choose(english: "Measurements", norwegian: "Måleenheter"),
+                        subtitle: ATHLTHLocalization.choose(english: "Choose units throughout ATHLTH.", norwegian: "Velg måleenheter i hele ATHLTH."),
+                        options: MeasurementPreference.allCases,
+                        selection: $settings.measurementPreference,
+                        optionTitle: { $0.title },
+                        optionDetail: { "\($0.distanceUnit) · \($0.runningSpeedUnit) · \($0.weightUnit) · \($0.temperatureUnit)" }
+                    )
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "ruler",
+                        title: ATHLTHLocalization.choose(english: "Measurements", norwegian: "Måleenheter"),
+                        subtitle: ATHLTHLocalization.choose(english: "Distance, speed, weight and temperature", norwegian: "Distanse, hastighet, vekt og temperatur")
+                    ) { settingsChoiceValue(settings.measurementPreference.title) }
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
 
-                            Menu {
-                                ForEach(ATHLTHTreadmillInputMode.allCases) { option in
-                                    Button {
-                                        preferredTreadmillInputMode = option.rawValue
-                                    } label: {
-                                        if preferredTreadmillInputMode == option.rawValue {
-                                            Label(option.title(
-                                                measurement: settings.measurementPreference
-                                            ), systemImage: "checkmark")
-                                        } else {
-                                            Text(option.title(
-                                                measurement: settings.measurementPreference
-                                            ))
-                                        }
-                                    }
-                                }
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "figure.run.treadmill",
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Treadmill tempo", norwegian: "Mølletempo"
-                                    ),
-                                    subtitle: ATHLTHLocalization.choose(
-                                        english: "Choose treadmill tempo, speed or pace",
-                                        norwegian: "Velg mølletempo, km/t eller min/km"
-                                    )
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text((ATHLTHTreadmillInputMode(
-                                            rawValue: preferredTreadmillInputMode
-                                        ) ?? .treadmill).title(
-                                            measurement: settings.measurementPreference
-                                        ))
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(
-                                                ATHLTHTheme.mutedText.opacity(0.72)
-                                            )
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
+                NavigationLink {
+                    ATHLTHPremiumSettingsChoices(
+                        title: ATHLTHLocalization.choose(english: "Time format", norwegian: "Tidsformat"),
+                        subtitle: ATHLTHLocalization.choose(english: "Used for times throughout ATHLTH", norwegian: "Brukes for klokkeslett i hele ATHLTH"),
+                        options: TimeFormatPreference.allCases,
+                        selection: $settings.timeFormatPreference,
+                        optionTitle: { $0.title },
+                        optionDetail: { $0.example }
+                    )
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "clock",
+                        title: ATHLTHLocalization.choose(english: "Time format", norwegian: "Tidsformat"),
+                        subtitle: ATHLTHLocalization.choose(english: "Used for times throughout ATHLTH", norwegian: "Brukes for klokkeslett i hele ATHLTH")
+                    ) { settingsChoiceValue(settings.timeFormatPreference.title) }
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
 
+                NavigationLink {
+                    ATHLTHPremiumSettingsChoices(
+                        title: ATHLTHLocalization.choose(english: "Language", norwegian: "Språk"),
+                        subtitle: ATHLTHLocalization.choose(english: "Choose the app language", norwegian: "Velg appens visningsspråk"),
+                        options: AppLanguage.currentlySupported,
+                        selection: $settings.language,
+                        optionTitle: { $0.title },
+                        optionDetail: { _ in "" }
+                    )
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "globe",
+                        title: ATHLTHLocalization.choose(english: "Language", norwegian: "Språk"),
+                        subtitle: ATHLTHLocalization.choose(english: "Choose English or Norwegian", norwegian: "Velg engelsk eller norsk")
+                    ) { settingsChoiceValue(settings.language.title) }
+                }
+                .buttonStyle(.plain)
+                SettingsDivider()
 
-
-                            SettingsDivider()
-
-                            Menu {
-                                ForEach(TimeFormatPreference.allCases) { preference in
-                                    Button {
-                                        settings.timeFormatPreference = preference
-                                    } label: {
-                                        if settings.timeFormatPreference == preference {
-                                            Label(
-                                                "\(preference.title) · \(preference.example)",
-                                                systemImage: "checkmark"
-                                            )
-                                        } else {
-                                            Text(
-                                                "\(preference.title) · \(preference.example)"
-                                            )
-                                        }
-                                    }
-                                }
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "clock",
-                                    title: ATHLTHLocalization.choose(
-                                        english: "Time format",
-                                        norwegian: "Tidsformat"
-                                    ),
-                                    subtitle: ATHLTHLocalization.choose(
-                                        english: "Used for times throughout ATHLTH",
-                                        norwegian: "Brukes for klokkeslett i hele ATHLTH"
-                                    )
-                                ) {
-                                    HStack(spacing: 8) {
-                                        Text(settings.timeFormatPreference.title)
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(
-                                                ATHLTHTheme.mutedText.opacity(0.72)
-                                            )
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            Menu {
-                                ForEach(
-                                    AppLanguage
-                                        .currentlySupported
-                                ) { language in
-                                    Button {
-                                        settings.language =
-                                            language
-                                    } label: {
-                                        if settings.language ==
-                                            language {
-                                            Label(
-                                                language.title,
-                                                systemImage:
-                                                    "checkmark"
-                                            )
-                                        } else {
-                                            Text(
-                                                language.title
-                                            )
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(
-                                        systemName: "globe"
-                                    )
-                                    .font(
-                                        .system(
-                                            size: 18,
-                                            weight: .medium
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .primaryText
-                                    )
-                                    .frame(
-                                        width: 44,
-                                        height: 44
-                                    )
-                                    .background(
-                                        ATHLTHTheme
-                                            .accentSoft,
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius: 14,
-                                                style:
-                                                    .continuous
-                                            )
-                                    )
-
-                                    VStack(
-                                        alignment: .leading,
-                                        spacing: 3
-                                    ) {
-                                        Text("Language")
-                                            .font(
-                                                .system(
-                                                    size: 16.5,
-                                                    weight:
-                                                        .medium
-                                                )
-                                            )
-                                            .foregroundStyle(
-                                                ATHLTHTheme
-                                                    .primaryText
-                                            )
-
-                                        Text(
-                                            "Choose English or Norwegian"
-                                        )
-                                        .font(.caption)
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                        )
-                                    }
-
-                                    Spacer(
-                                        minLength: 12
-                                    )
-
-                                    HStack(spacing: 8) {
-                                        Text(
-                                            settings
-                                                .language
-                                                .title
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                        )
-
-                                        Image(
-                                            systemName:
-                                                "chevron.up.chevron.down"
-                                        )
-                                        .font(
-                                            .caption2
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                                .opacity(
-                                                    0.72
-                                                )
-                                        )
-                                    }
-                                }
-                                .padding(
-                                    .horizontal,
-                                    16
-                                )
-                                .padding(
-                                    .vertical,
-                                    13
-                                )
-                                .contentShape(
-                                    Rectangle()
-                                )
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                ATHLTHWidgetsAndSurfacesSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "rectangle.grid.2x2",
-                                    iconTint: ATHLTHTheme.vitality,
-                                    iconBackground: ATHLTHTheme.vitalitySoft,
-                                    title: "Widgets & Surfaces",
-                                    subtitle: "Home Screen, Live Activities, Siri and Lock Screen"
-                                ) {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(
-                                            ATHLTHTheme.mutedText.opacity(0.72)
-                                        )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
+                NavigationLink {
+                    ATHLTHWidgetsAndSurfacesSettingsView()
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "rectangle.grid.2x2",
+                        title: ATHLTHLocalization.choose(english: "Widgets & Surfaces", norwegian: "Widgeter og flater"),
+                        subtitle: ATHLTHLocalization.choose(english: "Home Screen, Live Activities, Siri and Lock Screen", norwegian: "Hjemskjerm, Live Activities, Siri og låseskjerm")
+                    ) {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
                     }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func settingsChoiceValue(_ value: String) -> some View {
+        HStack(spacing: 8) {
+            Text(value).foregroundStyle(ATHLTHTheme.mutedText)
+            Image(systemName: "chevron.right")
+                .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+        }
     }
 
     private var profileSettingsSection: some View {
@@ -3255,6 +3065,62 @@ private struct AppleCalendarSettingsView: View {
 
             Spacer()
         }
+    }
+}
+
+private struct ATHLTHPremiumSettingsChoices<Option: Identifiable & Equatable>: View {
+    let title: String
+    let subtitle: String
+    let options: [Option]
+    @Binding var selection: Option
+    let optionTitle: (Option) -> String
+    let optionDetail: (Option) -> String
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(title)
+                    .font(.system(size: 32, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                ForEach(options) { option in
+                    Button {
+                        selection = option
+                    } label: {
+                        PremiumSettingsCard {
+                            PremiumSettingsRow(
+                                icon: selection == option ? "checkmark.circle.fill" : "circle",
+                                iconTint: ATHLTHTheme.accentDeep,
+                                iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                title: optionTitle(option),
+                                subtitle: optionDetail(option).isEmpty ? nil : optionDetail(option)
+                            ) {
+                                if selection == option {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                }
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selection == option ? .isSelected : [])
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+        }
+        .background {
+            LinearGradient(
+                colors: [ATHLTHTheme.canvasTop, .white, ATHLTHTheme.canvasBottom],
+                startPoint: .top, endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
