@@ -100,8 +100,11 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
                 mode: mode,
                 onPrimary: { primaryCalls += 1 },
                 onSecondary: { secondaryCalls += 1 },
+                detailsCollapsed: true,
                 onCollapse: { collapseCalls += 1 }
             ) { EmptyView() }
+            XCTAssertFalse(dock.showsDetails)
+            XCTAssertNotNil(dock.onSecondary)
             dock.onCollapse?()
         }
         XCTAssertEqual(collapseCalls, 7)
@@ -111,6 +114,11 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
             mode: .runningFree, onPrimary: {}
         ) { EmptyView() }
         XCTAssertNil(run.onCollapse)
+        XCTAssertTrue(run.showsDetails)
+        let expanded = ATHLTHLiveWorkoutBottomDock(
+            mode: .strengthReady, onPrimary: {}, onCollapse: {}
+        ) { EmptyView() }
+        XCTAssertTrue(expanded.showsDetails)
     }
 
     func testSharedDockSupportsStructuredSportActions() {

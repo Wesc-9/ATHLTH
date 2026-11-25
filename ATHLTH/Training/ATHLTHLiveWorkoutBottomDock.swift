@@ -12,7 +12,9 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
     let secondaryDisabled: Bool
     let onPrimary: () -> Void
     let onSecondary: (() -> Void)?
+    let detailsCollapsed: Bool
     let onCollapse: (() -> Void)?
+    var showsDetails: Bool { !detailsCollapsed || onCollapse == nil }
     let details: Details
 
     init(
@@ -22,6 +24,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         secondaryDisabled: Bool = false,
         onPrimary: @escaping () -> Void,
         onSecondary: (() -> Void)? = nil,
+        detailsCollapsed: Bool = false,
         onCollapse: (() -> Void)? = nil,
         @ViewBuilder details: () -> Details
     ) {
@@ -31,54 +34,60 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
         self.secondaryDisabled = secondaryDisabled
         self.onPrimary = onPrimary
         self.onSecondary = onSecondary
+        self.detailsCollapsed = detailsCollapsed
         self.onCollapse = onCollapse
         self.details = details()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 9) {
-                Image(systemName: mode.primarySymbol)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.premiumGold)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        ATHLTHTheme.premiumGold.opacity(0.12),
-                        in: RoundedRectangle(cornerRadius: 10)
-                    )
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(mode.phaseTitle)
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.85)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    if let subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(ATHLTHTrainDesign.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+        VStack(alignment: .leading, spacing: onCollapse == nil ? 11 : 4) {
+            if showsDetails {
+                HStack(spacing: 9) {
+                    Image(systemName: mode.primarySymbol)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            ATHLTHTheme.premiumGold.opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
+                        .accessibilityHidden(true)
+    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(mode.phaseTitle)
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.85)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        if let subtitle, !subtitle.isEmpty {
+                            Text(subtitle)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-                if let onCollapse {
-                    Button(action: onCollapse) {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(ATHLTHTrainDesign.ink)
-                            .frame(width: 44, height: 44)
-                            .background(ATHLTHTrainDesign.rule.opacity(0.22), in: Circle())
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Hide set controls", norwegian: "Skjul settkort"))
-                    .accessibilityIdentifier("athlth-strength-dock-collapse")
-                }
+    
+                details
             }
 
-            details
+            if let onCollapse {
+                Button(action: onCollapse) {
+                    Image(systemName: detailsCollapsed ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .frame(width: 64, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(detailsCollapsed
+                    ? ATHLTHLocalization.choose(english: "Show set details", norwegian: "Vis settinformasjon")
+                    : ATHLTHLocalization.choose(english: "Hide set details", norwegian: "Skjul settinformasjon"))
+                .accessibilityIdentifier(detailsCollapsed
+                    ? "athlth-strength-dock-expand" : "athlth-strength-dock-collapse")
+            }
 
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 9) {
@@ -92,7 +101,7 @@ struct ATHLTHLiveWorkoutBottomDock<Details: View>: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 13)
+        .padding(.top, showsDetails ? 13 : 0)
         .padding(.bottom, 10)
         .frame(maxWidth: 760)
         .frame(maxWidth: .infinity)
