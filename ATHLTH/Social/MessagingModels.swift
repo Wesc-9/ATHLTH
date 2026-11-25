@@ -351,3 +351,15 @@ struct DirectMessageRequestResponseParams: Encodable {
         case acceptRequest = "accept_request"
     }
 }
+
+
+/// Push is an invalidation hint only; authenticated REST is still the source
+/// of truth for messages and private read receipts.
+enum ATHLTHDirectMessageRefreshPolicy {
+    static func matches(_ payload: [AnyHashable: Any], owner: UUID, conversation: UUID) -> Bool {
+        guard payload["athlth_entity_type"] as? String == "direct_conversation",
+              let recipient = payload["athlth_recipient_id"] as? String,
+              let entity = payload["athlth_entity_id"] as? String else { return false }
+        return UUID(uuidString: recipient) == owner && UUID(uuidString: entity) == conversation
+    }
+}
