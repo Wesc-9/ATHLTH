@@ -5,6 +5,27 @@ import XCTest
 /// Phase 2: every phase has one explicit next command and the control
 /// surface never equates countdown completion with a recorded strength set.
 final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
+    func testLiveAddMenuOffersThreeDistinctExistingWorkoutActions() {
+        XCTAssertEqual(ATHLTHLiveAddAction.allCases, [.exercise, .workout, .reorder])
+        XCTAssertEqual(Set(ATHLTHLiveAddAction.allCases.map(\.symbol)).count, 3)
+        XCTAssertTrue(ATHLTHLiveAddAction.allCases.allSatisfy {
+            !$0.title.isEmpty && !$0.subtitle.isEmpty
+        })
+    }
+
+    func testLiveAddMenuAnchorsBelowPlusAndFitsPhoneAndIPad() {
+        for size in [CGSize(width: 320, height: 570), CGSize(width: 393, height: 740),
+                     CGSize(width: 1024, height: 768)] {
+            let anchor = CGRect(x: size.width - 110, y: 8, width: 43, height: 48)
+            let frame = ATHLTHLiveAddMenuLayout.frame(anchor: anchor, container: size)
+            XCTAssertEqual(frame.minY, anchor.maxY + 8)
+            XCTAssertGreaterThanOrEqual(frame.minX, 12)
+            XCTAssertLessThanOrEqual(frame.maxX, size.width - 12)
+            XCTAssertLessThanOrEqual(frame.maxY, size.height - 12)
+            XCTAssertLessThanOrEqual(frame.width, 310)
+        }
+    }
+
     func testRunningModesAlwaysOfferProgressionOrAddingIntervals() {
         let modes: [ATHLTHLiveWorkoutBottomMode] = [
             .runningMain, .runningInterval, .runningNext, .runningFree

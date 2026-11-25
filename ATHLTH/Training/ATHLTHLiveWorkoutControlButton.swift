@@ -69,6 +69,148 @@ struct ATHLTHLiveWorkoutControlButton: View {
 }
 
 
+// Opt-in anchor for a custom menu; other sports retain their existing
+// navigation and presentation. Resolve it outside the top safe-area inset.
+struct ATHLTHLiveAddMenuAnchor: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
+}
+
+enum ATHLTHLiveAddMenuLayout {
+    static func frame(anchor: CGRect, container: CGSize) -> CGRect {
+        let margin: CGFloat = 12
+        let width = min(310, max(0, container.width - margin * 2))
+        let x = min(max(margin, anchor.midX - width / 2),
+                    max(margin, container.width - margin - width))
+        let y = min(max(margin, anchor.maxY + 8), max(margin, container.height - margin))
+        return CGRect(x: x, y: y, width: width,
+                      height: max(0, container.height - y - margin))
+    }
+}
+
+enum ATHLTHLiveAddAction: String, CaseIterable, Identifiable {
+    case exercise
+    case workout
+    case reorder
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .exercise: ATHLTHLocalization.choose(english: "Add exercise", norwegian: "Legg til øvelse")
+        case .workout: ATHLTHLocalization.choose(english: "Add workout", norwegian: "Legg til treningsøkt")
+        case .reorder: ATHLTHLocalization.choose(english: "Edit order", norwegian: "Rediger rekkefølge")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .exercise: ATHLTHLocalization.choose(english: "An exercise from the library", norwegian: "Enkeltøvelse fra biblioteket")
+        case .workout: ATHLTHLocalization.choose(english: "Insert a ready-made workout", norwegian: "Sett inn en ferdig økt")
+        case .reorder: ATHLTHLocalization.choose(english: "Adjust exercises and structure", norwegian: "Flytt på øvelser og struktur")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .exercise: "dumbbell"
+        case .workout: "rectangle.stack"
+        case .reorder: "list.number"
+        }
+    }
+}
+
+/// A lightweight, opaque menu, with no system confirmation bubble or
+/// independent workout state. All selections route back to the host.
+struct ATHLTHLiveAddMenu: View {
+    let onSelect: (ATHLTHLiveAddAction) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            menuRows
+            ScrollView { menuRows }
+                .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(ATHLTHTrainDesign.paper, in: RoundedRectangle(cornerRadius: 21))
+        .clipShape(RoundedRectangle(cornerRadius: 21))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21)
+                .strokeBorder(ATHLTHTrainDesign.gold.opacity(0.38), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: ATHLTHTrainDesign.ink.opacity(0.13), radius: 15, x: 0, y: 7)
+        .accessibilityIdentifier("athlth-live-add-menu")
+        .accessibilityAction(.escape) { onClose() }
+    }
+
+    private var menuRows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(ATHLTHLocalization.choose(english: "ADD TO WORKOUT", norwegian: "LEGG TIL I ØKTEN"))
+                .font(.caption2.weight(.semibold))
+                .tracking(0.8)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                .accessibilityAddTraits(.isHeader)
+
+            ForEach(ATHLTHLiveAddAction.allCases) { action in
+                if action != .exercise {
+                    Rectangle()
+                        .fill(ATHLTHTrainDesign.rule.opacity(0.45))
+                        .frame(height: 1)
+                        .padding(.leading, 54)
+                        .padding(.trailing, 10)
+                }
+                Button { onSelect(action) } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: action.symbol)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .frame(width: 36, height: 36)
+                            .background(ATHLTHTrainDesign.paleGold.opacity(0.65),
+                                        in: RoundedRectangle(cornerRadius: 11))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(action.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(action.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 3)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 9)
+                    .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(ATHLTHLiveAddMenuRowStyle())
+                .accessibilityIdentifier("athlth-live-add-" + action.rawValue)
+            }
+        }
+        .padding(7)
+    }
+}
+
+private struct ATHLTHLiveAddMenuRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? ATHLTHTrainDesign.paleGold.opacity(0.55) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 /// Shared compact top controls for phone workouts and Apple Watch mirrors.
 /// The content area owns the expanded Spotify player and the fixed pause dock.
 struct ATHLTHLiveWorkoutTopStrip: View {
@@ -77,6 +219,8 @@ struct ATHLTHLiveWorkoutTopStrip: View {
     let spotifyExpanded: Bool
     var addEnabled = true
     var finishDisabled = false
+    var anchorsLiveAddMenu = false
+    var liveAddMenuExpanded = false
     var onOverview: (() -> Void)? = nil
     let onMinimize: () -> Void
     let onSpotify: () -> Void
@@ -143,7 +287,7 @@ struct ATHLTHLiveWorkoutTopStrip: View {
 
             HStack(spacing: 0) {
                 Button(action: onAdd) {
-                    Image(systemName: "plus")
+                    Image(systemName: liveAddMenuExpanded ? "xmark" : "plus")
                         .font(.system(size: 19, weight: .medium))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                         .frame(width: 43, height: 48)
@@ -152,9 +296,12 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                 .buttonStyle(.plain)
                 .disabled(!addEnabled)
                 .opacity(addEnabled ? 1 : 0.4)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Add to workout", norwegian: "Legg til i økten"
-                ))
+                .accessibilityLabel(liveAddMenuExpanded
+                    ? ATHLTHLocalization.choose(english: "Close add menu", norwegian: "Lukk meny")
+                    : ATHLTHLocalization.choose(english: "Add to workout", norwegian: "Legg til i økten"))
+                .anchorPreference(key: ATHLTHLiveAddMenuAnchor.self, value: .bounds) {
+                    anchorsLiveAddMenu ? $0 : nil
+                }
                 Button(action: onFinish) {
                     Text(ATHLTHLocalization.choose(
                         english: "Finish", norwegian: "Avslutt"

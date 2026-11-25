@@ -168,32 +168,6 @@ struct ActiveStrengthWorkoutView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .confirmationDialog(
-                ATHLTHLocalization.choose(
-                    english: "Add to workout", norwegian: "Legg til i økten"
-                ),
-                isPresented: $showingLiveAddActions,
-                titleVisibility: .visible
-            ) {
-                Button(ATHLTHLocalization.choose(
-                    english: "Add exercise", norwegian: "Legg til øvelse"
-                )) {
-                    showingExerciseLibrary = true
-                }
-
-                Button(ATHLTHLocalization.choose(
-                    english: "Add workout", norwegian: "Legg til treningsøkt"
-                )) {
-                    showingAppendWorkout = true
-                }
-
-                Button(ATHLTHLocalization.choose(
-                    english: "Exercises and order",
-                    norwegian: "Øvelser og rekkefølge"
-                )) {
-                    showingExerciseQueue = true
-                }
-            }
             .sheet(isPresented: $showingStrengthAudioCoachSettings.keepingPresentedWhenInactive(scenePhase)) {
                 if strength.activeWorkout?.captureDevice == .iPhone {
                     StrengthAudioCoachSettingsView(
@@ -799,7 +773,10 @@ struct ActiveStrengthWorkoutView: View {
                         ),
                         subtitle: strengthLiveTopSummary(workout),
                         spotifyExpanded: showingSpotifyControls,
+                        addEnabled: !finishInProgress,
                         finishDisabled: finishInProgress,
+                        anchorsLiveAddMenu: true,
+                        liveAddMenuExpanded: showingLiveAddActions,
                         onOverview: { showingExerciseQueue = true },
                         onMinimize: {
                             strength.checkpoint()
@@ -810,7 +787,11 @@ struct ActiveStrengthWorkoutView: View {
                                 showingSpotifyControls.toggle()
                             }
                         },
-                        onAdd: { showingLiveAddActions = true },
+                        onAdd: {
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                showingLiveAddActions.toggle()
+                            }
+                        },
                         onFinish: { showingFinishConfirmation = true }
                     )
 
@@ -856,6 +837,43 @@ struct ActiveStrengthWorkoutView: View {
                 strengthLiveDock(workout: workout)
             }
         }
+        .overlayPreferenceValue(ATHLTHLiveAddMenuAnchor.self) { anchor in
+            if showingLiveAddActions, let anchor, let workoutID = strength.activeWorkout?.id {
+                GeometryReader { geometry in
+                    let frame = ATHLTHLiveAddMenuLayout.frame(
+                        anchor: geometry[anchor], container: geometry.size)
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { closeLiveAddMenu() }
+                            .accessibilityHidden(true)
+                        ATHLTHLiveAddMenu(
+                            onSelect: { action in
+                                showingLiveAddActions = false
+                                guard strength.activeWorkout?.id == workoutID,
+                                      !finishInProgress else { return }
+                                switch action {
+                                case .exercise: showingExerciseLibrary = true
+                                case .workout: showingAppendWorkout = true
+                                case .reorder: showingExerciseQueue = true
+                                }
+                            },
+                            onClose: { closeLiveAddMenu() }
+                        )
+                        .frame(width: frame.width)
+                        .frame(maxHeight: frame.height, alignment: .top)
+                        .offset(x: frame.minX, y: frame.minY)
+                        .transition(.opacity)
+                    }
+                }
+            }
+        }
+        .onChange(of: strength.activeWorkout?.id) { _, _ in
+            showingLiveAddActions = false
+        }
+        .onChange(of: finishInProgress) { _, finishing in
+            if finishing { showingLiveAddActions = false }
+        }
         // A strength workout is a true full-screen surface. Spotify can
         // temporarily move ATHLTH to the background while App Remote wakes the
         // Spotify app. When iOS restores this fullScreenCover, an explicit
@@ -880,6 +898,12 @@ struct ActiveStrengthWorkoutView: View {
         .presentationBackground(
             ATHLTHTheme.canvasTop
         )
+    }
+
+    private func closeLiveAddMenu() {
+        withAnimation(.easeOut(duration: 0.16)) {
+            showingLiveAddActions = false
+        }
     }
 
     @MainActor
