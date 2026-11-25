@@ -160,3 +160,12 @@ final class ATHLTHiPadLiveScenePresentation: ObservableObject {
         state.resetForAccountChange()
     }
 }
+
+enum ATHLTHCrossDevicePresenceRefreshPolicy {
+    static func needsWrite(sessionID: UUID, source: String, previousSessionID: UUID?,
+                           previousSource: String?, previousWrite: Date?, now: Date) -> Bool {
+        guard sessionID == previousSessionID, source == previousSource,
+              let previousWrite else { return true }
+        return !(0..<12).contains(now.timeIntervalSince(previousWrite))
+    }
+}
