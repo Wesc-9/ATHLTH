@@ -14,6 +14,29 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
 
+    private func activityVenuePicker(_ activity: ATHLTHTournamentActivity) -> some View {
+        let options = settings.allowedEnvironments(activity: activity)
+        let current = settings.activityEnvironments[activity.rawValue]
+        return VStack(alignment: .leading, spacing: 3) {
+            Picker(activity.title, selection: Binding<ATHLTHCompetitionEnvironment?>(
+                get: { settings.activityEnvironments[activity.rawValue] },
+                set: { settings.activityEnvironments[activity.rawValue] = $0 }
+            )) {
+                Text("Arv: " + settings.environment.title).tag(ATHLTHCompetitionEnvironment?.none)
+                ForEach(ATHLTHCompetitionEnvironment.allCases.filter {
+                    ($0 != settings.environment && options.contains($0)) || $0 == current
+                }) { venue in
+                    Text(venue.title).tag(Optional(venue))
+                }
+            }
+            .pickerStyle(.menu)
+            if let current, !options.contains(current) {
+                Text("Velg en miljøregel som passer med fellesregelen.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             Text("Start og progresjon")
@@ -147,8 +170,17 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     Label("Treningsmiljøet passer ikke med valgte aktiviteter eller GPS-regler.", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
                 }
-                if !settings.environment.canPublish {
-                    Text("Kan lagres som mal. Publisering av dette miljøkravet er sperret inntil serveren kan kontrollere det.")
+                if activities.count > 1 || !settings.activityEnvironments.isEmpty {
+                    Divider()
+                    Text("Per treningsform").font(.subheadline.weight(.semibold))
+                    Text("Arv bruker fellesregelen. En egen regel kan bare snevre inn tillatt miljø.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    ForEach(ATHLTHTournamentActivity.allCases.filter { activities.contains($0) }) { activity in
+                        activityVenuePicker(activity)
+                    }
+                }
+                if !settings.environmentsCanPublish(activities: activities) {
+                    Text("Kan lagres som mal. Publisering av disse miljøkravene er sperret inntil serveren kan kontrollere dem.")
                         .font(.caption).foregroundStyle(.orange)
                 }
                 Button {
