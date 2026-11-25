@@ -1,38 +1,67 @@
 import SwiftUI
 
-/// Isolated, low-frequency editor. Typing a digit never invalidates the
-/// parent workout timeline, exercise artwork or the Spotify picker.
+/// Pace is stored canonically in seconds/km; treadmill speed is just another
+/// representation of that exact target, not a second independent value.
+enum ATHLTHRunningImportPace {
+    static func kilometersPerHour(from input: String, treadmill: Bool) -> Double? {
+        let clean = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if treadmill {
+            guard let speed = Double(clean.replacingOccurrences(of: ",", with: ".")),
+                  speed.isFinite, (2...30).contains(speed) else { return nil }
+            return speed
+        }
+        let parts = clean.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, let minutes = Int(parts[0]), let seconds = Int(parts[1]),
+              (0...30).contains(minutes), (0...59).contains(seconds),
+              parts[1].count == 2 else { return nil }
+        let pace = Double(minutes * 60 + seconds)
+        guard (120...1800).contains(pace) else { return nil }
+        return 3600 / pace
+    }
+
+    static func text(for pace: Double?, treadmill: Bool) -> String {
+        guard let pace, pace.isFinite, (120...1800).contains(pace) else { return "" }
+        if treadmill {
+            return (3600 / pace).formatted(.number.precision(.fractionLength(0...2)))
+        }
+        let seconds = Int(pace.rounded())
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+/// Isolated editor: typing never invalidates the parent workout timeline.
 struct ATHLTHRunningPrivateSpeedEditor: View {
     let effortCount: Int
+    var environment: RunEnvironment = .treadmill
+    var currentPace: Double? = nil
     let onApply: (Double) -> Void
 
     @State private var typedSpeed = ""
-
+    private var treadmill: Bool { environment == .treadmill }
     private var speed: Double? {
-        let normalized = typedSpeed.replacingOccurrences(of: ",", with: ".")
-        guard let number = Double(normalized),
-              number.isFinite, (2...30).contains(number) else { return nil }
-        return number
+        ATHLTHRunningImportPace.kilometersPerHour(from: typedSpeed, treadmill: treadmill)
+    }
+
+    private func refreshInput() {
+        typedSpeed = ATHLTHRunningImportPace.text(for: currentPace, treadmill: treadmill)
     }
 
     var body: some View {
         if effortCount > 0 {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Target speed", norwegian: "Målfart"
-                    ))
-                    .font(.subheadline.weight(.medium))
+                    Text(ATHLTHLocalization.choose(english: "Target pace", norwegian: "Målfart"))
+                        .font(.subheadline.weight(.medium))
                     Spacer(minLength: 6)
-                    TextField("14", text: $typedSpeed)
-                        .keyboardType(.decimalPad)
+                    TextField(treadmill ? "14" : "4:17", text: $typedSpeed)
+                        .keyboardType(treadmill ? .decimalPad : .numbersAndPunctuation)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 72)
+                        .frame(width: 76)
+                        .monospacedDigit()
                         .accessibilityIdentifier("athlth-running-private-speed")
-                    Text("km/t").font(.caption)
-                    Button(ATHLTHLocalization.choose(
-                        english: "Apply to all", norwegian: "Bruk"
-                    )) {
+                        .accessibilityLabel(treadmill ? "km/t" : "min/km")
+                    Text(treadmill ? "km/t" : "min/km").font(.caption)
+                    Button(ATHLTHLocalization.choose(english: "Apply", norwegian: "Bruk")) {
                         guard let speed else { return }
                         onApply(speed)
                     }
@@ -48,6 +77,9 @@ struct ATHLTHRunningPrivateSpeedEditor: View {
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             .frame(maxWidth: .infinity)
+            .onAppear(perform: refreshInput)
+            .onChange(of: environment) { _, _ in refreshInput() }
+            .onChange(of: currentPace) { _, _ in refreshInput() }
         }
     }
 }
