@@ -203,11 +203,24 @@ final class SupabaseAccountService: ObservableObject {
         passwordRecoveryPending = false
     }
 
-    func signOut() async throws {
+    func signOut(allDevices: Bool = false) async throws {
         await APNsPushManager.shared.unregisterCurrentDevice()
-        try await client.auth.signOut()
+        try await client.auth.signOut(scope: allDevices ? .global : .local)
         passwordRecoveryPending = false
     }
+
+    func accountSessions(deviceKind: String) async throws -> [ATHLTHAccountSession] {
+        struct Params: Encodable { let p_device_kind: String }
+        return try await client.rpc("athlth_my_account_sessions", params: Params(p_device_kind: deviceKind))
+            .execute().value
+    }
+
+    func revokeAccountSession(_ id: UUID) async throws -> Bool {
+        struct Params: Encodable { let p_session_id: UUID }
+        return try await client.rpc("athlth_revoke_my_other_session", params: Params(p_session_id: id))
+            .execute().value
+    }
+
 
     /// Clears a Supabase session that survived an app reinstall in Keychain.
     /// This is intentionally local-only so a fresh install on this iPhone
