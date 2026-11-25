@@ -370,6 +370,8 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     // Private session-only launch choices. These values are deliberately
     // excluded from Codable: workouts shared with friends or saved as public
     // recipes must never transport an athlete's personal Audio Coach/music.
+    /// Import-only environment; the resulting planned recipe stores its own venue.
+    var launchRunEnvironment: RunEnvironment? = nil
     var launchAudioCoachConfiguration: WatchAudioCoachConfiguration? = nil
     var launchSpotifyPlaylist: SpotifyPlaylistReference? = nil
     var launchSpotifyAutoplayOnStart: Bool? = nil
