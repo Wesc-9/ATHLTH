@@ -3,6 +3,22 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHTrainingProfileAndExerciseProgressTests: XCTestCase {
+    func testLatestMeasurementIndexHandlesUnsortedHistoryWithoutChangingIt() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let recent = ATHLTHBodyMeasurement(metric: .weight, value: 77, date: now)
+        let older = ATHLTHBodyMeasurement(metric: .weight, value: 80, date: now.addingTimeInterval(-86400))
+        let waist = ATHLTHBodyMeasurement(metric: .waist, value: 83, date: now.addingTimeInterval(-3600))
+        var profile = ATHLTHTrainingProfile()
+        profile.measurements = [recent, older, waist]
+        let index = profile.latestByMetric()
+        XCTAssertEqual(index[.weight], recent)
+        XCTAssertEqual(index[.waist], waist)
+        XCTAssertNil(index[.hips])
+        XCTAssertEqual(profile.latest(.weight), recent)
+        XCTAssertEqual(profile.readings(for: .weight), [older, recent])
+        XCTAssertEqual(profile.measurements, [recent, older, waist])
+    }
+
     func testPrivateMeasurementsRetainHistoryAndReplaceSameDayOnly() {
         var profile = ATHLTHTrainingProfile()
         let first = Date(timeIntervalSince1970: 1_700_000_000)
