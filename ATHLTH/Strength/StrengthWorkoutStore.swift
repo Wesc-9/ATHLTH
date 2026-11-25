@@ -1479,7 +1479,7 @@ final class StrengthWorkoutStore: ObservableObject {
         // completed set rows, but its completedAt marks a deliberate
         // transition. Without this check the Watch remains stuck on it.
         return exercise.isCompleted ||
-            (!exercise.sets.isEmpty && exercise.sets.allSatisfy(\.isCompleted))
+            (!exercise.sets.isEmpty && exercise.sets.allSatisfy(\.isResolved))
     }
 
     var hasNextExercise: Bool {
@@ -4005,6 +4005,7 @@ final class StrengthWorkoutStore: ObservableObject {
         Self.beginStrengthGroup(&launchedWorkout, selected: 0,
                                 at: launchStartedAt)
         launchedWorkout.relayRequestID = relayRequestID
+        launchedWorkout.sourceWorkoutTemplateID = session.workoutTemplateID
         launchedWorkout.plannedTrainingPlace = session.plannedTrainingPlace
         launchedWorkout.liveHeartRateTargetZone =
             session.targetAlertConfiguration?.heartRateZone
@@ -4170,7 +4171,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
         workout.exercises[currentExerciseIndex].sets[currentSetIndex] = set
 
-        let allSetsCompleted = workout.exercises[currentExerciseIndex].sets.allSatisfy(\.isCompleted)
+        let allSetsCompleted = workout.exercises[currentExerciseIndex].sets.allSatisfy(\.isResolved)
 
         if allSetsCompleted {
             workout.exercises[currentExerciseIndex].completedAt = completedAt
@@ -5791,7 +5792,7 @@ final class StrengthWorkoutStore: ObservableObject {
         restStartedAt = nil
         restEndsAt = nil
 
-        let nextPending = exercise.sets.firstIndex { !$0.isCompleted }
+        let nextPending = exercise.sets.firstIndex { !$0.isResolved }
         if let nextPending {
             currentSetIndex = nextPending
             exercise.completedAt = nil
@@ -6410,10 +6411,8 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     private func advanceSetIndex(in exercise: StrengthExerciseLog) {
-        if let nextIndex = exercise.sets.indices.first(where: { index in
-            index > currentSetIndex && !exercise.sets[index].isCompleted
-        }) {
-            currentSetIndex = nextIndex
-        }
+        let next = exercise.sets.indices.first { $0 > currentSetIndex && !exercise.sets[$0].isResolved }
+            ?? exercise.sets.firstIndex { !$0.isResolved }
+        if let next { currentSetIndex = next }
     }
 }
