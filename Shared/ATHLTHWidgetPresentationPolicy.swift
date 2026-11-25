@@ -3,6 +3,11 @@ import Foundation
 /// Presentation-only rules shared by Home Screen, Lock Screen and iPad
 /// widgets. The recording engine remains the sole source of workout data.
 enum ATHLTHWidgetPresentationPolicy {
+    // The compact and rest strength Live Activities share the same safe
+    // interior spacing. Do not rely on implicit WidgetKit content margins.
+    static let strengthLockScreenHorizontalInset: CGFloat = 14
+    static let strengthLockScreenVerticalInset: CGFloat = 8
+
     static func intervalLabel(
         ordinal: Int?, total: Int?, isRecovery: Bool
     ) -> String? {

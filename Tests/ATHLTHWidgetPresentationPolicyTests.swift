@@ -247,6 +247,18 @@ final class ATHLTHWidgetPresentationPolicyTests: XCTestCase {
         XCTAssertEqual(ATHLTHWidgetPresentationPolicy.remainingSeconds(32), 32)
     }
 
+    func testStrengthLockScreenKeepsInteriorMarginsOnNarrowCards() {
+        XCTAssertGreaterThanOrEqual(
+            ATHLTHWidgetPresentationPolicy.strengthLockScreenHorizontalInset, 12)
+        XCTAssertGreaterThanOrEqual(
+            ATHLTHWidgetPresentationPolicy.strengthLockScreenVerticalInset, 8)
+        // Margins must leave room for both the set counter and exercise title.
+        for width: CGFloat in [280, 320, 370, 400] {
+            XCTAssertGreaterThanOrEqual(
+                width - 2 * ATHLTHWidgetPresentationPolicy.strengthLockScreenHorizontalInset, 250)
+        }
+    }
+
     func testLongDurationIsNotTruncatedToMinutes() {
         XCTAssertEqual(ATHLTHWidgetPresentationPolicy.duration(90), "01:30")
         XCTAssertEqual(ATHLTHWidgetPresentationPolicy.duration(3_661), "1:01:01")

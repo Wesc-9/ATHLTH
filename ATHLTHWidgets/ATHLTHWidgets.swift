@@ -1042,8 +1042,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 .foregroundStyle(ATHLTHWidgetPalette.ink)
                 .activityBackgroundTint(Color.white)
                 .activitySystemActionForegroundColor(ATHLTHWidgetPalette.ink)
-                // ActivityKit owns the outer card. A second generic 16-point
-                // padding previously pushed long running content off-screen.
+                // Each sport supplies its own interior insets once. ActivityKit
+                // owns the outer rounded card, not the content's safe margins.
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -1336,7 +1336,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         countsDown: true,
                         showsHours: false
                     )
-                    .font(.system(size: 61, weight: .bold, design: .rounded))
+                    .font(.system(size: 43, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .minimumScaleFactor(0.65)
                     .lineLimit(1)
@@ -1344,13 +1344,15 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     .accessibilityLabel(localized("Rest time remaining", "Gjenstående pause"))
                 } else {
                     Text(localized("READY", "KLAR"))
-                        .font(.system(size: 43, weight: .bold, design: .rounded))
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
                         .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
-            .frame(maxHeight: .infinity)
-
+            // Use the timer's intrinsic height. An expanding frame can
+            // squeeze the header and next-exercise row out of ActivityKit.
             HStack(spacing: 7) {
                 Image(systemName: "arrow.right.circle.fill")
                     .foregroundStyle(ATHLTHWidgetPalette.brandGold)
@@ -1370,13 +1372,18 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 Spacer(minLength: 6)
                 if state.heartRate.isFinite, state.heartRate > 0 {
                     Text("\(Int(state.heartRate.rounded())) bpm")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(ATHLTHWidgetPalette.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .layoutPriority(1)
                 }
             }
         }
         .foregroundStyle(ATHLTHWidgetPalette.ink)
-        .padding(.vertical, 2)
+        .padding(.horizontal, ATHLTHWidgetPresentationPolicy.strengthLockScreenHorizontalInset)
+        .padding(.vertical, ATHLTHWidgetPresentationPolicy.strengthLockScreenVerticalInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 
@@ -1396,7 +1403,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         let restEndsAt = state.strengthRestEndsAt
         let remainingAtRender = restEndsAt?.timeIntervalSinceNow ?? 0
 
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 ATHLTHMarkShape()
                     .fill(ATHLTHWidgetPalette.ink)
@@ -1415,8 +1422,8 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         .tracking(0.5)
                 }
                 .foregroundStyle(ATHLTHWidgetPalette.brandGold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
                 .background(
                     ATHLTHWidgetPalette.brandGold.opacity(0.09),
                     in: Capsule()
@@ -1455,7 +1462,9 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         )
                         .font(.system(size: 25, weight: .semibold, design: .rounded))
                         .monospacedDigit()
-                        .frame(minWidth: 82, alignment: .trailing)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .frame(maxWidth: 110, alignment: .trailing)
                     } else {
                         Text(localized("Ready", "Klar"))
                             .font(.system(size: 20, weight: .semibold))
@@ -1480,13 +1489,15 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     Spacer(minLength: 0)
                 }
             }
-            .frame(minHeight: 36)
+            .lineLimit(1)
+            .minimumScaleFactor(0.70)
+            .frame(minHeight: 27)
 
             Rectangle()
                 .fill(ATHLTHWidgetPalette.ink.opacity(0.09))
                 .frame(height: 1)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Label {
                     if paused || state.phase != "running" {
                         Text(duration(state.elapsedTime))
@@ -1494,19 +1505,22 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         // Workout start includes pauses; anchor to active elapsed
                         // from the latest HealthKit snapshot instead.
                         Text(
-                            state.updatedAt.addingTimeInterval(-max(state.elapsedTime, 0)),
+                            ATHLTHWidgetPresentationPolicy.elapsedAnchor(
+                                updatedAt: state.updatedAt, elapsedSeconds: state.elapsedTime),
                             style: .timer
                         )
                     }
                 } icon: {
                     Image(systemName: "clock")
                 }
-                Spacer(minLength: 6)
-                if state.heartRate.isFinite, state.heartRate > 0 {
-                    Label(
-                        "\(Int(state.heartRate.rounded())) bpm",
-                        systemImage: "heart.fill"
-                    )
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                Spacer(minLength: 4)
+                if let heart = ATHLTHWidgetPresentationPolicy.heartRateLabel(state.heartRate) {
+                    Label(heart, systemImage: "heart.fill")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .layoutPriority(1)
                 }
             }
             .font(.system(size: 11, weight: .medium))
@@ -1515,7 +1529,9 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             .foregroundStyle(ATHLTHWidgetPalette.muted)
         }
         .foregroundStyle(ATHLTHWidgetPalette.ink)
-        .padding(.vertical, 2)
+        .padding(.horizontal, ATHLTHWidgetPresentationPolicy.strengthLockScreenHorizontalInset)
+        .padding(.vertical, ATHLTHWidgetPresentationPolicy.strengthLockScreenVerticalInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
     }
 
