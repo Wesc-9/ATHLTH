@@ -180,7 +180,7 @@ struct GarminPersonalSettingsView: View {
         .onDisappear {
             key = ""
             #if ATHLTH_GARMIN_INTERNAL_TEST
-            if store.accountID == accountID { store.activate(account: nil) }
+            store.suspendPreview(account: accountID)
             #endif
         }
     }

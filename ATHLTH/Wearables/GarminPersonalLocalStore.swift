@@ -96,6 +96,19 @@ final class GarminPersonalLocalStore: ObservableObject {
         } catch { message = "Unable to access the local Keychain." }
     }
 
+    /// Clear sensitive preview on leaving the private page, retaining connection state.
+    func suspendPreview(account: UUID) {
+        guard accountID == account else { return }
+        generation = UUID()
+        job?.cancel()
+        client?.close()
+        job = nil
+        client = nil
+        busy = false
+        preview = nil
+        lastAttempt = nil
+    }
+
     func disconnect(account: UUID) {
         guard accountID == account else { return }
         reset()
@@ -155,6 +168,7 @@ final class GarminPersonalLocalStore: ObservableObject {
                       !Task.isCancelled else { return }
                 switch error as? GarminPersonalClientError {
                 case .some(.unauthorized):
+                    self.connected = false
                     self.preview = nil
                     self.lastRefresh = nil
                     self.message = "Garmin rejected access. Replace or revoke your key."

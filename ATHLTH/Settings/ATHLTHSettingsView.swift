@@ -78,6 +78,9 @@ struct ATHLTHSettingsView: View {
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
+    #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+    @ObservedObject private var garminConnectionStore = GarminPersonalLocalStore.shared
+    #endif
 
     @State private var showingMembership = false
     @State private var membershipRestoreMessage: String?
@@ -1006,225 +1009,259 @@ settingsSection(ATHLTHLocalization.choose(
         }
     }
 
+    private enum ConnectionItem: String, CaseIterable, Identifiable {
+        case health, calendar, watch, garmin, spotify, homeAssistant
+        var id: String { rawValue }
+    }
+
+    private func connectionIsActive(_ item: ConnectionItem) -> Bool {
+        switch item {
+        case .health: return settings.appleHealthIntegrationEnabled && health.hasRequestedAuthorization && health.hasReadableHealthData
+        case .calendar: return session.subscriptionAccess.hasPaidAccess && calendarSync.isEnabled && calendarSync.hasFullAccess
+        case .watch: return !ATHLTHDeviceRole.isIPad && watchConnection.isReady
+        case .spotify: return spotify.isConnected
+        case .homeAssistant: return homeAssistant.isConnected
+        case .garmin:
+            #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+            return session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter &&
+                garminConnectionStore.isConnected(to: session.profile.userID)
+            #else
+            return false
+            #endif
+        }
+    }
+
     @ViewBuilder
     private var connectionsSettingsSection: some View {
-settingsSection("Connections") {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                appleHealthSettingsPage
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "heart.fill",
-                                    iconTint: .pink,
-                                    iconBackground: Color.pink.opacity(0.10),
-                                    title: "Apple Health",
-                                    subtitle: appleHealthConnectionSubtitle
-                                ) {
-                                    connectionTrailing(
-                                        !settings.appleHealthIntegrationEnabled
-                                            ? "Off"
-                                            : !health.hasRequestedAuthorization
-                                                ? "Connect"
-                                                : health.hasReadableHealthData
-                                                    ? "Connected"
-                                                    : "Configured",
-                                        showChevron: true
-                                    )
-                                }
-                            }
-                            .buttonStyle(.plain)
+        let active = ConnectionItem.allCases.filter { connectionIsActive($0) }
+        let available = ConnectionItem.allCases.filter { !connectionIsActive($0) }
+        connectionGroup("Active connections", items: active)
+        connectionGroup("Available connections", items: available)
+    }
 
-                            SettingsDivider()
+    private func connectionGroup(_ title: String, items: [ConnectionItem]) -> some View {
+        settingsSection(title) {
+            PremiumSettingsCard {
+                if items.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "None", norwegian: "Ingen"))
+                        .font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                } else {
+                    ForEach(items) { item in
+                        connectionRow(item)
+                        if item != items.last { SettingsDivider() }
+                    }
+                }
+            }
+        }
+    }
 
-                            if session.subscriptionAccess.hasPaidAccess {
-                                NavigationLink {
-                                    AppleCalendarSettingsView()
-                                } label: {
-                                    PremiumSettingsRow(
-                                        icon: "calendar",
-                                        iconTint: .red,
-                                        iconBackground: Color.red.opacity(0.09),
-                                        title: "Calendar",
-                                        subtitle: appleCalendarConnectionSubtitle
-                                    ) {
-                                        connectionTrailing(
-                                            calendarSync.isSyncing
-                                                ? "Syncing"
-                                                : calendarSync.isEnabled
-                                                    ? "Connected"
-                                                    : calendarSync.hasFullAccess
-                                                        ? "Ready"
-                                                        : "Connect",
-                                            showChevron: true,
-                                            loading: calendarSync.isSyncing
-                                        )
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            } else {
-                                Button {
-                                    showingMembership = true
-                                } label: {
-                                    PremiumSettingsRow(
-                                        icon: "calendar",
-                                        iconTint: .red,
-                                        iconBackground: Color.red.opacity(0.09),
-                                        title: "Calendar",
-                                        subtitle:
-                                            "ATHLTH+ · sync your training plan to Calendar"
-                                    ) {
-                                        HStack(spacing: 7) {
-                                            Text("ATHLTH+")
-                                                .font(.caption2.weight(.bold))
-                                                .foregroundStyle(
-                                                    ATHLTHTheme.premiumGold
-                                                )
-
-                                            Image(systemName: "chevron.right")
-                                                .foregroundStyle(
-                                                    ATHLTHTheme.mutedText
-                                                        .opacity(0.72)
-                                                )
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            SettingsDivider()
-
-                            if ATHLTHDeviceRole.isIPad {
-                                PremiumSettingsRow(
-                                    icon: "applewatch",
-                                    iconTint:
-                                        ATHLTHTheme.primaryText,
-                                    title: "Apple Watch",
-                                    subtitle:
-                                        ATHLTHLocalization.choose(
-                                            english:
-                                                "Managed by your paired iPhone · workout starts can be sent from iPad",
-                                            norwegian:
-                                                "Styres av den parede iPhonen · økter kan startes fra iPad"
-                                        )
-                                ) {
-                                    Text(
-                                        ATHLTHLocalization.choose(
-                                            english: "Via iPhone",
-                                            norwegian: "Via iPhone"
-                                        )
-                                    )
-                                    .font(
-                                        .caption.weight(
-                                            .semibold
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .mutedText
-                                    )
-                                }
-                            } else {
-                                NavigationLink {
-                                    AppleWatchConnectionView()
-                                } label: {
-                                    PremiumSettingsRow(
-                                        icon: "applewatch",
-                                        iconTint: ATHLTHTheme.primaryText,
-                                        title: "Apple Watch",
-                                        subtitle: trainingDeviceSubtitle
-                                    ) {
-                                        connectionTrailing(
-                                            watchDeviceTrailingTitle,
-                                            showChevron: true
-                                        )
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-
+    @ViewBuilder
+    private func connectionRow(_ item: ConnectionItem) -> some View {
+        switch item {
+        case .health:
+            NavigationLink {
+                appleHealthSettingsPage
+            } label: {
+                PremiumSettingsRow(
+                    icon: "heart.fill",
+                    iconTint: .pink,
+                    iconBackground: Color.pink.opacity(0.10),
+                    title: "Apple Health",
+                    subtitle: appleHealthConnectionSubtitle
+                ) {
+                    connectionTrailing(
+                        !settings.appleHealthIntegrationEnabled
+                            ? "Off"
+                            : !health.hasRequestedAuthorization
+                                ? "Connect"
+                                : health.hasReadableHealthData
+                                    ? "Connected"
+                                    : "Configured",
+                        showChevron: true
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+        case .calendar:
+            if session.subscriptionAccess.hasPaidAccess {
+                NavigationLink {
+                    AppleCalendarSettingsView()
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "calendar",
+                        iconTint: .red,
+                        iconBackground: Color.red.opacity(0.09),
+                        title: "Calendar",
+                        subtitle: appleCalendarConnectionSubtitle
+                    ) {
+                        connectionTrailing(
+                            calendarSync.isSyncing
+                                ? "Syncing"
+                                : calendarSync.isEnabled
+                                    ? "Connected"
+                                    : calendarSync.hasFullAccess
+                                        ? "Ready"
+                                        : "Connect",
+                            showChevron: true,
+                            loading: calendarSync.isSyncing
+                        )
+                    }
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    showingMembership = true
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "calendar",
+                        iconTint: .red,
+                        iconBackground: Color.red.opacity(0.09),
+                        title: "Calendar",
+                        subtitle:
+                            "ATHLTH+ · sync your training plan to Calendar"
+                    ) {
+                        HStack(spacing: 7) {
+                            Text("ATHLTH+")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(
+                                    ATHLTHTheme.premiumGold
+                                )
+            
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(
+                                    ATHLTHTheme.mutedText
+                                        .opacity(0.72)
+                                )
                         }
                     }
-
-                    settingsSection(ATHLTHLocalization.choose(english: "Optional connections", norwegian: "Valgfrie tilkoblinger")) {
-                        PremiumSettingsCard {
-                            NavigationLink {
-                                #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-                                if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
-                                    GarminPersonalSettingsView(accountID: session.profile.userID)
-                                        .id(session.profile.userID)
-                                } else {
-                                    GarminConnectionSetupView()
-                                }
-                                #else
-                                GarminConnectionSetupView()
-                                #endif
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "watch.analog",
-                                    iconTint: ATHLTHTheme.accentDeep,
-                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
-                                    title: "Garmin",
-                                    subtitle: session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
-                                        ? ATHLTHLocalization.choose(english: "Developer testing · connection and status", norwegian: "Utviklertest · tilkobling og status")
-                                        : ATHLTHLocalization.choose(english: "Garmin Connect integration", norwegian: "Garmin Connect-integrasjon")
-                                ) {
-                                    connectionTrailing(
-                                        session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
-                                            ? ATHLTHLocalization.choose(english: "Test", norwegian: "Test")
-                                            : ATHLTHLocalization.choose(english: "Coming soon", norwegian: "Kommer snart"),
-                                        showChevron: true
-                                    )
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                SpotifySettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "music.note",
-                                    iconTint: spotifyGreen,
-                                    iconBackground: spotifyGreen.opacity(0.12),
-                                    title: "Spotify",
-                                    subtitle: spotifyConnectionSubtitle
-                                ) {
-                                    connectionTrailing(
-                                        spotify.connectionState.title,
-                                        showChevron: true,
-                                        loading:
-                                            spotify.connectionState == .connecting
-                                    )
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            SettingsDivider()
-
-                            NavigationLink {
-                                HomeAssistantSettingsView()
-                            } label: {
-                                PremiumSettingsRow(
-                                    icon: "house.fill",
-                                    iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
-                                    iconBackground: Color(red: 0.12, green: 0.58, blue: 0.86).opacity(0.11),
-                                    title: "Home Assistant",
-                                    subtitle: homeAssistant.connectionSubtitle
-                                ) {
-                                    connectionTrailing(
-                                        homeAssistant.connectionState.title,
-                                        showChevron: true,
-                                        loading:
-                                            homeAssistant.connectionState == .discovering ||
-                                            homeAssistant.connectionState == .authorizing ||
-                                            homeAssistant.connectionState == .pairing
-                                    )
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
+                }
+                .buttonStyle(.plain)
+            }
+        case .watch:
+            if ATHLTHDeviceRole.isIPad {
+                PremiumSettingsRow(
+                    icon: "applewatch",
+                    iconTint:
+                        ATHLTHTheme.primaryText,
+                    title: "Apple Watch",
+                    subtitle:
+                        ATHLTHLocalization.choose(
+                            english:
+                                "Managed by your paired iPhone · workout starts can be sent from iPad",
+                            norwegian:
+                                "Styres av den parede iPhonen · økter kan startes fra iPad"
+                        )
+                ) {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Via iPhone",
+                            norwegian: "Via iPhone"
+                        )
+                    )
+                    .font(
+                        .caption.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        ATHLTHTheme
+                            .mutedText
+                    )
+                }
+            } else {
+                NavigationLink {
+                    AppleWatchConnectionView()
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "applewatch",
+                        iconTint: ATHLTHTheme.primaryText,
+                        title: "Apple Watch",
+                        subtitle: trainingDeviceSubtitle
+                    ) {
+                        connectionTrailing(
+                            watchDeviceTrailingTitle,
+                            showChevron: true
+                        )
                     }
+                }
+                .buttonStyle(.plain)
+            }
+        case .garmin:
+            NavigationLink {
+                #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+                if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
+                    GarminPersonalSettingsView(accountID: session.profile.userID)
+                        .id(session.profile.userID)
+                } else {
+                    GarminConnectionSetupView()
+                }
+                #else
+                GarminConnectionSetupView()
+                #endif
+            } label: {
+                PremiumSettingsRow(
+                    icon: "watch.analog",
+                    iconTint: ATHLTHTheme.accentDeep,
+                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                    title: "Garmin",
+                    subtitle: session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
+                        ? ATHLTHLocalization.choose(english: "Developer testing · connection and status", norwegian: "Utviklertest · tilkobling og status")
+                        : ATHLTHLocalization.choose(english: "Garmin Connect integration", norwegian: "Garmin Connect-integrasjon")
+                ) {
+                    connectionTrailing(
+                        session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
+                            ? (connectionIsActive(.garmin) ? ATHLTHLocalization.choose(english: "Connected", norwegian: "Tilkoblet") : ATHLTHLocalization.choose(english: "Test", norwegian: "Test"))
+                            : ATHLTHLocalization.choose(english: "Coming soon", norwegian: "Kommer snart"),
+                        showChevron: true
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+        case .spotify:
+            NavigationLink {
+                SpotifySettingsView()
+            } label: {
+                PremiumSettingsRow(
+                    icon: "music.note",
+                    iconTint: spotifyGreen,
+                    iconBackground: spotifyGreen.opacity(0.12),
+                    title: "Spotify",
+                    subtitle: spotifyConnectionSubtitle
+                ) {
+                    connectionTrailing(
+                        spotify.connectionState.title,
+                        showChevron: true,
+                        loading:
+                            spotify.connectionState == .connecting
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+        case .homeAssistant:
+            NavigationLink {
+                HomeAssistantSettingsView()
+            } label: {
+                PremiumSettingsRow(
+                    icon: "house.fill",
+                    iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
+                    iconBackground: Color(red: 0.12, green: 0.58, blue: 0.86).opacity(0.11),
+                    title: "Home Assistant",
+                    subtitle: homeAssistant.connectionSubtitle
+                ) {
+                    connectionTrailing(
+                        homeAssistant.connectionState.title,
+                        showChevron: true,
+                        loading:
+                            homeAssistant.connectionState == .discovering ||
+                            homeAssistant.connectionState == .authorizing ||
+                            homeAssistant.connectionState == .pairing
+                    )
+                }
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var trainingSettingsSection: some View {
@@ -1773,6 +1810,10 @@ if session.currentRole.canAccessControlCenter {
             return "Helse og synkronisering"
         case "Connections":
             return "Tilkoblinger"
+        case "Active connections":
+            return "Aktive tilkoblinger"
+        case "Available connections":
+            return "Kan tilkobles"
         case "Preferences":
             return "Preferanser"
         case "Membership":
