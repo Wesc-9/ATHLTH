@@ -279,6 +279,35 @@ final class ATHLTHTrainingProfileAndExerciseProgressTests: XCTestCase {
         XCTAssertEqual(summary.bestWeight, 55)
     }
 
+    func testLiveHistoryRequiresExactIdentityAndIgnoresOtherExercisesInSameWorkout() {
+        let identity = UUID()
+        var workout = strengthSession(weight: 50, days: 1)
+        workout.exercises[0].exercise.libraryExerciseID = identity
+        let active = workout.exercises[0]
+        var different = strengthSession(weight: 99, days: 2)
+        different.exercises[0].exercise.libraryExerciseID = UUID()
+        workout.exercises.append(different.exercises[0])
+        let anonymous = strengthSession(weight: 120, days: 3)
+        let result = ATHLTHExerciseProgress.liveSummary(
+            exercise: active, workouts: [workout, different, anonymous])
+        XCTAssertEqual(result.uses, 1)
+        XCTAssertEqual(result.totalSets, 3)
+        XCTAssertEqual(result.bestWeight, 50)
+    }
+
+    func testLiveHistoryDoesNotGuessIdentityForAnonymousOrOtherPlannedRows() {
+        var workout = strengthSession(weight: 55, days: 1)
+        let active = workout.exercises[0]
+        XCTAssertEqual(ATHLTHExerciseProgress.liveSummary(exercise: active, workouts: [workout]).uses, 0)
+        let identity = UUID()
+        workout.exercises[0].plannedExerciseID = identity
+        var linked = active
+        linked.plannedExerciseID = identity
+        XCTAssertEqual(ATHLTHExerciseProgress.liveSummary(exercise: linked, workouts: [workout]).uses, 1)
+        linked.plannedExerciseID = UUID()
+        XCTAssertEqual(ATHLTHExerciseProgress.liveSummary(exercise: linked, workouts: [workout]).uses, 0)
+    }
+
     func testCustomExerciseDoesNotInheritOtherExercisesHistoryByName() {
         let summary = ATHLTHExerciseProgress.summary(
             exerciseID: UUID(), name: "Bench Press", isCustom: true,

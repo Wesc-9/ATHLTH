@@ -276,18 +276,14 @@ final class StrengthWorkoutStore: ObservableObject {
               let exercise = workout.exercises.first(where: { $0.id == exerciseID }),
               exercise.isEmbeddedRunningInterval != true else { return false }
         let snapshot = exercise.exercise
-        // Require known movement and load/equipment provenance, not name alone.
-        guard ATHLTHCoachStrengthComparableHistory.isSameExercise(snapshot, snapshot) else { return false }
-        let summary = ATHLTHExerciseProgress.summary(
-            exerciseID: snapshot.libraryExerciseID ?? exercise.plannedExerciseID ?? exercise.id,
-            name: snapshot.name, isCustom: snapshot.libraryExerciseID == nil,
-            workouts: workoutHistory, reference: snapshot)
+        let summary = ATHLTHExerciseProgress.liveSummary(
+            exercise: exercise, workouts: workoutHistory)
         guard let reference = summary.sessions.first(where: { $0.id == historicalWorkoutID }),
               reference.completedSets > 0 else { return false }
         activeGhostReferences = activeGhostReferences.filter { $0.value.workoutID == workoutID }
         activeGhostReferences[exerciseID] = .init(
             workoutID: workoutID, exerciseID: exerciseID,
-            exerciseSnapshot: snapshot, result: reference)
+            exerciseSnapshot: snapshot, result: reference, exactIdentityVersion: 1)
         persistCheckpointNow()
         return true
     }
@@ -3079,12 +3075,16 @@ final class StrengthWorkoutStore: ObservableObject {
             let setTargets =
                 planned.resolvedSetTargets
 
+            var snapshot = planned.embeddedExercise
+            if snapshot.libraryExerciseID == nil {
+                snapshot.libraryExerciseID = planned.exerciseID
+            }
             var log = StrengthExerciseLog(
                 id: UUID(),
                 // Use the canonical library ID for cross-workout history,
                 // not this session's incidental PlannedExercise row ID.
                 plannedExerciseID: planned.exerciseID ?? planned.id,
-                exercise: planned.embeddedExercise,
+                exercise: snapshot,
                 sets:
                     Array(
                         setTargets.enumerated()
@@ -3183,13 +3183,16 @@ final class StrengthWorkoutStore: ObservableObject {
                 continue
             }
             guard block.kind == .exercise else { continue }
-            let snapshot = block.exerciseSnapshot ?? ExerciseSnapshot(
+            var snapshot = block.exerciseSnapshot ?? ExerciseSnapshot(
                 name: block.title,
                 instructions: [],
                 primaryMuscles: [],
                 equipment: [],
                 imageURL: nil
             )
+            if snapshot.libraryExerciseID == nil {
+                snapshot.libraryExerciseID = block.exerciseID
+            }
             // AMRAP has no predetermined number of rounds. Start with
             // one round and extend the queue while its time window is open.
             let setCount = block.groupKind == .amrap ? 1 :
@@ -3296,13 +3299,16 @@ final class StrengthWorkoutStore: ObservableObject {
                     continue
                 }
                 guard block.kind == .exercise else { continue }
-                let snapshot = block.exerciseSnapshot ?? ExerciseSnapshot(
+                var snapshot = block.exerciseSnapshot ?? ExerciseSnapshot(
                     name: block.title,
                     instructions: [],
                     primaryMuscles: [],
                     equipment: [],
                     imageURL: nil
                 )
+                if snapshot.libraryExerciseID == nil {
+                    snapshot.libraryExerciseID = block.exerciseID
+                }
                 let timed = block.durationSeconds != nil
                 let newSet = StrengthSetLog(
                     id: UUID(),
@@ -3323,7 +3329,9 @@ final class StrengthWorkoutStore: ObservableObject {
                 )
 
                 if let last = additions.indices.last,
-                   additions[last].exercise.name == snapshot.name,
+                   let identity = snapshot.libraryExerciseID,
+                   additions[last].exercise.libraryExerciseID == identity,
+                   ATHLTHExerciseProgress.sameLiveSnapshot(additions[last].exercise, snapshot),
                    additions[last].appendedWorkoutID == nil {
                     var next = newSet
                     next.setNumber = additions[last].sets.count + 1
@@ -3331,7 +3339,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 } else {
                     additions.append(StrengthExerciseLog(
                         id: UUID(),
-                        plannedExerciseID: nil,
+                        plannedExerciseID: block.exerciseID,
                         exercise: snapshot,
                         sets: [newSet],
                         completedAt: nil

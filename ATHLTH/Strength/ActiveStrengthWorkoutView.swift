@@ -75,6 +75,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingLiveExerciseHistory = false
     @State private var liveExerciseHistory: ATHLTHExerciseProgress.Summary?
     @State private var liveHistoryExerciseID: UUID?
+    @State private var liveHistoryExerciseName: String = ""
     @State private var liveHistoryReferenceID: UUID?
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
@@ -207,6 +208,10 @@ struct ActiveStrengthWorkoutView: View {
                     ScrollView {
                         if let liveExerciseHistory {
                             VStack(spacing: 14) {
+                                Text(liveHistoryExerciseName)
+                                    .font(.title2.weight(.semibold))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityIdentifier("athlth-live-history-exercise-name")
                                 if let previous = liveExerciseHistory.sessions.first(where: { $0.id == liveHistoryReferenceID }) ??
                                     liveExerciseHistory.sessions.last,
                                    let exercise = strength.activeWorkout?.exercises.first(where: {
@@ -246,7 +251,7 @@ struct ActiveStrengthWorkoutView: View {
                                             }
                                             .buttonStyle(.borderedProminent)
                                             .tint(ATHLTHPlanDesign.accentInk)
-                                            .disabled(!ATHLTHCoachStrengthComparableHistory.isSameExercise(exercise.exercise, exercise.exercise))
+                                            .disabled(strength.currentExercise?.id != exercise.id)
                                         }
                                         HStack {
                                             Text(ATHLTHLocalization.choose(english: "Recorded sets", norwegian: "Registrerte sett"))
@@ -283,6 +288,11 @@ struct ActiveStrengthWorkoutView: View {
                     }
                     .navigationTitle(ATHLTHLocalization.choose(english: "Exercise history", norwegian: "Øvelseshistorikk"))
                     .navigationBarTitleDisplayMode(.inline)
+                    .onChange(of: strength.currentExercise?.id) { _, currentID in
+                        if currentID != liveHistoryExerciseID {
+                            showingLiveExerciseHistory = false
+                        }
+                    }
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
@@ -2596,14 +2606,10 @@ struct ActiveStrengthWorkoutView: View {
 
                     if exercise.isEmbeddedRunningInterval != true {
                         Button {
-                            let reference = exercise.exercise
                             liveHistoryExerciseID = exercise.id
-                            liveExerciseHistory = ATHLTHExerciseProgress.summary(
-                                exerciseID: reference.libraryExerciseID ?? exercise.plannedExerciseID ?? exercise.id,
-                                name: reference.name,
-                                isCustom: reference.libraryExerciseID == nil,
-                                workouts: strength.workoutHistory,
-                                reference: reference
+                            liveHistoryExerciseName = exercise.exercise.name
+                            liveExerciseHistory = ATHLTHExerciseProgress.liveSummary(
+                                exercise: exercise, workouts: strength.workoutHistory
                             )
                             liveHistoryReferenceID = strength.ghostReference(for: exercise)?.result.id ??
                                 liveExerciseHistory?.sessions.last?.id

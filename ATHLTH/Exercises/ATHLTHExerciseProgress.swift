@@ -20,10 +20,14 @@ enum ATHLTHExerciseProgress {
         let exerciseID: UUID
         let exerciseSnapshot: ExerciseSnapshot
         let result: Session
+        // Old pinned references may have been selected by name fallback.
+        // Require a fresh selection under the exact live-history policy.
+        var exactIdentityVersion: Int? = nil
 
         func applies(to workoutID: UUID, exercise: StrengthExerciseLog) -> Bool {
-            self.workoutID == workoutID && exerciseID == exercise.id &&
-                ATHLTHCoachStrengthComparableHistory.isSameExercise(exerciseSnapshot, exercise.exercise)
+            exactIdentityVersion == 1 &&
+                self.workoutID == workoutID && exerciseID == exercise.id &&
+                ATHLTHExerciseProgress.sameLiveSnapshot(exerciseSnapshot, exercise.exercise)
         }
     }
 
@@ -75,6 +79,46 @@ enum ATHLTHExerciseProgress {
         }
     }
 
+    /// Live history never guesses an exercise from a name, muscle group or
+    /// parent workout. Only explicit catalog identities or a matching legacy
+    /// planned reference with compatible metadata qualify.
+    static func sameLiveSnapshot(_ lhs: ExerciseSnapshot, _ rhs: ExerciseSnapshot) -> Bool {
+        if let left = lhs.libraryExerciseID, let right = rhs.libraryExerciseID {
+            let alias = ATHLTHExerciseReferenceResolver.areReviewedAliases(left, right)
+            guard left == right || alias,
+                  lhs.coachLoadBasis == rhs.coachLoadBasis else { return false }
+            let leftEquipment = Set(lhs.equipment.map(ATHLTHExerciseReferenceResolver.key).filter { !$0.isEmpty })
+            let rightEquipment = Set(rhs.equipment.map(ATHLTHExerciseReferenceResolver.key).filter { !$0.isEmpty })
+            return alias || leftEquipment.isEmpty || rightEquipment.isEmpty || leftEquipment == rightEquipment
+        }
+        return ATHLTHCoachStrengthComparableHistory.isSameExercise(lhs, rhs)
+    }
+
+    private static func matchesLiveExercise(_ entry: StrengthExerciseLog, _ active: StrengthExerciseLog) -> Bool {
+        guard entry.isEmbeddedRunningInterval != true,
+              active.isEmbeddedRunningInterval != true else { return false }
+        let logged = entry.exercise
+        let reference = active.exercise
+        if logged.libraryExerciseID != nil && reference.libraryExerciseID != nil {
+            return sameLiveSnapshot(logged, reference)
+        }
+        guard let loggedID = logged.libraryExerciseID ?? entry.plannedExerciseID,
+              let activeID = reference.libraryExerciseID ?? active.plannedExerciseID,
+              loggedID == activeID ||
+                ATHLTHExerciseReferenceResolver.areReviewedAliases(loggedID, activeID) else { return false }
+        // A missing snapshot identity may come from a legacy planned row.
+        // Require the same stored ID AND explicit movement/equipment evidence.
+        var old = logged
+        var new = reference
+        old.libraryExerciseID = nil
+        new.libraryExerciseID = nil
+        return ATHLTHCoachStrengthComparableHistory.isSameExercise(old, new)
+    }
+
+    static func liveSummary(exercise: StrengthExerciseLog, workouts: [StrengthWorkoutLog]) -> Summary {
+        summarize(workouts: workouts) { matchesLiveExercise($0, exercise) }
+    }
+
     static func summary(
         exerciseID: UUID,
         name: String,
@@ -84,9 +128,7 @@ enum ATHLTHExerciseProgress {
     ) -> Summary {
         let canonical = ATHLTHExerciseReferenceResolver.key(name)
         let referenceIdentity = reference?.libraryExerciseID ?? exerciseID
-        var sessions: [Session] = []
-        for workout in workouts where workout.isFinished {
-            let matching = workout.exercises.filter { entry in
+        return summarize(workouts: workouts) { entry in
                 let logged = entry.exercise
                 if let loggedID = logged.libraryExerciseID {
                     // Canonical library identity is authoritative, including
@@ -145,7 +187,16 @@ enum ATHLTHExerciseProgress {
                         canonical
                 }
                 return true
-            }
+        }
+    }
+
+    private static func summarize(
+        workouts: [StrengthWorkoutLog],
+        matches: (StrengthExerciseLog) -> Bool
+    ) -> Summary {
+        var sessions: [Session] = []
+        for workout in workouts where workout.isFinished {
+            let matching = workout.exercises.filter(matches)
             guard !matching.isEmpty else { continue }
             let sets = matching.flatMap(\.sets).filter(\.countsTowardTrainingLoad)
             guard !sets.isEmpty else { continue }
