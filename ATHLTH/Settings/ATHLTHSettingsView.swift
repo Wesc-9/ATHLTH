@@ -3124,7 +3124,7 @@ private struct ATHLTHPremiumSettingsChoices<Option: Identifiable & Equatable>: V
     }
 }
 
-private struct PremiumSettingsCard<Content: View>: View {
+struct PremiumSettingsCard<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -3154,7 +3154,7 @@ private struct PremiumSettingsCard<Content: View>: View {
     }
 }
 
-private struct PremiumSettingsRow<Trailing: View>: View {
+struct PremiumSettingsRow<Trailing: View>: View {
     let icon: String
     var iconTint: Color = ATHLTHTheme.primaryText
     var iconBackground: Color = ATHLTHTheme.accentSoft
@@ -3221,7 +3221,7 @@ private struct PremiumSettingsRow<Trailing: View>: View {
     }
 }
 
-private struct SettingsDivider: View {
+struct SettingsDivider: View {
     var body: some View {
         Rectangle()
             .fill(ATHLTHTheme.divider)
