@@ -1214,6 +1214,9 @@ struct ATHLTHHomeView: View {
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
     #endif
     @State private var homeStreakDays: [Date]?
+    @State private var homeStreakRefreshTask: Task<Void, Never>?
+    @State private var homeArenaLoadAccountID: UUID?
+    @State private var lastHomeArenaLoadAt: Date?
     @State private var lastHomeInitialLoadAt: Date?
     @State private var homeInitialLoadAccountID: UUID?
     @State private var lastHomeSocialLoadAt: Date?
@@ -1926,7 +1929,15 @@ struct ATHLTHHomeView: View {
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)-arena") {
                 guard isActive, !session.previewModeEnabled else { return }
-                _ = await tournamentCalendar.refresh(for: session.profile.userID)
+                let owner = session.profile.userID
+                if homeArenaLoadAccountID == owner, let lastHomeArenaLoadAt,
+                   Date().timeIntervalSince(lastHomeArenaLoadAt) < 60 { return }
+                do { try await Task.sleep(for: .milliseconds(850)) } catch { return }
+                guard !Task.isCancelled, isActive, session.profile.userID == owner else { return }
+                _ = await tournamentCalendar.refresh(for: owner)
+                guard !Task.isCancelled, session.profile.userID == owner else { return }
+                homeArenaLoadAccountID = owner
+                lastHomeArenaLoadAt = Date()
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
@@ -1986,15 +1997,11 @@ struct ATHLTHHomeView: View {
             }
             .onChange(of: strengthWorkout.workoutHistory.count) {
                 syncHomeTodayWorkoutToWatch()
-                Task {
-                    await loadHomeStreak()
-                }
+                scheduleHomeStreakRefresh()
             }
             .onChange(of: health.workouts.count) {
                 syncHomeTodayWorkoutToWatch()
-                Task {
-                    await loadHomeStreak()
-                }
+                scheduleHomeStreakRefresh()
             }
             .onChange(of: session.activePlan) {
                 // Editing sessions in the same plan must also refresh Watch.
@@ -2011,7 +2018,20 @@ struct ATHLTHHomeView: View {
     }
 
     @MainActor
+    private func scheduleHomeStreakRefresh() {
+        homeStreakRefreshTask?.cancel()
+        guard isActive, !session.previewModeEnabled else { return }
+        let owner = session.profile.userID
+        homeStreakRefreshTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled, isActive, session.profile.userID == owner else { return }
+            await loadHomeStreak()
+        }
+    }
+
+    @MainActor
     private func loadHomeStreak() async {
+        let owner = session.profile.userID
         let calendar = Calendar.current
         let now = Date()
         let today = calendar.startOfDay(for: now)
@@ -2055,7 +2075,9 @@ struct ATHLTHHomeView: View {
             }
         }
 
-        homeStreakDays = Array(activeDays).sorted()
+        guard !Task.isCancelled, session.profile.userID == owner else { return }
+        let updated = Array(activeDays).sorted()
+        if homeStreakDays != updated { homeStreakDays = updated }
     }
 
 
