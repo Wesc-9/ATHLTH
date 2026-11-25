@@ -214,7 +214,7 @@ struct ATHLTHTournamentMyExercisesView: View {
                 Spacer(minLength: 4)
                 if recorded {
                     Text(ownCompletion?.reviewStatus == "approved"
-                         ? "Godkjent" :
+                         ? (ownCompletion?.autoApproved == true ? "Godkjent etter svarfrist" : "Godkjent") :
                          ownCompletion?.reviewStatus == "disputed"
                          ? "Bestridt" : "Til godkjenning")
                         .font(.caption.weight(.semibold))
@@ -235,7 +235,7 @@ struct ATHLTHTournamentMyExercisesView: View {
             if let opponent = unreviewedOpponent,
                slot.state == "pending" {
                 VStack(alignment: .leading,spacing: 7) {
-                    Text(unreviewedOpponent?.measuredScore.map { "Motstanderens måling: " + $0.formatted() } ?? "Motstanderen har registrert øvelsen.")
+                    Text(opponent.measuredScore.map { "Motstanderens måling: " + $0.formatted() } ?? "Motstanderen har registrert øvelsen.")
                         .font(.caption)
                     HStack(spacing: 15) {
                         Button("Godkjenn") {

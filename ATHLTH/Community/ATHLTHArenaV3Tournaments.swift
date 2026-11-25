@@ -520,6 +520,7 @@ struct ATHLTHTournamentCreator: View {
         if configured.race.discipline == .workout {
             configured.race.scoringMode = configured.race.effectiveScoringMode
             configured.race.pointsPerExercise = configured.race.pointsPerExercise ?? 1
+            configured.race.reviewHours = configured.race.reviewHours ?? 48
             let keys = Set((configured.selectedExerciseIDs ?? []).map(ATHLTHCompetitionRaceRules.key))
             let roster = Set(athletes.map { ATHLTHCompetitionRaceRules.key($0.id) })
             configured.race.scoringGoals = configured.race.effectiveScoringMode.needsGoal
@@ -529,6 +530,7 @@ struct ATHLTHTournamentCreator: View {
         } else {
             configured.race.scoringMode = nil
             configured.race.pointsPerExercise = nil
+            configured.race.reviewHours = nil
             configured.race.scoringGoals = nil
             configured.race.exerciseWeights = nil
             configured.race.handicapPercentages = nil
@@ -824,6 +826,17 @@ struct ATHLTHTournamentCreator: View {
                     }))
             }
             Divider()
+            Text("Godkjenningsfrist").font(.subheadline.weight(.semibold))
+            Picker("Tid til å godkjenne eller bestride", selection: Binding(
+                get: { competitionSettings.race.reviewHours ?? 48 },
+                set: { competitionSettings.race.reviewHours = $0 })) {
+                ForEach([12, 24, 48, 72, 168], id: \.self) { hours in
+                    Text(ATHLTHTournamentCadence.window(hours)).tag(hours)
+                }
+            }.pickerStyle(.menu)
+            Text("Et innsendt resultat som ikke bestrides innen fristen godkjennes automatisk etter den avtalte regelen. Dette er ikke sensorverifisering. Bestridte resultater må korrigeres før øvelsesfristen.")
+                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            Divider()
             Text("Handicap").font(.subheadline.weight(.semibold))
             Toggle("Bruk handicap", isOn: Binding(
                 get: { competitionSettings.race.handicapPercentages != nil },
@@ -916,14 +929,15 @@ struct ATHLTHTournamentCreator: View {
             Text("\(competitionSettings.selectedExerciseIDs?.count ?? 0) av maksimalt 12 øvelser").font(.caption)
         }
         .padding(15).background(ATHLTHArenaV3Style.panel())
-        .task {
-            guard let parentID = continuationParentID else { return }
+        .task(id: (competitionSettings.selectedExerciseIDs ?? []).map(\.uuidString).joined(separator: ",")) {
             do {
                 let service = ATHLTHTournamentLobbyCloudService()
-                let candidates = try await service.candidates(tournamentID: parentID)
-                let titles = try await service.candidateNames(candidates)
-                for (id, name) in titles { rematchNames[id] = name }
-                exerciseMetrics = try await service.exerciseMetrics(ids: candidates.map(\.lookupID))
+                let ids = competitionSettings.selectedExerciseIDs ?? []
+                let labels = try await service.exerciseLabels(ids: ids)
+                let metrics = try await service.exerciseMetrics(ids: ids)
+                guard !Task.isCancelled else { return }
+                for (id, name) in labels { rematchNames[id] = name }
+                for (id, metric) in metrics { exerciseMetrics[id] = metric }
             } catch { rematchSearchError = error.localizedDescription }
         }
         .task(id: rematchSearch + allowedActivities.map(\.rawValue).sorted().joined(separator: ",")) {
@@ -1293,6 +1307,19 @@ struct ATHLTHTournamentCreator: View {
             Label(competitionSettings.unlock.title, systemImage: "list.bullet").font(.subheadline)
             if competitionSettings.race.discipline == .workout {
                 Label(competitionSettings.race.scoringSummary, systemImage: "chart.bar").font(.subheadline)
+                Label("Godkjenningsfrist: \(competitionSettings.race.reviewHours ?? 48) timer", systemImage: "clock.badge.checkmark").font(.caption)
+                ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
+                    let metric = exerciseMetrics[id] ?? "repetitions"
+                    let unit = metric == "duration" ? "m" : metric == "distance" || metric == "time" ? "sek" : "repetisjoner"
+                    HStack {
+                        Text(rematchNames[id] ?? "Øvelse")
+                        Spacer()
+                        if let goal = competitionSettings.race.goal(for: id), competitionSettings.race.effectiveScoringMode.needsGoal {
+                            Text(goal.formatted() + " " + unit)
+                        }
+                        Text("\(competitionSettings.race.weight(for: id))×")
+                    }.font(.caption)
+                }
                 ForEach(athletes.filter { competitionSettings.race.handicap(for: $0.id) > 0 }, id: \.id) { athlete in
                     Text("Handicap: " + athlete.username + " · " + String(competitionSettings.race.handicap(for: athlete.id)) + " %").font(.caption)
                 }

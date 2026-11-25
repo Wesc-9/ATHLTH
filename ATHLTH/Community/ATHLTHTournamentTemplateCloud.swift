@@ -26,6 +26,7 @@ struct ATHLTHTournamentPersonalTemplate: Decodable, Identifiable {
         draft.seasonID = nil
         draft.competitionSettings.race.previousCompetitionID = nil
         draft.competitionSettings.race.seasonNumber = nil
+        draft.competitionSettings.race.handicapPercentages = nil
         draft.competitionSettings.race.competitionEndsAt = nil
         draft.competitionSettings.endsAt = nil
         draft.competitionSettings.startsAt = nil
@@ -83,6 +84,7 @@ struct ATHLTHTournamentTemplateCloudService {
         copy.participants = copy.participants.filter { $0.id == userID }
         copy.competitionSettings.race.previousCompetitionID = nil
         copy.competitionSettings.race.seasonNumber = nil
+        copy.competitionSettings.race.handicapPercentages = nil
         copy.competitionSettings.race.competitionEndsAt = nil
         copy.competitionSettings.endsAt = nil
         copy.competitionSettings.startsAt = nil

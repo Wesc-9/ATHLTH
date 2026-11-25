@@ -192,9 +192,11 @@ struct ATHLTHTournamentExerciseCompletionRemote: Decodable {
     let submittedAt: Date
     let reviewStatus: String
     let measuredScore: Double?
+    let autoApproved: Bool?
     enum CodingKeys: String, CodingKey {
         case reviewStatus = "review_status"
         case measuredScore = "measured_score"
+        case autoApproved = "auto_approved"
         case matchExerciseID = "match_exercise_id"
         case userID = "user_id"
         case submittedAt = "submitted_at"
@@ -386,6 +388,16 @@ struct ATHLTHTournamentLobbyCloudService {
                 )
             }
         }
+        return result
+    }
+
+    func exerciseLabels(ids: [UUID]) async throws -> [UUID: String] {
+        guard !ids.isEmpty else { return [:] }
+        let list: [ATHLTHTournamentActivityTemplateRemote] = try await client
+            .from("athlth_tournament_activity_templates").select("id,title,activity_type,metric")
+            .in("id", values: ids).limit(500).execute().value
+        var result = try await exerciseNames(ids: Set(ids).subtracting(list.map(\.id)))
+        for item in list { result[item.id] = item.title }
         return result
     }
 
@@ -615,7 +627,7 @@ struct ATHLTHTournamentLobbyCloudService {
             let end = min(start + 150,slotIDs.count)
             let batch: [ATHLTHTournamentExerciseCompletionRemote] = try await client
               .from("athlth_tournament_exercise_completions")
-              .select("match_exercise_id,user_id,submitted_at,review_status,measured_score")
+              .select("match_exercise_id,user_id,submitted_at,review_status,measured_score,auto_approved")
               .in("match_exercise_id",values: Array(slotIDs[start..<end]))
               .limit(1000).execute().value
             all.append(contentsOf: batch)

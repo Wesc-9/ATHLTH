@@ -349,7 +349,7 @@ private struct ATHLTHSharedEventProgressView: View {
     private var ownExercises: [ATHLTHSharedEventExerciseRow] {
         rows.filter { $0.userID == userID }.sorted { $0.sortOrder < $1.sortOrder }
     }
-    private var decided: Int { ownExercises.filter { ["approved", "missed"].contains($0.progress) }.count }
+    private var decided: Int { ownExercises.filter { ["approved", "auto_approved", "missed"].contains($0.progress) }.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -457,6 +457,9 @@ private struct ATHLTHSharedEventProgressView: View {
                         Spacer()
                         Text(result.score.map { $0.formatted() + " " + result.unit } ?? result.stateLabel)
                     }.font(.caption)
+                    if result.progress == "auto_approved" {
+                        Text("Godkjent automatisk etter svarfrist").font(.caption2).foregroundStyle(ATHLTHTrainDesign.secondary)
+                    }
                     if let note = result.evidenceNote {
                         Text(note).font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
                     }
@@ -481,7 +484,7 @@ private struct ATHLTHSharedEventProgressView: View {
     private func mayReview(_ result: ATHLTHSharedEventExerciseRow, own: ATHLTHSharedEventExerciseRow) -> Bool {
         guard tournament.status == "active", result.progress == "submitted", result.score != nil else { return false }
         if tournament.isDuel {
-            return result.userID != userID && ["submitted", "approved", "missed"].contains(own.progress)
+            return result.userID != userID && ["submitted", "approved", "auto_approved", "missed"].contains(own.progress)
         }
         return tournament.ownerID == userID
     }

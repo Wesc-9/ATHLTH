@@ -971,6 +971,10 @@ struct ATHLTHTournamentLiveDetailView: View {
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                } else if current.raceRules.scoringMode != nil && match.status == "disputed" && match.phase.eliminates && match.homeScore != nil && match.homeScore == match.awayScore {
+                    Button("Registrer avtalt omkamp") { showingMatchReport = match }
+                        .font(.caption.weight(.semibold)).foregroundStyle(ATHLTHArenaV3Style.gold)
+                    Text("Oppgjøret er uavgjort. Gjennomfør en avtalt omkamp, og få resultatet godkjent av motstanderen.").font(.caption2)
                 } else if (match.status == "scheduled" || match.status == "disputed") && (current.raceRules.scoringMode == nil || match.isWarmup) {
                     Button("Foreslå resultat") { showingMatchReport = match }
                         .font(.caption.weight(.semibold))

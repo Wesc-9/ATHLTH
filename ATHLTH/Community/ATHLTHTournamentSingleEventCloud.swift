@@ -162,6 +162,7 @@ struct ATHLTHSharedEventExerciseRow: Decodable, Identifiable {
         switch progress {
         case "submitted": "Til godkjenning"
         case "approved": "Godkjent"
+        case "auto_approved": "Godkjent etter svarfrist"
         case "rejected": "Må leveres på nytt"
         case "missed": "0 poeng · frist utløpt"
         default: "Ikke gjennomført"

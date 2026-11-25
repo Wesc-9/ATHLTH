@@ -12,6 +12,9 @@ struct ATHLTHTournamentLobbyRulesView: View {
     let onChange: @MainActor () async -> Void
 
     @State private var proposals: [ATHLTHTournamentRuleProposalRemote] = []
+    @State private var scoredCandidates: [ATHLTHTournamentExerciseCandidateRemote] = []
+    @State private var scoredNames: [UUID: String] = [:]
+    @State private var scoredMetrics: [UUID: String] = [:]
     @State private var votes: [ATHLTHTournamentRuleVoteRemote] = []
     @State private var showingProposal = false
     @State private var busy = false
@@ -75,8 +78,23 @@ struct ATHLTHTournamentLobbyRulesView: View {
                 FlowLayoutActivityBadges(activities: tournament.allowedActivities)
                 if tournament.raceRules.scoringMode != nil {
                     Label(tournament.raceRules.scoringSummary, systemImage: "chart.bar").font(.subheadline.weight(.medium))
-                    if let handicaps = tournament.raceRules.handicapPercentages, !handicaps.isEmpty {
-                        Text("Handicap er avtalt per deltaker. Originalmålinger endres ikke.").font(.caption)
+                    if let hours = tournament.raceRules.reviewHours {
+                        Text("Godkjenningsfrist: \(hours) timer. Ubestridte resultater godkjennes automatisk etter fristen, ikke som sensorverifiserte målinger.").font(.caption)
+                    }
+                    ForEach(entries.filter { tournament.raceRules.handicap(for: $0.userID) > 0 }, id: \.userID) { athlete in
+                        Text("Handicap: " + (names[athlete.userID] ?? "Utøver") + " · " + String(tournament.raceRules.handicap(for: athlete.userID)) + " %").font(.caption)
+                    }
+                    ForEach(scoredCandidates.filter { $0.selectedPosition != nil }.sorted { ($0.selectedPosition ?? 0) < ($1.selectedPosition ?? 0) }) { item in
+                        let metric = scoredMetrics[item.lookupID] ?? "repetitions"
+                        let unit = metric == "duration" ? "m" : metric == "distance" || metric == "time" ? "sek" : "repetisjoner"
+                        HStack {
+                            Text(scoredNames[item.lookupID] ?? "Konkurranseøvelse")
+                            Spacer()
+                            if let goal = tournament.raceRules.goal(for: item.lookupID) {
+                                Text(goal.formatted() + " " + unit)
+                            }
+                            Text("\(tournament.raceRules.weight(for: item.lookupID))×")
+                        }.font(.caption)
                     }
                 }
 
@@ -438,6 +456,12 @@ struct ATHLTHTournamentLobbyRulesView: View {
             async let tallies = cloud.ruleVotes(tournamentID: tournament.id)
             proposals = try await available
             votes = try await tallies
+            if tournament.raceRules.scoringMode != nil {
+                let selected = try await cloud.candidates(tournamentID: tournament.id)
+                scoredCandidates = selected
+                scoredNames = try await cloud.candidateNames(selected)
+                scoredMetrics = try await cloud.exerciseMetrics(ids: selected.map(\.lookupID))
+            }
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
     }

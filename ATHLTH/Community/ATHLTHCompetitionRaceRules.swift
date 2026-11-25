@@ -92,6 +92,7 @@ enum ATHLTHCompetitionScoringMode: String, Codable, CaseIterable, Identifiable {
 struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     var scoringMode: ATHLTHCompetitionScoringMode? = nil
     var pointsPerExercise: Int? = nil
+    var reviewHours: Int? = nil
     var scoringGoals: [String: Double]? = nil
     var exerciseWeights: [String: Int]? = nil
     var handicapPercentages: [String: Int]? = nil
@@ -139,13 +140,14 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
              lapCount, lapVerification, lapCourseName, lapCourseLatitude,
              lapCourseLongitude, countdownSeconds, allowOptInLiveLocation,
              equipmentRules, exerciseScoringVersion, duelMode, competitionEndsAt, previousCompetitionID, seasonNumber,
-             scoringMode, pointsPerExercise, scoringGoals, exerciseWeights, handicapPercentages
+             scoringMode, pointsPerExercise, reviewHours, scoringGoals, exerciseWeights, handicapPercentages
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         scoringMode = try c.decodeIfPresent(ATHLTHCompetitionScoringMode.self, forKey: .scoringMode)
         pointsPerExercise = try c.decodeIfPresent(Int.self, forKey: .pointsPerExercise)
+        reviewHours = try c.decodeIfPresent(Int.self, forKey: .reviewHours)
         scoringGoals = try c.decodeIfPresent([String: Double].self, forKey: .scoringGoals)
         exerciseWeights = try c.decodeIfPresent([String: Int].self, forKey: .exerciseWeights)
         handicapPercentages = try c.decodeIfPresent([String: Int].self, forKey: .handicapPercentages)
@@ -199,7 +201,8 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     }
 
     var isValid: Bool {
-        guard (1...10).contains(pointsPerExercise ?? 1),
+        guard (12...168).contains(reviewHours ?? 48),
+              (1...10).contains(pointsPerExercise ?? 1),
               (scoringGoals ?? [:]).values.allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000_000 }),
               (exerciseWeights ?? [:]).values.allSatisfy({ (1...5).contains($0) }),
               (handicapPercentages ?? [:]).values.allSatisfy({ (0...30).contains($0) }),
