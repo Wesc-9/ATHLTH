@@ -70,6 +70,26 @@ final class ATHLTHPlanWorkoutCardPresentationTests: XCTestCase {
             .contains { $0.contains("3.0 %") })
     }
 
+    func testEstimatedPulseIsInlineWithZoneAndAbsentWithoutMaximum() throws {
+        var work = step("Intervall")
+        work.targetHeartRateZone = 4
+        let plain = ATHLTHPlanWorkoutCardPresentation.facts(for: work, workoutTitle: "4 × 4 intervaller")
+        let estimated = ATHLTHPlanWorkoutCardPresentation.facts(for: work, workoutTitle: "4 × 4 intervaller", maximumBPM: 190)
+        XCTAssertEqual(plain.count, estimated.count)
+        let zone = try XCTUnwrap(plain.last)
+        let inline = try XCTUnwrap(estimated.last)
+        XCTAssertTrue(inline.hasPrefix(zone + " ("))
+        XCTAssertTrue(inline.contains("152–171"))
+        XCTAssertFalse(plain.joined().contains("152–171"))
+
+        work.targetHeartRateZone = nil
+        let recovery = step("Pause", phase: .recovery, seconds: 120)
+        let compact = ATHLTHSimpleWorkoutOutline.stages(for: [work, recovery], workoutTitle: "4x4", maximumBPM: 190)
+        let detail = try XCTUnwrap(compact.first?.items.first?.detail)
+        XCTAssertTrue(detail.contains("152–171"))
+        XCTAssertTrue(detail.contains("95–133"))
+    }
+
     func testStrengthExerciseExpandsAllSetsWithNoFinalPause() {
         var squat = step("Knebøy", kind: .exercise, seconds: 60)
         squat.setCount = 3
