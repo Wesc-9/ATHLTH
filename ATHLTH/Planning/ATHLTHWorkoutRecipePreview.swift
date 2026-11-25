@@ -317,7 +317,7 @@ enum ATHLTHSimpleWorkoutOutline {
 
     /// Recovery belongs to the preceding main exercise for display only.
     /// The source retains its actual recovery phase and execution sequence.
-    static func stages(for blocks: [WorkoutTemplateBlock]) -> [Stage] {
+    static func stages(for blocks: [WorkoutTemplateBlock], workoutTitle: String? = nil, maximumBPM: Double? = nil) -> [Stage] {
         var groups: [(phase: WorkoutPhaseKind, steps: [IndexedBlock])] = []
         var lastWorkPhase: WorkoutPhaseKind = .main
         for (index, block) in blocks.enumerated() {
@@ -342,12 +342,23 @@ enum ATHLTHSimpleWorkoutOutline {
                 phase: group.phase,
                 sourceStepCount: group.steps.count,
                 plannedSeconds: sum > 0 ? sum : nil,
-                items: compactItems(group.steps)
+                items: compactItems(group.steps, workoutTitle: workoutTitle, maximumBPM: maximumBPM)
             )
         }
     }
 
-    private static func compactItems(_ steps: [IndexedBlock]) -> [Item] {
+    private static func compactItems(_ steps: [IndexedBlock], workoutTitle: String?, maximumBPM: Double?) -> [Item] {
+        func zoneText(for block: WorkoutTemplateBlock) -> String {
+            let suggestion = workoutTitle.flatMap { ATHLTHWorkoutStepCopy.suggestedZone(for: block, workoutTitle: $0) }
+            let zone = ATHLTHWorkoutStepTargetSummary.zoneLabel(for: block)
+                .map { workoutTitle != nil && ATHLTHLocalization.isNorwegian ? $0.replacingOccurrences(of: "Z", with: "S") : $0 } ?? suggestion
+            let pulse = ATHLTHPlannedHeartRatePreview.inlineRangeText(
+                for: block, maximumBPM: maximumBPM,
+                suggestedZones: workoutTitle.flatMap { ATHLTHWorkoutStepCopy.suggestedZones(for: block, workoutTitle: $0) }
+            )
+            if let zone { return " · " + zone + (pulse ?? "") }
+            return pulse.map { " · " + ATHLTHLocalization.choose(english: "Estimated HR", norwegian: "Estimert puls") + $0 } ?? ""
+        }
         var result: [Item] = []
         var cursor = 0
         while cursor < steps.count {
@@ -398,11 +409,8 @@ enum ATHLTHSimpleWorkoutOutline {
             // Compact previews must show executable targets, not only the
             // prose title. Zoned's 1-minute efforts therefore read as
             // "1 min · Z5 arbeid · 1 min · Z1 pause".
-            let workZone = ATHLTHWorkoutStepTargetSummary
-                .zoneLabel(for: work.block).map { " · \($0)" } ?? ""
-            let recoveryZone = recovery.flatMap {
-                ATHLTHWorkoutStepTargetSummary.zoneLabel(for: $0.block)
-            }.map { " · \($0)" } ?? ""
+            let workZone = zoneText(for: work.block)
+            let recoveryZone = recovery.map { zoneText(for: $0.block) } ?? ""
             let detail: String
             if let recoveryText {
                 detail = ATHLTHLocalization.choose(
@@ -838,7 +846,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     /// A quick understanding of WHAT to do, not 26 individual settings.
     /// Changing to Advanced shows the unchanged original step-by-step recipe.
     private var simpleOutline: some View {
-        let stages = ATHLTHSimpleWorkoutOutline.stages(for: normalizedBlocks)
+        let stages = ATHLTHSimpleWorkoutOutline.stages(for: normalizedBlocks, workoutTitle: configuredMaximumOnly ? title : nil, maximumBPM: configuredMaximumOnly ? maximumHeartRateBPM : nil)
         return VStack(alignment: .leading, spacing: 11) {
             if !stages.isEmpty {
                 Text(tr("This is your workout", "Dette skal du gjøre"))
@@ -891,9 +899,6 @@ struct ATHLTHWorkoutRecipePreview: View {
                                             : tr("Pace", "Tempo") + " · " + String(format: "%d:%02d/km", seconds / 60, seconds % 60))
                                             .font(.caption)
                                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    }
-                                    if let pulse = ATHLTHPlannedHeartRatePreview.rangeText(for: step, maximumBPM: maximumHeartRateBPM, suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: step, workoutTitle: title)) {
-                                        Text(pulse).font(.caption2.weight(.medium)).foregroundStyle(recipeTint)
                                     }
                                 }
                             }
@@ -1045,14 +1050,14 @@ struct ATHLTHWorkoutRecipePreview: View {
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
                             let facts = ATHLTHPlanWorkoutCardPresentation.facts(
-                                for: block, workoutTitle: title
+                                for: block, workoutTitle: title, maximumBPM: maximumHeartRateBPM
                             )
                             if !facts.isEmpty {
                                 Text(facts.joined(separator: " · "))
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                     .multilineTextAlignment(.leading)
-                                    .lineLimit(expanded ? nil : 2)
+                                    .fixedSize(horizontal: false, vertical: true)
                             } else {
                                 Text(
                                     (block.kind == .run || block.kind == .rest) &&
@@ -1064,14 +1069,6 @@ struct ATHLTHWorkoutRecipePreview: View {
                                 )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                            if let pulse = ATHLTHPlannedHeartRatePreview.rangeText(
-                                for: block, maximumBPM: maximumHeartRateBPM,
-                                suggestedZones: ATHLTHWorkoutStepCopy.suggestedZones(for: block, workoutTitle: title)
-                            ) {
-                                Text(pulse)
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(recipeTint)
                             }
                         }
                         Spacer(minLength: 0)
