@@ -3559,6 +3559,24 @@ private struct ATHLTHTrainingSettingsView: View {
             }
             ATHLTHSettingsGroup(title: tr("Running & walking", "Løping og gåing")) {
                 PremiumSettingsCard {
+                    NavigationLink {
+                        ATHLTHPremiumSettingsChoices(title: tr("Default running environment", "Standard løpemiljø"),
+                            subtitle: tr("Applies only to new free runs; planned workouts and routes keep their own setup.", "Gjelder bare nye friløp. Planlagte økter og ruter beholder eget oppsett."),
+                            options: RunEnvironment.allCases, selection: $settings.defaultFreeRunEnvironment,
+                            optionTitle: { $0.title }, optionDetail: { $0.subtitle })
+                    } label: {
+                        row("figure.run", tr("Default running environment", "Standard løpemiljø"), settings.defaultFreeRunEnvironment.title)
+                    }.buttonStyle(.plain)
+                    SettingsDivider()
+                    NavigationLink {
+                        ATHLTHPremiumSettingsChoices(title: tr("Quick Run countdown", "Nedtelling ved hurtigløp"),
+                            subtitle: tr("The 30-second Watch countdown runs on the watch. Other countdowns require the phone app to remain active.", "30 sekunders Watch-nedtelling kjører på klokken. Andre nedtellinger krever at telefonappen er aktiv."),
+                            options: ATHLTHQuickRunCountdownPreference.allCases, selection: $settings.quickRunStartCountdown,
+                            optionTitle: { $0.title }, optionDetail: { _ in "" })
+                    } label: {
+                        row("timer", tr("Quick Run countdown", "Nedtelling ved hurtigløp"), settings.quickRunStartCountdown.title)
+                    }.buttonStyle(.plain)
+                    SettingsDivider()
                     toggle("pause.circle", tr("Auto-pause outdoors", "Automatisk pause ute"),
                            tr("Default for outdoor running and walking", "Standard for løping og gåing utendørs"),
                            $settings.autoPauseOutdoorWorkouts)
@@ -3577,6 +3595,8 @@ private struct ATHLTHTrainingSettingsView: View {
                     toggle("waveform", tr("Sound cues", "Lydsignaler"), tr("Feedback during training", "Tilbakemelding under trening"), $settings.audioCuesEnabled)
                     SettingsDivider()
                     toggle("waveform.path", tr("Haptic cues", "Vibrasjon"), tr("Haptic feedback during training", "Haptisk tilbakemelding under trening"), $settings.hapticCuesEnabled)
+                    SettingsDivider()
+                    toggle("sun.max", tr("Keep screen awake", "Hold skjermen på"), tr("While an active workout requests the screen", "Under aktive økter som bruker skjermen"), $settings.keepWorkoutScreenAwake)
                 }
             }
             ATHLTHSettingsGroup(title: tr("Sharing", "Deling")) {
