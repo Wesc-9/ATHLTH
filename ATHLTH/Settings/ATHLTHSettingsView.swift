@@ -1141,10 +1141,22 @@ settingsSection("Connections") {
                                 .buttonStyle(.plain)
                             }
 
-                            SettingsDivider()
+                        }
+                    }
 
+                    settingsSection(ATHLTHLocalization.choose(english: "Optional connections", norwegian: "Valgfrie tilkoblinger")) {
+                        PremiumSettingsCard {
                             NavigationLink {
+                                #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+                                if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
+                                    GarminPersonalSettingsView(accountID: session.profile.userID)
+                                        .id(session.profile.userID)
+                                } else {
+                                    GarminConnectionSetupView()
+                                }
+                                #else
                                 GarminConnectionSetupView()
+                                #endif
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "watch.analog",
@@ -3195,7 +3207,7 @@ private struct GarminConnectionSetupView: View {
                     }
                     if canTest {
                         SettingsDivider()
-                        #if ATHLTH_GARMIN_PERSONAL && DEBUG
+                        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
                         NavigationLink {
                             GarminPersonalSettingsView(accountID: session.profile.userID)
                                 .id(session.profile.userID)
@@ -3210,7 +3222,7 @@ private struct GarminConnectionSetupView: View {
                         #else
                         PremiumSettingsRow(icon: "lock.shield", iconTint: ATHLTHTheme.accentDeep,
                             title: tr("Developer access", "Utviklertilgang"),
-                            subtitle: tr("Personal API requires an owner-installed local development build. Distributed builds require approved Garmin authorization.", "Personal API krever et lokalt utviklingsbygg. Distribuerte bygg krever godkjent Garmin-autorisasjon.")) {
+                            subtitle: tr("Personal API requires a local development build or the separate internal test build. Public builds require approved Garmin authorization.", "Personal API krever et lokalt utviklingsbygg eller det separate interne testbygget. Offentlige bygg krever godkjent Garmin-autorisasjon.")) {
                             Image(systemName: "info.circle").foregroundStyle(ATHLTHTheme.mutedText)
                         }
                         #endif

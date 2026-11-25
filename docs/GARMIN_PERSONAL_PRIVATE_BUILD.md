@@ -4,8 +4,14 @@ Personal API is for an individual's own personal applications only.
 Normal builds do not include the client, Keychain access or private settings screen.
 For an owner-only local Debug build, add ATHLTH_GARMIN_PERSONAL to the app target's
 SWIFT_ACTIVE_COMPILATION_CONDITIONS while retaining DEBUG and inherited flags.
-Do not enable this in Release, TestFlight, distributed project settings or
-normal CI builds. A separate unsigned, simulator-only compile check may use
+Do not enable this in ordinary Release, external TestFlight, App Store,
+distributed project settings or normal CI builds. For strictly personal admin
+testing, the manual TestFlight workflow on release/v3.0.2 has an explicit
+garmin_internal_test option, which compiles the settings-only personal client
+and forces Apple's TestFlight internal-testing-only export. It cannot be used
+for App Store release or external testing. Use only your own Garmin data and
+confirm your Personal API terms allow this private development use. The
+ordinary commercial integration remains disabled pending Garmin approval. A separate unsigned, simulator-only compile check may use
 the flags with synthetic/no data and no credentials; it never publishes an app.
 Install locally on your own device using Xcode, sign into your own ATHLTH account,
 and open Settings > Health & connections > Garmin (admin/owner account). Create a personal key on Garmin Connect once.

@@ -5,6 +5,9 @@ import SwiftUI
 struct AppleWatchConnectionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var routeTransferMessage: String?
+    @State private var selectedTestRouteID: UUID?
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -57,6 +60,47 @@ struct AppleWatchConnectionView: View {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
                         .padding(.horizontal, 12)
+                }
+            }
+            ATHLTHSettingsGroup(title: tr("Supported functions", "Støttede funksjoner")) {
+                PremiumSettingsCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(tr("Workout recording and live data", "Øktregistrering og livedata"), systemImage: "figure.run")
+                        Label(tr("Routes and workout transfers", "Ruter og overføring av økter"), systemImage: "map")
+                        Label(tr("Audio Coach and haptic feedback", "Audio Coach og vibrasjon"), systemImage: "waveform")
+                        Text(tr("Requires a compatible watch and the ATHLTH watch app. Each feature can depend on workout type and device state.", "Krever kompatibel klokke og ATHLTH-appen på klokken. Funksjoner kan avhenge av økttype og enhetsstatus."))
+                            .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                    }.font(.subheadline).padding(16)
+                }
+            }
+            if watchConnection.isReady {
+                ATHLTHSettingsGroup(title: tr("Transfer test", "Testoverføring")) {
+                    PremiumSettingsCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Picker(tr("Choose saved route", "Velg lagret rute"), selection: $selectedTestRouteID) {
+                                Text(tr("Select", "Velg")).tag(UUID?.none)
+                                ForEach(session.savedRoutes) { route in
+                                    Text(route.title).tag(Optional(route.id))
+                                }
+                            }
+                            Button {
+                                guard let route = session.savedRoutes.first(where: { $0.id == selectedTestRouteID }) else { return }
+                                do {
+                                    try watchConnection.sendRoute(route)
+                                    routeTransferMessage = tr("Route queued. Open Routes on your watch to confirm receipt.", "Rute lagt i overføringskø. Åpne Ruter på klokken for å bekrefte mottak.")
+                                } catch { routeTransferMessage = error.localizedDescription }
+                            } label: {
+                                Label(tr("Send test route", "Send testrute"), systemImage: "paperplane")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(selectedTestRouteID == nil || !watchConnection.isReady)
+                            if let routeTransferMessage {
+                                Text(routeTransferMessage).font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Text(tr("Does not start a workout.", "Starter ingen treningsøkt."))
+                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                        }.padding(16)
+                    }
                 }
             }
             ATHLTHSettingsGroup(title: tr("Workout readiness", "Klar for trening")) {

@@ -2,6 +2,12 @@ name: Upload ATHLTH to TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      garmin_internal_test:
+        description: 'Personal Garmin developer test, internal TestFlight only (own data only)'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - release/v1.7.3
@@ -102,6 +108,7 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      ATHLTH_GARMIN_INTERNAL_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.garmin_internal_test && github.ref == 'refs/heads/release/v3.0.2' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -249,6 +256,13 @@ jobs:
 
       - name: Generate Xcode project
         run: xcodegen generate
+
+      - name: Verify internal Garmin export option exists
+        if: env.ATHLTH_GARMIN_INTERNAL_TEST == '1'
+        shell: bash
+        run: |
+          xcodebuild -help > "$RUNNER_TEMP/xcodebuild-help.txt" 2>&1 || true
+          grep -q 'testFlightInternalTestingOnly' "$RUNNER_TEMP/xcodebuild-help.txt"
 
       - name: Archive unsigned release in parallel with acceptance tests
         if: github.ref == 'refs/heads/release/v3.0.2'
@@ -547,6 +561,10 @@ jobs:
           </dict>
           </plist>
           EOF
+          if [ "$ATHLTH_GARMIN_INTERNAL_TEST" = "1" ]; then
+            /usr/libexec/PlistBuddy -c 'Add :testFlightInternalTestingOnly bool true' "$RUNNER_TEMP/ValidationExportOptions.plist"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :testFlightInternalTestingOnly' "$RUNNER_TEMP/ValidationExportOptions.plist")" = true
+          fi
 
       - name: Export and validate signed IPA before upload
         shell: bash
@@ -673,6 +691,10 @@ jobs:
           </dict>
           </plist>
           EOF
+          if [ "$ATHLTH_GARMIN_INTERNAL_TEST" = "1" ]; then
+            /usr/libexec/PlistBuddy -c 'Add :testFlightInternalTestingOnly bool true' "$RUNNER_TEMP/ExportOptions.plist"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :testFlightInternalTestingOnly' "$RUNNER_TEMP/ExportOptions.plist")" = true
+          fi
 
       - name: Recheck legacy same-commit release status before upload
         if: github.ref != 'refs/heads/release/v3.0.2'

@@ -1,4 +1,4 @@
-#if ATHLTH_GARMIN_PERSONAL && DEBUG
+#if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
 import SwiftUI
 
 struct GarminPersonalMetricsView: View {
@@ -38,6 +38,7 @@ struct GarminPersonalHistoryRows: View {
     let existing: [SocialPublishableWorkout]
     let startDate: Date?
     let endDate: Date?
+    var healthWorkouts: [WorkoutSummary] = []
     private var workouts: [GarminImportedActivity] {
         snapshot.workouts.filter { item in
             (startDate.map { item.workout.startedAt >= $0 } ?? true) &&
@@ -64,7 +65,8 @@ struct GarminPersonalHistoryRows: View {
                 if let heartRate = item.workout.averageHeartRate {
                     Text(heartRate.formatted(.number.precision(.fractionLength(0))) + " bpm")
                 }
-                if existing.contains(where: { GarminHistoryMatchPolicy.possibleMatch(item.workout, $0) }) {
+                if existing.contains(where: { GarminHistoryMatchPolicy.possibleMatch(item.workout, $0) }) ||
+                    healthWorkouts.contains(where: { GarminHistoryMatchPolicy.possibleMatch(item.workout, summary: $0) }) {
                     Label("Mulig duplikat i Apple Helse / ATHLTH", systemImage: "exclamationmark.circle")
                         .font(.caption).foregroundStyle(.secondary)
                 }

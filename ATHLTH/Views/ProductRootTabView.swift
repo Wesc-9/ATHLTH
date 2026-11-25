@@ -673,7 +673,7 @@ struct ProductRootTabView: View {
         .background {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
-            #if ATHLTH_GARMIN_PERSONAL && DEBUG
+            #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
             GarminPersonalAccountBoundary()
                 .frame(width: 0, height: 0)
             #endif

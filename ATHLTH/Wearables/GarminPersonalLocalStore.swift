@@ -1,4 +1,4 @@
-#if ATHLTH_GARMIN_PERSONAL && DEBUG
+#if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
 import Foundation
 import SwiftUI
 
@@ -13,7 +13,14 @@ final class GarminPersonalLocalStore: ObservableObject {
     @Published private(set) var displayPreference: WearableDisplayPreference = .automatic
     @Published private(set) var busy = false
     @Published private(set) var message: String?
+    struct SyncEvent: Identifiable {
+        let id = UUID()
+        let date = Date()
+        let success: Bool
+        let message: String
+    }
     @Published private(set) var lastRefresh: Date?
+    @Published private(set) var syncEvents: [SyncEvent] = []
     @Published private var preview: GarminPersonalPreview?
     private var generation = UUID()
     private var job: Task<Void, Never>?
@@ -98,7 +105,13 @@ final class GarminPersonalLocalStore: ObservableObject {
         preview = nil
         lastAttempt = nil
         lastRefresh = nil
+        syncEvents = []
         message = nil
+    }
+
+    private func recordSync(success: Bool, message: String) {
+        syncEvents.insert(.init(success: success, message: message), at: 0)
+        if syncEvents.count > 20 { syncEvents.removeLast(syncEvents.count - 20) }
     }
 
     private func begin(account: UUID, key: String, replaceKey: Bool) {
@@ -120,6 +133,7 @@ final class GarminPersonalLocalStore: ObservableObject {
                 self.preview = result
                 self.lastRefresh = Date()
                 self.message = "Garmin data refreshed locally."
+                self.recordSync(success: true, message: ATHLTHLocalization.choose(english: "Data refreshed", norwegian: "Data oppdatert"))
             } catch {
                 guard let self, self.accountID == account, self.generation == requestID,
                       !Task.isCancelled else { return }
@@ -133,6 +147,7 @@ final class GarminPersonalLocalStore: ObservableObject {
                 default:
                     self.message = "Garmin refresh failed. Check your connection or key."
                 }
+                self.recordSync(success: false, message: ATHLTHLocalization.choose(english: "Refresh failed", norwegian: "Oppdatering mislyktes"))
             }
             guard let self, self.accountID == account, self.generation == requestID else { return }
             self.busy = false

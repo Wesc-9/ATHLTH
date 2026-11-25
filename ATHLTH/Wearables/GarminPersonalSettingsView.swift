@@ -1,10 +1,11 @@
-#if ATHLTH_GARMIN_PERSONAL && DEBUG
+#if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
 import SwiftUI
 
 @MainActor
 struct GarminPersonalSettingsView: View {
     let accountID: UUID
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var store = GarminPersonalLocalStore.shared
     @State private var key = ""
@@ -32,12 +33,7 @@ struct GarminPersonalSettingsView: View {
                         }
                         SettingsDivider()
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(tr("Use your own personal key. Data stays on this device and is not shared with Coach or ATHLTH cloud services.", "Bruk din egen personlige nøkkel. Data blir på denne enheten og deles ikke med Coach eller ATHLTHs skytjenester."))
-                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
-                            Link(tr("Create or revoke personal key", "Opprett eller tilbakekall personlig nøkkel"),
-                                 destination: URL(string: "https://connect.garmin.com/app/settings/personalApiToken")!)
-                                .font(.subheadline.weight(.medium))
-                            SecureField(tr("Personal API key", "Personlig API-nøkkel"), text: $key)
+                            SecureField(tr("Auth key · personal API key", "Auth key · personlig API-nøkkel"), text: $key)
                                 .textContentType(.password)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
@@ -54,6 +50,11 @@ struct GarminPersonalSettingsView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(ATHLTHTheme.accentDeep)
                             .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || store.busy || store.needsKeyRemoval)
+                            Link(tr("Create or revoke personal key", "Opprett eller tilbakekall personlig nøkkel"),
+                                 destination: URL(string: "https://connect.garmin.com/app/settings/personalApiToken")!)
+                                .font(.subheadline.weight(.medium))
+                            Text(tr("Use only your own key. Data stays on this device and is not shared with Coach or ATHLTH cloud services.", "Bruk kun din egen nøkkel. Data blir på denne enheten og deles ikke med Coach eller ATHLTHs skytjenester."))
+                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
                         }
                         .padding(16)
                     }
@@ -103,6 +104,30 @@ struct GarminPersonalSettingsView: View {
                             .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
                     }
                 }
+                ATHLTHSettingsGroup(title: tr("Supported functions", "Støttede funksjoner")) {
+                    PremiumSettingsCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label(tr("Personal workout and health data", "Personlige trenings- og helsedata"), systemImage: "heart.text.clipboard")
+                            Label(tr("Local read-only preview", "Lokal, skrivebeskyttet forhåndsvisning"), systemImage: "lock.shield")
+                            Label(tr("Live start, Audio Coach and workout/route transfer not available yet", "Live-start, Audio Coach og økt-/ruteoverføring er ikke tilgjengelig ennå"), systemImage: "info.circle")
+                            Text(tr("Possible duplicates are flagged without deleting either record.", "Mulige duplikater markeres uten at noen av originaløktene slettes."))
+                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .font(.subheadline).foregroundStyle(ATHLTHTheme.primaryText)
+                        .padding(16)
+                    }
+                }
+                if store.accountID == accountID && !store.syncEvents.isEmpty {
+                    ATHLTHSettingsGroup(title: tr("Sync history · this session", "Synkroniseringshistorikk · denne økten")) {
+                        PremiumSettingsCard {
+                            ForEach(store.syncEvents) { event in
+                                PremiumSettingsRow(icon: event.success ? "checkmark.circle" : "exclamationmark.circle",
+                                    iconTint: ATHLTHTheme.accentDeep, title: event.message,
+                                    subtitle: event.date.formatted(date: .abbreviated, time: .shortened)) { EmptyView() }
+                            }
+                        }
+                    }
+                }
                 if let snapshot = store.snapshot(for: accountID) {
                     ATHLTHSettingsGroup(title: tr("Garmin measurements", "Garmin-målinger")) {
                         PremiumSettingsCard {
@@ -111,7 +136,8 @@ struct GarminPersonalSettingsView: View {
                     }
                     ATHLTHSettingsGroup(title: tr("Recent workouts · 30 days", "Siste økter · 30 dager")) {
                         PremiumSettingsCard {
-                            GarminPersonalHistoryRows(snapshot: snapshot, existing: [], startDate: nil, endDate: nil)
+                            GarminPersonalHistoryRows(snapshot: snapshot, existing: [], startDate: nil, endDate: nil, healthWorkouts: health.workouts)
+                                .padding(16)
                         }
                     }
                 }

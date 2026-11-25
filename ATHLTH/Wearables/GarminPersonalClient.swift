@@ -1,9 +1,9 @@
-#if ATHLTH_GARMIN_PERSONAL && DEBUG
+#if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
 import Foundation
 import Security
 
-/// This file is excluded from every ordinary Debug/Release/TestFlight build.
-/// Opt in explicitly only for a private, owner-installed development build.
+/// Excluded from ordinary builds. Explicitly opt in for personal local
+/// development or a dedicated internal-only TestFlight build.
 enum GarminPersonalClientError: Error {
     case invalidKey, invalidToken, invalidResponse, unauthorized, throttled, server, keychain
 }
