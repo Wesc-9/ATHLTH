@@ -495,7 +495,12 @@ final class IPhoneWorkoutStore:
     var hasPendingLaunch: Bool { pendingWalking != nil }
     // Expose ownership only for exact remote-launch reconciliation.
     var recordingAccountID: UUID? { accountID }
-    @Published private(set) var history: [PhoneWorkout] = []
+    // Only completed-history mutations invalidate calendar/feed projections.
+    // Live GPS, heart rate and timers must not change this revision.
+    private(set) var historyRevision: UInt64 = 0
+    @Published private(set) var history: [PhoneWorkout] = [] {
+        didSet { historyRevision &+= 1 }
+    }
     @Published private(set) var treadmillInclineOverrides:
         [UUID: Double] = [:]
     @Published var showingWorkout = false

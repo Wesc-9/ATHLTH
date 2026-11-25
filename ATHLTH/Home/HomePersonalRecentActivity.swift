@@ -352,36 +352,15 @@ enum HomePersonalWorkoutCatalog {
                         strengthWorkout
                 )
 
-            let nearestHealthStrength =
-                byID.values
-                    .filter { candidate in
-                        candidate.activity ==
-                            .strength &&
-                        candidate.source ==
-                            "Apple Health"
-                    }
-                    .min { lhs, rhs in
-                        abs(
-                            lhs.startDate
-                                .timeIntervalSince(
-                                    strengthWorkout
-                                        .startedAt
-                                )
-                        ) <
-                        abs(
-                            rhs.startDate
-                                .timeIntervalSince(
-                                    strengthWorkout
-                                        .startedAt
-                                )
-                        )
-                    }
-
-            if strengthWorkout
-                .healthMetrics
-                .healthKitWorkoutUUID == nil,
-               let candidate =
-                    nearestHealthStrength,
+            // A linked HealthKit ID is authoritative; only unlinked legacy
+            // recordings require the nearest-time fallback.
+            if strengthWorkout.healthMetrics.healthKitWorkoutUUID == nil,
+               let candidate = byID.values.lazy.filter({
+                   $0.activity == .strength && $0.source == "Apple Health"
+               }).min(by: {
+                   abs($0.startDate.timeIntervalSince(strengthWorkout.startedAt)) <
+                   abs($1.startDate.timeIntervalSince(strengthWorkout.startedAt))
+               }),
                abs(
                     candidate.startDate
                         .timeIntervalSince(

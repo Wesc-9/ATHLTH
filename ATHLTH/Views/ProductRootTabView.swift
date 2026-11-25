@@ -1253,6 +1253,17 @@ struct ATHLTHHomeView: View {
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
     #endif
     @State private var homeRecordingProjection = ATHLTHRecordedWorkoutProjection()
+    private struct HomeCalendarRecordingsKey: Equatable {
+        let account: UUID
+        let phoneAccount: UUID?
+        let phoneRevision: UInt64
+        let health: [WorkoutSummary]
+        let strength: [StrengthWorkoutLog]
+        let norwegian: Bool
+        let locale: String
+        let translationRevision: Int
+    }
+    @State private var homeCalendarRecordingMemo = ATHLTHProjectionMemo<HomeCalendarRecordingsKey, [SocialPublishableWorkout]>()
     @State private var homeStreakDays: [Date]?
     @State private var homeStreakRefreshTask: Task<Void, Never>?
     @State private var homeArenaLoadAccountID: UUID?
@@ -2713,11 +2724,27 @@ struct ATHLTHHomeView: View {
         let plannedStarts = planned.compactMap {
             session.recordedTimes(for: $0.id)?.startedAt
         }
-        let merged = HomePersonalWorkoutCatalog.mergeRecent(
-            healthSummaries: health.workouts,
-            strengthHistory: strengthWorkout.workoutHistory,
-            phoneHistory: phoneWorkout.history
+        let key = HomeCalendarRecordingsKey(
+            account: session.profile.userID,
+            phoneAccount: phoneWorkout.recordingAccountID,
+            phoneRevision: phoneWorkout.historyRevision,
+            health: health.workouts,
+            strength: strengthWorkout.workoutHistory,
+            norwegian: ATHLTHLocalization.isNorwegian,
+            locale: Locale.current.identifier,
+            translationRevision: NorwegianExerciseAutoTranslation.shared.revision
         )
+        let merged = homeCalendarRecordingMemo.value(for: key) {
+            let signpost = ATHLTHPerformance.begin("HomeCalendarRecordings")
+            defer { ATHLTHPerformance.end("HomeCalendarRecordings", id: signpost) }
+            return HomePersonalWorkoutCatalog.mergeRecent(
+                healthSummaries: key.health,
+                strengthHistory: key.strength,
+                phoneHistory: key.phoneAccount == key.account ? phoneWorkout.history : []
+            )
+        }
+        // Day and actual planned starts are intentionally evaluated fresh,
+        // so rescheduling and midnight never leave cached calendar rows.
         let today = Date()
         let filtered = merged.filter {
             HomeTodayRecordedWorkoutPolicy.shouldShow(
