@@ -4,23 +4,16 @@ struct ATHLTHExploreView: View {
     /// Keep the MapKit view and camera in memory between tabs, but only run
     /// location/network refreshes while Explore is actually selected.
     var isActive = true
+    var embeddedInStudio = false
     @StateObject private var locationStore = HomeLocationStore()
     @State private var hasOpenedExplore = false
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isActive || hasOpenedExplore {
-                    AroundYouExploreView(
-                        locationStore: locationStore,
-                        embeddedInTab: true,
-                        isActive: isActive
-                    )
-                } else {
-                    // Avoid constructing an offscreen MapKit tree on app launch.
-                    // Once visited, retain the map/camera through tab changes.
-                    Color.clear
-                }
+        Group {
+            if embeddedInStudio {
+                exploreContent
+            } else {
+                NavigationStack { exploreContent }
             }
         }
         .onAppear {
@@ -28,6 +21,21 @@ struct ATHLTHExploreView: View {
         }
         .onChange(of: isActive) { _, active in
             if active { hasOpenedExplore = true }
+        }
+    }
+
+    @ViewBuilder
+    private var exploreContent: some View {
+        if isActive || hasOpenedExplore {
+            AroundYouExploreView(
+                locationStore: locationStore,
+                embeddedInTab: true,
+                embeddedInStudio: embeddedInStudio,
+                isActive: isActive
+            )
+        } else {
+            // Avoid constructing an offscreen MapKit tree on app launch.
+            Color.clear
         }
     }
 }

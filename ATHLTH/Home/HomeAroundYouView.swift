@@ -876,6 +876,7 @@ struct AroundYouExploreView: View {
 
     @ObservedObject var locationStore: HomeLocationStore
     var embeddedInTab: Bool = false
+    var embeddedInStudio: Bool = false
     /// Prevent offscreen MapKit refreshes while preserving route/camera state.
     var isActive = true
 
@@ -1294,7 +1295,7 @@ struct AroundYouExploreView: View {
                 // Keep the map behind Dynamic Island, not its controls.
                 .ignoresSafeArea(
                     .container,
-                    edges: embeddedInTab ? .top : []
+                    edges: embeddedInTab && !embeddedInStudio ? .top : []
                 )
                 .mapControls {
                     MapCompass()
@@ -1472,11 +1473,11 @@ struct AroundYouExploreView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(
-            embeddedInTab ? .hidden : .visible,
+            embeddedInTab && !embeddedInStudio ? .hidden : .visible,
             for: .navigationBar
         )
         .toolbar(
-            embeddedInTab ? .visible : .hidden,
+            embeddedInTab && !embeddedInStudio ? .visible : .hidden,
             for: .tabBar
         )
         .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
@@ -1568,7 +1569,7 @@ struct AroundYouExploreView: View {
                     .environmentObject(marketplace)
             }
         }
-        .sheet(item: $routeToStart) { route in
+        .athlthStudioEditor(item: $routeToStart, useFullScreen: embeddedInStudio) { route in
             RunQuickStartSheet(
                 trainingDeviceProvider:
                     watchConnection.isReady

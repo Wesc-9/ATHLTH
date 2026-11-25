@@ -311,6 +311,7 @@ if [ "$IPAD_SIZE" = "13" ]; then
   preview_13_inch "home" "--athlth-compatibility-tab=0"
   preview_13_inch "train-today" "--athlth-compatibility-train-today"
   preview_13_inch "plan-studio" "--athlth-compatibility-tab=1"
+  preview_13_inch "explore" "--athlth-compatibility-tab=3"
   preview_13_inch "workout-planner" "--athlth-compatibility-workout-planner"
   preview_13_inch "library-exercises" "--athlth-compatibility-library=exercises"
   preview_13_inch "profile" "--athlth-compatibility-sidebar=profile"

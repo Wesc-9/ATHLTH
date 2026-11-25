@@ -25,7 +25,7 @@ private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
         case .planner: return ATHLTHLocalization.choose(english: "Plan Studio", norwegian: "Plan Studio")
         case .insights: return ATHLTHLocalization.choose(english: "Insights Lab", norwegian: "Innsiktslab")
         case .history: return ATHLTHLocalization.choose(english: "Workout history", norwegian: "Treningshistorikk")
-        case .explore: return ATHLTHLocalization.choose(english: "Routes & Explore", norwegian: "Ruter og utforsk")
+        case .explore: return ATHLTHLocalization.choose(english: "Explore", norwegian: "Utforsk")
         case .community: return ATHLTHLocalization.choose(english: "Community", norwegian: "Fellesskap")
         case .coach: return "ATHLTH Coach"
         case .settings: return ATHLTHLocalization.choose(english: "Settings", norwegian: "Innstillinger")
@@ -39,7 +39,7 @@ private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
         case .planner: "calendar"
         case .insights: "chart.xyaxis.line"
         case .history: "clock.arrow.circlepath"
-        case .explore: "map"
+        case .explore: "map.fill"
         case .community: "person.3"
         case .coach: "sparkles"
         case .settings: "gearshape"
@@ -796,6 +796,14 @@ struct ATHLTHiPadStudioRootView: View {
                     trainingLibraryShortcut
 
                     sidebarAction(
+                        ATHLTHLocalization.choose(english: "Explore", norwegian: "Utforsk"),
+                        symbol: "map.fill",
+                        selected: selection == .explore && libraryPage == nil &&
+                            sidebarPage == nil
+                    ) { openStudio(.explore) }
+                    .accessibilityIdentifier("athlth-ipad-sidebar-explore")
+
+                    sidebarAction(
                         ATHLTHLocalization.choose(english: "Train Together", norwegian: "Tren sammen"),
                         symbol: "person.2",
                         selected: sidebarPage == .trainTogether
@@ -1051,8 +1059,8 @@ struct ATHLTHiPadStudioRootView: View {
                 openStudio(.explore)
             } label: {
                 Label(ATHLTHLocalization.choose(
-                    english: "Routes & Explore", norwegian: "Ruter og utforsk"
-                ), systemImage: "map")
+                    english: "Explore", norwegian: "Utforsk"
+                ), systemImage: "map.fill")
             }
         }
     }
@@ -1261,7 +1269,11 @@ struct ATHLTHiPadStudioRootView: View {
         case .history:
             ATHLTHStudioHistoryView(onInspect: inspect)
         case .explore:
-            ATHLTHStudioRouteWorkspaceView()
+            // Same map, filters, previews and workout actions as iPhone;
+            // Studio supplies the existing detail navigation stack.
+            ATHLTHExploreView(embeddedInStudio: true)
+                .environment(\.athlthStudioFullscreenEditing, true)
+                .accessibilityIdentifier("athlth-ipad-shared-explore")
         case .community:
             ATHLTHCommunityV5View(initialTab: communityTab)
                 .id(communityTab)
