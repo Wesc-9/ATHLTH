@@ -10893,6 +10893,7 @@ private struct StrengthActiveExerciseQueueView: View {
     @State private var batchExercise: StrengthExerciseLog?
     @State private var replacementExercise: StrengthExerciseLog?
     @State private var groupRestExercise: StrengthExerciseLog?
+    @State private var editingGroupRounds: StrengthExerciseLog?
     @State private var pendingSetEditor: StrengthQueueSetEdit?
     @State private var showingEditFailure = false
     @State private var showingSelectionBlocked = false
@@ -11523,6 +11524,13 @@ private struct StrengthActiveExerciseQueueView: View {
                                 ) {
                                 if exercise.groupStyle == .circuit || exercise.groupStyle == .superset {
                                     Button {
+                                        editingGroupRounds = exercise
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(english: "Manage future rounds", norwegian: "Administrer kommende runder"), systemImage: "arrow.up.arrow.down")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    .buttonStyle(.plain)
+                                    Button {
                                         groupRestExercise = exercise
                                     } label: {
                                         Label(ATHLTHLocalization.choose(english: "Station and round rest", norwegian: "Pause mellom øvelser og runder"), systemImage: "timer")
@@ -11935,6 +11943,11 @@ private struct StrengthActiveExerciseQueueView: View {
                 pendingSetEditor = nil
             }
         }
+        .sheet(item: $editingGroupRounds) { exercise in
+            if let groupID = exercise.groupID {
+                StrengthQueueRoundsEditor(groupID: groupID)
+            }
+        }
         .sheet(item: $groupRestExercise) { exercise in
             StrengthQueueGroupRestEditor(exercise: exercise) { station, round in
                 strength.setLiveGroupRest(exerciseID: exercise.id, station: station, round: round)
@@ -12177,6 +12190,90 @@ private struct StrengthQueueSetEditor: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+private struct StrengthQueueRoundsEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+    let groupID: UUID
+    @State private var pendingRemoval: Int?
+    @State private var blocked = false
+
+    private var stations: [StrengthExerciseLog] {
+        strength.activeWorkout?.exercises.filter { $0.groupID == groupID } ?? []
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(0..<(stations.map(\.sets.count).min() ?? 0), id: \.self) { round in
+                    let available = stations.allSatisfy { !$0.sets[round].isResolved && $0.sets[round].id != strength.currentSet?.id }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(ATHLTHLocalization.choose(english: "Round \(round + 1)", norwegian: "Runde \(round + 1)"))
+                                .font(.headline)
+                            Spacer()
+                            if available {
+                                Menu {
+                                    if round > 0 {
+                                        Button(ATHLTHLocalization.choose(english: "Move up", norwegian: "Flytt opp")) {
+                                            blocked = !strength.editFutureStrengthRound(groupID: groupID, round: round, moveTo: round - 1)
+                                        }
+                                    }
+                                    if round + 1 < (stations.map(\.sets.count).min() ?? 0) {
+                                        Button(ATHLTHLocalization.choose(english: "Move down", norwegian: "Flytt ned")) {
+                                            blocked = !strength.editFutureStrengthRound(groupID: groupID, round: round, moveTo: round + 1)
+                                        }
+                                    }
+                                    Button(ATHLTHLocalization.choose(english: "Skip round", norwegian: "Hopp over runde"), role: .destructive) {
+                                        pendingRemoval = round
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle").font(.title3)
+                                }
+                            } else {
+                                Image(systemName: "lock").foregroundStyle(.secondary)
+                            }
+                        }
+                        ForEach(stations) { exercise in
+                            let set = exercise.sets[round]
+                            HStack {
+                                Text(exercise.exercise.displayName)
+                                Spacer()
+                                Text(set.resolvedTargetKind == .time
+                                     ? TimeInterval(set.plannedDurationSeconds ?? 0).clockDuration
+                                     : "\(set.plannedReps ?? 0) reps")
+                                if set.isCompleted { Image(systemName: "checkmark.circle.fill") }
+                                else if set.isResolved { Image(systemName: "forward.end") }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(english: "Rounds", norwegian: "Runder"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) { dismiss() }
+                }
+            }
+        }
+        .confirmationDialog(ATHLTHLocalization.choose(english: "Skip this round?", norwegian: "Hoppe over denne runden?"),
+                            isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
+                            titleVisibility: .visible) {
+            Button(ATHLTHLocalization.choose(english: "Skip round", norwegian: "Hopp over runde"), role: .destructive) {
+                if let round = pendingRemoval {
+                    blocked = !strength.editFutureStrengthRound(groupID: groupID, round: round)
+                }
+                pendingRemoval = nil
+            }
+        }
+        .alert(ATHLTHLocalization.choose(english: "Only completely pending rounds can be changed.", norwegian: "Kun runder som ikke er påbegynt kan endres."), isPresented: $blocked) {
+            Button("OK", role: .cancel) {}
+        }
     }
 }
 
