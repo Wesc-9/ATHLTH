@@ -37,6 +37,20 @@ final class ATHLTHCompetitionRaceRulesTests: XCTestCase {
         XCTAssertFalse(rules.isValid)
     }
 
+    func testPreviewPointsUsesServerMetricDirectionAndSharedRanks() {
+        let score = ATHLTHCompetitionRaceRules.previewPoints
+        XCTAssertEqual(score(.ranking, "distance", [100, 110], [0, 10], 2, 3, nil), [6, 12])
+        XCTAssertEqual(score(.ranking, "duration", [100, 100, 80], [0, 0, 0], 1, 1, nil), [3, 3, 1])
+        XCTAssertEqual(score(.winner, "repetitions", [10, 10], [0, 0], 2, 1, nil), [2, 2])
+        XCTAssertEqual(score(.target, "distance", [100, 110], [0, 10], 1, 1, 100), [1, 1])
+        XCTAssertEqual(score(.target, "time", [45, 50], [0, 10], 2, 1, 50), [0, 2])
+        XCTAssertEqual(score(.closest, "duration", [90, 110], [0, 0], 1, 2, 100), [2, 2])
+        XCTAssertEqual(score(.completion, "repetitions", [8, 12], [0, 0], 3, 2, nil), [6, 6])
+        XCTAssertNil(score(.target, "distance", [100, 110], [0, 10], 1, 1, nil))
+        XCTAssertNil(score(.ranking, "distance", [100, 110], [0, 31], 1, 1, nil))
+        XCTAssertNil(score(.winner, "invalid", [100], [0], 1, 1, nil))
+    }
+
     func testOneRaceDisciplineCanBeReusedForEachCompetitionFormat() {
         XCTAssertEqual(ATHLTHCompetitionDiscipline.allCases.count, 5)
         XCTAssertEqual(ATHLTHCompetitionSprintMode.allCases.count, 3)
