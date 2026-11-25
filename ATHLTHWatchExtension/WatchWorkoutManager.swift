@@ -9031,6 +9031,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         sendToPhone(result)
         WatchRouteStore.shared.clearCompletedPetSelection()
 
+        // HealthKit has saved the workout and the optional route callback
+        // has finished. Release the finalization lock BEFORE exposing Done.
+        // Reset must still reject genuinely active or unfinished workouts.
+        finishing = false
         publish {
             self.completedResult = result
             self.elapsedTime =
@@ -9039,6 +9043,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.automaticPauseActive =
                 false
         }
+        reportWorkoutActivityStateToPhone(.completed)
         // The metrics recap must be immediate and offline. A potentially
         // slow HealthKit history query must never delay basic completion
         // narration after the recording session ends.
@@ -9127,20 +9132,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             .workoutStopped()
         clearPersistedWorkoutState()
 
+        // The saved result was already queued for durable phone delivery.
+        // Final mirror cleanup must never hold the summary open or touch a
+        // replacement workout if Done is tapped during the asynchronous send.
+        let completedSession = workoutSession
+        let completedResultID = result.id
+        let shouldStopMirroring = mirroringActive
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, let completedSession else { return }
 
-            await self.sendLiveSnapshot(
-                stateOverride: .completed,
-                force: true
-            )
+            if self.workoutSession === completedSession,
+               self.completedResult?.id == completedResultID,
+               self.state == .completed {
+                await self.sendLiveSnapshot(stateOverride: .completed, force: true)
+            }
 
-            if self.mirroringActive,
-               let workoutSession =
-                    self.workoutSession {
-                try? await workoutSession
-                    .stopMirroringToCompanionDevice()
-                self.mirroringActive = false
+            if shouldStopMirroring {
+                try? await completedSession.stopMirroringToCompanionDevice()
+                if self.workoutSession === completedSession {
+                    self.mirroringActive = false
+                }
             }
         }
     }
@@ -9596,11 +9607,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         do {
             try await workoutSession.sendToRemoteWorkoutSession(data: data)
+            guard workoutSession === self.workoutSession else { return }
             lastMirrorSnapshotSentAt = now
 
             // The phone may become available after Watch start or reconnection.
             // Re-advertise without interrupting the original workout session.
             if workoutSession === self.workoutSession,
+               isActive,
                (kind == .running || kind == .walking || kind == .strength),
                audioCoachConfiguration.enabled,
                audioCoachConfiguration.shouldPreferIPhoneAudioWhenReachable,
@@ -9627,6 +9640,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
             }
         } catch {
+            guard workoutSession === self.workoutSession, self.state != .completed else { return }
             publish {
                 self.errorMessage =
                     "iPhone live metrics are temporarily unavailable. Workout continues normally."
@@ -9906,6 +9920,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         _ state: HKWorkoutSessionState,
         date: Date
     ) {
+        // A saved result is terminal. Late HealthKit callbacks cannot
+        // turn its summary back into a live recording.
+        guard self.state != .completed, completedResult == nil else { return }
         let previousState = self.state
 
         switch state {
@@ -10293,7 +10310,8 @@ extension WatchWorkoutManager:
                           ObjectIdentifier($0)
                       },
                       incomingSession: callbackIdentity
-                  ) else { return }
+                  ), self.state != .completed,
+                  self.completedResult == nil else { return }
             self.fail(message: message)
         }
     }

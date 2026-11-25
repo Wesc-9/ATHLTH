@@ -175,6 +175,30 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
     }
 
 
+    func testSavedWatchSummaryCanCloseButUnfinishedWorkoutCannot() {
+        let policy = ATHLTHWatchWorkoutResetPolicy.self
+        XCTAssertTrue(policy.mayClear(
+            active: false, preparing: false, ending: false,
+            finishing: false, recovering: false,
+            healthKitSessionInProgress: false
+        ), "A saved summary must close without any iPhone acknowledgement")
+        XCTAssertFalse(policy.mayClear(
+            active: false, preparing: false, ending: true,
+            finishing: true, recovering: false,
+            healthKitSessionInProgress: true
+        ))
+        XCTAssertFalse(policy.mayClear(
+            active: true, preparing: false, ending: false,
+            finishing: false, recovering: false,
+            healthKitSessionInProgress: true
+        ))
+        XCTAssertFalse(policy.mayClear(
+            active: false, preparing: false, ending: false,
+            finishing: true, recovering: false,
+            healthKitSessionInProgress: false
+        ), "Finalization must release its lock before showing a dismissible summary")
+    }
+
     func testWatchFinishCanPublishOnlyOnceForOriginalHealthKitSession() {
         let began = Date(timeIntervalSince1970: 1_900_000_000)
         let policy = ATHLTHWatchResultPublicationPolicy.self
