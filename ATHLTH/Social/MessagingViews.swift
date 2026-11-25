@@ -3553,9 +3553,7 @@ struct DirectMessageThreadView: View {
         .onReceive(NotificationCenter.default.publisher(for: .athlthRemoteNotificationReceived)) { event in
             guard let owner = draftOwner, let conversationID,
                   let payload = event.userInfo,
-                  (payload["athlth_recipient_id"] as? String).flatMap(UUID.init(uuidString:)) == owner,
-                  payload["athlth_entity_type"] as? String == "direct_conversation",
-                  (payload["athlth_entity_id"] as? String).flatMap(UUID.init(uuidString:)) == conversationID else { return }
+                  ATHLTHDirectMessageRefreshPolicy.matches(payload, owner: owner, conversation: conversationID) else { return }
             foregroundRefreshRequest = UUID()
         }
         .onChange(of: scenePhase) { _, phase in
