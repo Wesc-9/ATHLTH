@@ -262,47 +262,49 @@ final class SupabaseMessagingService: Sendable {
     }
 
     func markConversationRead(_ conversationID: UUID, messageIDs: [UUID]) async throws {
-        guard let currentUserID else {
-            throw SocialServiceError.notAuthenticated
-        }
-
+        guard let owner = currentUserID else { throw SocialServiceError.notAuthenticated }
+        guard !messageIDs.isEmpty else { return }
         let readAt = ISO8601DateFormatter().string(from: Date())
 
-        guard !messageIDs.isEmpty else { return }
-        try await client
-            .from("direct_messages")
-            .update(["read_at": readAt])
-            .eq("conversation_id", value: conversationID)
-            .eq("recipient_id", value: currentUserID)
-            .in("id", values: messageIDs)
-            .execute()
+        func checkOwner() throws {
+            try Task.checkCancellation()
+            guard currentUserID == owner else { throw CancellationError() }
+        }
 
-        for kind in [
-            "message",
-            "message_request",
-            "message_request_accepted",
-            "mention"
-        ] {
+        // Keep PostgREST URL length bounded when the user loads older history.
+        // Mark only those messages actually loaded, not the entire conversation.
+        let uniqueIDs = Array(Set(messageIDs))
+        for start in stride(from: 0, to: uniqueIDs.count, by: 100) {
+            try checkOwner()
+            let ids = Array(uniqueIDs[start..<min(start + 100, uniqueIDs.count)])
+            try await client
+                .from("direct_messages")
+                .update(["read_at": readAt])
+                .eq("conversation_id", value: conversationID)
+                .eq("recipient_id", value: owner)
+                .in("id", values: ids)
+                .execute()
+
+            try checkOwner()
             try await client
                 .from("social_inbox_events")
                 .update(["read_at": readAt])
-                .eq(
-                    "recipient_id",
-                    value: currentUserID
-                )
-                .eq("kind", value: kind)
-                .eq(
-                    "entity_type",
-                    value:
-                        "direct_conversation"
-                )
-                .eq(
-                    "entity_id",
-                    value:
-                        conversationID
-                )
-                .in("direct_message_id", values: messageIDs)
+                .eq("recipient_id", value: owner)
+                .eq("entity_type", value: "direct_conversation")
+                .eq("entity_id", value: conversationID)
+                .in("direct_message_id", values: ids)
                 .execute()
         }
+
+        // Acceptance is a conversation event, not an actual message.
+        try checkOwner()
+        try await client
+            .from("social_inbox_events")
+            .update(["read_at": readAt])
+            .eq("recipient_id", value: owner)
+            .eq("kind", value: "message_request_accepted")
+            .eq("entity_type", value: "direct_conversation")
+            .eq("entity_id", value: conversationID)
+            .execute()
     }
 }
