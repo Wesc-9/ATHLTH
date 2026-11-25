@@ -98,7 +98,7 @@ final class SupabaseMessagingService: Sendable {
 
     func loadRecentMessages(limit: Int = 500) async throws -> [DirectMessageRecord] {
         try await client
-            .from("direct_messages")
+            .from("athlth_direct_messages_visible")
             .select()
             .order("created_at", ascending: false)
             .limit(limit)
@@ -113,7 +113,7 @@ final class SupabaseMessagingService: Sendable {
         sourceWorkoutID: UUID
     ) async throws -> [DirectMessageRecord] {
         try await client
-            .from("direct_messages")
+            .from("athlth_direct_messages_visible")
             .select()
             .eq("source_object_id", value: sourceWorkoutID)
             .eq("attachment_kind", value: MessageShareKind.workout.rawValue)
@@ -128,7 +128,7 @@ final class SupabaseMessagingService: Sendable {
         limit: Int = 300
     ) async throws -> [DirectMessageRecord] {
         try await client
-            .from("direct_messages")
+            .from("athlth_direct_messages_visible")
             .select()
             .eq("conversation_id", value: conversationID)
             .order("created_at", ascending: true)
@@ -189,18 +189,36 @@ final class SupabaseMessagingService: Sendable {
             .execute()
     }
 
-    func markConversationRead(_ conversationID: UUID) async throws {
+    func retractUnreadMessage(_ id: UUID) async throws -> Bool {
+        struct Params: Encodable { let p_message_id: UUID }
+        return try await client.rpc("athlth_retract_unread_direct_message", params: Params(p_message_id: id))
+            .execute().value
+    }
+
+    func readReceiptPreference() async throws -> Bool {
+        try await client.rpc("athlth_my_read_receipts").execute().value
+    }
+
+    func setReadReceiptPreference(_ enabled: Bool) async throws -> Bool {
+        struct Params: Encodable { let p_enabled: Bool }
+        return try await client.rpc("athlth_my_read_receipts", params: Params(p_enabled: enabled))
+            .execute().value
+    }
+
+    func markConversationRead(_ conversationID: UUID, messageIDs: [UUID]) async throws {
         guard let currentUserID else {
             throw SocialServiceError.notAuthenticated
         }
 
         let readAt = ISO8601DateFormatter().string(from: Date())
 
+        guard !messageIDs.isEmpty else { return }
         try await client
             .from("direct_messages")
             .update(["read_at": readAt])
             .eq("conversation_id", value: conversationID)
             .eq("recipient_id", value: currentUserID)
+            .in("id", values: messageIDs)
             .execute()
 
         for kind in [
