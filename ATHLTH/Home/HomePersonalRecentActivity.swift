@@ -2607,7 +2607,8 @@ private struct HomeFollowingWorkoutArtwork:
                         distanceMeters: HomeRecentCardFormat.number(item, key: "distance_meters"),
                         exerciseCount: HomeRecentCardFormat.integer(item, key: "exercise_count"),
                         volumeKilograms: HomeRecentCardFormat.number(item, key: "volume_kg"),
-                        strength: activity == .strength
+                        strength: activity == .strength,
+                        showsPace: activity == .running || activity == .walking || activity == .hiking
                     )
                 ) { backgroundArtwork }
             } else {
@@ -4885,7 +4886,8 @@ private struct HomePersonalWorkoutVisual:
                         duration: workout.duration, distanceMeters: workout.distanceMeters,
                         exerciseCount: workout.strengthExerciseCount ?? strengthWorkout?.exercises.count,
                         volumeKilograms: workout.strengthTotalVolumeKilograms ?? strengthWorkout?.totalVolumeKilograms,
-                        strength: workout.activity == .strength
+                        strength: workout.activity == .strength,
+                        showsPace: workout.activity == .running || workout.activity == .walking || workout.activity == .hiking
                     ),
                     averageHeartRate: workout.strengthWorkoutAverageHeartRateBPM
                 ) { background }
