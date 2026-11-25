@@ -104,14 +104,50 @@ enum ATHLTHCompetitionStartMode: String, Codable, CaseIterable, Identifiable {
 }
 
 enum ATHLTHCompetitionEnvironment: String, Codable, CaseIterable, Identifiable {
-    case any, outdoor, gym
+    case any, outdoor, indoor, treadmill, gym
     var id: String { rawValue }
     var title: String {
         switch self {
         case .any: return "Ingen begrensning"
         case .outdoor: return "Kun utendørs"
+        case .indoor: return "Kun innendørs"
+        case .treadmill: return "Kun tredemølle"
         case .gym: return "Kun treningssenter"
         }
+    }
+
+    var detail: String {
+        switch self {
+        case .any: return "Alle treningsmiljøer er tillatt. Inne- og uteøkter kan ha ulik målenøyaktighet."
+        case .outdoor: return "Utendørsaktivitet med GPS der det er relevant. Registrert utendørstype alene er ikke GPS-bevis."
+        case .indoor: return "Innendørsaktivitet uten krav til GPS. Målingen baseres på den opprinnelige økten og tilgjengelige sensorer."
+        case .treadmill: return "Bruk innendørs løpe- eller gåmodus på tredemølle. Hastighet, distanse, tid og stigning erstatter GPS-rute; manuelt angitte verdier må ikke kalles sensormålinger."
+        case .gym: return "Treningssenter krever bekreftelse av sted. En styrkeøkt alene beviser ikke at den er utført på et treningssenter."
+        }
+    }
+
+    /// The current server competition RPC only accepts these three values.
+    var canPublish: Bool { self == .any || self == .outdoor || self == .gym }
+
+    func supports(_ activities: Set<ATHLTHTournamentActivity>) -> Bool {
+        let cardio = activities.contains(.running) || activities.contains(.walking)
+        switch self {
+        case .any: return true
+        case .outdoor: return cardio || activities.contains(.hiking)
+        case .indoor: return cardio || activities.contains(.strength)
+        case .treadmill: return cardio && activities.allSatisfy { $0 == .running || $0 == .walking }
+        case .gym: return activities.contains(.strength)
+        }
+    }
+
+    func supports(_ race: ATHLTHCompetitionRaceRules) -> Bool {
+        if self == .indoor || self == .treadmill || self == .gym {
+            if race.discipline == .laps && race.lapVerification == .gps { return false }
+            if race.discipline == .sprint && race.sprintTarget == .route { return false }
+            if self == .treadmill && race.discipline == .laps { return false }
+            if race.allowOptInLiveLocation { return false }
+        }
+        return true
     }
 }
 
@@ -160,7 +196,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
              (meetingLat.map { (-90...90).contains($0) } == true &&
               meetingLon.map { (-180...180).contains($0) } == true))
         let validEnd = endsAt.map { $0 > max(now, startsAt ?? now) && $0 <= now.addingTimeInterval(366 * 86_400) } ?? true
-        return validStart && validEnd && validVenue && race.isValid &&
+        return validStart && validEnd && validVenue && race.isValid && environment.supports(race) &&
             (1...30).contains(invitationDays) &&
             (selectedExerciseIDs.map { (1...12).contains($0.count) && Set($0).count == $0.count && coachExerciseIDs.isEmpty } ?? true) &&
             coachExerciseIDs.count <= 12 &&
