@@ -659,7 +659,8 @@ struct RouteMapSnapshotThumbnail: View {
                     image = nil
                     imageRequestID = nil
                 }
-                if imageRequestID == requestID, image != nil { return }
+                // An offline preview is not a completed live render. When
+                // scrolling stops, allow MapKit to upgrade it.
 
                 // Cached map previews are displayed even while scrolling;
                 // the async MapKit snapshotter is not started during motion.
@@ -728,17 +729,21 @@ struct GhostReplayRouteThumbnail: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .task(id: key) {
                 guard width > 20, !Task.isCancelled else { return }
-                if let cached = RouteMapSnapshotCache.cachedImage(requestID: key) {
-                    image = cached
+                // Resolve the HealthKit route first; do not bypass its
+                // existing access and refresh behavior with a map cache hit.
+                if resolvedID != key {
+                    image = nil
+                    resolvedID = nil
+                }
+                loading = true
+                let locations = await health.workoutRoute(for: workoutID)
+                guard !Task.isCancelled, session.profile.userID == accountID else { return }
+                guard locations.count >= 2 else {
+                    image = nil
                     resolvedID = key
                     loading = false
                     return
                 }
-                image = nil
-                resolvedID = nil
-                loading = true
-                let locations = await health.workoutRoute(for: workoutID)
-                guard !Task.isCancelled else { return }
                 let result = await RouteMapSnapshotCache.image(
                     for: locations.map(\.coordinate),
                     size: size,
