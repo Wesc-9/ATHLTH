@@ -109,7 +109,8 @@ enum ATHLTHGoalMergePolicy {
 
 /// Offline-first synchronization. A failed network request never destroys a
 /// locally saved goal. Every write to Supabase uses an atomic server revision.
-/// Changes to health measurements themselves remain outside this payload.
+/// New body measurements remain local. Historical cloud measurement arrays
+/// are retained unchanged until an explicit, safe cleanup migration exists.
 @MainActor
 final class ATHLTHGoalAccountSyncStore: ObservableObject {
     @Published private(set) var status = ""
@@ -194,9 +195,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
         }
 
         let capturedLocalGoals = goals.goals
-        let capturedMeasurements = ATHLTHTrainingProfile.load(userID: userID).measurements
         let baseItems = acknowledgement?.goals ?? []
-        let baseMeasurements = acknowledgement?.measurements ?? []
         do {
             let localItems = try Self.capture(
                 goals: capturedLocalGoals, baseline: baseItems, from: goals
@@ -219,28 +218,23 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
             let result = ATHLTHGoalMergePolicy.reconcile(
                 base: baseItems, local: localItems, remote: remoteItems
             )
-            let measurementResult = ATHLTHGoalMergePolicy.reconcileMeasurements(
-                base: baseMeasurements, local: capturedMeasurements, remote: remoteMeasurements
-            )
-
-            // Each saved value is reconciled automatically. No profile prompt.
+            // Body measurements are private device data. Keep historical
+            // server entries unchanged to avoid silently deleting past data,
+            // and never read or upload the local measurement history here.
             let resolvedGoals = result.merged
-            let resolvedMeasurements = measurementResult.merged
 
             // Local goals could change while the remote request is pending.
-            guard goals.goals == capturedLocalGoals,
-                  ATHLTHTrainingProfile.load(userID: userID).measurements == capturedMeasurements else {
+            guard goals.goals == capturedLocalGoals else {
                 scheduleSync(session: session, goals: goals)
                 return
             }
             let merged = ATHLTHGoalMergePolicy.ordered(resolvedGoals)
-            let mergedMeasurements = ATHLTHGoalMergePolicy.ordered(resolvedMeasurements)
+            let mergedMeasurements = remoteMeasurements
             let remote = ATHLTHGoalMergePolicy.ordered(remoteItems)
-            let remoteMeasurementsSorted = ATHLTHGoalMergePolicy.ordered(remoteMeasurements)
 
             var effectiveRevision = remoteRevision
             var didUpload = false
-            if merged != remote || mergedMeasurements != remoteMeasurementsSorted {
+            if merged != remote {
                 let encoded = try Self.encode(ATHLTHCloudGoalDocument(
                     goals: merged, measurements: mergedMeasurements
                 ))
@@ -260,8 +254,7 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
                   client.auth.currentUser?.id == userID else { return }
 
             // Do not replace a more recent edit made during the upload.
-            guard goals.goals == capturedLocalGoals,
-                  ATHLTHTrainingProfile.load(userID: userID).measurements == capturedMeasurements else {
+            guard goals.goals == capturedLocalGoals else {
                 // Our uploaded snapshot must be acknowledged before merging
                 // a newer edit created while the network call was pending.
                 if didUpload {
@@ -275,13 +268,6 @@ final class ATHLTHGoalAccountSyncStore: ObservableObject {
             }
             if merged != ATHLTHGoalMergePolicy.ordered(localItems) {
                 try applySnapshot(merged, previous: localItems, to: goals, accountID: userID)
-            }
-            if mergedMeasurements != ATHLTHGoalMergePolicy.ordered(capturedMeasurements) {
-                var profile = ATHLTHTrainingProfile.load(userID: userID)
-                profile.measurements = mergedMeasurements
-                profile.updatedAt = .now
-                profile.save(userID: userID)
-                NotificationCenter.default.post(name: .athlthTrainingDataDidChange, object: nil)
             }
             // Commit the acknowledgement only after all imported files/data
             // were persisted. A failed photo write must never clear remote goals.
