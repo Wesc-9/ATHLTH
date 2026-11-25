@@ -48,15 +48,18 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
     }
 
     private func tournament(format: ATHLTHTournamentFormat,
-                            status: String) -> ATHLTHTournamentRemote {
+                            status: String,
+                            id: UUID = UUID(),
+                            rules: ATHLTHCompetitionRaceRules = ATHLTHCompetitionRaceRules(),
+                            singleEvent: Bool = false) -> ATHLTHTournamentRemote {
         ATHLTHTournamentRemote(
-            id: UUID(), ownerID: owner,
+            id: id, ownerID: owner,
             clubID: nil, seasonID: nil,
             title: "Testliga", format: format,
             groupSize: 4, qualifiersPerGroup: 2,
             winPoints: 4, drawPoints: 1,
             status: status,
-            singleEventMode: false,
+            singleEventMode: singleEvent,
             raceSignalAt: nil,
             exerciseMode: .vote,
             exerciseCount: 6,
@@ -77,7 +80,7 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
             completedAt: status == "completed" ? Date() : nil,
             plannedStartsAt: nil,
             startMode: "manual",
-            raceRules: ATHLTHCompetitionRaceRules(),
+            raceRules: rules,
             requiredEnvironment: "any",
             meetingPlace: nil,
             meetingLat: nil,
@@ -152,6 +155,44 @@ final class ATHLTHTournamentSeasonContinuationTests: XCTestCase {
         // The old record remains immutable: no new ID reuses its match graph.
         XCTAssertEqual(ended.title, "Testliga")
         XCTAssertEqual(ended.status, "completed")
+    }
+
+    func testHistoryFollowsBothDirectionsButNeverMatchesUnrelatedTitles() {
+        let first = tournament(format: .league, status: "completed")
+        var secondRules = ATHLTHCompetitionRaceRules()
+        secondRules.previousCompetitionID = first.id
+        secondRules.seasonNumber = 2
+        let second = tournament(format: .league, status: "completed", rules: secondRules)
+        var thirdRules = ATHLTHCompetitionRaceRules()
+        thirdRules.previousCompetitionID = second.id
+        thirdRules.seasonNumber = 3
+        let third = tournament(format: .league, status: "active", rules: thirdRules)
+        let unrelated = tournament(format: .league, status: "completed")
+        let otherFormat = tournament(format: .cup, status: "active", rules: thirdRules)
+        let single = tournament(format: .league, status: "active", rules: thirdRules, singleEvent: true)
+        let visible = [unrelated, third, first, second, otherFormat, single, second]
+        for current in [first, second, third] {
+            XCTAssertEqual(
+                ATHLTHTournamentSeasonContinuation.history(current: current, visible: visible).map(\.id),
+                [third.id, second.id, first.id]
+            )
+        }
+        XCTAssertTrue(ATHLTHTournamentSeasonContinuation.history(current: single, visible: visible).isEmpty)
+    }
+
+    func testHistoryDoesNotBridgeInvisibleAncestorAndTerminatesCycles() {
+        let firstID = UUID()
+        let secondID = UUID()
+        var firstRules = ATHLTHCompetitionRaceRules()
+        firstRules.previousCompetitionID = secondID
+        firstRules.seasonNumber = 1
+        var secondRules = ATHLTHCompetitionRaceRules()
+        secondRules.previousCompetitionID = firstID
+        secondRules.seasonNumber = 2
+        let first = tournament(format: .league, status: "completed", id: firstID, rules: firstRules)
+        let second = tournament(format: .league, status: "active", id: secondID, rules: secondRules)
+        XCTAssertEqual(ATHLTHTournamentSeasonContinuation.history(current: first, visible: []).map(\.id), [firstID])
+        XCTAssertEqual(ATHLTHTournamentSeasonContinuation.history(current: first, visible: [second]).map(\.id), [secondID, firstID])
     }
 
     func testActiveTournamentCannotRenewAndOwnerMustRemainEligible() {
