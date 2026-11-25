@@ -3829,6 +3829,18 @@ struct DirectMessageThreadView: View {
                                     reviewChallengeChange(message, accept: accept)
                                 }
                             )
+                            .contextMenu {
+                                if message.senderID == messaging.currentUserID,
+                                   message.attachmentKindRaw == nil,
+                                   message.deletedAt == nil,
+                                   message.readAt == nil {
+                                    Button(role: .destructive) {
+                                        Task { await messaging.retractTextMessage(message) }
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(english: "Undo send", norwegian: "Angre sending"), systemImage: "arrow.uturn.backward")
+                                    }
+                                }
+                            }
                             .id(item.id)
 
                         case .challengeInvite(let challenge, let invitedAt):
@@ -7481,7 +7493,11 @@ private struct MessageBubble: View {
                 HStack(spacing: 4) {
                     Text(message.createdAt.formatted(date: .omitted, time: .shortened))
                     if isMine {
-                        Image(systemName: message.readAt == nil ? "checkmark" : "checkmark.circle.fill")
+                        if message.readAt != nil {
+                            Label(ATHLTHLocalization.choose(english: "Read", norwegian: "Lest"), systemImage: "checkmark.circle.fill")
+                        } else {
+                            Label(ATHLTHLocalization.choose(english: "Sent", norwegian: "Sendt"), systemImage: "checkmark")
+                        }
                     }
                 }
                 .font(.caption2)
