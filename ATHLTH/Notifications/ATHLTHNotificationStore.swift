@@ -269,6 +269,7 @@ final class ATHLTHNotificationStore: ObservableObject {
 
         if item.kind == .social {
             let eventKind = item.socialEventKind?.lowercased() ?? ""
+            if eventKind == "account_new_sign_in" { return true }
 
             if eventKind.hasPrefix("arena_") {
                 return eventKind == "arena_chat"
