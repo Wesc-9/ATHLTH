@@ -2552,6 +2552,7 @@ private struct HomeFollowingWorkoutArtwork:
     let height: CGFloat
 
     var embeddedInFeedCard = false
+    @State private var sharedRouteImage: UIImage?
 
     private var strengthMuscleProfile:
         StrengthMuscleProfile {
@@ -2598,26 +2599,59 @@ private struct HomeFollowingWorkoutArtwork:
 
     var body: some View {
         Group {
-            if activity == .strength {
-                ATHLTHStrengthCompletedHeroCard(
-                    profile: strengthMuscleProfile,
-                    duration: HomeRecentCardFormat.number(item, key: "duration_seconds") ?? 0,
-                    exerciseCount: HomeRecentCardFormat.integer(item, key: "exercise_count"),
-                    volumeKilograms: HomeRecentCardFormat.number(item, key: "volume_kg"),
-                    height: height,
-                    compact: true,
-                    showsCompletionLabel: false,
-                    cornerRadius: embeddedInFeedCard ? 0 : nil,
-                    recentActivityStrip: embeddedInFeedCard && height < 170
-                )
-            } else if ATHLTHHomeFeedFallbackPolicy.imageName(for: activity) != nil {
-                ATHLTHHomeRunningFeedPhoto(height: height)
+            if embeddedInFeedCard {
+                ATHLTHFeedArtworkOverlay(
+                    title: HomeRecentCardFormat.activity(activity), icon: activity.icon, height: height,
+                    metrics: .init(
+                        duration: HomeRecentCardFormat.number(item, key: "duration_seconds"),
+                        distanceMeters: HomeRecentCardFormat.number(item, key: "distance_meters"),
+                        exerciseCount: HomeRecentCardFormat.integer(item, key: "exercise_count"),
+                        volumeKilograms: HomeRecentCardFormat.number(item, key: "volume_kg"),
+                        strength: activity == .strength
+                    )
+                ) { backgroundArtwork }
             } else {
-                genericArtwork
+                backgroundArtwork
             }
         }
         .frame(height: height)
         .clipped()
+        .task(id: item.activity.metadata?["route_preview"]) {
+            guard embeddedInFeedCard else { return }
+            sharedRouteImage = nil
+            guard activity == .running || activity == .walking || activity == .hiking || activity == .cycling else { return }
+            // Never request another athlete's private route. Only the
+            // already privacy-filtered preview attached to the feed item.
+            let shared = WorkoutRouteSharing.decode(item.activity.metadata?["route_preview"])
+            guard shared.count >= 2 else { return }
+            let locations = shared.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
+            let coordinates = HomeActivityRouteSanitizer.sampledCoordinates(from: locations, maximumCount: 96)
+            guard coordinates.count >= 2 else { return }
+            let rendered = await HomeActivityRouteSnapshotRendererV2.shared.image(coordinates: coordinates)
+            guard !Task.isCancelled else { return }
+            sharedRouteImage = rendered
+        }
+    }
+
+    @ViewBuilder private var backgroundArtwork: some View {
+        if activity == .strength {
+            ATHLTHStrengthCompletedHeroCard(
+                profile: strengthMuscleProfile,
+                duration: HomeRecentCardFormat.number(item, key: "duration_seconds") ?? 0,
+                exerciseCount: HomeRecentCardFormat.integer(item, key: "exercise_count"),
+                volumeKilograms: HomeRecentCardFormat.number(item, key: "volume_kg"),
+                height: height, compact: true, showsCompletionLabel: false,
+                cornerRadius: embeddedInFeedCard ? 0 : nil,
+                recentActivityStrip: embeddedInFeedCard && height < 170,
+                feedBackgroundOnly: embeddedInFeedCard
+            )
+        } else if let sharedRouteImage {
+            Image(uiImage: sharedRouteImage).resizable().scaledToFill().athlthBoundedFill()
+        } else if ATHLTHHomeFeedFallbackPolicy.imageName(for: activity) != nil {
+            ATHLTHHomeRunningFeedPhoto(height: height)
+        } else {
+            genericArtwork
+        }
     }
 
     private var genericArtwork:
@@ -4841,9 +4875,24 @@ private struct HomePersonalWorkoutVisual:
     }
 
     var body: some View {
-        // The activity name already appears in the card title below.
-        // Let the muscle map, route and treadmill metrics remain unobscured.
-        background
+        Group {
+            if (recentActivityStrip || embeddedInFeedCard) &&
+                !(workout.activity == .running && workout.isIndoor == true) {
+                ATHLTHFeedArtworkOverlay(
+                    title: HomeRecentCardFormat.activity(workout.activity),
+                    icon: workout.activity.icon, height: height,
+                    metrics: .init(
+                        duration: workout.duration, distanceMeters: workout.distanceMeters,
+                        exerciseCount: workout.strengthExerciseCount ?? strengthWorkout?.exercises.count,
+                        volumeKilograms: workout.strengthTotalVolumeKilograms ?? strengthWorkout?.totalVolumeKilograms,
+                        strength: workout.activity == .strength
+                    ),
+                    averageHeartRate: workout.strengthWorkoutAverageHeartRateBPM
+                ) { background }
+            } else {
+                background
+            }
+        }
             .frame(height: height)
             .clipped()
             .task(id: workout.id) {
@@ -4886,7 +4935,8 @@ private struct HomePersonalWorkoutVisual:
             compact: height < 250,
             showsCompletionLabel: height >= 220,
             cornerRadius: (recentActivityStrip || embeddedInFeedCard) ? 0 : nil,
-            recentActivityStrip: recentActivityStrip
+            recentActivityStrip: recentActivityStrip,
+            feedBackgroundOnly: recentActivityStrip || embeddedInFeedCard
         )
     }
 
