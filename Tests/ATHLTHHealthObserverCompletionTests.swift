@@ -20,6 +20,13 @@ private final class HealthObserverCompletionTestCounter: @unchecked Sendable {
 }
 
 final class ATHLTHHealthObserverCompletionTests: XCTestCase {
+    func testBackgroundDeliveryStatusUsesActualRegistrationResults() {
+        XCTAssertEqual(ATHLTHBackgroundDeliveryStatus.registrationResult(accepted: 0, total: 0), .unavailable)
+        XCTAssertEqual(ATHLTHBackgroundDeliveryStatus.registrationResult(accepted: 0, total: 18), .unavailable)
+        XCTAssertEqual(ATHLTHBackgroundDeliveryStatus.registrationResult(accepted: 1, total: 18), .partial)
+        XCTAssertEqual(ATHLTHBackgroundDeliveryStatus.registrationResult(accepted: 18, total: 18), .active)
+    }
+
     func testMultipleCompletionPathsCallHealthKitExactlyOnce() {
         let counter = HealthObserverCompletionTestCounter()
         let callback = ATHLTHHealthObserverCompletion {
