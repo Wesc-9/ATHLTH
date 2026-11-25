@@ -384,6 +384,9 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHQuickRunTimelineAdapterTests \
             -only-testing:ATHLTHTests/ATHLTHPlanWorkoutCardPresentationTests \
             -only-testing:ATHLTHTests/ATHLTHSimpleWorkoutOutlineTests \
+            -only-testing:ATHLTHTests/ATHLTHPlanRefreshPerformanceTests \
+            -only-testing:ATHLTHTests/PerformanceCache174Tests \
+            -only-testing:ATHLTHTests/ATHLTHUnifiedQuickStartPresentationTests \
             -only-testing:ATHLTHTests/ATHLTHHomeWorkoutComposerRecoveryTests \
             CODE_SIGNING_ALLOWED=NO \
             test
