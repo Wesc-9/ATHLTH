@@ -132,9 +132,7 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         systemImage: "checkmark.circle"
                     )
                     if tournament.requiredEnvironment != "any" {
-                        Label(tournament.requiredEnvironment == "gym"
-                              ? "Tillatt treningsmiljø: treningssenter"
-                              : "Tillatt treningsmiljø: utendørs",
+                        Label("Tillatt treningsmiljø: " + (ATHLTHCompetitionEnvironment(rawValue: tournament.requiredEnvironment)?.title ?? "Ukjent"),
                               systemImage: "checkmark.shield")
                     }
                     if let place = tournament.meetingPlace, !place.isEmpty {
