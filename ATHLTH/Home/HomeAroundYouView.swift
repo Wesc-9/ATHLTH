@@ -877,6 +877,8 @@ struct AroundYouExploreView: View {
     @ObservedObject var locationStore: HomeLocationStore
     var embeddedInTab: Bool = false
     var embeddedInStudio: Bool = false
+    @State private var studioMapWidth: CGFloat = 0
+    @State private var studioMapHeight: CGFloat = 0
     /// Prevent offscreen MapKit refreshes while preserving route/camera state.
     var isActive = true
 
@@ -999,6 +1001,46 @@ struct AroundYouExploreView: View {
                     }
 
 
+    }
+
+    private var studioWideMap: Bool {
+        embeddedInStudio && ATHLTHExploreStudioLayoutPolicy.usesWideMap(width: studioMapWidth)
+    }
+
+    @ViewBuilder
+    private var selectionPreviewContent: some View {
+        if let event = selectedEvent {
+            eventPreviewCard(event)
+        } else if let post = selectedPublicWorkout {
+            publicWorkoutPreviewCard(post)
+        } else if let route = selectedRoute {
+            routePreviewCard(route)
+        }
+    }
+
+    private var selectionPreview: some View {
+        selectionPreviewContent
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .zIndex(10)
+    }
+
+    @ViewBuilder
+    private var studioSelectionPreview: some View {
+        if selectedEvent != nil || selectedPublicWorkout != nil || selectedRoute != nil {
+            // Leave the map visible and keep the attribution and tools reachable.
+            ViewThatFits(in: .vertical) {
+                selectionPreviewContent.fixedSize(horizontal: false, vertical: true)
+                ScrollView { selectionPreviewContent }
+            }
+            .frame(maxWidth: ATHLTHExploreStudioLayoutPolicy.previewWidth(width: studioMapWidth) ?? .infinity)
+            .frame(maxHeight: max(160, studioMapHeight * 0.68), alignment: .bottom)
+            .padding(.horizontal, studioWideMap ? 16 : 12)
+            .padding(.bottom, 32)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .zIndex(10)
+        }
     }
 
     private var mapAndLifecycleContent: some View {
@@ -1419,23 +1461,12 @@ struct AroundYouExploreView: View {
                         .padding(.bottom, 13)
                     }
                 }
-                .overlay(alignment: .bottom) {
-                    Group {
-                        if let event = selectedEvent {
-                            eventPreviewCard(event)
-                        } else if let post = selectedPublicWorkout {
-                            publicWorkoutPreviewCard(post)
-                        } else if let route = selectedRoute {
-                            routePreviewCard(route)
-                        }
+                .overlay(alignment: studioWideMap ? .bottomLeading : .bottom) {
+                    if embeddedInStudio {
+                        studioSelectionPreview
+                    } else {
+                        selectionPreview
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 6)
-                    .transition(
-                        .move(edge: .bottom)
-                            .combined(with: .opacity)
-                    )
-                    .zIndex(10)
                 }
                 .animation(
                     .spring(
@@ -1451,25 +1482,34 @@ struct AroundYouExploreView: View {
             }
 
             exploreFloatingControls
-                .frame(
-                    maxHeight: .infinity,
-                    alignment: .top
-                )
+                .frame(maxWidth: embeddedInStudio
+                    ? ATHLTHExploreStudioLayoutPolicy.controlsWidth(width: studioMapWidth) ?? .infinity
+                    : .infinity)
+                .padding(.trailing, embeddedInStudio && !studioWideMap ? 44 : 0)
+                .padding(.top, embeddedInStudio ? 10 : 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .allowsHitTesting(true)
 
-            // Map-first actions stay within thumb reach without occupying
-            // the filter row or obscuring the search/recenter controls.
             exploreMapQuickActions
                 .frame(
                     maxWidth: .infinity,
                     maxHeight: .infinity,
                     alignment: .trailing
                 )
-                .padding(.trailing, 12)
+                .padding(.trailing, embeddedInStudio ? 16 : 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            guard embeddedInStudio else { return }
+            studioMapWidth = size.width
+            studioMapHeight = size.height
         }
         .background(ATHLTHPremiumCanvas())
         .navigationTitle(
-            embeddedInTab ? "" : "Around You"
+            embeddedInStudio ? ATHLTHLocalization.choose(english: "Explore", norwegian: "Utforsk") :
+                (embeddedInTab ? "" : "Around You")
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(
@@ -1558,15 +1598,33 @@ struct AroundYouExploreView: View {
                 selectedPublicWorkout = nil
             }
         }
-        .sheet(item: $eventToOpen) { item in
+        .athlthStudioEditor(item: $eventToOpen, useFullScreen: embeddedInStudio) { item in
             NavigationStack {
                 CommunityEventDetailView(eventID: item.id)
+                    .toolbar {
+                        if embeddedInStudio {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                                    eventToOpen = nil
+                                }
+                            }
+                        }
+                    }
             }
         }
-        .sheet(item: $publicWorkoutToOpen) { post in
+        .athlthStudioEditor(item: $publicWorkoutToOpen, useFullScreen: embeddedInStudio) { post in
             NavigationStack {
                 TrainTogetherPostDetailView(postID: post.id)
                     .environmentObject(marketplace)
+                    .toolbar {
+                        if embeddedInStudio {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                                    publicWorkoutToOpen = nil
+                                }
+                            }
+                        }
+                    }
             }
         }
         .athlthStudioEditor(item: $routeToStart, useFullScreen: embeddedInStudio) { route in
@@ -2705,7 +2763,7 @@ struct AroundYouExploreView: View {
             }
 
             HStack(spacing: 8) {
-                if isPublicTrailRoute(route) {
+                if embeddedInStudio || isPublicTrailRoute(route) {
                     Button {
                         routeToStart = routeForWorkout(route)
                     } label: {

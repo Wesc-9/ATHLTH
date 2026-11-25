@@ -69,6 +69,7 @@ enum ATHLTHRouteEndpointAddressPresentation {
 
 struct RouteDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -260,7 +261,7 @@ struct RouteDetailView: View {
             }
             .padding()
             .padding(.bottom, 80)
-            .frame(maxWidth: 760)
+            .frame(maxWidth: studioFullscreenEditing ? .infinity : 760)
             .frame(maxWidth: .infinity)
         }
         .onScrollPhaseChange { _, phase in
@@ -562,7 +563,7 @@ struct RouteDetailView: View {
         .fullScreenCover(isPresented: $showingInteractiveMap) {
             SavedRouteFullscreenMap(route: directedRoute)
         }
-        .sheet(item: $routeToStart) { route in
+        .athlthStudioEditor(item: $routeToStart, useFullScreen: studioFullscreenEditing) { route in
             ATHLTHRouteQuickTrainSheet(route: route)
         }
         .sheet(isPresented: $showingAllPersonalAttempts) {
@@ -886,7 +887,7 @@ struct RouteDetailView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 300)
+                        .frame(height: studioFullscreenEditing ? 420 : 300)
                         .clipped()
                         .contentShape(Rectangle())
                         .onTapGesture { showingInteractiveMap = true }

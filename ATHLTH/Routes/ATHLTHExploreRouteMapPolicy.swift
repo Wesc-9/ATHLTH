@@ -212,3 +212,19 @@ enum ATHLTHExploreRouteMapPolicy {
         )
     }
 }
+
+
+/// Layout depends on the actual Studio detail width, not device model.
+enum ATHLTHExploreStudioLayoutPolicy {
+    static func usesWideMap(width: CGFloat) -> Bool {
+        width.isFinite && width >= 700
+    }
+
+    static func previewWidth(width: CGFloat) -> CGFloat? {
+        usesWideMap(width: width) ? min(480, width * 0.48) : nil
+    }
+
+    static func controlsWidth(width: CGFloat) -> CGFloat? {
+        usesWideMap(width: width) ? min(680, width - 100) : nil
+    }
+}

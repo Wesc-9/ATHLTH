@@ -4,6 +4,17 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHExploreRouteMapPolicyTests: XCTestCase {
+    func testStudioExploreUsesActualDetailWidth() {
+        XCTAssertFalse(ATHLTHExploreStudioLayoutPolicy.usesWideMap(width: 600))
+        XCTAssertNil(ATHLTHExploreStudioLayoutPolicy.previewWidth(width: 600))
+        XCTAssertNil(ATHLTHExploreStudioLayoutPolicy.controlsWidth(width: 600))
+        XCTAssertTrue(ATHLTHExploreStudioLayoutPolicy.usesWideMap(width: 800))
+        XCTAssertEqual(ATHLTHExploreStudioLayoutPolicy.previewWidth(width: 800), 384)
+        XCTAssertEqual(ATHLTHExploreStudioLayoutPolicy.previewWidth(width: 1200), 480)
+        XCTAssertEqual(ATHLTHExploreStudioLayoutPolicy.controlsWidth(width: 800), 680)
+        XCTAssertFalse(ATHLTHExploreStudioLayoutPolicy.usesWideMap(width: .infinity))
+    }
+
     private func point(_ lat: Double, _ lon: Double) -> CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }

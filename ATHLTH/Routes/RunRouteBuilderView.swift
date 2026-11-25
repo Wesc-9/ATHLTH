@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RunRouteBuilderView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -680,7 +681,7 @@ struct RunRouteBuilderView: View {
                     handleMapTap(at: coordinate)
                 }
             }
-            .frame(height: 345)
+            .frame(height: studioFullscreenEditing ? 490 : 345)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(RoundedRectangle(cornerRadius: 20)
                 .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1))
