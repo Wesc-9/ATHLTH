@@ -35,6 +35,27 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
         XCTAssertTrue(options.allSatisfy { $0.matches("") })
     }
 
+    func testEquipmentDropdownIsAnchoredAndBoundedOnPhone() {
+        let bounds = CGSize(width: 393, height: 740)
+        let anchor = CGRect(x: 16, y: 210, width: 90, height: 44)
+        let frame = ATHLTHEquipmentDropdownLayout.frame(anchor: anchor, container: bounds)
+        XCTAssertEqual(frame.minX, anchor.minX)
+        XCTAssertEqual(frame.minY, anchor.maxY + 6)
+        XCTAssertLessThanOrEqual(frame.maxX, bounds.width - 10)
+        XCTAssertLessThanOrEqual(frame.maxY, bounds.height - 10)
+    }
+
+    func testEquipmentDropdownFitsKeyboardAndSmallWindow() {
+        let anchor = CGRect(x: 350, y: 220, width: 100, height: 44)
+        let bounds = CGSize(width: 390, height: 320)
+        let frame = ATHLTHEquipmentDropdownLayout.frame(anchor: anchor, container: bounds)
+        XCTAssertGreaterThanOrEqual(frame.minX, 10)
+        XCTAssertGreaterThanOrEqual(frame.minY, 10)
+        XCTAssertLessThanOrEqual(frame.maxX, bounds.width - 10)
+        XCTAssertLessThanOrEqual(frame.maxY, bounds.height - 10)
+        XCTAssertGreaterThan(frame.height, 180)
+    }
+
     func testEquipmentFilterRetainsDistinctIDsWithSameDisplayTitle() {
         let options = ATHLTHEquipmentFilterOption.make(
             values: ["Machine A", "Machine B"], title: { _ in "Maskin" }

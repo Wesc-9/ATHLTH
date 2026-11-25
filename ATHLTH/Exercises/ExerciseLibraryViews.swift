@@ -134,62 +134,126 @@ private struct ATHLTHEquipmentFilterPresentation: Identifiable {
     let options: [ATHLTHEquipmentFilterOption]
 }
 
-private struct ATHLTHEquipmentFilterSheet: View {
+// Resolve the button's bounds in the library's own overlay so the
+// dropdown is never clipped by the horizontal filter ScrollView.
+private struct ATHLTHEquipmentFilterAnchor: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
+}
+
+enum ATHLTHEquipmentDropdownLayout {
+    static func frame(anchor: CGRect, container: CGSize) -> CGRect {
+        let margin: CGFloat = 10
+        let gap: CGFloat = 6
+        let width = min(340, max(0, container.width - 2 * margin))
+        let availableHeight = max(0, container.height - 2 * margin)
+        let desired = min(420, availableHeight)
+        let below = max(0, container.height - margin - anchor.maxY - gap)
+        let above = max(0, anchor.minY - gap - margin)
+        let opensBelow = below >= min(desired, 220) || below >= above
+        let space = opensBelow ? below : above
+        // With the keyboard or a small iPad window, use the available
+        // library area if neither side can fit a usable dropdown.
+        let height = min(desired, space >= 180 ? space : availableHeight)
+        let x = min(max(margin, anchor.minX), max(margin, container.width - margin - width))
+        let preferredY = opensBelow ? anchor.maxY + gap : anchor.minY - gap - height
+        let y = min(max(margin, preferredY), max(margin, container.height - margin - height))
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+}
+
+private struct ATHLTHEquipmentFilterDropdown: View {
     let options: [ATHLTHEquipmentFilterOption]
     let selected: String
     let onSelect: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
+    let onClose: () -> Void
     @State private var query = ""
 
     var body: some View {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        NavigationStack {
-            List {
-                if clean.isEmpty {
-                    row(id: "All", title: ATHLTHLocalization.choose(
-                        english: "All equipment", norwegian: "Alt utstyr"))
-                }
-                ForEach(clean.isEmpty ? options : options.filter { $0.matches(clean) }) { option in
-                    row(id: option.id, title: option.title)
+        VStack(spacing: 0) {
+            HStack(spacing: 9) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                TextField(ATHLTHLocalization.choose(
+                    english: "Search equipment", norwegian: "Søk etter utstyr"),
+                    text: $query)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .accessibilityIdentifier("exercise-equipment-filter-search")
+                if !query.isEmpty {
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Clear search", norwegian: "Tøm søk"))
                 }
             }
-            .listStyle(.plain)
-            .scrollDismissesKeyboard(.interactively)
-            .searchable(text: $query, prompt: Text(ATHLTHLocalization.choose(
-                english: "Search equipment", norwegian: "Søk etter utstyr")))
-            .navigationTitle(ATHLTHLocalization.choose(
-                english: "Equipment", norwegian: "Utstyr"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
-                        dismiss()
+            .padding(11)
+            .background(ATHLTHTheme.cardWarm.opacity(0.65),
+                        in: RoundedRectangle(cornerRadius: 12))
+            .padding(10)
+
+            Divider()
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if clean.isEmpty {
+                        row(id: "All", title: ATHLTHLocalization.choose(
+                            english: "All equipment", norwegian: "Alt utstyr"))
+                    }
+                    ForEach(clean.isEmpty ? options : options.filter { $0.matches(clean) }) { option in
+                        row(id: option.id, title: option.title)
+                    }
+                    if !clean.isEmpty && !options.contains(where: { $0.matches(clean) }) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "No matching equipment", norwegian: "Ingen utstyrstreff"))
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                .padding(.vertical, 4)
             }
+            .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("exercise-equipment-filter-list")
         }
-        .tint(ATHLTHTheme.accentDeep)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 14, x: 0, y: 6)
+        .accessibilityAction(.escape, onClose)
     }
 
     private func row(id: String, title: String) -> some View {
         Button {
             onSelect(id)
-            dismiss()
         } label: {
             HStack(spacing: 12) {
                 Text(title)
+                    .font(.subheadline)
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if selected == id {
                     Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
             .frame(minHeight: 44)
             .contentShape(Rectangle())
+            .background(selected == id ? ATHLTHPlanDesign.selectedSurface : Color.clear)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected == id ? [.isSelected] : [])
@@ -949,6 +1013,36 @@ struct ExerciseLibraryView: View {
                     ATHLTHTheme.accent
             )
         )
+        .overlayPreferenceValue(ATHLTHEquipmentFilterAnchor.self) { anchor in
+            if let anchor, let presentation = equipmentFilterPresentation {
+                GeometryReader { geometry in
+                    let frame = ATHLTHEquipmentDropdownLayout.frame(
+                        anchor: geometry[anchor], container: geometry.size)
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { equipmentFilterPresentation = nil }
+                            .accessibilityHidden(true)
+
+                        ATHLTHEquipmentFilterDropdown(
+                            options: presentation.options,
+                            selected: selectedEquipment,
+                            onSelect: { value in
+                                selectedEquipment = value
+                                equipmentFilterPresentation = nil
+                            },
+                            onClose: { equipmentFilterPresentation = nil }
+                        )
+                        .id(presentation.id)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                    }
+                }
+                // Do not animate changes to the frame or lazy row identities
+                // when live exercise metrics or the keyboard update.
+                .transaction { $0.animation = nil }
+            }
+        }
         .navigationTitle(selectionTitle ?? "Exercises")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -978,14 +1072,6 @@ struct ExerciseLibraryView: View {
             })
                 .environmentObject(library)
                 .environmentObject(session)
-        }
-        .sheet(item: $equipmentFilterPresentation) { presentation in
-            ATHLTHEquipmentFilterSheet(
-                options: presentation.options, selected: selectedEquipment,
-                onSelect: { selectedEquipment = $0 }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingEquipmentSubscription) {
             SubscriptionOfferView {
@@ -1028,6 +1114,7 @@ struct ExerciseLibraryView: View {
             visibleLimit = ATHLTHLibraryPagination.pageSize
         }
         .onChange(of: selectedSection) { _, section in
+            equipmentFilterPresentation = nil
             if section == .mine, scannerResultsActive {
                 resetEquipmentScan()
             }
@@ -1506,6 +1593,7 @@ struct ExerciseLibraryView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("exercise-equipment-filter")
+                    .anchorPreference(key: ATHLTHEquipmentFilterAnchor.self, value: .bounds) { $0 }
 
                     if selectedBodyPart != "All" || selectedEquipment != "All" ||
                        favoritesOnly {
