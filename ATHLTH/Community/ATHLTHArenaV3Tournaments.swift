@@ -304,7 +304,9 @@ struct ATHLTHTournamentCreator: View {
                         drawPoints: $drawPoints,
                         allowExtensions: $allowExtensions,
                         publicResults: isDuel ? .constant(false) : $publicResults,
-                        proof: $proofMode
+                        proof: $proofMode,
+                        sharedEvent: isSingleEvent,
+                        duel: isDuel
                     )
                     ATHLTHCompetitionRaceRulesSection(
                         settings: $competitionSettings,
@@ -526,11 +528,11 @@ struct ATHLTHTournamentCreator: View {
             // competitionSettings, and both UIs share one deadline value.
             cadenceDays: cadenceDays,
             completionHours: competitionSettings.completionHours,
-            rotationMode: rotationMode,
-            restWeekdays: Array(restWeekdays).sorted(),
+            rotationMode: isSingleEvent ? .all : rotationMode,
+            restWeekdays: isSingleEvent ? [] : Array(restWeekdays).sorted(),
             proofMode: proofMode,
-            publicResults: isDuel ? false : publicResults,
-            allowExtensions: allowExtensions,
+            publicResults: isSingleEvent ? false : publicResults,
+            allowExtensions: isSingleEvent ? false : allowExtensions,
             winPoints: winPoints,
             drawPoints: drawPoints,
             competitionSettings: configured

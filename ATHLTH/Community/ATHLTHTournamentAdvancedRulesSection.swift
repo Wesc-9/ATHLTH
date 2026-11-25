@@ -9,6 +9,8 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
     @Binding var allowExtensions: Bool
     @Binding var publicResults: Bool
     @Binding var proof: ATHLTHTournamentProofMode
+    var sharedEvent = false
+    var duel = false
 
     @State private var expanded = false
 
@@ -38,6 +40,7 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
 
             if expanded {
                 VStack(alignment: .leading,spacing: 12) {
+                    if !sharedEvent {
                     Text("Hvordan brukes øvelsene?")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
@@ -111,6 +114,12 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
+                    } else {
+                        Text("Hver øvelse rangeres separat. Uteblivelse gir 0 poeng, og like sammenlagtresultater deler plasseringen.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    if !sharedEvent {
                     VStack(spacing: 12) {
                         Toggle(isOn: $allowExtensions) {
                             VStack(alignment: .leading,spacing: 3) {
@@ -135,7 +144,10 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
                     .padding(14)
                     .background(ATHLTHArenaV3Style.panel())
 
-                    Label("Resultater registreres med dokumentasjon og må godkjennes av motstanderen. Sensorbasert automatisk verifisering kommer senere.",
+                    }
+                    Label(duel ? "Deltakerne godkjenner hverandres målinger. Lokale øktmålinger er forslag, ikke serververifisering."
+                          : sharedEvent ? "Arrangøren godkjenner målingene. Lokale øktmålinger er forslag, ikke serververifisering."
+                          : "Resultater registreres med dokumentasjon og må godkjennes av motstanderen. Sensorbasert automatisk verifisering kommer senere.",
                           systemImage: "checkmark.shield")
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
