@@ -3,6 +3,10 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHRecentActivityLayoutTests: XCTestCase {
+    func testFullHistoryHasOneMediaHeight() {
+        XCTAssertEqual(ATHLTHRecentActivityLayoutPolicy.historyArtworkHeight, 190)
+    }
+
     func testIPhoneCardsUseFullWidthMediaAboveText() {
         for width: CGFloat in [280, 320, 375, 393, 440, 600] {
             XCTAssertFalse(
