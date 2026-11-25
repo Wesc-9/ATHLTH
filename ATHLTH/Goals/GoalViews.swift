@@ -454,9 +454,9 @@ struct GoalsHubView: View {
                     .buttonStyle(.borderedProminent).tint(ink)
             } else {
                 Button(tr("Show active goals", "Vis aktive mål")) { filter = .active }
+                    .font(.subheadline)
+                    .foregroundStyle(accent)
             }
-            .font(.subheadline)
-            .foregroundStyle(accent)
         }
         .frame(maxWidth: .infinity, minHeight: 170)
         .background(.white, in: RoundedRectangle(cornerRadius: 22))
