@@ -6,6 +6,7 @@ import SwiftUI
 struct ATHLTHCompetitionRaceRulesSection: View {
     @Binding var settings: ATHLTHTournamentCompetitionSettings
     let activities: Set<ATHLTHTournamentActivity>
+    var workoutOnly = false
     @State private var showingSavedRoutes = false
     @State private var showingLapPoint = false
 
@@ -72,7 +73,7 @@ struct ATHLTHCompetitionRaceRulesSection: View {
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 124), spacing: 8)], spacing: 8) {
                 ForEach(ATHLTHCompetitionDiscipline.allCases.filter {
-                    $0 != .sprint || runningAllowed
+                    workoutOnly ? $0 == .workout : ($0 != .sprint || runningAllowed)
                 }) { value in
                     disciplineTile(value)
                 }

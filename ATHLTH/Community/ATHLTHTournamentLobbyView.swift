@@ -350,7 +350,7 @@ struct ATHLTHTournamentLobbyView: View {
                             Image(systemName: "circle.dotted")
                                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
                         }
-                        if isOwner && person.userID != userID &&
+                        if !tournament.isDuel && isOwner && person.userID != userID &&
                            person.removedAt == nil &&
                            (tournament.status == "inviting" ||
                             tournament.status == "active") {
@@ -813,12 +813,12 @@ struct ATHLTHTournamentLobbyView: View {
     }
 
     private var mayInviteMore: Bool {
-        tournament.status == "inviting" &&
+        !tournament.isDuel && tournament.status == "inviting" &&
         (isOwner || (tournament.invitationPermission == "participants" && isAccepted))
     }
 
     private var mayApproveInvite: Bool {
-        tournament.status == "inviting" &&
+        !tournament.isDuel && tournament.status == "inviting" &&
         (isOwner && tournament.joinApproval == "admin" ||
          isAccepted && tournament.joinApproval == "participants")
     }

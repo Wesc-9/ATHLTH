@@ -125,6 +125,7 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         } ?? "Start når invitasjoner og regler er godkjent",
                         systemImage: "calendar"
                     )
+                    if !tournament.singleEventMode {
                     Label(
                         tournament.releaseMode == "everyone_finished"
                             ? "Neste øvelse: når alle er ferdige"
@@ -140,6 +141,9 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         "ikke gjennomført: 0 poeng",
                         systemImage: "clock.badge.exclamationmark"
                     )
+                    } else {
+                        Label("Alle øvelser i samme konkurranse", systemImage: "list.bullet")
+                    }
                     Label("Invitasjoner: svar innen \(tournament.invitationDays) dager",
                           systemImage: "clock")
                     Label(tournament.unansweredPolicy == "continue"

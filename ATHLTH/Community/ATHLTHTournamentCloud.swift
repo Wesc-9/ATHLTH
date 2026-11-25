@@ -69,11 +69,14 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         return "Valgt gren: " + titles.joined(separator: " og ")
     }
 
+    var isDuel: Bool { raceRules.duelMode == true }
+    var minimumAthletes: Int { isDuel ? 2 : singleEventMode ? 3 : format == .cup ? 4 : 2 }
+
     var displayFormatTitle: String {
-        singleEventMode ? "Enkeltkonkurranse" : format.title
+        isDuel ? "Duell" : singleEventMode ? "Enkeltkonkurranse" : format.title
     }
     var displayFormatSymbol: String {
-        singleEventMode ? "flag.checkered" : format.symbol
+        isDuel ? "person.2.fill" : singleEventMode ? "flag.checkered" : format.symbol
     }
 
     enum CodingKeys: String, CodingKey {
@@ -566,7 +569,9 @@ struct ATHLTHTournamentCloudService {
     }
 
     func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
-        guard draft.participants.count >= (draft.singleEventMode ? 3 : 2) else {
+        let duel = draft.competitionSettings.race.duelMode == true
+        guard duel ? (draft.singleEventMode && draft.participants.count == 2) :
+            draft.participants.count >= (draft.singleEventMode ? 3 : draft.format == .cup ? 4 : 2) else {
             throw ATHLTHTournamentEngineError.tooFewParticipants
         }
         guard draft.competitionSettings.isValid else {

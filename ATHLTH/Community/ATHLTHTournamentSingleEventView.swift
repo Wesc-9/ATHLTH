@@ -64,7 +64,7 @@ struct ATHLTHTournamentSingleEventView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Label("Enkeltkonkurranse", systemImage: "flag.checkered")
+                Label(tournament.displayFormatTitle, systemImage: tournament.displayFormatSymbol)
                     .font(.headline)
                 Spacer()
                 Text("\(entries.count) utøvere")
@@ -193,7 +193,8 @@ struct ATHLTHTournamentSingleEventView: View {
                             }
                             if let note = detail.evidenceNote { Text(note).font(.caption).foregroundStyle(.secondary) }
                         }
-                        if isOrganizer && result.progress == "awaiting_review" {
+                        if result.progress == "awaiting_review" &&
+                            (tournament.isDuel ? (result.userID != userID && entries.contains { $0.userID == userID && ($0.progress == "awaiting_review" || $0.progress == "finished") }) : isOrganizer) {
                             HStack(spacing: 11) {
                                 Button("Godkjenn") {
                                     Task { await review(result.userID, true) }

@@ -7,6 +7,8 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
     @Binding var settings: ATHLTHTournamentCompetitionSettings
     var activities: Set<ATHLTHTournamentActivity> = []
     var showsStartTiming = true
+    var isDuel = false
+    var isSharedEvent = false
     @State private var showingMeetingPoint = false
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
@@ -44,6 +46,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 Divider()
                 }
+                if !isSharedEvent {
                 Text("Når åpner neste øvelse?")
                     .font(.subheadline.weight(.semibold))
                 Picker("Neste øvelse", selection: $settings.unlock) {
@@ -93,6 +96,10 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                } else {
+                    Text("Øvelsene gjennomføres i samme konkurranse. Resultatene sendes samlet til godkjenning.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
             }
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
@@ -159,6 +166,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 Divider()
                 Text("Hvis noen ikke godtar eller svarer")
                     .font(.subheadline.weight(.semibold))
+                if isDuel {
+                    Text("Duellen avlyses hvis motstanderen ikke godtar invitasjonen.").font(.caption)
+                } else {
                 Picker("Ubesvarte invitasjoner",
                        selection: $settings.unansweredPolicy) {
                     ForEach(ATHLTHCompetitionUnansweredPolicy.allCases) { item in
@@ -174,6 +184,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 Divider()
+                }
                 Toggle("Kan publiseres i Feed etter avslutning",
                        isOn: $settings.allowFeedPost)
                     .tint(ATHLTHArenaV3Style.gold)
@@ -185,6 +196,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
 
+            if !isDuel {
             DisclosureGroup(
                 "Invitasjoner og godkjenning",
                 isExpanded: $expandedAccess
@@ -218,6 +230,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
 
+            }
             DisclosureGroup(
                 "Regler, premier og frivillig straff",
                 isExpanded: $expandedAgreement

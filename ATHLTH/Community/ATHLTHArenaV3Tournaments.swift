@@ -27,6 +27,7 @@ struct ATHLTHTournamentCreator: View {
     let preset: ATHLTHTournamentFormat
     let fixedClubID: UUID?
     let isSingleEvent: Bool
+    let isDuel: Bool
     /// Sports chosen from Quick Train cannot silently change to another mode.
     let fixedActivity: ATHLTHTournamentActivity?
     /// Entry flows choose a single competition format. The detailed rules
@@ -97,20 +98,23 @@ struct ATHLTHTournamentCreator: View {
         fixedClubID: UUID?,
         fixedActivity: ATHLTHTournamentActivity? = nil,
         singleEventMode: Bool = false,
+        duelMode: Bool = false,
         initialTitle: String? = nil,
         continuation: ATHLTHTournamentDraft? = nil,
         fixedInvitees: [ATHLTHTournamentParticipant]? = nil,
         fixedStartMode: ATHLTHCompetitionStartMode? = nil,
         fixedStartDate: Date? = nil,
+        initialActivity: ATHLTHTournamentActivity? = nil,
         onBack: ((ATHLTHTournamentDraft) -> Void)? = nil,
         onPublished: ((UUID) -> Void)? = nil,
         onSave: @escaping (ATHLTHTournamentDraft) -> Void
     ) {
         self.preset = preset
         self.fixedClubID = fixedClubID
-        self.isSingleEvent = continuation?.singleEventMode ?? singleEventMode
+        self.isDuel = continuation?.competitionSettings.race.duelMode == true || duelMode
+        self.isSingleEvent = continuation?.singleEventMode ?? (singleEventMode || duelMode)
         self.fixedActivity = fixedActivity
-        self.restrictFormat = fixedActivity != nil || continuation != nil
+        self.restrictFormat = fixedActivity != nil || continuation != nil || fixedInvitees != nil
         self.fixedInvitees = fixedInvitees
         self.fixedStartMode = fixedStartMode
         self.fixedStartDate = fixedStartDate
@@ -118,15 +122,15 @@ struct ATHLTHTournamentCreator: View {
         self.onSave = onSave
         self.onPublished = onPublished
         _format = State(initialValue:
-            (continuation?.singleEventMode ?? singleEventMode)
+            (continuation?.singleEventMode ?? (singleEventMode || duelMode))
                 ? .league : (continuation?.format ?? preset))
-        _title = State(initialValue: continuation?.title ?? initialTitle ?? "")
+        _title = State(initialValue: initialTitle ?? continuation?.title ?? "")
         _groupSize = State(initialValue: continuation?.groupSize ?? 4)
         _qualifiersPerGroup = State(initialValue:
             continuation?.qualifiersPerGroup ?? 2)
         _allowedActivities = State(initialValue:
             Set(continuation?.allowedActivities ??
-                fixedActivity.map { [$0] } ?? []))
+                fixedActivity.map { [$0] } ?? initialActivity.map { [$0] } ?? []))
         _rulesAuthority = State(initialValue:
             continuation?.rulesAuthority ?? .owner)
         _cadenceDays = State(initialValue:
@@ -142,6 +146,13 @@ struct ATHLTHTournamentCreator: View {
         _drawPoints = State(initialValue:
             continuation?.drawPoints ?? 1)
         var initialSettings = continuation?.competitionSettings ?? .init()
+        if duelMode || continuation?.competitionSettings.race.duelMode == true {
+            initialSettings.race.duelMode = true
+            initialSettings.race.discipline = .workout
+            initialSettings.unansweredPolicy = .cancel
+            initialSettings.invitationPermission = .admin
+            initialSettings.joinApproval = .admin
+        }
         if let fixedStartMode {
             initialSettings.startMode = fixedStartMode
             initialSettings.startsAt = fixedStartDate
@@ -207,8 +218,9 @@ struct ATHLTHTournamentCreator: View {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         // Two athletes belong in a private duel. Group competitions
         // require the organizer plus at least two invitees.
-        athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2) &&
+        (isDuel ? athletes.count == 2 : athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
         !busy && !allowedActivities.isEmpty &&
+        (!isDuel || competitionSettings.race.discipline == .workout) &&
         (!isSingleEvent || competitionSettings.race.discipline == .workout ||
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
         competitionSettings.isValid &&
@@ -279,7 +291,7 @@ struct ATHLTHTournamentCreator: View {
                             .background(ATHLTHArenaV3Style.panel())
                     }
                     coachEntry
-                    if fixedInvitees == nil { templateEntry }
+                    templateEntry
                     exerciseRulesSection
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
@@ -287,19 +299,22 @@ struct ATHLTHTournamentCreator: View {
                         winPoints: $winPoints,
                         drawPoints: $drawPoints,
                         allowExtensions: $allowExtensions,
-                        publicResults: $publicResults,
+                        publicResults: isDuel ? .constant(false) : $publicResults,
                         proof: $proofMode
                     )
                     ATHLTHCompetitionRaceRulesSection(
                         settings: $competitionSettings,
-                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities
+                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
+                        workoutOnly: isDuel
                     )
                     ATHLTHTournamentCompetitionRulesSection(
                         settings: $competitionSettings,
                         activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
-                        showsStartTiming: fixedStartMode == nil
+                        showsStartTiming: fixedStartMode == nil,
+                        isDuel: isDuel,
+                        isSharedEvent: isSingleEvent
                     )
-                    warmupSection
+                    if !isSingleEvent { warmupSection }
                     if format == .groups { groupsSection }
                     if fixedInvitees == nil {
                         inviteSection
@@ -464,6 +479,12 @@ struct ATHLTHTournamentCreator: View {
     private func makeDraft() -> ATHLTHTournamentDraft {
         var configured = competitionSettings
         configured.race.exerciseScoringVersion = isSingleEvent && configured.race.discipline == .workout ? 1 : nil
+        configured.race.duelMode = isDuel ? true : nil
+        if isDuel {
+            configured.unansweredPolicy = .cancel
+            configured.invitationPermission = .admin
+            configured.joinApproval = .admin
+        }
         return ATHLTHTournamentDraft(
             ownerID: session.profile.userID,
             clubID: activeClubID,
@@ -502,7 +523,7 @@ struct ATHLTHTournamentCreator: View {
             rotationMode: rotationMode,
             restWeekdays: Array(restWeekdays).sorted(),
             proofMode: proofMode,
-            publicResults: publicResults,
+            publicResults: isDuel ? false : publicResults,
             allowExtensions: allowExtensions,
             winPoints: winPoints,
             drawPoints: drawPoints,
@@ -545,7 +566,7 @@ struct ATHLTHTournamentCreator: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Konkurranseform")
             if isSingleEvent {
-                Label("Enkeltkonkurranse · én hendelse for minst tre",
+                Label(isDuel ? "Duell · nøyaktig to deltakere" : "Enkeltkonkurranse · én hendelse for minst tre",
                       systemImage: "person.3.sequence.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
@@ -620,7 +641,8 @@ struct ATHLTHTournamentCreator: View {
 
     private func applyTemplate(_ saved: ATHLTHTournamentDraft) {
         if restrictFormat && (saved.format != format ||
-                              saved.singleEventMode != isSingleEvent) {
+                              saved.singleEventMode != isSingleEvent ||
+                              (saved.competitionSettings.race.duelMode == true) != isDuel) {
             errorMessage = "Denne malen har en annen konkurranseform."
             return
         }
@@ -630,7 +652,7 @@ struct ATHLTHTournamentCreator: View {
             return
         }
         format = saved.format
-        title = saved.title
+        if fixedInvitees == nil { title = saved.title }
         groupSize = saved.groupSize
         qualifiersPerGroup = saved.qualifiersPerGroup
         allowedActivities = fixedActivity.map { Set([$0]) } ??
@@ -653,9 +675,11 @@ struct ATHLTHTournamentCreator: View {
             Date().addingTimeInterval(3 * 86_400)
         approvePlayerChanges = saved.approvePlayerChanges
         warmupRounds = saved.warmupRounds
-        chosenIDs = []
-        chosenNames = [:]
-        selectedSeasonID = nil
+        if fixedInvitees == nil {
+            chosenIDs = []
+            chosenNames = [:]
+            selectedSeasonID = nil
+        }
         errorMessage = nil
     }
 
@@ -1047,7 +1071,18 @@ struct ATHLTHTournamentCreator: View {
 
     private var preview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Forhåndsvisning")
+            sectionTitle("Gjennomgang før invitasjon")
+            Text(title).font(ATHLTHTrainDesign.cardTitle)
+            Label("Valgt gren: " + allowedActivities.sorted { $0.rawValue < $1.rawValue }.map(\.title).joined(separator: " og "), systemImage: "figure.mixed.cardio")
+                .font(.subheadline)
+            Label("\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
+            Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
+            if let start = competitionSettings.startsAt {
+                Text(start.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+            }
+            ForEach(athletes, id: \.id) { athlete in
+                Label(athlete.username, systemImage: "person.crop.circle").font(.caption)
+            }
             Text(isSingleEvent
                 ? "Én felles hendelse · \(athletes.count) deltakere"
                 : format == .cup
@@ -1146,7 +1181,7 @@ struct ATHLTHTournamentDraftDetailView: View {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text((draft.singleEventMode
-                          ? "ENKELTKONKURRANSE" : draft.format.title.uppercased()) +
+                          ? (draft.competitionSettings.race.duelMode == true ? "DUELL" : "ENKELTKONKURRANSE") : draft.format.title.uppercased()) +
                           " · UTKAST")
                         .font(.caption2.weight(.semibold))
                         .tracking(2.2)

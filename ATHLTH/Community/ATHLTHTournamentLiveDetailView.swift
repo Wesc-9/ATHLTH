@@ -56,10 +56,10 @@ struct ATHLTHTournamentLiveDetailView: View {
     private var isOwner: Bool { current.ownerID == userID }
     private var pendingCount: Int { entries.filter { $0.response == "invited" }.count }
     private var minimumAthletes: Int {
-        current.singleEventMode ? 3 : current.format == .cup ? 4 : 2
+        current.minimumAthletes
     }
     private var readyToStart: Bool {
-        confirmedEntries.count >= minimumAthletes &&
+        (current.isDuel ? confirmedEntries.count == 2 : confirmedEntries.count >= minimumAthletes) &&
         (current.unansweredPolicy != "replace" ||
          current.replacementUntil == nil) &&
         pendingCount == 0 &&
@@ -247,9 +247,7 @@ struct ATHLTHTournamentLiveDetailView: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text(((current.singleEventMode
-                ? "Enkeltkonkurranse" : current.format.title)
-                + " · " + statusLabel).uppercased())
+            Text((current.displayFormatTitle + " · " + statusLabel).uppercased())
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.8)
                 .foregroundStyle(ATHLTHArenaV3Style.gold)
