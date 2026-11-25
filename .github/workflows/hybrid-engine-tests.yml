@@ -113,6 +113,13 @@ on:
       - Tests/StrengthSkipSetWatchTests.swift
       - Tests/ATHLTHiPadLiveWorkoutTests.swift
       - ATHLTH/Surfaces/ATHLTHCrossDeviceWorkoutStore.swift
+      - ATHLTH/Surfaces/ATHLTHCrossDeviceLivePolicies.swift
+      - ATHLTH/Social/DirectMessageThreadView.swift
+      - ATHLTH/Social/MessagingStore.swift
+      - ATHLTH/Social/SupabaseMessagingService.swift
+      - ATHLTH/Social/MessagingModels.swift
+      - Tests/ATHLTHDirectMessageDeliveryTests.swift
+      - ATHLTH/Insights/InsightsSessionBaselines.swift
       - ATHLTH/Surfaces/ATHLTHLiveViewRequest.swift
       - ATHLTH/Studio/ATHLTHPrivateLiveStrengthStatusStore.swift
       - Tests/StrengthTimedSetCountdownTests.swift
