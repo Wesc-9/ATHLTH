@@ -444,7 +444,7 @@ struct ATHLTHAdminUserDirectoryView: View {
             if showPlusControls && !user.adminPlusGrantActive {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) {
-                        registeredDetail(user)
+                        accountDates(user)
                             .fixedSize(horizontal: true, vertical: false)
                         Spacer(minLength: 2)
                         Button {
@@ -460,7 +460,7 @@ struct ATHLTHAdminUserDirectoryView: View {
                         .fixedSize(horizontal: true, vertical: false)
                     }
                     VStack(alignment: .leading, spacing: 7) {
-                        registeredDetail(user)
+                        accountDates(user)
                         Button {
                             prepare(.grantPlus, user: user)
                         } label: {
@@ -474,10 +474,8 @@ struct ATHLTHAdminUserDirectoryView: View {
                     }
                 }
             } else {
-                registeredDetail(user)
+                accountDates(user)
             }
-
-            lastSignInDetail(user)
 
             if showPlusControls && user.adminPlusGrantActive {
                 plusGrantControls(for: user)
@@ -571,6 +569,21 @@ struct ATHLTHAdminUserDirectoryView: View {
         .accessibilityLabel(tr("Subscription type", "Abonnementstype") + ": " + value)
     }
 
+    private func accountDates(_ user: DirectoryUser) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                registeredDetail(user)
+                    .fixedSize(horizontal: true, vertical: false)
+                lastSignInDetail(user)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                registeredDetail(user)
+                lastSignInDetail(user)
+            }
+        }
+    }
+
     private func registeredDetail(_ user: DirectoryUser) -> some View {
         let date = user.joinedAt.formatted(date: .abbreviated, time: .omitted)
         return Label(date, systemImage: "calendar")
@@ -583,10 +596,10 @@ struct ATHLTHAdminUserDirectoryView: View {
         let date = ATHLTHAdminDirectoryPresentation.lastSignInLabel(
             user.lastSignInAt, norwegian: norwegian
         )
-        return Label(tr("Last sign-in", "Sist innlogget") + ": " + date, systemImage: "clock")
+        return Label(user.lastSignInAt == nil ? "—" : date, systemImage: "clock")
             .font(.caption)
             .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(tr("Last sign-in", "Sist innlogget") + ": " + date)
             .accessibilityIdentifier("admin-last-sign-in")
     }
 
