@@ -947,6 +947,7 @@ struct ATHLTHCompetitionCreationView: View {
             if choosesActivityInRules && format == .duel {
                 duelActivityPicker
             }
+            if !choosesActivityInRules || selectedDuelActivity != nil {
             if format == .duel && advanced && (!choosesActivityInRules || selectedDuelActivity != nil) {
                 ATHLTHCompetitionRaceRulesSection(
                     settings: $duelRaceSettings,
@@ -1129,6 +1130,7 @@ struct ATHLTHCompetitionCreationView: View {
                     .padding(.top, 11)
                 }
                 .tint(bronze)
+            }
             }
         }
         .padding(15)

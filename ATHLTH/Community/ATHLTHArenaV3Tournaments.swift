@@ -209,6 +209,7 @@ struct ATHLTHTournamentCreator: View {
         // require the organizer plus at least two invitees.
         athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2) &&
         !busy && !allowedActivities.isEmpty &&
+        (!isSingleEvent || allowedActivities.count == 1) &&
         competitionSettings.isValid &&
         competitionSettings.race.isOperational &&
         (competitionSettings.coachExerciseIDs.isEmpty ||
@@ -251,6 +252,13 @@ struct ATHLTHTournamentCreator: View {
                         completionHours: $competitionSettings.completionHours,
                         showsLegacyRoundTiming: false
                     )
+                    if isSingleEvent && allowedActivities.count > 1 {
+                        Label("Enkeltkonkurranse har foreløpig én resultatmåling. Velg én gren for å publisere. Liga og cup støtter øvelser fra flere grener.",
+                              systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if let fixedActivity {
                         Label(
                             "Konkurransen gjelder bare \(fixedActivity.title)",

@@ -16,11 +16,11 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Aktiviteter og regler")
+            Text("Grener og regler")
                 .font(.system(size: 24, weight: .regular, design: .serif))
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
 
-            Text("Velg alt som er tillatt. Deltakerne kan bare foreslå øvelser fra disse aktivitetene.")
+            Text("Velg én eller flere grener. Deltakerne kan bare foreslå øvelser fra de valgte grenene.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
@@ -59,6 +59,15 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                         activities.contains(activity) ? "Valgt" : "Ikke valgt"
                     )
                 }
+            }
+
+            if !activities.isEmpty {
+                Label("Valgt gren: " + ATHLTHTournamentActivity.allCases
+                    .filter { activities.contains($0) }.map(\.title).joined(separator: " og "),
+                    systemImage: "checkmark.circle")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if activities.isEmpty {
