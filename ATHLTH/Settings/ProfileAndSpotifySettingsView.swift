@@ -3631,127 +3631,180 @@ struct ATHLTHAccountSecurityView: View {
     @State private var statusMessage: String?
     @State private var statusIsError = false
 
-    var body: some View {
-        Form {
-            Section("Account") {
-                LabeledContent("Email", value: accountEmail)
-                LabeledContent("Sign-in method", value: signInMethodTitle)
-                LabeledContent(
-                    "Member since",
-                    value: session.accountCreatedAt.formatted(
-                        date: .abbreviated,
-                        time: .omitted
-                    )
-                )
-            }
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        accountText(english: english, norwegian: norwegian)
+    }
 
-            if session.signInMethod == .email {
-                Section("Security") {
-                    Button {
-                        Task { await sendPasswordReset() }
-                    } label: {
-                        HStack {
-                            Label("Change Password", systemImage: "key.fill")
-                            Spacer()
-                            if sendingReset {
-                                ProgressView()
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(tr("Account & Security", "Konto og sikkerhet"))
+                        .font(.system(size: 32, weight: .regular, design: .serif))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(tr("Manage your account, access and private data.", "Administrer kontoen din, tilgang og private data."))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                accountSection(tr("Account", "Konto")) {
+                    PremiumSettingsCard {
+                        PremiumSettingsRow(
+                            icon: "envelope",
+                            iconTint: ATHLTHTheme.accentDeep,
+                            iconBackground: ATHLTHTheme.premiumGoldSoft,
+                            title: tr("Email", "E-post")
+                        ) { EmptyView() }
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(accountEmail)
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if session.signInMethod == .apple &&
+                                accountEmail.lowercased().hasSuffix("@privaterelay.appleid.com") {
+                                Label(tr("Apple Hide My Email · forwarding address", "Skjul e-postadressen min · Apple-videresending"), systemImage: "eye.slash")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 14)
+
+                        SettingsDivider()
+                        accountFact(icon: session.signInMethod == .apple ? "apple.logo" : "key",
+                                    title: tr("Sign-in method", "Innloggingsmetode"),
+                                    value: signInMethodTitle)
+                        SettingsDivider()
+                        accountFact(icon: "calendar",
+                                    title: tr("Member since", "Medlem siden"),
+                                    value: session.accountCreatedAt.formatted(date: .abbreviated, time: .omitted))
+                    }
+                }
+
+                if session.signInMethod == .email || session.signInMethod == .apple {
+                    accountSection(tr("Security", "Sikkerhet")) {
+                        PremiumSettingsCard {
+                            if session.signInMethod == .email {
+                                Button {
+                                    Task { await sendPasswordReset() }
+                                } label: {
+                                    PremiumSettingsRow(
+                                        icon: "key.fill",
+                                        iconTint: ATHLTHTheme.accentDeep,
+                                        iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                        title: tr("Change password", "Endre passord"),
+                                        subtitle: tr("Receive a secure reset link by email", "Motta en sikker lenke på e-post")
+                                    ) {
+                                        if sendingReset { ProgressView() }
+                                        else { accountChevron }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(sendingReset || signOutInProgress)
+                            } else {
+                                PremiumSettingsRow(
+                                    icon: "apple.logo",
+                                    iconTint: ATHLTHTheme.accentDeep,
+                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                    title: tr("Sign in with Apple", "Logg på med Apple"),
+                                    subtitle: tr("Your Apple account manages authentication", "Apple-kontoen din styrer innloggingen")
+                                ) { EmptyView() }
+                                Text(tr("Manage Apple sign-in and account security in your Apple account settings.", "Administrer Apple-innlogging og kontosikkerhet i innstillingene for Apple-kontoen din."))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 14)
                             }
                         }
                     }
-                    .disabled(sendingReset)
-
-                    Text("ATHLTH sends a secure password-reset link to your account email.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else if session.signInMethod == .apple {
-                Section("Security") {
-                    Label("Secured with Sign in with Apple", systemImage: "apple.logo")
-                    Text("Your Apple ID controls authentication for this ATHLTH account.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                NavigationLink {
-                    ATHLTHAccountAIConsentView()
-                } label: {
-                    Label(
-                        accountText(
-                            english: "AI & data consent",
-                            norwegian: "AI og datasamtykker"
-                        ),
-                        systemImage: "shield.lefthalf.filled"
-                    )
                 }
 
-                NavigationLink {
-                    TrainingDataSettingsView()
-                } label: {
-                    Label(
-                        accountText(
-                            english: "Training data & Coach",
-                            norwegian: "Treningsdata og Coach"
-                        ),
-                        systemImage: "icloud"
-                    )
-                }
-
-                NavigationLink {
-                    ATHLTHDataExportView()
-                } label: {
-                    Label(
-                        accountText(
-                            english: "Export ATHLTH Data",
-                            norwegian: "Eksporter ATHLTH-data"
-                        ),
-                        systemImage: "square.and.arrow.up"
-                    )
-                }
-            } header: {
-                Text(
-                    accountText(
-                        english: "Privacy & data",
-                        norwegian: "Personvern og data"
-                    )
-                )
-            } footer: {
-                Text(
-                    accountText(
-                        english:
-                            "Manage privacy, AI access, cloud training data, backup and export from one place.",
-                        norwegian:
-                            "Administrer personvern, AI-tilgang, treningsdata i skyen, sikkerhetskopi og eksport på ett sted."
-                    )
-                )
-            }
-
-            Section {
-                Button(role: .destructive) {
-                    showingSignOutConfirmation = true
-                } label: {
-                    HStack {
-                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                        Spacer()
-                        if signOutInProgress {
-                            ProgressView()
+                accountSection(tr("Privacy & data", "Personvern og data")) {
+                    PremiumSettingsCard {
+                        NavigationLink {
+                            ATHLTHAccountAIConsentView()
+                        } label: {
+                            accountLinkRow(icon: "shield.lefthalf.filled", title: tr("AI & data consent", "AI og datasamtykker"),
+                                           subtitle: tr("Manage consent and AI access", "Administrer samtykker og AI-tilgang"))
                         }
+                        .buttonStyle(.plain)
+                        SettingsDivider()
+                        NavigationLink {
+                            TrainingDataSettingsView()
+                        } label: {
+                            accountLinkRow(icon: "icloud", title: tr("Training data & Coach", "Treningsdata og Coach"),
+                                           subtitle: tr("Cloud storage and backup", "Skylagring og sikkerhetskopi"))
+                        }
+                        .buttonStyle(.plain)
+                        SettingsDivider()
+                        NavigationLink {
+                            ATHLTHDataExportView()
+                        } label: {
+                            accountLinkRow(icon: "square.and.arrow.up", title: tr("Export ATHLTH data", "Eksporter ATHLTH-data"),
+                                           subtitle: tr("Request a copy of your data", "Få en kopi av opplysningene dine"))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .disabled(signOutInProgress)
 
-                NavigationLink {
-                    DeleteAccountView()
-                } label: {
-                    Label("Delete Account", systemImage: "trash")
-                        .foregroundStyle(.red)
+                accountSection(tr("Account actions", "Kontohandlinger")) {
+                    PremiumSettingsCard {
+                        Button {
+                            showingSignOutConfirmation = true
+                        } label: {
+                            PremiumSettingsRow(
+                                icon: "rectangle.portrait.and.arrow.right",
+                                iconTint: ATHLTHTheme.accentDeep,
+                                iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                title: tr("Sign out", "Logg ut"),
+                                subtitle: tr("Keep your account and sign out of this device", "Behold kontoen, men logg ut på denne enheten")
+                            ) {
+                                if signOutInProgress { ProgressView() }
+                                else { accountChevron }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(signOutInProgress || sendingReset)
+                        SettingsDivider()
+                        NavigationLink {
+                            DeleteAccountView()
+                        } label: {
+                            PremiumSettingsRow(
+                                icon: "trash",
+                                iconTint: .red,
+                                iconBackground: Color.red.opacity(0.07),
+                                title: tr("Delete account", "Slett konto"),
+                                subtitle: tr("Permanent and cannot be undone", "Permanent og kan ikke angres"),
+                                titleColor: .red
+                            ) { accountChevron }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(signOutInProgress)
+                    }
+                    Text(tr("Signing out clears account-specific cached data on this device. Account deletion is permanent.", "Utlogging tømmer kontospesifikke hurtigbufferdata på denne enheten. Sletting av kontoen er permanent."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .padding(.horizontal, 8)
                 }
-            } footer: {
-                Text("Deleting your account is permanent. Signing out keeps your account and clears account-specific cached data from this device.")
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 22)
+            .padding(.bottom, 32)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
         }
-        .athlthBrandedForm()
+        .background {
+            ZStack {
+                LinearGradient(colors: [ATHLTHTheme.canvasTop, .white, ATHLTHTheme.canvasBottom],
+                               startPoint: .top, endPoint: .bottomTrailing)
+                RadialGradient(colors: [ATHLTHTheme.premiumGold.opacity(0.055), .clear],
+                               center: .topTrailing, startRadius: 20, endRadius: 420)
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle(
             accountText(
                 english: "Account & Security",
@@ -3760,17 +3813,17 @@ struct ATHLTHAccountSecurityView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
-            "Sign out of ATHLTH?",
+            tr("Sign out of ATHLTH?", "Logge ut av ATHLTH?"),
             isPresented: $showingSignOutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Sign Out", role: .destructive) {
+            Button(tr("Sign Out", "Logg ut"), role: .destructive) {
                 Task { await signOut() }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
         }
         .alert(
-            statusIsError ? "ATHLTH" : "Check Your Email",
+            statusIsError ? "ATHLTH" : tr("Check Your Email", "Sjekk e-posten din"),
             isPresented: Binding(
                 get: { statusMessage != nil },
                 set: { if !$0 { statusMessage = nil } }
@@ -3780,6 +3833,36 @@ struct ATHLTHAccountSecurityView: View {
         } message: {
             Text(statusMessage ?? "")
         }
+    }
+
+    private var accountChevron: some View {
+        Image(systemName: "chevron.right")
+            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+    }
+
+    private func accountSection<Content: View>(
+        _ title: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title.uppercased())
+                .font(.caption.weight(.semibold))
+                .tracking(2.8)
+                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.82))
+                .padding(.leading, 16)
+            content()
+        }
+    }
+
+    private func accountFact(icon: String, title: String, value: String) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep,
+                           iconBackground: ATHLTHTheme.premiumGoldSoft,
+                           title: title, subtitle: value) { EmptyView() }
+    }
+
+    private func accountLinkRow(icon: String, title: String, subtitle: String) -> some View {
+        PremiumSettingsRow(icon: icon, iconTint: ATHLTHTheme.accentDeep,
+                           iconBackground: ATHLTHTheme.premiumGoldSoft,
+                           title: title, subtitle: subtitle) { accountChevron }
     }
 
     private func accountText(
@@ -3829,6 +3912,7 @@ struct ATHLTHAccountSecurityView: View {
     }
 
     private func sendPasswordReset() async {
+        guard !sendingReset, !signOutInProgress else { return }
         sendingReset = true
         statusMessage = nil
         defer { sendingReset = false }
@@ -3848,6 +3932,7 @@ struct ATHLTHAccountSecurityView: View {
     }
 
     private func signOut() async {
+        guard !signOutInProgress, !sendingReset else { return }
         signOutInProgress = true
         statusMessage = nil
         defer { signOutInProgress = false }
