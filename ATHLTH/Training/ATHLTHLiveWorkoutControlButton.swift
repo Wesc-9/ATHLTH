@@ -307,12 +307,14 @@ struct ATHLTHLiveWorkoutTopStrip: View {
                         english: "Finish", norwegian: "Avslutt"
                     ))
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(finishDisabled
-                        ? ATHLTHTrainDesign.secondary : ATHLTHTrainDesign.ink)
+                    .foregroundStyle(Color.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                    .frame(minWidth: 52, minHeight: 48)
-                    .padding(.trailing, 6)
+                    .frame(minWidth: 52, minHeight: 40)
+                    .padding(.horizontal, 8)
+                    .background(Color.red.opacity(finishDisabled ? 0.35 : 0.92), in: Capsule())
+                    .padding(.trailing, 4)
+                    .frame(minHeight: 48)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
