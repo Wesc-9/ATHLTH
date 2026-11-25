@@ -2060,6 +2060,14 @@ final class CommunityGroupStore: ObservableObject {
     @Published private(set) var recentClubMessagesByGroup: [UUID: CommunityGroupMessageRecord] = [:]
     @Published private(set) var unreadClubGroupIDs: Set<UUID> = []
     @Published private(set) var eventsByGroup: [UUID: [CommunityGroupEventRecord]] = [:]
+    private struct HomeCalendarSnapshot: Equatable {
+        let owner: UUID
+        let interval: DateInterval
+        let events: [CommunityGroupEventRecord]
+        let responses: [CommunityGroupEventRSVPRecord]
+    }
+    @Published private var homeCalendarSnapshot: HomeCalendarSnapshot?
+    private var homeCalendarRequest = UUID()
     // Home only needs a tiny future-events summary, not the entire
     // club calendar (which can contain thousands of past RSVPs).
     @Published private(set) var homeUpcomingEvents: [CommunityGroupEventRecord] = []
@@ -2872,6 +2880,80 @@ final class CommunityGroupStore: ObservableObject {
             guard currentUserID == userID else { return }
             // Preserve the previously verified summary when offline.
             homeUpcomingEventsLoadFailed = true
+        }
+    }
+
+    /// Only the visible Home week, independent of each club's full calendar.
+    func homeCalendarContent(in interval: DateInterval) -> (events: [CommunityGroupEventRecord], responses: [CommunityGroupEventRSVPRecord]) {
+        guard let snapshot = homeCalendarSnapshot, snapshot.owner == currentUserID,
+              snapshot.interval == interval else { return ([], []) }
+        let joined = joinedGroupIDs
+        return (snapshot.events.filter { joined.contains($0.groupID) },
+                snapshot.responses.filter { joined.contains($0.groupID) })
+    }
+
+    func refreshHomeCalendar(in interval: DateInterval) async {
+        let request = UUID()
+        homeCalendarRequest = request
+        guard let owner = currentUserID else {
+            homeCalendarSnapshot = nil
+            return
+        }
+        let groupIDs = joinedGroupIDs.sorted { $0.uuidString < $1.uuidString }
+        func ownsRequest() -> Bool {
+            !Task.isCancelled && currentUserID == owner && homeCalendarRequest == request
+        }
+        guard !groupIDs.isEmpty else {
+            let empty = HomeCalendarSnapshot(owner: owner, interval: interval, events: [], responses: [])
+            if homeCalendarSnapshot != empty { homeCalendarSnapshot = empty }
+            return
+        }
+        let signpost = ATHLTHPerformance.begin("HomeGroupCalendarWeek")
+        defer { ATHLTHPerformance.end("HomeGroupCalendarWeek", id: signpost) }
+        let formatter = ISO8601DateFormatter()
+        let start = formatter.string(from: interval.start)
+        let end = formatter.string(from: interval.end)
+        do {
+            var events: [CommunityGroupEventRecord] = []
+            // Bound request URL size and page results without dropping busy weeks.
+            for offset in stride(from: 0, to: groupIDs.count, by: 50) {
+                let ids = groupIDs[offset..<min(offset + 50, groupIDs.count)].map(\.uuidString)
+                var pageStart = 0
+                while ownsRequest() {
+                    let page: [CommunityGroupEventRecord] = try await client
+                        .from("community_group_events").select()
+                        .in("group_id", values: ids)
+                        .gte("starts_at", value: start).lt("starts_at", value: end)
+                        .order("starts_at", ascending: true).order("id", ascending: true)
+                        .range(from: pageStart, to: pageStart + 199)
+                        .execute().value
+                    guard ownsRequest() else { return }
+                    events.append(contentsOf: page)
+                    if page.count < 200 { break }
+                    pageStart += 200
+                }
+                guard ownsRequest() else { return }
+            }
+            var responses: [CommunityGroupEventRSVPRecord] = []
+            for offset in stride(from: 0, to: events.count, by: 50) {
+                guard ownsRequest() else { return }
+                let ids = events[offset..<min(offset + 50, events.count)].map { $0.id.uuidString }
+                let page: [CommunityGroupEventRSVPRecord] = try await client
+                    .from("community_group_event_rsvps").select()
+                    .eq("user_id", value: owner).in("event_id", values: ids)
+                    .execute().value
+                guard ownsRequest() else { return }
+                responses.append(contentsOf: page)
+            }
+            guard ownsRequest() else { return }
+            let snapshot = HomeCalendarSnapshot(owner: owner, interval: interval,
+                events: events.sorted { $0.startsAt == $1.startsAt ? $0.id.uuidString < $1.id.uuidString : $0.startsAt < $1.startsAt },
+                responses: responses.sorted { $0.eventID.uuidString < $1.eventID.uuidString })
+            if homeCalendarSnapshot != snapshot { homeCalendarSnapshot = snapshot }
+        } catch {
+            guard ownsRequest() else { return }
+            // Keep the last successful snapshot for the exact week when offline.
+            errorMessage = error.localizedDescription
         }
     }
 
