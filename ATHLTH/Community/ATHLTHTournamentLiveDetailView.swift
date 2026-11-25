@@ -43,6 +43,8 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var continuationExists = false
     @State private var checkingSeasonRenewal = false
     @State private var seasonNotice: String?
+    @State private var seasonHistory: [ATHLTHTournamentRemote] = []
+    @State private var showAllSeasons = false
 
     private let cloud = ATHLTHTournamentCloudService()
 
@@ -211,6 +213,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                     nextSeasonDraft = nil
                     continuationExists = true
                     seasonNotice = draft.competitionSettings.race.duelMode == true ? "Rematch sendt som ny invitasjon." : "Ny sesong opprettet. Forrige sesongs resultater er bevart."
+                    Task { await reload() }
                 },
                 onSave: { newDraft in
                     var stored = ATHLTHTournamentDraftStore.load(userID)
@@ -551,6 +554,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     private var overview: some View {
         VStack(alignment: .leading, spacing: 17) {
             eventInformation
+            if !current.singleEventMode && !current.isDuel { seasonHistorySection }
             athleteProgressSection
             ATHLTHCompetitionLiveMapView(
                 tournament: current,
@@ -613,6 +617,76 @@ struct ATHLTHTournamentLiveDetailView: View {
             }
             } // Separate events never display a fictitious league fixture.
         }
+    }
+
+    private var seasonHistorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionTitle("Sesonghistorikk")
+                Spacer()
+                if seasonHistory.count > 5 {
+                    Button(showAllSeasons ? "Vis færre" : "Se alle") {
+                        showAllSeasons.toggle()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+            }
+            Text("Hver sesong har egne oppgjør, resultater og tabeller.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            ForEach(Array(seasonHistory.prefix(showAllSeasons ? seasonHistory.count : 5))) { season in
+                if season.id == current.id {
+                    seasonHistoryRow(season, isCurrent: true)
+                } else {
+                    NavigationLink {
+                        ATHLTHTournamentLiveDetailView(tournament: season)
+                    } label: {
+                        seasonHistoryRow(season, isCurrent: false)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(15)
+        .background(ATHLTHArenaV3Style.panel())
+        .accessibilityIdentifier("athlth-tournament-season-history")
+    }
+
+    private func seasonHistoryRow(_ season: ATHLTHTournamentRemote, isCurrent: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: season.status == "completed" ? "trophy" : "calendar")
+                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(season.seasonLabel ?? season.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                Text(season.title)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                if let date = season.completedAt ?? season.startedAt ?? season.plannedStartsAt {
+                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(season.status == "completed" ? "Fullført" :
+                     season.status == "active" ? "Pågår" :
+                     season.status == "cancelled" ? "Avlyst" : "Invitasjoner")
+                    .font(.caption.weight(.medium))
+                if isCurrent {
+                    Text("Denne sesongen").font(.caption2)
+                } else {
+                    Image(systemName: "chevron.right").font(.caption)
+                }
+            }
+            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 
     private var singleEventSection: some View {
@@ -1050,6 +1124,10 @@ struct ATHLTHTournamentLiveDetailView: View {
             // presence. That must never prevent the public detail from loading.
             let statuses = (try? await progress) ?? []
             latest = all.first { $0.id == current.id } ?? latest
+            seasonHistory = ATHLTHTournamentSeasonContinuation.history(current: current, visible: all)
+            continuationExists = all.contains {
+                $0.raceRules.previousCompetitionID == current.id && $0.status != "cancelled"
+            }
             entries = newEntries
             matches = newMatches
             confirmedStandings = updatedRankings
