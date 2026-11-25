@@ -2006,6 +2006,12 @@ struct RunQuickStartSheet: View {
                     isAdvancedSetup = forceBasicSetup
                         ? false
                         : settings.resolvedAdvancedSetup(for: .running)
+                    // Only a new free run uses the preferred environment.
+                    // Routes, templates and planned/competition sessions retain their own configuration.
+                    if plannedSession == nil && mode == .free && selectedRoute == nil &&
+                        selectedWorkout == nil && advancedWorkout == nil {
+                        environment = settings.defaultFreeRunEnvironment
+                    }
                     didResolveSetupMode = true
                 }
 
@@ -2851,16 +2857,10 @@ struct RunQuickStartSheet: View {
                 starting: launchInProgress,
                 scheduledDate: pendingStartDate,
                 onIPhoneNow: {
-                    cancelPendingQuickRun()
-                    captureDevice = .iPhone
-                    watchStartMode = .immediate
-                    submitQuickRun(captureDevice: .iPhone)
+                    startWithPreferredCountdown(device: .iPhone)
                 },
                 onWatchNow: {
-                    cancelPendingQuickRun()
-                    captureDevice = .appleWatch
-                    watchStartMode = .immediate
-                    submitQuickRun(captureDevice: .appleWatch)
+                    startWithPreferredCountdown(device: .appleWatch)
                 },
                 onWatchCountDown: {
                     cancelPendingQuickRun()
@@ -2880,6 +2880,23 @@ struct RunQuickStartSheet: View {
                 onCancelDelay: cancelPendingQuickRun
             )
             }
+        }
+    }
+
+    private func startWithPreferredCountdown(device: WorkoutCaptureDevice) {
+        guard canSubmitQuickRun(captureDevice: device), !launchInProgress else { return }
+        cancelPendingQuickRun()
+        captureDevice = device
+        watchStartMode = .immediate
+        // Native Watch countdown works independently of the phone.
+        let seconds = settings.quickRunStartCountdown.rawValue
+        if device == .appleWatch && seconds == 30 {
+            watchStartMode = .afterThirtySeconds
+            submitQuickRun(captureDevice: device)
+        } else if seconds > 0 {
+            scheduleQuickRun(device: device, after: seconds)
+        } else {
+            submitQuickRun(captureDevice: device)
         }
     }
 
