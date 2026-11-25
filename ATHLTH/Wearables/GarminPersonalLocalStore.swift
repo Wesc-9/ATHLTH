@@ -149,7 +149,8 @@ struct GarminPersonalAccountBoundary: View {
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.scenePhase) private var scenePhase
     private var account: UUID? {
-        scenePhase == .active && session.signedIn && !session.previewModeEnabled
+        scenePhase == .active && session.signedIn && !session.previewModeEnabled &&
+            session.currentRole.canAccessControlCenter
             ? session.profile.userID : nil
     }
     var body: some View {

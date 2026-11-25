@@ -76,7 +76,15 @@ struct AppleWatchConnectionView: View {
         }
         .task { watchConnection.connect() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { watchConnection.connect() }
+            guard phase == .active else { return }
+            watchConnection.connect()
+            Task { @MainActor in
+                for delay in [1, 2] {
+                    try? await Task.sleep(for: .seconds(delay))
+                    guard scenePhase == .active, watchConnection.state == .appNotInstalled else { return }
+                    watchConnection.connect()
+                }
+            }
         }
     }
 

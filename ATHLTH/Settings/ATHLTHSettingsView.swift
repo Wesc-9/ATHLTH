@@ -1151,12 +1151,12 @@ settingsSection("Connections") {
                                     iconTint: ATHLTHTheme.accentDeep,
                                     iconBackground: ATHLTHTheme.premiumGoldSoft,
                                     title: "Garmin",
-                                    subtitle: session.currentRole.canAccessControlCenter
+                                    subtitle: session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
                                         ? ATHLTHLocalization.choose(english: "Developer testing · connection and status", norwegian: "Utviklertest · tilkobling og status")
                                         : ATHLTHLocalization.choose(english: "Garmin Connect integration", norwegian: "Garmin Connect-integrasjon")
                                 ) {
                                     connectionTrailing(
-                                        session.currentRole.canAccessControlCenter
+                                        session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter
                                             ? ATHLTHLocalization.choose(english: "Test", norwegian: "Test")
                                             : ATHLTHLocalization.choose(english: "Coming soon", norwegian: "Kommer snart"),
                                         showChevron: true
