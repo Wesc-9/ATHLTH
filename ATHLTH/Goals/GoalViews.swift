@@ -7,22 +7,28 @@ import UIKit
 struct GoalsHubView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @State private var showingCreateGoal = false
-    @State private var filter: GoalHubFilter = .all
+    @State private var filter: GoalHubFilter
+    @State private var followUpGoal: ATHLTHGoal?
+    @State private var celebratedGoal: ATHLTHGoal?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(showAchievements: Bool = false) {
+        _filter = State(initialValue: showAchievements ? .completed : .active)
+    }
 
     private let ink = ATHLTHPlanDesign.ink
     private let accent = ATHLTHPlanDesign.accent
     private let canvas = ATHLTHPlanDesign.canvas
 
     private enum GoalHubFilter: String, CaseIterable, Identifiable {
-        case all, active, paused, completed, archived
+        case active, paused, completed, archived
 
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .all: return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
             case .active: return ATHLTHLocalization.choose(english: "Active", norwegian: "Aktive")
-            case .paused: return ATHLTHLocalization.choose(english: "Paused", norwegian: "Deaktiverte")
-            case .completed: return ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullførte")
+            case .paused: return ATHLTHLocalization.choose(english: "Paused", norwegian: "På pause")
+            case .completed: return ATHLTHLocalization.choose(english: "Achieved", norwegian: "Oppnådde")
             case .archived: return ATHLTHLocalization.choose(english: "Archived", norwegian: "Arkiverte")
             }
         }
@@ -44,7 +50,6 @@ struct GoalsHubView: View {
         goalStore.goals
             .filter { goal in
                 switch filter {
-                case .all: return true
                 case .active: return goal.status == .active
                 case .paused: return goal.status == .paused
                 case .completed: return goal.status == .completed
@@ -63,8 +68,22 @@ struct GoalsHubView: View {
                     }
                 }
                 if rank(lhs) != rank(rhs) { return rank(lhs) < rank(rhs) }
+                if filter == .completed {
+                    return (lhs.completedAt ?? lhs.createdAt) > (rhs.completedAt ?? rhs.createdAt)
+                }
                 return lhs.createdAt > rhs.createdAt
             }
+    }
+
+    private var achievedCount: Int { goalStore.goals.filter { $0.status == .completed }.count }
+    private var completedIDs: Set<UUID> { Set(goalStore.goals.filter { $0.status == .completed }.map(\.id)) }
+    private var sectionTitle: String {
+        switch filter {
+        case .active: return tr("Active goals", "Aktive mål")
+        case .paused: return tr("Paused goals", "Mål på pause")
+        case .completed: return tr("Achieved goals", "Oppnådde mål")
+        case .archived: return tr("Archived goals", "Arkiverte mål")
+        }
     }
 
     var body: some View {
@@ -98,9 +117,7 @@ struct GoalsHubView: View {
                         if !otherGoals.isEmpty {
                             VStack(alignment: .leading, spacing: 11) {
                                 sectionHeading(
-                                    filter == .paused
-                                        ? tr("Deactivated goals", "Deaktiverte mål")
-                                        : tr("My goals", "Mine mål"),
+                                    sectionTitle,
                                     detail: "\(otherGoals.count)"
                                 )
                                 ForEach(otherGoals) { goal in
@@ -109,6 +126,7 @@ struct GoalsHubView: View {
                             }
                         }
                     }
+                    if filter == .active && achievedCount > 0 { achievementsShortcut }
                 }
             }
             .padding(.horizontal, 18)
@@ -124,6 +142,45 @@ struct GoalsHubView: View {
         .sheet(isPresented: $showingCreateGoal) {
             GoalCreationView()
         }
+        .sheet(item: $followUpGoal) { goal in
+            GoalFollowUpSheet(goal: goal)
+        }
+        .onChange(of: goalStore.ownerAccountID) { _, _ in celebratedGoal = nil }
+        .onChange(of: completedIDs) { old, new in
+            guard let goal = goalStore.goals.first(where: { new.subtracting(old).contains($0.id) }) else { return }
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { celebratedGoal = goal }
+        }
+        .overlay(alignment: .top) {
+            if let goal = celebratedGoal {
+                GoalAchievementBanner(goal: goal) { celebratedGoal = nil }
+                    .padding(18)
+                    .transition(.opacity)
+                    .task(id: goal.id) {
+                        try? await Task.sleep(for: .seconds(4))
+                        guard !Task.isCancelled else { return }
+                        withAnimation(reduceMotion ? nil : .easeOut) { celebratedGoal = nil }
+                    }
+            }
+        }
+    }
+
+    private var achievementsShortcut: some View {
+        Button {
+            filter = .completed
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "trophy.fill").font(.title2).foregroundStyle(accent)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Your achievements", "Dine prestasjoner")).font(.headline).foregroundStyle(ink)
+                    Text("\(achievedCount) " + tr("achieved goals", "oppnådde mål")).font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .padding(16)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
     }
 
     private var heading: some View {
@@ -166,11 +223,11 @@ struct GoalsHubView: View {
                          title: tr("Active", "Aktive"),
                          symbol: "checkmark.circle")
             overviewStat(count: inactiveCount,
-                         title: tr("Deactivated", "Deaktiverte"),
+                         title: tr("Paused", "På pause"),
                          symbol: "pause.circle")
             overviewStat(count: goalStore.goals.filter {
                 $0.status == .completed
-            }.count, title: tr("Completed", "Fullført"),
+            }.count, title: tr("Achieved", "Oppnådd"),
                symbol: "trophy")
         }
     }
@@ -259,21 +316,34 @@ struct GoalsHubView: View {
                     Button {
                         goalStore.setStatus(.paused, for: goal.id)
                     } label: {
-                        Label(tr("Deactivate goal", "Deaktiver mål"),
+                        Label(tr("Pause goal", "Sett mål på pause"),
                               systemImage: "pause.circle")
                     }
                 } else if goal.status == .paused {
                     Button {
                         goalStore.setStatus(.active, for: goal.id)
                     } label: {
-                        Label(tr("Activate goal", "Aktiver mål"),
+                        Label(tr("Resume goal", "Fortsett med målet"),
                               systemImage: "play.circle")
                     }
                 }
                 NavigationLink {
                     GoalDetailView(goalID: goal.id)
                 } label: {
-                    Label(tr("View details", "Se detaljer"), systemImage: "arrow.up.right")
+                    Label(goal.isAchievement ? tr("View result", "Se resultat") : tr("View details", "Se detaljer"), systemImage: "arrow.up.right")
+                }
+                if goal.isAchievement {
+                    Button { followUpGoal = goal } label: {
+                        Label(tr("Build on this goal", "Bygg videre på målet"), systemImage: "arrow.up.right.circle")
+                    }
+                    ShareLink(item: tr("I achieved a goal in ATHLTH!", "Jeg nådde et mål i ATHLTH!")) {
+                        Label(tr("Share achievement", "Del prestasjon"), systemImage: "square.and.arrow.up")
+                    }
+                }
+                if goal.status == .completed || goal.status == .paused {
+                    Button { goalStore.setStatus(.abandoned, for: goal.id) } label: {
+                        Label(tr("Archive", "Arkiver"), systemImage: "archivebox")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -353,11 +423,16 @@ struct GoalsHubView: View {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.title)
                 .foregroundStyle(accent)
-            Text(tr("No goals here yet", "Ingen mål i denne kategorien"))
+            Text(filter == .active ? tr("What is your next goal?", "Hva er ditt neste mål?") : tr("No goals here yet", "Ingen mål i denne kategorien"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ink)
-            Button(tr("Show all goals", "Vis alle mål")) {
-                filter = .all
+            if filter == .active {
+                Text(tr("Set a new goal and follow your progress.", "Sett deg et nytt mål og følg utviklingen din."))
+                    .font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Button(tr("Create goal", "Opprett mål")) { showingCreateGoal = true }
+                    .buttonStyle(.borderedProminent).tint(ink)
+            } else {
+                Button(tr("Show active goals", "Vis aktive mål")) { filter = .active }
             }
             .font(.subheadline)
             .foregroundStyle(accent)
@@ -396,6 +471,10 @@ struct GoalSummaryCard: View {
     }
 
     var body: some View {
+        if goal.isAchievement {
+            GoalAchievementSummary(goal: goal)
+                .padding(.leading, 12)
+        } else {
         GeometryReader { geometry in
             // Give the photo more visual weight while keeping text readable
             // on compact iPhones and resizable iPad windows.
@@ -476,6 +555,72 @@ struct GoalSummaryCard: View {
         .frame(height: prominent ? 146 : 126)
         .padding(.leading, 10)
         .padding(.trailing, 4)
+        }
+    }
+}
+
+private struct GoalAchievementSummary: View {
+    let goal: ATHLTHGoal
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "trophy.fill")
+                .font(.system(size: 27, weight: .medium))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 66, height: 66)
+                .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 17))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(ATHLTHLocalization.choose(english: "GOAL ACHIEVED", norwegian: "MÅL OPPNÅDD"))
+                    .font(.caption2.weight(.bold)).tracking(0.7)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(goal.title).font(.system(.headline, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Text(goal.category.title).font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                if let date = goal.completedAt {
+                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                if !goal.milestones.isEmpty {
+                    Text("\(goal.completedMilestones)/\(goal.milestones.count) " + ATHLTHLocalization.choose(english: "milestones", norwegian: "delmål"))
+                        .font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct GoalAchievementBanner: View {
+    let goal: ATHLTHGoal
+    let close: () -> Void
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "trophy.fill").font(.title2).foregroundStyle(ATHLTHPlanDesign.accentInk)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(ATHLTHLocalization.choose(english: "Goal achieved!", norwegian: "Mål oppnådd!")).font(.headline)
+                Text(goal.title).font(.subheadline)
+            }
+            Spacer()
+            Button(action: close) { Image(systemName: "xmark.circle.fill") }
+                .accessibilityLabel(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk"))
+        }
+        .foregroundStyle(ATHLTHPlanDesign.ink)
+        .padding(16)
+        .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 20))
+        .shadow(radius: 5, y: 3)
+    }
+}
+
+private struct GoalFollowUpSheet: View {
+    let goal: ATHLTHGoal
+    var body: some View {
+        if goal.bodyMeasurementGoal != nil {
+            ATHLTHBodyGoalCreationView()
+        } else {
+            GoalCreationView(initialCategory: goal.category, initialTitle: goal.title, previousGoal: goal)
+        }
     }
 }
 
@@ -609,12 +754,16 @@ struct GoalDetailView: View {
                 ScrollView(.vertical) {
                     VStack(spacing: 16) {
                         hero(goal)
-                        progressCard(goal)
+                        if goal.isAchievement {
+                            GoalAchievementSummary(goal: goal).padding(16).goalCard().padding(.horizontal)
+                        } else {
+                            progressCard(goal)
+                        }
                         milestonesCard(goal)
-                        if goal.bodyMeasurementGoal != nil {
+                        if !goal.isAchievement && goal.bodyMeasurementGoal != nil {
                             ATHLTHBodyGoalProgressView(goal: goal)
                                 .padding(.horizontal, 16)
-                        } else {
+                        } else if !goal.isAchievement {
                             goalProgressInsightCard(goal)
                         }
                         if let why = goal.whyItMatters, !why.isEmpty {
@@ -670,7 +819,7 @@ struct GoalDetailView: View {
                     edge: .bottom,
                     spacing: 0
                 ) {
-                    if goal.status != .completed {
+                    if goal.status == .active || goal.status == .paused {
                         goalCompletionBar(goal)
                     }
                 }
@@ -692,6 +841,7 @@ struct GoalDetailView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
+                            if !goal.isAchievement && goal.status != .abandoned {
                             Button(ATHLTHLocalization.choose(english: "Edit goal", norwegian: "Rediger mål"), systemImage: "pencil") {
                                 showingEditGoal = true
                             }
@@ -704,6 +854,7 @@ struct GoalDetailView: View {
 
                             Button(ATHLTHLocalization.choose(english: "Add milestone", norwegian: "Legg til delmål"), systemImage: "plus.circle") {
                                 showingAddMilestone = true
+                            }
                             }
 
                             Divider()
@@ -1101,11 +1252,13 @@ struct GoalDetailView: View {
                 Text(ATHLTHLocalization.choose(english: "Milestones", norwegian: "Delmål"))
                     .font(.title3.bold())
                 Spacer()
+                if !goal.isAchievement && goal.status != .abandoned {
                 Button {
                     showingAddMilestone = true
                 } label: {
                     Label(ATHLTHLocalization.choose(english: "Add", norwegian: "Legg til"), systemImage: "plus")
                         .font(.caption.bold())
+                }
                 }
             }
             .padding(.bottom, 8)
@@ -1146,6 +1299,7 @@ struct GoalDetailView: View {
                         .foregroundStyle(milestone.isCompleted ? ATHLTHTheme.accent : .secondary)
                 }
                 .buttonStyle(.plain)
+                .disabled(goal.isAchievement || goal.status == .abandoned)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(milestone.title)
@@ -1186,7 +1340,8 @@ struct GoalDetailView: View {
                 Spacer()
             }
 
-            if milestone.manualOverride == .forceIncomplete,
+            if !goal.isAchievement, goal.status != .abandoned,
+               milestone.manualOverride == .forceIncomplete,
                milestone.automationRule?.isEnabled == true {
                 Button(ATHLTHLocalization.choose(english: "Resume automatic tracking", norwegian: "Gjenoppta automatisk sporing")) {
                     goalStore.resumeAutomaticTracking(
@@ -1545,7 +1700,8 @@ struct GoalCreationView: View {
         planGoalChoice: String? = nil,
         onMuscleChanged: ((String?) -> Void)? = nil,
         checkpoint: Binding<Data?> = .constant(nil),
-        onCreated: ((UUID) -> Void)? = nil
+        onCreated: ((UUID) -> Void)? = nil,
+        previousGoal: ATHLTHGoal? = nil
     ) {
         self.embeddedInPlan = embeddedInPlan
         self.planGoalChoice = planGoalChoice
@@ -1557,7 +1713,15 @@ struct GoalCreationView: View {
             embeddedInPlan && planGoalChoice == "muscle" ? .custom : initialCategory)
         // The suggested name is a grey placeholder, not actual user input.
         self._title = State(initialValue: embeddedInPlan ? "" : initialTitle)
-        self._exerciseName = State(initialValue: embeddedInPlan ? "" : "Squat")
+        self._exerciseName = State(initialValue: previousGoal?.target?.exerciseName ?? (embeddedInPlan ? "" : "Squat"))
+        if let previousGoal {
+            self._coverStyle = State(initialValue: previousGoal.coverStyle)
+            self._activity = State(initialValue: previousGoal.target?.activity ?? .running)
+            if let target = previousGoal.target {
+                let divisor: Double = target.metric == .singleWorkoutDistanceMeters ? 1_000 : (target.metric == .sleepDurationSeconds ? 3_600 : 1)
+                self._targetValue = State(initialValue: target.targetValue / divisor)
+            }
+        }
     }
 
     private struct PlanCheckpoint: Codable {

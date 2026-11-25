@@ -458,7 +458,13 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
         self.bodyMeasurementGoal = bodyMeasurementGoal
     }
 
+    /// Archived achievements retain their original completion date.
+    var isAchievement: Bool {
+        status == .completed || (status == .abandoned && completedAt != nil)
+    }
+
     var progress: Double {
+        if isAchievement { return 1 }
         guard !milestones.isEmpty else {
             return status == .completed ? 1 : 0
         }

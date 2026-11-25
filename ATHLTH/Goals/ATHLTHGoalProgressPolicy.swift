@@ -9,6 +9,8 @@ enum ATHLTHGoalProgressPolicy {
         profile: ATHLTHTrainingProfile,
         latestBodyWeightKilograms: Double? = nil
     ) -> Double {
+        // A completed goal is historical, not a live measurement.
+        if goal.isAchievement { return 1 }
         if goal.bodyMeasurementGoal != nil {
             return ATHLTHBodyGoalCheckInPolicy.progress(goal, profile: profile)
         }

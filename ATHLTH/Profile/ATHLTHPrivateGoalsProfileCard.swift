@@ -124,6 +124,25 @@ struct ATHLTHPrivateGoalsProfileCard: View {
                 }
             }
 
+            let achievedCount = goalStore.goals.filter { $0.status == .completed }.count
+            if achievedCount > 0 {
+                NavigationLink {
+                    GoalsHubView(showAchievements: true)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "trophy.fill").foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        Text(tr("Achievements", "Prestasjoner")).font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text("\(achievedCount)").font(.subheadline.weight(.semibold))
+                        Image(systemName: "chevron.right").font(.caption)
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .padding(13)
+                    .background(ATHLTHPlanDesign.selectedSurface.opacity(0.48), in: RoundedRectangle(cornerRadius: 15))
+                }
+                .buttonStyle(.plain)
+            }
+
             HStack(spacing: 10) {
                 NavigationLink {
                     GoalsHubView()

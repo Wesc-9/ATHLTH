@@ -50,6 +50,19 @@ final class ATHLTHGoalProgressPolicyTests: XCTestCase {
         )
     }
 
+    func testAchievementRetainsProgressAfterMeasurementChangesAndArchive() {
+        var goal = weightGoal()
+        goal.status = .completed
+        goal.completedAt = Date()
+        XCTAssertTrue(goal.isAchievement)
+        XCTAssertEqual(ATHLTHGoalProgressPolicy.progress(for: goal, profile: ATHLTHTrainingProfile(), latestBodyWeightKilograms: 80), 1)
+        goal.status = .abandoned
+        XCTAssertTrue(goal.isAchievement)
+        XCTAssertEqual(goal.progress, 1)
+        goal.completedAt = nil
+        XCTAssertFalse(goal.isAchievement)
+    }
+
     func testNewGoalsDefaultToPrivate() {
         XCTAssertEqual(weightGoal().privacy, .privateOnly)
     }
