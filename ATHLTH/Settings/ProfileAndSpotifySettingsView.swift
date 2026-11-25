@@ -3626,6 +3626,7 @@ struct ATHLTHAccountSecurityView: View {
     @EnvironmentObject private var messaging: MessagingStore
 
     @State private var showingSignOutConfirmation = false
+    @State private var showingGlobalSignOutConfirmation = false
     @State private var signOutInProgress = false
     @State private var sendingReset = false
     @State private var statusMessage: String?
@@ -3719,6 +3720,27 @@ struct ATHLTHAccountSecurityView: View {
                                     .padding(.bottom, 14)
                             }
                         }
+                    }
+                }
+
+                accountSection(tr("Sessions", "Innlogginger")) {
+                    PremiumSettingsCard {
+                        NavigationLink {
+                            ATHLTHAccountSessionsView()
+                        } label: {
+                            accountLinkRow(icon: "iphone.and.arrow.forward",
+                                           title: tr("Signed-in devices", "Innloggede enheter"),
+                                           subtitle: tr("Manage access and login history", "Administrer tilgang og innloggingshistorikk"))
+                        }
+                        .buttonStyle(.plain)
+                        SettingsDivider()
+                        Button { showingGlobalSignOutConfirmation = true } label: {
+                            accountLinkRow(icon: "rectangle.portrait.and.arrow.right",
+                                           title: tr("Sign out on all devices", "Logg ut av alle enheter"),
+                                           subtitle: tr("End all account sessions, including this device", "Avslutt alle innlogginger, også på denne enheten"))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(signOutInProgress || sendingReset)
                     }
                 }
 
@@ -3821,6 +3843,18 @@ struct ATHLTHAccountSecurityView: View {
                 Task { await signOut() }
             }
             Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        }
+        .confirmationDialog(
+            tr("Sign out on all devices?", "Logge ut av alle enheter?"),
+            isPresented: $showingGlobalSignOutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Sign out everywhere", "Logg ut overalt"), role: .destructive) {
+                Task { await signOut(allDevices: true) }
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(tr("All sessions will be revoked. Other devices may retain access until their current token expires.", "Alle innlogginger tilbakekalles. Andre enheter kan ha tilgang frem til gjeldende token utløper."))
         }
         .alert(
             statusIsError ? "ATHLTH" : tr("Check Your Email", "Sjekk e-posten din"),
@@ -3931,14 +3965,14 @@ struct ATHLTHAccountSecurityView: View {
         }
     }
 
-    private func signOut() async {
+    private func signOut(allDevices: Bool = false) async {
         guard !signOutInProgress, !sendingReset else { return }
         signOutInProgress = true
         statusMessage = nil
         defer { signOutInProgress = false }
 
         do {
-            try await accountService.signOut()
+            try await accountService.signOut(allDevices: allDevices)
             messaging.reset()
             session.clearAfterSignOut()
         } catch {
