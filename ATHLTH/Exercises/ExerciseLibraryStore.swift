@@ -209,6 +209,7 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     private var accountID: UUID?
+    private(set) var catalogRevision = 0
     private var cachedAllExercises: [ExerciseLibraryEntry]?
     private var cachedSelectableExercises: [ExerciseLibraryEntry]?
     private var cachedBodyParts: [String]?
@@ -752,6 +753,7 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     private func invalidateDerivedCaches() {
+        catalogRevision &+= 1
         cachedAllExercises = nil
         cachedSelectableExercises = nil
         cachedBodyParts = nil

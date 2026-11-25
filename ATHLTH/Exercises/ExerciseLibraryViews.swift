@@ -1,4 +1,5 @@
 import AVKit
+import Combine
 import PhotosUI
 import Supabase
 import SwiftUI
@@ -107,6 +108,122 @@ enum ATHLTHEquipmentScanVisibilityPolicy {
     }
 }
 
+// Capture the equipment labels once per presentation, rather than
+// rebuilding a native Menu while the athlete is scrolling it.
+struct ATHLTHEquipmentFilterOption: Identifiable, Equatable {
+    let id: String
+    let title: String
+
+    static func make(values: [String], title: (String) -> String) -> [Self] {
+        Set(values).filter { $0 != "All" }.map {
+            Self(id: $0, title: title($0))
+        }.sorted { lhs, rhs in
+            let order = lhs.title.localizedStandardCompare(rhs.title)
+            return order == .orderedSame ? lhs.id < rhs.id : order == .orderedAscending
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        query.isEmpty || title.localizedStandardContains(query) ||
+            id.localizedStandardContains(query)
+    }
+}
+
+private struct ATHLTHEquipmentFilterPresentation: Identifiable {
+    let id = UUID()
+    let options: [ATHLTHEquipmentFilterOption]
+}
+
+private struct ATHLTHEquipmentFilterSheet: View {
+    let options: [ATHLTHEquipmentFilterOption]
+    let selected: String
+    let onSelect: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    var body: some View {
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        NavigationStack {
+            List {
+                if clean.isEmpty {
+                    row(id: "All", title: ATHLTHLocalization.choose(
+                        english: "All equipment", norwegian: "Alt utstyr"))
+                }
+                ForEach(clean.isEmpty ? options : options.filter { $0.matches(clean) }) { option in
+                    row(id: option.id, title: option.title)
+                }
+            }
+            .listStyle(.plain)
+            .scrollDismissesKeyboard(.interactively)
+            .searchable(text: $query, prompt: Text(ATHLTHLocalization.choose(
+                english: "Search equipment", norwegian: "Søk etter utstyr")))
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Equipment", norwegian: "Utstyr"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
+                        dismiss()
+                    }
+                }
+            }
+            .accessibilityIdentifier("exercise-equipment-filter-list")
+        }
+        .tint(ATHLTHTheme.accentDeep)
+    }
+
+    private func row(id: String, title: String) -> some View {
+        Button {
+            onSelect(id)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                Text(title)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if selected == id {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected == id ? [.isSelected] : [])
+    }
+}
+
+// Non-publishing memo: unrelated redraws must not scan the whole catalog.
+@MainActor
+private final class ATHLTHExercisePickerResultsCache {
+    struct Key: Equatable {
+        let filter: String
+        let account: UUID
+        let catalogRevision: Int
+        let translationRevision: Int
+        let norwegian: Bool
+        let favoriteIDs: Set<String>
+    }
+    private var key: Key?
+    private var entries: [ExerciseLibraryEntry] = []
+    private var targets: [String: UUID] = [:]
+
+    func resolve(
+        _ key: Key, entries makeEntries: () -> [ExerciseLibraryEntry],
+        targets makeTargets: ([ExerciseLibraryEntry]) -> [String: UUID]
+    ) -> ([ExerciseLibraryEntry], [String: UUID]) {
+        if self.key != key {
+            entries = makeEntries()
+            targets = makeTargets(entries)
+            self.key = key
+        }
+        return (entries, targets)
+    }
+}
+
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -128,6 +245,8 @@ struct ExerciseLibraryView: View {
     @State private var queryInput = ""
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
+    @State private var equipmentFilterPresentation: ATHLTHEquipmentFilterPresentation?
+    @State private var resultsCache = ATHLTHExercisePickerResultsCache()
     @State private var favoritesOnly = false
     @State private var standaloneFavorites = false
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
@@ -159,9 +278,8 @@ struct ExerciseLibraryView: View {
             [StrengthWorkoutLog].self, name: "strengthHistory",
             userID: session.profile.userID
         ) ?? []
-        strengthHistoryIndex = ATHLTHLibraryWorkoutHistory.strengthExerciseIndex(
-            workouts: history
-        )
+        let index = ATHLTHLibraryWorkoutHistory.strengthExerciseIndex(workouts: history)
+        if strengthHistoryIndex != index { strengthHistoryIndex = index }
     }
 
     init(
@@ -322,8 +440,26 @@ struct ExerciseLibraryView: View {
         // Reuse one filtered/sorted list for empty state, rows and alphabet targets.
         // Marketplace has its own remote catalog. Do not filter/sort the
         // entire on-device exercise library while that tab is selected.
-        let entries = selectedSection == .marketplace ||
-            (onSelect == nil && standaloneFavorites) ? [] : displayedResults
+        let presentation: ([ExerciseLibraryEntry], [String: UUID])
+        if selectedSection == .marketplace || (onSelect == nil && standaloneFavorites) {
+            presentation = ([], [:])
+        } else if scannerResultsActive {
+            let scanned = displayedResults
+            presentation = (scanned, library.alphabetIndexTargets(for: scanned))
+        } else {
+            let favoriteIDs: Set<String> = favoritesOnly ? Set(favorites.favorites.lazy
+                .filter { $0.itemType == .exercise }.map(\.itemID)) : []
+            presentation = resultsCache.resolve(
+                .init(filter: pageFilterKey, account: session.profile.userID,
+                      catalogRevision: library.catalogRevision,
+                      translationRevision: norwegianTranslations.revision,
+                      norwegian: ATHLTHLocalization.isNorwegian,
+                      favoriteIDs: favoriteIDs),
+                entries: { results },
+                targets: { library.alphabetIndexTargets(for: $0) }
+            )
+        }
+        let (entries, alphabetTargets) = presentation
         return VStack(spacing: 0) {
             if onSelect == nil {
                 HStack(spacing: 10) {
@@ -788,7 +924,7 @@ struct ExerciseLibraryView: View {
                             ATHLTHExerciseAlphabetIndex(
                                 // Targets must cover ALL matching exercises, not
                                 // only the 50 rows currently mounted in the grid.
-                                targets: library.alphabetIndexTargets(for: entries),
+                                targets: alphabetTargets,
                                 onJump: { id in
                                     guard let index =
                                         ATHLTHExerciseAlphabetPage.startIndex(
@@ -842,6 +978,14 @@ struct ExerciseLibraryView: View {
             })
                 .environmentObject(library)
                 .environmentObject(session)
+        }
+        .sheet(item: $equipmentFilterPresentation) { presentation in
+            ATHLTHEquipmentFilterSheet(
+                options: presentation.options, selected: selectedEquipment,
+                onSelect: { selectedEquipment = $0 }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingEquipmentSubscription) {
             SubscriptionOfferView {
@@ -899,6 +1043,9 @@ struct ExerciseLibraryView: View {
             libraryViewWidth = width
         }
         .onChange(of: session.profile.userID) { _, userID in
+            strengthHistoryIndex = .empty
+            equipmentFilterPresentation = nil
+            refreshExerciseHistory()
             displayMode = .load(userID: userID)
             preferredColumns = ATHLTHLibraryColumnPreference.load(userID: userID)
         }
@@ -910,7 +1057,11 @@ struct ExerciseLibraryView: View {
                 count, userID: session.profile.userID
             )
         }
-        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)
+            .compactMap { $0.object as? UUID }
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+        ) { owner in
+            guard owner == session.profile.userID else { return }
             refreshExerciseHistory()
         }
         // Debounce typing so long catalog scans do not run for each key.
@@ -1335,26 +1486,13 @@ struct ExerciseLibraryView: View {
                     .buttonStyle(.plain)
                     }
 
-                    Menu {
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english: "All",
-                                norwegian: "Alle"
+                    Button {
+                        equipmentFilterPresentation = ATHLTHEquipmentFilterPresentation(
+                            options: ATHLTHEquipmentFilterOption.make(
+                                values: library.equipmentOptions,
+                                title: library.localizedEquipmentTitle
                             )
-                        ) { selectedEquipment = "All" }
-                        ForEach(
-                            library.equipmentOptions.sorted {
-                                library.localizedEquipmentTitle($0)
-                                    .localizedStandardCompare(
-                                        library.localizedEquipmentTitle($1)
-                                    ) == .orderedAscending
-                            },
-                            id: \.self
-                        ) { equipment in
-                            Button(library.localizedEquipmentTitle(equipment)) {
-                                selectedEquipment = equipment
-                            }
-                        }
+                        )
                     } label: {
                         filterChip(
                             selectedEquipment == "All"
@@ -1366,6 +1504,8 @@ struct ExerciseLibraryView: View {
                             active: selectedEquipment != "All"
                         )
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("exercise-equipment-filter")
 
                     if selectedBodyPart != "All" || selectedEquipment != "All" ||
                        favoritesOnly {

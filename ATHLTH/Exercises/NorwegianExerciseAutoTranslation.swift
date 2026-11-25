@@ -86,6 +86,15 @@ final class NorwegianExerciseAutoTranslation: ObservableObject {
             return seen.insert(text).inserted
         }
 
+        // One revision and disk write per translation request, not per batch.
+        var completedUpdates: [String: String] = [:]
+        defer {
+            if !completedUpdates.isEmpty {
+                translatedValues.merge(completedUpdates) { _, new in new }
+                revision &+= 1
+                persist()
+            }
+        }
         for start in stride(from: 0, to: missing.count, by: max(1, batchSize)) {
             if Task.isCancelled { return }
             let end = min(start + max(1, batchSize), missing.count)
@@ -118,9 +127,8 @@ final class NorwegianExerciseAutoTranslation: ObservableObject {
                 return
             }
             if !updates.isEmpty {
-                translatedValues.merge(updates) { _, new in new }
-                revision &+= 1
-                persist()
+                completedUpdates.merge(updates) { _, new in new }
+                await Task.yield()
             }
         }
     }

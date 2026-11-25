@@ -21,6 +21,27 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
         )
     }
 
+    func testEquipmentFilterUsesStableOriginalIDsAndLocalizedOrder() {
+        let options = ATHLTHEquipmentFilterOption.make(
+            values: ["Barbell", "Bodyweight", "Barbell", "All", "Cable"],
+            title: { ["Barbell": "Stang", "Bodyweight": "Kroppsvekt",
+                      "Cable": "Kabel"][$0] ?? $0 }
+        )
+        XCTAssertEqual(options.map(\.id), ["Cable", "Bodyweight", "Barbell"])
+        XCTAssertEqual(options.map(\.title), ["Kabel", "Kroppsvekt", "Stang"])
+        XCTAssertTrue(options[2].matches("stang"))
+        XCTAssertTrue(options[2].matches("barbell"))
+        XCTAssertFalse(options[2].matches("kabel"))
+        XCTAssertTrue(options.allSatisfy { $0.matches("") })
+    }
+
+    func testEquipmentFilterRetainsDistinctIDsWithSameDisplayTitle() {
+        let options = ATHLTHEquipmentFilterOption.make(
+            values: ["Machine A", "Machine B"], title: { _ in "Maskin" }
+        )
+        XCTAssertEqual(options.map(\.id), ["Machine A", "Machine B"])
+    }
+
     func testNorwegianAlphabetIncludesAllTwentyNineLetters() {
         XCTAssertEqual(ATHLTHExerciseAlphabet.letters.count, 29)
         XCTAssertEqual(Array(ATHLTHExerciseAlphabet.letters.suffix(3)), ["Æ", "Ø", "Å"])

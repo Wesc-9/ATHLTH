@@ -91,7 +91,7 @@ enum ATHLTHLibraryWorkoutHistory {
     /// Precomputed once per history revision for library scrolling. Matching
     /// preserves the existing identity-first rules: personal exercises never
     /// inherit a different exercise's result from its name alone.
-    struct StrengthExerciseIndex {
+    struct StrengthExerciseIndex: Equatable {
         let byID: [UUID: Summary]
         let byName: [String: Summary]
 
