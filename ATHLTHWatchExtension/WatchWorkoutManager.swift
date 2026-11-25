@@ -1182,6 +1182,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     /// A direct Watch tap should be spoken on the Watch, even when the
     /// paired iPhone normally owns automatic commentary.
+    /// Run the actual configured coach voice pipeline while idle, never
+    /// start a recording, change coach preferences or overwrite replay text.
+    func runIdleAudioCoachDiagnostic() -> Bool {
+        guard state == .idle, !isActive, audioCoachConfiguration.enabled,
+              !coachSpeechPaused, !speechSynthesizer.isSpeaking,
+              audioCoachActivationTask == nil else { return false }
+        let event = ATHLTHCoachEvent(kind: .manualStatus, key: "diagnostic:" + UUID().uuidString,
+                                     priority: .routineCoach, validFor: 12)
+        speak(coachPhrase(english: "ATHLTH. Audio Coach test.", norwegian: "ATHLTH. Test av Audio Coach."),
+              priority: .routineCoach, event: event, forceLocal: true,
+              rememberForReplay: false, deadline: event.expiresAt)
+        return audioCoachActivationTask != nil
+    }
+
     func announceCoachStatusNow() {
         guard audioCoachConfiguration.enabled,
               !coachSpeechPaused,

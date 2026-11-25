@@ -7,6 +7,7 @@ using Toybox.Graphics as Gfx;
 using Toybox.Lang as Lang;
 using Toybox.Timer as Timer;
 using Toybox.Time as Time;
+using Toybox.System as System;
 
 class ATHLTHGarminApp extends App.AppBase {
     var controller;
@@ -469,6 +470,14 @@ class ATHLTHGarminController {
         sequence += 1;
         var data = {"v" => wireVersion, "kind" => "event", "id" => requestID,
                     "seq" => sequence, "state" => state};
+        // Report non-unique device metadata, never serial number or account identity.
+        if (state == "ready") {
+            var settings = System.getDeviceSettings();
+            if (settings has :firmwareVersion) {
+                data["firmwareVersion"] = Lang.format("$1$.$2$", settings.firmwareVersion);
+            }
+            if (settings has :partNumber) { data["partNumber"] = settings.partNumber; }
+        }
         if (coach != null) { data["coachStatus"] = coach.status; }
         if (recipe != null) {
             data["stepIndex"] = stepIndex;

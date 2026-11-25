@@ -24,6 +24,20 @@ final class ATHLTHGarminLiveProtocolTests: XCTestCase {
         XCTAssertFalse(handshake.receive(try event(5, "recording"), from: device))
     }
 
+    func testOptionalDeviceMetadataDoesNotConfirmRecording() throws {
+        let request = ATHLTHGarminLiveRequest(sport: .running)
+        let device = UUID()
+        var handshake = ATHLTHGarminLiveHandshake(request: request, deviceID: device)
+        let ready = try XCTUnwrap(ATHLTHGarminLiveEvent(message: [
+            "v": 1, "kind": "event", "id": request.id.uuidString,
+            "seq": 1, "state": "ready", "firmwareVersion": "27.1", "partNumber": "test-part"
+        ]))
+        XCTAssertEqual(ready.firmwareVersion, "27.1")
+        XCTAssertEqual(ready.partNumber, "test-part")
+        XCTAssertTrue(handshake.receive(ready, from: device))
+        XCTAssertFalse(handshake.confirmedRecording)
+    }
+
     func testInvalidPayloadAndMissingMeasurements() throws {
         XCTAssertNil(ATHLTHGarminLiveEvent(message: ["v": 2]))
         let request = ATHLTHGarminLiveRequest(sport: .strength)

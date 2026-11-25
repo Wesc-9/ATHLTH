@@ -287,6 +287,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 diagnosticSpeech.speak(utterance)
             }
             return true
+        case .coachPipeline:
+            guard !diagnosticSpeech.isSpeaking else { return false }
+            return WatchWorkoutManager.shared.runIdleAudioCoachDiagnostic()
         case .workoutPackage:
             // Decode and validate only. Never stage or launch a test workout.
             guard let data,

@@ -90,6 +90,8 @@ struct AppleWatchConnectionView: View {
                         SettingsDivider()
                         diagnosticButton(.speech, "speaker.wave.2", tr("Test speech output", "Test tale"))
                         SettingsDivider()
+                        diagnosticButton(.coachPipeline, "waveform", tr("Test Audio Coach with configured voice", "Test Audio Coach med valgt stemme"))
+                        SettingsDivider()
                         diagnosticButton(.workoutPackage, "figure.run", tr("Test workout package", "Test øktpakke"))
                         if let message = watchConnection.diagnosticMessage {
                             Text(message).font(.caption).foregroundStyle(ATHLTHTheme.mutedText)

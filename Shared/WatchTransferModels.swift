@@ -2887,6 +2887,6 @@ enum ATHLTHWatchDiagnosticTransport {
     static let action = "diagnosticAction"
     static let result = "diagnosticResult"
     enum Action: String, CaseIterable, Sendable {
-        case haptic, speech, workoutPackage
+        case haptic, speech, workoutPackage, coachPipeline
     }
 }

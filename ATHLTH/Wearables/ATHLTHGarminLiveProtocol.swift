@@ -62,6 +62,8 @@ struct ATHLTHGarminLiveEvent: Equatable {
     let completedSets: Int?
     let resting: Bool?
     let coachStatus: String?
+    let firmwareVersion: String?
+    let partNumber: String?
 
     init?(message: [String: Any]) {
         guard let version = message["v"] as? Int, [1, 2, 3, 4].contains(version),
@@ -89,6 +91,15 @@ struct ATHLTHGarminLiveEvent: Equatable {
         completedSets = (message["completedSets"] as? Int).flatMap { (0...32).contains($0) ? $0 : nil }
         resting = message["resting"] as? Bool
         coachStatus = message["coachStatus"] as? String
+        func boundedMetadata(_ key: String) -> String? {
+            guard let value = message[key] as? String,
+                  !value.isEmpty, value.count <= 64,
+                  value.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) })
+            else { return nil }
+            return value
+        }
+        firmwareVersion = boundedMetadata("firmwareVersion")
+        partNumber = boundedMetadata("partNumber")
     }
 }
 

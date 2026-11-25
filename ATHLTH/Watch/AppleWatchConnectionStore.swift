@@ -1605,7 +1605,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 store?.diagnosticMessage = ok
                     ? (action == .workoutPackage
                        ? "Klokken bekreftet mottak og dekoding av testpakken."
-                       : "Klokken bekreftet testkommandoen. Bekreft selv at lyd eller vibrasjon ble registrert.")
+                       : action == .coachPipeline
+                           ? "Audio Coach godtok testen. Bekreft at du hører valgt stemme på klokken."
+                           : "Klokken bekreftet testkommandoen. Bekreft selv at lyd eller vibrasjon ble registrert.")
                     : "Testen ble ikke bekreftet. Kontroller at klokken er oppdatert og ikke i en økt."
             }
         }
