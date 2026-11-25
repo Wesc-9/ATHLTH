@@ -2014,7 +2014,8 @@ struct ATHLTHHomeView: View {
     private func refreshHomeGroupCalendar()
         async {
         await groups.refresh()
-        await groups.refreshCalendarContent()
+        guard !Task.isCancelled else { return }
+        await groups.refreshHomeCalendar(in: homeWeekInterval)
     }
 
     @MainActor
@@ -3650,10 +3651,11 @@ struct ATHLTHHomeView: View {
 
     private var homeUserGroupEvents:
         [CommunityGroupEventRecord] {
+        let snapshot = groups.homeCalendarContent(in: homeWeekInterval)
         let acceptedEventIDs =
             Set(
-                groups
-                    .calendarEventRSVPs
+                snapshot
+                    .responses
                     .filter {
                         $0.status == "going" ||
                         $0.status == "maybe"
@@ -3661,7 +3663,7 @@ struct ATHLTHHomeView: View {
                     .map(\.eventID)
             )
 
-        return groups.calendarEvents
+        return snapshot.events
             .filter { event in
                 event.status != "cancelled" &&
                 event.status != "draft" &&
