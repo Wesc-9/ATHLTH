@@ -131,7 +131,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
         }
     }
 
-    func sync(session: AppSessionStore, strength: StrengthWorkoutStore) async {
+    func sync(session: AppSessionStore, strength: StrengthWorkoutStore, force: Bool = false) async {
         guard session.signedIn, !session.previewModeEnabled,
               let owner = accountID,
               session.profile.userID == owner,
@@ -139,7 +139,7 @@ final class ATHLTHStrengthAccountSyncStore: ObservableObject {
               !isBusy, !Self.syncingAccounts.contains(owner) else { return }
         // Periodic foreground checks are cheap when nothing changed. Local
         // completed workouts bypass this delay and publish promptly.
-        if let lastSuccessfulSync,
+        if !force, let lastSuccessfulSync,
            Date().timeIntervalSince(lastSuccessfulSync) < 60,
            lastSyncedLocalCount == strength.workoutHistory.count {
             return
