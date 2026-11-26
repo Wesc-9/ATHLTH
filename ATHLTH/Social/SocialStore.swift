@@ -3791,6 +3791,8 @@ final class SocialStore: ObservableObject {
         workout: SocialPublishableWorkout,
         includeHealthData: Bool
     ) {
+        if workout.isSports { metadata["activity_subtype"] = "sports" }
+        if let title = workout.reviewTitleOverride { metadata["custom_workout_title"] = title }
         metadata["duration_seconds"] =
             String(
                 max(

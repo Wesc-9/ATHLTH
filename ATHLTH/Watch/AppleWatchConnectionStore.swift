@@ -648,7 +648,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         _ kind: WatchWorkoutKind,
         indoor: Bool? = nil,
         outdoorHybrid: Bool = false,
-        relayRequestID: UUID? = nil
+        relayRequestID: UUID? = nil,
+        isSports: Bool = false
     ) async throws {
         guard isReady else {
             throw AppleWatchWorkoutLaunchError.watchUnavailable
@@ -702,7 +703,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         case .yoga:
             configuration.activityType = .yoga
         case .other:
-            configuration.activityType = .other
+            // Open game/practice identity survives the HealthKit save and import.
+            configuration.activityType = isSports ? .play : .other
         }
 
         configuration.locationType =

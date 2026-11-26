@@ -681,9 +681,11 @@ struct WorkoutSummary: Identifiable, Hashable {
     let distanceMeters: Double?
     let activeEnergyKilocalories: Double?
     let isIndoor: Bool?
+    var isSports: Bool = false
 
     init(workout: HKWorkout) {
         id = workout.uuid
+        isSports = workout.workoutActivityType == .play
         activity = WorkoutActivity(healthKitType: workout.workoutActivityType)
         startDate = workout.startDate
         endDate = workout.endDate

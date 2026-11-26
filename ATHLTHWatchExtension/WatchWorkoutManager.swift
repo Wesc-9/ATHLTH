@@ -9058,6 +9058,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         result.accountOwnerID = workoutOwnerID
+        result.isSports = workout.workoutActivityType == .play ? true : nil
         result.universalWorkoutID = universalWorkoutID
         // Do not publish an identity on a prepared/failed activity. This
         // result exists only after HealthKit finishWorkout() succeeded.

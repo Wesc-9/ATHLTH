@@ -2122,6 +2122,7 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     /// Stable ATHLTH ID for the original Watch recording; separate from
     /// HealthKit UUID and queued result receipt. Nil in legacy results.
     var universalWorkoutID: UUID? = nil
+    var isSports: Bool? = nil
 }
 
 /// The same saved HKWorkout may be delivered with different transfer

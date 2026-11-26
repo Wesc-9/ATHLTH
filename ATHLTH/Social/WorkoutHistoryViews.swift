@@ -313,11 +313,12 @@ struct WorkoutHistoryView: View {
 }
 
 struct WorkoutHistoryRow: View {
+    @EnvironmentObject private var session: AppSessionStore
     let workout: SocialPublishableWorkout
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: workout.activity.icon)
+            Image(systemName: workout.presentationIcon)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(ATHLTHTheme.accent)
                 .frame(width: 42, height: 42)
@@ -327,7 +328,7 @@ struct WorkoutHistoryRow: View {
                 )
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(workout.title)
+                Text(ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) ?? workout.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
 
@@ -777,13 +778,13 @@ struct WorkoutHistoryDetailView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Label(
-                    workout.activity.rawValue.uppercased(),
-                    systemImage: workout.activity.icon
+                    (workout.isSports ? workout.sportsActivityTitle : workout.activity.rawValue).uppercased(),
+                    systemImage: workout.presentationIcon
                 )
                 .font(.caption2.bold())
                 .tracking(1.2)
 
-                Text(workout.title)
+                Text(ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) ?? workout.title)
                     .font(.largeTitle.bold())
 
                 if let venue = workout.plannedTrainingPlaceName {
@@ -1097,6 +1098,10 @@ struct PostWorkoutReviewView: View {
 
     @State private var visibility: ProfileVisibility = .privateOnly
     @State private var descriptionText = ""
+    @State private var reviewName: String? = nil
+    @State private var nameDraft = ""
+    @State private var editingReviewName = false
+    @State private var sportsZoneSeconds: [Double] = []
     @State private var effort = 5.0
     @State private var showingFeedPrivacyConfirmation = false
     @State private var feedPrivacyError: String?
@@ -1133,6 +1138,7 @@ struct PostWorkoutReviewView: View {
                     }
                     if workout.activity != .strength {
                         resultStrip
+                        if workout.isSports && !sportsZoneSeconds.isEmpty { sportsZonesCard }
                         if workout.activity == .running || workout.activity == .walking {
                             kilometerSplitsDisclosure
                         }
@@ -1389,6 +1395,13 @@ struct PostWorkoutReviewView: View {
                 saveBar
             }
             .interactiveDismissDisabled(requiresDecision)
+            .alert(ATHLTHLocalization.choose(english: "Workout name", norwegian: "Navn på økten"), isPresented: $editingReviewName) {
+                TextField(ATHLTHLocalization.choose(english: "Workout name", norwegian: "Øktnavn"), text: $nameDraft)
+                Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                    reviewName = ATHLTHCompletedWorkoutNames.clean(nameDraft) ?? completionWorkoutTitle
+                }
+                Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
+            }
             .confirmationDialog(
                 ATHLTHLocalization.choose(
                     english: "Allow friends to see your shared workouts?",
@@ -1680,7 +1693,9 @@ struct PostWorkoutReviewView: View {
                 workout: workout,
                 log: completedStrengthLog,
                 personalRecords: strengthReviewPersonalRecords,
-                muscleProfile: completionMuscleProfile
+                muscleProfile: completionMuscleProfile,
+                reviewTitle: reviewName ?? completionWorkoutTitle,
+                editTitle: openReviewNameEditor
             )
         } else {
             nonStrengthSummaryCard
@@ -1727,7 +1742,7 @@ struct PostWorkoutReviewView: View {
                             : workout.source.uppercased(),
                         systemImage: workout.isIndoor == true &&
                             workout.activity == .running
-                            ? "figure.run.treadmill" : workout.activity.icon
+                            ? "figure.run.treadmill" : workout.presentationIcon
                     )
                     .font(.system(size: 9, weight: .bold))
                     .tracking(1.0)
@@ -1738,10 +1753,15 @@ struct PostWorkoutReviewView: View {
 
                 Spacer()
 
-                Text(heroHeadline)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
+                Button(action: openReviewNameEditor) {
+                    HStack(alignment: .firstTextBaseline, spacing: 9) {
+                        Text(reviewName ?? heroHeadline)
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .lineLimit(2).minimumScaleFactor(0.72)
+                        Image(systemName: "pencil").font(.subheadline.weight(.semibold))
+                    }
+                }.buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(english: "Edit workout name", norwegian: "Rediger øktnavn"))
 
                 Text(heroSubtitle)
                     .font(.system(size: 20, weight: .medium, design: .rounded))
@@ -1816,7 +1836,13 @@ struct PostWorkoutReviewView: View {
         return completionActivityTitle
     }
 
+    private func openReviewNameEditor() {
+        nameDraft = reviewName ?? completionWorkoutTitle
+        editingReviewName = true
+    }
+
     private var completionActivityTitle: String {
+        if workout.isSports { return workout.sportsActivityTitle }
         switch workout.activity {
         case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
         case .walking: return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåtur")
@@ -1835,7 +1861,9 @@ struct PostWorkoutReviewView: View {
     }
 
     private var completionWorkoutTitle: String {
+        if workout.isSports { return ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") }
         let original = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if original.isEmpty || original == "Økt completed" { return completionActivityTitle }
         let genericEnglish = [
             workout.activity.rawValue,
             "\(workout.activity.rawValue) completed",
@@ -2125,10 +2153,59 @@ struct PostWorkoutReviewView: View {
 
     @ViewBuilder
     private var resultStrip: some View {
-        if workout.activity == .running || workout.activity == .walking {
+        if workout.isSports {
+            sportsResultsGrid
+        } else if workout.activity == .running || workout.activity == .walking {
             enduranceResultsGrid
         } else {
             compactResultStrip
+        }
+    }
+
+    private var sportsResultsGrid: some View {
+        let distance = workout.distanceMeters ?? replayContext?.distanceMeters
+        let average = replayContext?.averageHeartRateBPM ?? workout.recordedAverageHeartRate
+        let maximum = replayContext?.maxHeartRateBPM ?? workout.recordedMaximumHeartRate
+        var metrics: [(String, String, String)] = [(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), durationText(workout.duration), "timer")]
+        if let distance, distance.isFinite, distance > 0 {
+            metrics.append((ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"), String(format: "%.2f km", distance / 1000), "location.fill"))
+            if workout.duration > 0 { metrics.append((ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Snittfart"), String(format: "%.1f km/t", distance / workout.duration * 3.6), "speedometer")) }
+        }
+        if calorieText != "—" { metrics.append((ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"), calorieText, "flame.fill")) }
+        if bpmText(average) != "—" { metrics.append((ATHLTHLocalization.choose(english: "Avg HR", norwegian: "Snittpuls"), bpmText(average), "heart.fill")) }
+        if bpmText(maximum) != "—" { metrics.append((ATHLTHLocalization.choose(english: "Max HR", norwegian: "Makspuls"), bpmText(maximum), "heart.text.square.fill")) }
+        if let elevation = replayContext?.elevationGainMeters, elevation.isFinite, elevation > 0 { metrics.append((ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter"), String(format: "+%.0f m", elevation), "mountain.2.fill")) }
+        return ATHLTHUnifiedCard {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 17) {
+                ForEach(metrics.indices, id: \.self) { index in
+                    completionStat(metrics[index].0, value: metrics[index].1, icon: metrics[index].2, tint: completionAccent)
+                }
+            }
+        }
+    }
+
+    private var sportsZonesCard: some View {
+        let total = sportsZoneSeconds.reduce(0, +)
+        let colors: [Color] = [.gray, .brown.opacity(0.55), .brown, .orange, .red]
+        return ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(ATHLTHLocalization.choose(english: "Heart rate zones", norwegian: "Pulssoner")).font(.headline)
+                Text(ATHLTHLocalization.choose(english: "High intensity (Z4–Z5)", norwegian: "Høy intensitet (Z4–Z5)") + " · " + durationText(sportsZoneSeconds[3] + sportsZoneSeconds[4])).font(.subheadline.weight(.semibold))
+                ForEach(0..<5, id: \.self) { index in
+                    HStack(spacing: 8) {
+                        Text("Z\(index + 1)").font(.caption.weight(.bold)).frame(width: 26, alignment: .leading)
+                        GeometryReader { proxy in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.gray.opacity(0.12))
+                                Capsule().fill(colors[index]).frame(width: proxy.size.width * CGFloat(total > 0 ? sportsZoneSeconds[index] / total : 0))
+                            }
+                        }.frame(height: 7)
+                        Text(durationText(sportsZoneSeconds[index])).font(.caption.monospacedDigit()).frame(width: 56, alignment: .trailing)
+                        Text(String(format: "%.0f %%", total > 0 ? sportsZoneSeconds[index] / total * 100 : 0)).font(.caption.monospacedDigit()).frame(width: 45, alignment: .trailing)
+                    }
+                }
+                Text(ATHLTHLocalization.choose(english: "Percentages reflect recorded time in zones, not the entire session. Unmeasured gaps are excluded.", norwegian: "Prosentene viser registrert tid i sonene, ikke hele økten. Perioder uten målinger er utelatt.")).font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -4545,7 +4622,7 @@ struct PostWorkoutReviewView: View {
 
     @MainActor
     private func loadCompletionPulse() async {
-        guard workout.activity == .running || workout.activity == .walking
+        guard workout.activity == .running || workout.activity == .walking || workout.isSports
         else {
             completionMeasuredPulse = []
             return
@@ -4553,6 +4630,17 @@ struct PostWorkoutReviewView: View {
         completionMeasuredPulse = await health.runningHeartRateTimeline(
             for: workout.id
         )
+        if workout.isSports {
+            let maximum = session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+            var seconds = Array(repeating: 0.0, count: 5)
+            let points = completionMeasuredPulse.sorted { $0.date < $1.date }
+            for (point, next) in zip(points, points.dropFirst()) {
+                guard let zone = ATHLTHHeartRateZones.measuredZone(heartRateBPM: point.bpm, maximumBPM: maximum) else { continue }
+                let interval = min(max(next.date.timeIntervalSince(point.date), 0), 15)
+                seconds[zone - 1] += interval
+            }
+            sportsZoneSeconds = seconds.reduce(0, +) > 0 ? seconds : []
+        }
     }
 
     private func waitingTimeText(_ seconds: TimeInterval) -> String {
@@ -4584,6 +4672,7 @@ struct PostWorkoutReviewView: View {
     }
 
     private func loadExistingReview() async {
+        if reviewName == nil { reviewName = ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) }
         visibility = initialVisibilityOverride ?? (
             settings.workoutSharingChoiceCompleted
                 ? (settings.defaultActivityVisibility == .privateOnly ? .privateOnly : .friends)
@@ -4605,6 +4694,7 @@ struct PostWorkoutReviewView: View {
 
         if let activity = await social.workoutActivity(for: workout.id) {
             alreadyPublished = true
+            if reviewName == nil, let stored = activity.metadata?["custom_workout_title"] { reviewName = ATHLTHCompletedWorkoutNames.clean(stored) }
 
             if let existingVisibility = ProfileVisibility(rawValue: activity.visibility) {
                 visibility = existingVisibility
@@ -4666,8 +4756,9 @@ struct PostWorkoutReviewView: View {
         let petsSaved = await pets.savePetUsage(
             for: workout, petIDs: selectedPetIDs)
 
+        let reviewWorkout = reviewName.map { workout.renamed($0) } ?? workout
         let reviewSaved = await social.saveWorkoutReview(
-            workout,
+            reviewWorkout,
             visibility: visibility,
             description: descriptionText,
             effort: Int(effort),
@@ -4686,6 +4777,7 @@ struct PostWorkoutReviewView: View {
             petsSaved &&
             reviewSaved &&
             mediaSaved {
+            if let reviewName { ATHLTHCompletedWorkoutNames.save(reviewName, for: workout.id, userID: session.profile.userID) }
             dismiss()
         }
     }

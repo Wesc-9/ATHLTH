@@ -1489,7 +1489,22 @@ enum ATHLTHSharedPulseSeries {
 
 struct SocialPublishableWorkout: Identifiable, Hashable {
     let id: UUID
-    let title: String
+    var title: String
+    var isSports = false
+    var reviewTitleOverride: String? = nil
+    var recordedAverageHeartRate: Double? = nil
+    var recordedMaximumHeartRate: Double? = nil
+
+    var sportsActivityTitle: String { ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") }
+    var presentationIcon: String { isSports ? "sportscourt.fill" : activity.icon }
+
+    func renamed(_ name: String) -> Self {
+        var copy = self
+        copy.title = name
+        copy.reviewTitleOverride = name
+        return copy
+    }
+
     let activity: WorkoutActivity
     let startDate: Date
     let endDate: Date
@@ -1582,7 +1597,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
 
     init(summary: WorkoutSummary) {
         id = summary.id
-        title = summary.activity.rawValue
+        isSports = summary.isSports
+        title = summary.isSports ? ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") : summary.activity.rawValue
         activity = summary.activity
         startDate = summary.startDate
         endDate = summary.endDate
@@ -1828,7 +1844,10 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
 
     init(watchResult: WatchWorkoutResult) {
         id = watchResult.healthKitWorkoutUUID ?? watchResult.id
-        title = "\(watchResult.kind.title) completed"
+        isSports = watchResult.isSports == true
+        title = isSports ? ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") : "\(watchResult.kind.title) completed"
+        recordedAverageHeartRate = watchResult.averageHeartRate
+        recordedMaximumHeartRate = watchResult.maxHeartRate
 
         switch watchResult.kind {
         case .running:
@@ -2037,5 +2056,25 @@ extension SocialPrivacySettings {
         else if profileVisibility == "friends" && trainingFocusVisibility == "public" {
             trainingFocusVisibility = "friends"
         }
+    }
+}
+
+
+/// Review names are scoped to the original workout and account, not the plan.
+enum ATHLTHCompletedWorkoutNames {
+    private static let key = "completedWorkoutReviewNames"
+    static func clean(_ name: String) -> String? {
+        let value = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(100))
+        return value.isEmpty ? nil : value
+    }
+    static func name(for workoutID: UUID, userID: UUID) -> String? {
+        let names = AccountLocalStorage.read([String: String].self, name: key, userID: userID) ?? [:]
+        return names[workoutID.uuidString]
+    }
+    static func save(_ name: String, for workoutID: UUID, userID: UUID) {
+        guard let clean = clean(name) else { return }
+        var names = AccountLocalStorage.read([String: String].self, name: key, userID: userID) ?? [:]
+        names[workoutID.uuidString] = clean
+        try? AccountLocalStorage.writeChecked(names, name: key, userID: userID)
     }
 }

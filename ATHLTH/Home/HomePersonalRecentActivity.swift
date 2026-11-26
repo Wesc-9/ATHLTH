@@ -1573,7 +1573,7 @@ struct HomePersonalRecentActivitySection:
             } details: {
                 VStack(alignment: .leading, spacing: 7) {
                     HomeRecentActivityMetricLine(
-                        title: workout.title,
+                        title: ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) ?? workout.title,
                         activity: workout.activity,
                         distanceMeters: workout.distanceMeters,
                         durationSeconds: workout.duration,
@@ -2657,7 +2657,7 @@ private struct HomeFollowingWorkoutArtwork:
         Group {
             if embeddedInFeedCard {
                 ATHLTHFeedArtworkOverlay(
-                    title: HomeRecentCardFormat.activity(activity), icon: activity.icon, height: height,
+                    title: item.activity.metadata?["activity_subtype"] == "sports" ? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") : HomeRecentCardFormat.activity(activity), icon: item.activity.metadata?["activity_subtype"] == "sports" ? "sportscourt.fill" : activity.icon, height: height,
                     metrics: .init(
                         duration: HomeRecentCardFormat.number(item, key: "duration_seconds"),
                         distanceMeters: HomeRecentCardFormat.number(item, key: "distance_meters"),
@@ -3544,7 +3544,7 @@ private struct HomePersonalHistoryCard:
                                 .accentDeep
                         )
 
-                        Text(workout.title)
+                        Text(ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) ?? workout.title)
                             .font(
                                 .title3.weight(
                                     .bold
@@ -4937,8 +4937,8 @@ private struct HomePersonalWorkoutVisual:
             if (recentActivityStrip || embeddedInFeedCard) &&
                 !(workout.activity == .running && workout.isIndoor == true) {
                 ATHLTHFeedArtworkOverlay(
-                    title: HomeRecentCardFormat.activity(workout.activity),
-                    icon: workout.activity.icon, height: height,
+                    title: workout.isSports ? workout.sportsActivityTitle : HomeRecentCardFormat.activity(workout.activity),
+                    icon: workout.presentationIcon, height: height,
                     metrics: .init(
                         duration: workout.duration, distanceMeters: workout.distanceMeters,
                         exerciseCount: workout.strengthExerciseCount ?? strengthWorkout?.exercises.count,

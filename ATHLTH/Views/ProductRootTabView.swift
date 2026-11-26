@@ -2707,6 +2707,8 @@ struct ATHLTHHomeView: View {
     private func completedWorkoutCalendarTitle(
         _ workout: SocialPublishableWorkout
     ) -> String {
+        if let custom = ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) { return custom }
+        if workout.isSports { return ATHLTHLocalization.choose(english: "Sports session completed", norwegian: "Idrettsøkt fullført") }
         let raw = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !raw.isEmpty && raw.lowercased() != workout.activity.rawValue.lowercased() {
             return raw
@@ -9139,7 +9141,8 @@ struct ATHLTHTrainView: View {
                     configuration.audioCoach
                 )
                 try await watchConnection.startWorkoutOnWatch(
-                    configuration.activity.watchKind
+                    configuration.activity.watchKind,
+                    isSports: configuration.activity == .sports
                 )
                 if !configuration.selectedFriendIDs.isEmpty {
                     _ = await social.confirmCurrentJoinedWorkoutStarted()

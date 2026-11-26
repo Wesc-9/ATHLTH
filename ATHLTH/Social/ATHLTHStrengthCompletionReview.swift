@@ -7,6 +7,8 @@ struct ATHLTHStrengthCompletionReview: View {
     let log: StrengthWorkoutLog?
     let personalRecords: [StrengthWorkoutPersonalRecord]
     let muscleProfile: StrengthMuscleProfile
+    var reviewTitle: String? = nil
+    var editTitle: (() -> Void)? = nil
 
     @State private var expandedExerciseIDs: Set<UUID> = []
 
@@ -189,10 +191,20 @@ struct ATHLTHStrengthCompletionReview: View {
 
                     Spacer(minLength: 60)
 
-                    Text(tr("Strength", "Styrke"))
-                        .font(.system(size: 35, weight: .bold, design: .rounded))
-                        .tracking(-0.8)
-                        .foregroundStyle(ink)
+                    if let editTitle {
+                        Button(action: editTitle) {
+                            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                                Text(reviewTitle ?? tr("Strength", "Styrke"))
+                                    .font(.system(size: 29, weight: .bold, design: .rounded))
+                                    .lineLimit(2).minimumScaleFactor(0.7)
+                                Image(systemName: "pencil").font(.subheadline.weight(.semibold))
+                            }.foregroundStyle(ink)
+                        }.buttonStyle(.plain)
+                    } else {
+                        Text(tr("Strength", "Styrke"))
+                            .font(.system(size: 35, weight: .bold, design: .rounded))
+                            .tracking(-0.8).foregroundStyle(ink)
+                    }
 
                     Text(heroMuscleFocus)
                         .font(.system(size: 15, weight: .medium))
