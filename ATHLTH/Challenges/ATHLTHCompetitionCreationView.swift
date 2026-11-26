@@ -60,6 +60,18 @@ enum ATHLTHSprintGoal: String, CaseIterable, Identifiable {
 /// Pure entry policy. A tournament or duel cannot be published with
 /// nonexistent rivals, duplicated participants or invalid measures.
 enum ATHLTHCompetitionCreationPolicy {
+    static func duelName(owner: String, opponent: String?, branches: [String]) -> String {
+        let opponentName = opponent?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rival = opponentName.flatMap { $0.isEmpty ? nil : $0 } ?? "motstander"
+        let prefix = "Duell "
+        let suffix = branches.isEmpty ? " i valgt gren" : " i " + branches.joined(separator: " og ")
+        let namesBudget = max(2, 80 - prefix.count - suffix.count - 4)
+        let firstBudget = min(owner.count, namesBudget / 2)
+        let secondBudget = max(1, namesBudget - firstBudget)
+        return String((prefix + String(owner.prefix(firstBudget)) + " vs " +
+            String(rival.prefix(secondBudget)) + suffix).prefix(80))
+    }
+
     /// The canonical activity grid never hides unsupported categories.
     /// Do not silently map cycling, mobility or custom to a different sport.
     /// These categories stay visible but cannot create unscorable events.
@@ -174,10 +186,45 @@ enum ATHLTHCompetitionCreationPolicy {
 }
 
 /// Shared step one: format, name, participants. Dates and sports are rules.
+/// A local recovery checkpoint, separate from saved/published competitions.
+struct ATHLTHCompetitionCreationCheckpoint: Codable {
+    let owner: UUID
+    let format: String
+    let leagueStyle: ATHLTHTournamentFormat
+    let customTitle: String
+    let opponents: [UUID]
+    let rules: ATHLTHTournamentDraft?
+    let inRules: Bool
+    let scrollID: String?
+
+    static func key(owner: UUID, entry: String) -> String {
+        "athlth.competition.creation.v1." + owner.uuidString + "." + entry
+    }
+    static func load(owner: UUID, entry: String, defaults: UserDefaults = .standard) -> Self? {
+        guard let data = defaults.data(forKey: key(owner: owner, entry: entry)),
+              let checkpoint = try? JSONDecoder().decode(Self.self, from: data),
+              checkpoint.owner == owner, checkpoint.rules.map({ $0.ownerID == owner }) ?? true
+        else { return nil }
+        return checkpoint
+    }
+    func save(entry: String, defaults: UserDefaults = .standard) {
+        if let data = try? JSONEncoder().encode(self) {
+            defaults.set(data, forKey: Self.key(owner: owner, entry: entry))
+        }
+    }
+    static func clear(owner: UUID, entry: String, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(owner: owner, entry: entry))
+    }
+}
+
 struct ATHLTHCompetitionCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var checkpointOwner: UUID?
+    @State private var restoredRuleScrollID: String?
+    @State private var confirmDiscard = false
 
     // Keep the caller interface for the route and activity shortcuts.
     let initialActivity: ATHLTHQuickStartActivity
@@ -202,9 +249,44 @@ struct ATHLTHCompetitionCreationView: View {
         social.mutualFollows.filter { chosenIDs.contains($0.userID) }
     }
 
+    private var checkpointEntry: String {
+        (initialFormat?.rawValue ?? "any") + "." + (preselectedFriend?.userID.uuidString ?? "none") + "." +
+            String(describing: initialActivity) + "." + String(choosesActivityInRules)
+    }
+    private var suggestedTitle: String {
+        if format == .duel {
+            let branches = ruleDraft?.allowedActivities.map(\.title) ??
+                (choosesActivityInRules ? [] : [ATHLTHCompetitionCreationPolicy.tournamentActivity(initialActivity).title])
+            return ATHLTHCompetitionCreationPolicy.duelName(
+                owner: session.profile.username.isEmpty ? "Du" : session.profile.username,
+                opponent: selectedPeople.first.map { $0.username ?? $0.resolvedName },
+                branches: branches)
+        }
+        return format.title
+    }
+    private var effectiveTitle: String {
+        let clean = competitionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? suggestedTitle : clean
+    }
+
+    private func persistCheckpoint(inRules: Bool? = nil) {
+        guard let owner = checkpointOwner, owner == session.profile.userID,
+              session.signedIn, !finishAfterRules else { return }
+        ATHLTHCompetitionCreationCheckpoint(owner: owner, format: format.rawValue,
+            leagueStyle: leagueStyle, customTitle: competitionTitle,
+            opponents: chosenIDs.sorted { $0.uuidString < $1.uuidString },
+            rules: ruleDraft, inRules: inRules ?? showingRules,
+            scrollID: restoredRuleScrollID).save(entry: checkpointEntry)
+    }
+    private func clearCheckpoint() {
+        if let owner = checkpointOwner {
+            ATHLTHCompetitionCreationCheckpoint.clear(owner: owner, entry: checkpointEntry)
+        }
+    }
+
     private var readyForRules: Bool {
         ATHLTHCompetitionCreationPolicy.canContinueToRules(
-            name: competitionTitle, ownerID: session.profile.userID,
+            name: effectiveTitle, ownerID: session.profile.userID,
             opponents: chosenIDs, format: format) &&
             selectedPeople.count == chosenIDs.count
     }
@@ -217,7 +299,7 @@ struct ATHLTHCompetitionCreationView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
+                LazyVStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
                     ATHLTHTrainPageTitle(title: format.title)
                     Text(format.subtitle).font(ATHLTHTrainDesign.pageSubtitle)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
@@ -229,7 +311,7 @@ struct ATHLTHCompetitionCreationView: View {
                                     format = item
                                     chosenIDs = ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
                                         chosenIDs, format: item, preferred: preselectedFriend?.userID)
-                                    competitionTitle = item.title
+                                    competitionTitle = item == .duel ? "" : item.title
                                     ruleDraft = nil
                                 } label: {
                                     HStack {
@@ -260,11 +342,11 @@ struct ATHLTHCompetitionCreationView: View {
             .navigationTitle("Konkurranse").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Avbryt") { dismiss() }
+                    Button("Avbryt") { confirmDiscard = true }
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button { showingRules = true } label: {
+                Button { showingRules = true; persistCheckpoint(inRules: true) } label: {
                     Label("Fortsett til regler", systemImage: "arrow.right")
                         .font(.headline).foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -277,26 +359,36 @@ struct ATHLTHCompetitionCreationView: View {
             }
         }
         .fullScreenCover(isPresented: $showingRules, onDismiss: {
-            if finishAfterRules { dismiss() }
+            if finishAfterRules { clearCheckpoint(); dismiss() }
+            else { persistCheckpoint(inRules: false) }
         }) {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : format == .league ? leagueStyle : .league,
                 fixedClubID: nil,
                 singleEventMode: format == .single || format == .duel,
                 duelMode: format == .duel,
-                initialTitle: competitionTitle,
+                initialTitle: effectiveTitle,
                 continuation: ruleDraft,
                 fixedInvitees: participants,
                 initialActivity: choosesActivityInRules ? nil :
                     ATHLTHCompetitionCreationPolicy.tournamentActivity(initialActivity),
-                onBack: { ruleDraft = $0 },
-                onPublished: { _ in finishAfterRules = true },
+                onBack: { ruleDraft = $0; persistCheckpoint(inRules: false) },
+                automaticDuelName: format == .duel && competitionTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                restoredScrollID: restoredRuleScrollID,
+                onCheckpoint: { draft, scrollID in
+                    guard !finishAfterRules else { return }
+                    ruleDraft = draft
+                    restoredRuleScrollID = scrollID
+                    persistCheckpoint(inRules: true)
+                },
+                onPublished: { _ in finishAfterRules = true; clearCheckpoint() },
                 onSave: { draft in
                     var saved = ATHLTHTournamentDraftStore.load(session.profile.userID)
                     saved.removeAll { $0.id == draft.id }
                     saved.append(draft)
                     ATHLTHTournamentDraftStore.save(saved, owner: session.profile.userID)
                     finishAfterRules = true
+                    clearCheckpoint()
                 }
             )
         }
@@ -305,10 +397,39 @@ struct ATHLTHCompetitionCreationView: View {
             guard !didInitialize else { return }
             didInitialize = true
             format = initialFormat ?? .duel
-            competitionTitle = format.title
+            competitionTitle = format == .duel ? "" : format.title
+            checkpointOwner = session.signedIn ? session.profile.userID : nil
+            if let owner = checkpointOwner,
+               let saved = ATHLTHCompetitionCreationCheckpoint.load(owner: owner, entry: checkpointEntry),
+               let savedFormat = ATHLTHCompetitionFormat(rawValue: saved.format),
+               initialFormat == nil || initialFormat == savedFormat {
+                format = savedFormat
+                leagueStyle = saved.leagueStyle
+                competitionTitle = saved.customTitle
+                chosenIDs = Set(saved.opponents)
+                ruleDraft = saved.rules
+                restoredRuleScrollID = saved.scrollID
+                showingRules = saved.inRules
+                return
+            }
             if let friend = preselectedFriend, friend.userID != session.profile.userID {
                 chosenIDs = [friend.userID]
             }
+            persistCheckpoint()
+        }
+        .onChange(of: competitionTitle) { _, _ in persistCheckpoint() }
+        .onChange(of: chosenIDs) { _, _ in persistCheckpoint() }
+        .onChange(of: format) { _, _ in persistCheckpoint() }
+        .onChange(of: leagueStyle) { _, _ in persistCheckpoint() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active && !showingRules { persistCheckpoint() }
+        }
+        .onChange(of: session.profile.userID) { _, _ in dismiss() }
+        .onChange(of: session.signedIn) { _, signedIn in if !signedIn { dismiss() } }
+        .confirmationDialog("Avslutte oppsett?", isPresented: $confirmDiscard, titleVisibility: .visible) {
+            Button("Behold utkast og lukk") { persistCheckpoint(inRules: false); dismiss() }
+            Button("Forkast utkast", role: .destructive) { clearCheckpoint(); dismiss() }
+            Button("Fortsett", role: .cancel) {}
         }
     }
 
@@ -327,9 +448,11 @@ struct ATHLTHCompetitionCreationView: View {
             }
             Divider()
             Text("Navn på konkurransen").font(ATHLTHTrainDesign.rowTitle)
-            TextField("Navn", text: $competitionTitle)
+            TextField("", text: $competitionTitle, prompt: Text(suggestedTitle).foregroundStyle(ATHLTHTrainDesign.secondary))
                 .padding(12).background(ATHLTHTrainDesign.canvas, in: RoundedRectangle(cornerRadius: 12))
-                .onChange(of: competitionTitle) { _, _ in ruleDraft = nil }
+                .onChange(of: competitionTitle) { _, value in
+                    if value.count > 80 { competitionTitle = String(value.prefix(80)) }
+                }
             Divider()
             HStack {
                 Text("Deltakere").font(ATHLTHTrainDesign.cardTitle)
