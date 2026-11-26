@@ -1605,6 +1605,7 @@ final class StrengthWorkoutStore: ObservableObject {
         restStartedAt = nil
         restEndsAt = nil
         Self.beginStrengthGroup(&workout, selected: exerciseIndex)
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         currentExerciseIndex = exerciseIndex
         currentSetIndex = setIndex
@@ -1640,6 +1641,16 @@ final class StrengthWorkoutStore: ObservableObject {
         return (exercise, set)
     }
 
+    var nextExecutionLabel: String? {
+        guard let workout = activeWorkout,
+              let entry = pendingExecutionQueue.first,
+              let target = Self.queueTarget(entry, in: workout) else { return nil }
+        let exercise = workout.exercises[target.exercise]
+        let set = exercise.sets[target.set]
+        return exercise.exercise.displayName + " · " +
+            ATHLTHLocalization.choose(english: "Set \(set.setNumber)", norwegian: "Sett \(set.setNumber)")
+    }
+
     var pendingExecutionQueue: [StrengthLiveQueueEntry] {
         guard let workout = activeWorkout else { return [] }
         return (workout.liveExecutionQueue ?? []).filter {
@@ -1669,6 +1680,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
         if next { entries.insert(entry, at: 0) } else { entries.append(entry) }
         workout.liveExecutionQueue = entries
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
         return true
@@ -1688,6 +1700,7 @@ final class StrengthWorkoutStore: ObservableObject {
         guard !additions.isEmpty else { return false }
         entries.append(contentsOf: additions)
         workout.liveExecutionQueue = entries
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
         return true
@@ -1703,6 +1716,7 @@ final class StrengthWorkoutStore: ObservableObject {
         guard let to = entries.firstIndex(where: { $0.id == targetID }) else { return false }
         entries.insert(entry, at: to)
         workout.liveExecutionQueue = entries
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
         return true
@@ -1730,6 +1744,7 @@ final class StrengthWorkoutStore: ObservableObject {
         entries.append(contentsOf: moved)
         workout.liveExecutionQueue = entries.isEmpty ? nil : entries
         currentExerciseIndex = workout.exercises.firstIndex(where: { $0.id == selectedID }) ?? 0
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
         return true
@@ -1776,6 +1791,7 @@ final class StrengthWorkoutStore: ObservableObject {
             workout.exercises[index].groupStationRestSeconds = min(max(station, 0), 600)
             workout.exercises[index].groupRoundRestSeconds = min(max(round, 0), 600)
         }
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
     }
@@ -1823,6 +1839,7 @@ final class StrengthWorkoutStore: ObservableObject {
         if let selectedID, let position = workout.exercises[currentExerciseIndex].sets.firstIndex(where: { $0.id == selectedID }) {
             currentSetIndex = position
         }
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
         return true
@@ -1986,6 +2003,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = workout.exercises.firstIndex {
             $0.id == activeID
         } ?? 0
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
     }
@@ -2010,6 +2028,7 @@ final class StrengthWorkoutStore: ObservableObject {
         currentExerciseIndex = workout.exercises.firstIndex(where: {
             $0.id == currentID
         }) ?? 0
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
         return true
@@ -2703,6 +2722,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 siblings.firstIndex(where: { $0.id == exercise.id }).map { $0 + 1 }
             snapshot.strengthModeStationCount = siblings.count
         }
+        snapshot.requiresCompanionExecutionOrder = workout.requiresCompanionExecutionOrder
+        snapshot.nextExecutionLabel = nextExecutionLabel
         // The Watch may show/adjust plates only when the iPhone knows this
         // exercise uses a bar. Nil intentionally preserves legacy total entry
         // for older/offline Watch-created sessions.
@@ -4767,6 +4788,7 @@ final class StrengthWorkoutStore: ObservableObject {
             return
         }
 
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
     }
@@ -4795,6 +4817,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 nil
         }
 
+        workout.requiresCompanionExecutionOrder = true
         activeWorkout = workout
         persistCheckpointNow()
     }
