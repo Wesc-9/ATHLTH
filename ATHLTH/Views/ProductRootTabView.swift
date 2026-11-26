@@ -247,7 +247,7 @@ struct ProductRootTabView: View {
     }
 
     private func updateDailyCheckInReminder() {
-        let store = RecoverySorenessStore()
+        let store = RecoverySorenessStore(accountID: session.profile.userID)
         notifications.reconcileDailyCheckIn(
             enabled: settings.dailyCheckInRemindersEnabled,
             accountID: session.profile.userID,
@@ -1252,6 +1252,7 @@ struct ATHLTHHomeView: View {
     #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
     #endif
+    @State private var homeDailyForm: RecoverySorenessEntry?
     @State private var homeRecordingProjection = ATHLTHRecordedWorkoutProjection()
     private struct HomeCalendarRecordingsKey: Equatable {
         let account: UUID
@@ -1946,6 +1947,12 @@ struct ATHLTHHomeView: View {
             // Social feeds and group calendars are secondary to the Health
             // cards. Give the native tab transition the first render frames.
             // Fast Home -> Train taps cancel this work before it begins.
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)-daily-form") {
+                homeDailyForm = isActive ? RecoverySorenessStore(accountID: session.profile.userID).todayEntry : nil
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
+                if isActive { homeDailyForm = RecoverySorenessStore(accountID: session.profile.userID).todayEntry }
+            }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)-social") {
                 guard isActive, !session.previewModeEnabled else { return }
                 let userID = session.profile.userID
@@ -2419,6 +2426,9 @@ struct ATHLTHHomeView: View {
 
     private var homeReadinessMetricText:
         String? {
+        let personal = ATHLTHDailyFormPolicy.assess(entry: homeDailyForm, measuredScore: nil)
+        if personal.recommendation == .rest { return ATHLTHLocalization.choose(english: "Consider rest", norwegian: "Vurder hvile") }
+        if personal.recommendation == .lighter { return ATHLTHLocalization.choose(english: "Consider lighter training", norwegian: "Vurder rolig trening") }
         switch health.recovery.state {
         case .ready:
             return "God form"
@@ -6606,6 +6616,9 @@ struct ATHLTHTrainView: View {
         .onReceive(strengthWorkout.$workoutHistory) { _ in
             scheduleTrainDailyRecommendationRefresh()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
+            scheduleTrainDailyRecommendationRefresh()
+        }
         .onChange(
             of: navigationRequest?.id
         ) { _, _ in
@@ -6807,18 +6820,20 @@ struct ATHLTHTrainView: View {
                 trainDailyRecommendationInfo = nil
                 return
             }
-            let readiness: HomeDailyRecommendationPolicy.Readiness
+            let measuredReadiness: HomeDailyRecommendationPolicy.Readiness
             if health.recovery.score == nil {
-                readiness = .unavailable
+                measuredReadiness = .unavailable
             } else {
                 switch health.recovery.state {
-                case .ready: readiness = .ready
-                case .balanced: readiness = .balanced
-                case .takeItEasy: readiness = .takeItEasy
-                case .recover: readiness = .recover
-                case .buildingBaseline: readiness = .unavailable
+                case .ready: measuredReadiness = .ready
+                case .balanced: measuredReadiness = .balanced
+                case .takeItEasy: measuredReadiness = .takeItEasy
+                case .recover: measuredReadiness = .recover
+                case .buildingBaseline: measuredReadiness = .unavailable
                 }
             }
+            let checkIn = RecoverySorenessStore(accountID: account)
+            let readiness = ATHLTHDailyFormPolicy.recommendationReadiness(measuredReadiness, entry: checkIn.todayEntry)
             let ratio: Double?
             if health.hasRequestedAuthorization {
                 ratio = await health.recoveryTrendSnapshot(days: 14)
@@ -7682,13 +7697,16 @@ struct ATHLTHTrainView: View {
                         strengthHistory: strengthWorkout.workoutHistory
                       )
                 else { return }
-                let checkIn = RecoverySorenessStore()
+                let checkIn = RecoverySorenessStore(accountID: session.profile.userID)
                 let freshSignals = ATHLTHDailyWorkoutAlternativeAdvisor.Signals(
                     energy: checkIn.todayEnergy,
                     stress: checkIn.todayStress,
                     overallSoreness: checkIn.todayOverallSoreness,
                     muscleRatings: checkIn.todayRatings,
-                    readiness: readiness
+                    readiness: readiness,
+                    motivation: checkIn.todayMotivation,
+                    sleepQuality: checkIn.todayEntry?.sleepQuality,
+                    feelsUnwell: checkIn.todayEntry?.feelsUnwell
                 )
                 guard ATHLTHDailyWorkoutAlternativeAdvisor.suggestions(
                     for: current, signals: freshSignals
