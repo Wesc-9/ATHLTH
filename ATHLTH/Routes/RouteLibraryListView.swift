@@ -132,6 +132,7 @@ struct RouteLibraryListView: View {
     let source: RouteLibrarySource
     /// Preserve the originating sport when choosing a route from Train.
     var quickStartActivity: WorkoutKind = .running
+    var ghostCompetitionSetup = false
 
     @State private var selectedCollection: ATHLTHUnifiedLibraryScope = .athlth
     @State private var didSaveRouteInBuilder = false
@@ -894,7 +895,8 @@ struct RouteLibraryListView: View {
             NavigationLink {
                 RouteLibraryDetailLoader(
                     routeID: entry.id,
-                    sourceType: entry.sourceType ?? "community"
+                    sourceType: entry.sourceType ?? "community",
+                    ghostCompetitionSetup: ghostCompetitionSetup
                 )
             } label: {
                 VStack(alignment: .leading, spacing: 7) {
@@ -994,7 +996,8 @@ struct RouteLibraryListView: View {
                 NavigationLink {
                     RouteLibraryDetailLoader(
                         routeID: entry.id,
-                        sourceType: entry.sourceType ?? "community"
+                        sourceType: entry.sourceType ?? "community",
+                        ghostCompetitionSetup: ghostCompetitionSetup
                     )
                 } label: {
                     VStack(alignment: .leading, spacing: 5) {
@@ -1076,7 +1079,8 @@ struct RouteLibraryListView: View {
                 NavigationLink {
                     RouteLibraryDetailLoader(
                         routeID: entry.id,
-                        sourceType: entry.sourceType ?? "community"
+                        sourceType: entry.sourceType ?? "community",
+                        ghostCompetitionSetup: ghostCompetitionSetup
                     )
                 } label: {
                     Label(tr("Details", "Detaljer"), systemImage: "arrow.up.right")
@@ -1118,7 +1122,8 @@ struct RouteLibraryListView: View {
             NavigationLink {
                 RouteLibraryDetailLoader(
                     routeID: entry.id,
-                    sourceType: entry.sourceType ?? "community"
+                    sourceType: entry.sourceType ?? "community",
+                    ghostCompetitionSetup: ghostCompetitionSetup
                 )
             } label: {
                 HStack(spacing: 10) {
@@ -1481,7 +1486,8 @@ struct RouteLibraryListView: View {
             ) {
                 NavigationLink {
                     RouteDetailView(
-                        route: route
+                        route: route,
+                        ghostCompetitionSetup: ghostCompetitionSetup
                     )
                 } label: {
                     VStack(
@@ -1683,7 +1689,8 @@ struct RouteLibraryListView: View {
             NavigationLink {
                 RouteLibraryDetailLoader(
                     routeID: entry.id,
-                    sourceType: entry.sourceType ?? "community"
+                    sourceType: entry.sourceType ?? "community",
+                    ghostCompetitionSetup: ghostCompetitionSetup
                 )
             } label: {
                 VStack(
@@ -1867,13 +1874,14 @@ struct RouteLibraryListView: View {
 struct RouteLibraryDetailLoader: View {
     let routeID: UUID
     var sourceType: String = "community"
+    var ghostCompetitionSetup = false
     @State private var route: TrainingRoute?
     @State private var errorMessage: String?
 
     var body: some View {
         Group {
             if let route {
-                RouteDetailView(route: route)
+                RouteDetailView(route: route, ghostCompetitionSetup: ghostCompetitionSetup)
             } else if let errorMessage {
                 ContentUnavailableView {
                     Label("Route unavailable", systemImage: "map")
