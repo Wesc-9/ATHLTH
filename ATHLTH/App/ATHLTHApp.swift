@@ -280,6 +280,7 @@ private struct ATHLTHSceneRootView: View {
             .frame(width: 0, height: 0)
         }
         .onAppear {
+            RecoverySorenessStore.configureAccount(appSession.signedIn ? appSession.profile.userID : nil)
             ATHLTHMetricDeliveryObserver.install()
             applyResourcePolicyIfNeeded()
             installBackgroundRefreshHandlersIfNeeded()
@@ -374,6 +375,7 @@ private struct ATHLTHSceneRootView: View {
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
+            RecoverySorenessStore.configureAccount(signedIn ? appSession.profile.userID : nil)
             scheduleAutomaticOfflinePreparation()
             if !signedIn {
                 // The signed-in AppRootView may disappear before its account
@@ -456,6 +458,7 @@ private struct ATHLTHSceneRootView: View {
             scheduleProfileRecordSummaryPublish()
         }
         .onChange(of: appSession.profile.userID) { _, _ in
+            RecoverySorenessStore.configureAccount(appSession.signedIn ? appSession.profile.userID : nil)
             notifications.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
