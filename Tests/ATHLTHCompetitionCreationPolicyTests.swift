@@ -276,4 +276,42 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
             }
         }
     }
+
+    func testAutomaticDuelTitleIncludesBothUsersAndChosenBranches() {
+        XCTAssertEqual(ATHLTHCompetitionCreationPolicy.duelName(owner: "bruker1",
+            opponent: "bruker2", branches: ["Løping", "Styrke"]),
+            "Duell bruker1 vs bruker2 i Løping og Styrke")
+        XCTAssertLessThanOrEqual(ATHLTHCompetitionCreationPolicy.duelName(
+            owner: String(repeating: "a", count: 100),
+            opponent: String(repeating: "b", count: 100), branches: ["Løping", "Styrke"]).count, 80)
+    }
+
+    func testCompetitionCheckpointRestoresIncompleteRulesAndAccountIsolation() throws {
+        let defaults = UserDefaults(suiteName: "athlth.test.competition.\(UUID())")!
+        let key = "duel.test.running.true"
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.selectedExerciseIDs = []
+        settings.race.duelMode = true
+        settings.completionHours = 72
+        let draft = ATHLTHTournamentDraft(ownerID: owner, clubID: nil,
+            title: "", format: .league, singleEventMode: true, groupSize: 4,
+            qualifiersPerGroup: 2, participants: [.init(id: owner, username: "bruker1"),
+                .init(id: rival, username: "bruker2")], allowedActivities: [.running, .strength],
+            competitionSettings: settings)
+        let checkpoint = ATHLTHCompetitionCreationCheckpoint(owner: owner, format: "duel",
+            leagueStyle: .league, customTitle: "", opponents: [rival], rules: draft,
+            inRules: true, scrollID: "timing")
+        checkpoint.save(entry: key, defaults: defaults)
+        let loaded = try XCTUnwrap(ATHLTHCompetitionCreationCheckpoint.load(owner: owner, entry: key, defaults: defaults))
+        XCTAssertEqual(loaded.customTitle, "")
+        XCTAssertEqual(loaded.opponents, [rival])
+        XCTAssertEqual(loaded.rules?.id, draft.id)
+        XCTAssertEqual(loaded.rules?.competitionSettings.completionHours, 72)
+        XCTAssertEqual(loaded.rules?.competitionSettings.selectedExerciseIDs, [])
+        XCTAssertEqual(loaded.scrollID, "timing")
+        XCTAssertTrue(loaded.inRules)
+        XCTAssertNil(ATHLTHCompetitionCreationCheckpoint.load(owner: rival, entry: key, defaults: defaults))
+        ATHLTHCompetitionCreationCheckpoint.clear(owner: owner, entry: key, defaults: defaults)
+        XCTAssertNil(ATHLTHCompetitionCreationCheckpoint.load(owner: owner, entry: key, defaults: defaults))
+    }
 }
