@@ -6816,7 +6816,9 @@ struct ATHLTHTrainView: View {
                 phoneHistory: phoneWorkout.history,
                 dogs: pets.pets.filter { $0.userID == account }
             )
-            guard history.supportsPersonalization else {
+            let checkIn = RecoverySorenessStore(accountID: account)
+            let personal = ATHLTHDailyFormPolicy.assess(entry: checkIn.todayEntry, measuredScore: nil)
+            guard history.supportsPersonalization || personal.recommendation == .rest || personal.recommendation == .lighter else {
                 trainDailyRecommendationInfo = nil
                 return
             }
@@ -6832,7 +6834,6 @@ struct ATHLTHTrainView: View {
                 case .buildingBaseline: measuredReadiness = .unavailable
                 }
             }
-            let checkIn = RecoverySorenessStore(accountID: account)
             let readiness = ATHLTHDailyFormPolicy.recommendationReadiness(measuredReadiness, entry: checkIn.todayEntry)
             let ratio: Double?
             if health.hasRequestedAuthorization {
@@ -6857,7 +6858,8 @@ struct ATHLTHTrainView: View {
                 trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
                     workouts: recorded
                 ),
-                personalizedHistory: history
+                personalizedHistory: history,
+                checkIn: personal
             )
             trainDailyRecommendationInfo = HomeDailyRecommendationInfo(
                 advice: advice, history: history,
