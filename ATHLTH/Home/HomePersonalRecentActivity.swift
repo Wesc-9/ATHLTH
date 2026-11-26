@@ -4946,7 +4946,7 @@ private struct HomePersonalWorkoutVisual:
                         strength: workout.activity == .strength,
                         showsPace: workout.activity == .running || workout.activity == .walking || workout.activity == .hiking
                     ),
-                    averageHeartRate: workout.strengthWorkoutAverageHeartRateBPM
+                    averageHeartRate: workout.isSports ? workout.recordedAverageHeartRate : workout.strengthWorkoutAverageHeartRateBPM
                 ) { background }
             } else {
                 background

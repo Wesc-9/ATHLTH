@@ -32,6 +32,8 @@ struct CustomQuickIPhoneWorkoutView: View {
     @State private var notes = ""
     @State private var showingDiscard = false
     @State private var savedRecord: CustomQuickWorkoutRecord?
+    @State private var editingName = false
+    @State private var nameDraft = ""
     @State private var invalidInputMessage: String?
 
     private let ink = ATHLTHTheme.primaryText
@@ -148,6 +150,17 @@ struct CustomQuickIPhoneWorkoutView: View {
             } message: {
                 Text(invalidInputMessage ?? "")
             }
+            .alert(tr("Workout name", "Navn på økten"), isPresented: $editingName) {
+                TextField(tr("Workout name", "Øktnavn"), text: $nameDraft)
+                Button(tr("Done", "Ferdig")) {
+                    guard let record = savedRecord else { return }
+                    let name = ATHLTHCompletedWorkoutNames.clean(nameDraft) ?? configuration.title
+                    if let updated = CustomQuickWorkoutJournal.rename(id: record.id, title: name, userID: session.profile.userID) {
+                        savedRecord = updated
+                    } else { invalidInputMessage = tr("Could not save the name.", "Kunne ikke lagre øktnavnet.") }
+                }
+                Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+            }
             .onAppear {
                 guard isTimed, savedRecord == nil,
                       manualCaptureID == nil else { return }
@@ -183,9 +196,19 @@ struct CustomQuickIPhoneWorkoutView: View {
                 .background(ATHLTHTheme.accentSoft,
                             in: RoundedRectangle(cornerRadius: 17))
             VStack(alignment: .leading, spacing: 5) {
-                Text(configuration.title)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(ink)
+                if let record = savedRecord {
+                    Button {
+                        nameDraft = record.title
+                        editingName = true
+                    } label: {
+                        HStack(spacing: 7) {
+                            Text(record.title).font(.title3.weight(.bold))
+                            Image(systemName: "pencil").font(.caption.weight(.semibold))
+                        }.foregroundStyle(ink)
+                    }.buttonStyle(.plain)
+                } else {
+                    Text(configuration.title).font(.title3.weight(.bold)).foregroundStyle(ink)
+                }
                 Label(
                     isTimed ? tr("iPhone measures time", "iPhone måler tiden")
                             : tr("Enter previous workout", "Etterregistrer økten"),

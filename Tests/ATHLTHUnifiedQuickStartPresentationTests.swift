@@ -99,3 +99,33 @@ final class ATHLTHSportsQuickStartTests: XCTestCase {
         XCTAssertNotEqual(configuration.title, CustomQuickWorkoutConfiguration.openTimed(activity: .sports).title)
     }
 }
+
+
+final class ATHLTHCompletedSportsReviewTests: XCTestCase {
+    func testWatchSportsIdentityAndRenameKeepOriginalMetrics() {
+        let id = UUID()
+        let start = Date()
+        var result = WatchWorkoutResult(id: UUID(), kind: .other, healthKitWorkoutUUID: id,
+            startedAt: start, endedAt: start.addingTimeInterval(60), duration: 60,
+            activeCalories: 50, distanceMeters: 100, averageHeartRate: 150,
+            maxHeartRate: 175, routePointCount: 0)
+        XCTAssertFalse(SocialPublishableWorkout(watchResult: result).isSports)
+        result.isSports = true
+        let original = SocialPublishableWorkout(watchResult: result)
+        let named = original.renamed("Cageball")
+        XCTAssertTrue(named.isSports)
+        XCTAssertEqual(named.presentationIcon, "sportscourt.fill")
+        XCTAssertEqual(named.title, "Cageball")
+        XCTAssertEqual(named.id, id)
+        XCTAssertEqual(named.distanceMeters, 100)
+        XCTAssertEqual(named.recordedAverageHeartRate, 150)
+        XCTAssertEqual(named.recordedMaximumHeartRate, 175)
+        XCTAssertNotEqual(original.title, named.title)
+    }
+
+    func testNameRejectsWhitespaceAndLimitsLength() {
+        XCTAssertNil(ATHLTHCompletedWorkoutNames.clean("   "))
+        XCTAssertEqual(ATHLTHCompletedWorkoutNames.clean("  Cageball  "), "Cageball")
+        XCTAssertEqual(ATHLTHCompletedWorkoutNames.clean(String(repeating: "a", count: 200))?.count, 100)
+    }
+}

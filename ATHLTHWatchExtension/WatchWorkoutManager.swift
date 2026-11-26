@@ -3897,6 +3897,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         configuration
                 )
 
+            if configuration.activityType == .play,
+               let type = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning) {
+                builder.dataSource?.enableCollection(for: type, predicate: nil)
+            }
             workoutSession = recovered
             workoutBuilder = builder
             collectingHybridTreadmillDistance = false
@@ -4825,6 +4829,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 healthStore: healthStore,
                 workoutConfiguration: configuration
             )
+
+            // Collect only measured walking/running distance for open sports, without adding a second recorder.
+            if configuration.activityType == .play,
+               let type = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning) {
+                builder.dataSource?.enableCollection(for: type, predicate: nil)
+            }
 
             if configuration.locationType == .outdoor,
                let seriesBuilder = builder.seriesBuilder(
@@ -9059,6 +9069,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         result.accountOwnerID = workoutOwnerID
         result.isSports = workout.workoutActivityType == .play ? true : nil
+        if result.isSports == true,
+           let type = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning),
+           let measured = workout.statistics(for: type)?.sumQuantity()?.doubleValue(for: .meter()),
+           measured.isFinite, measured > 0 {
+            result.distanceMeters = measured
+        }
         result.universalWorkoutID = universalWorkoutID
         // Do not publish an identity on a prepared/failed activity. This
         // result exists only after HealthKit finishWorkout() succeeded.

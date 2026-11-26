@@ -682,10 +682,31 @@ struct WorkoutSummary: Identifiable, Hashable {
     let activeEnergyKilocalories: Double?
     let isIndoor: Bool?
     var isSports: Bool = false
+    var sportName: String? = nil
+    var averageHeartRate: Double? = nil
+    var maximumHeartRate: Double? = nil
 
     init(workout: HKWorkout) {
         id = workout.uuid
-        isSports = workout.workoutActivityType == .play
+        switch workout.workoutActivityType {
+        case .play: isSports = true
+        case .soccer: sportName = ATHLTHLocalization.choose(english: "Football", norwegian: "Fotball")
+        case .basketball: sportName = ATHLTHLocalization.choose(english: "Basketball", norwegian: "Basketball")
+        case .tennis: sportName = "Tennis"
+        case .volleyball: sportName = "Volleyball"
+        case .handball: sportName = ATHLTHLocalization.choose(english: "Handball", norwegian: "Håndball")
+        case .badminton: sportName = "Badminton"
+        case .squash: sportName = "Squash"
+        case .tableTennis: sportName = ATHLTHLocalization.choose(english: "Table tennis", norwegian: "Bordtennis")
+        default: break
+        }
+        if sportName != nil { isSports = true }
+        if isSports, let type = HKObjectType.quantityType(forIdentifier: .heartRate),
+           let statistics = workout.statistics(for: type) {
+            let unit = HKUnit.count().unitDivided(by: .minute())
+            averageHeartRate = statistics.averageQuantity()?.doubleValue(for: unit)
+            maximumHeartRate = statistics.maximumQuantity()?.doubleValue(for: unit)
+        }
         activity = WorkoutActivity(healthKitType: workout.workoutActivityType)
         startDate = workout.startDate
         endDate = workout.endDate

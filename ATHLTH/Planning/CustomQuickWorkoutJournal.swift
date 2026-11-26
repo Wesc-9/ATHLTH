@@ -126,6 +126,20 @@ enum CustomQuickWorkoutJournal {
         ) ?? []
     }
 
+    /// Rename only an already saved entry. Retain original identity and evidence.
+    static func rename(id: UUID, title: String, userID: UUID, defaults: UserDefaults = .standard) -> CustomQuickWorkoutRecord? {
+        guard let title = ATHLTHCompletedWorkoutNames.clean(title) else { return nil }
+        var entries = load(userID: userID, defaults: defaults)
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return nil }
+        entries[index].titleOverride = title
+        do {
+            try AccountLocalStorage.writeChecked(entries, name: key, userID: userID, defaults: defaults)
+            guard let saved = load(userID: userID, defaults: defaults).first(where: { $0.id == id }), saved.titleOverride == title else { return nil }
+            ATHLTHTrainingDataChangeSignal.post(userID: userID)
+            return saved
+        } catch { return nil }
+    }
+
     /// Exactly one history receipt for a stable timer ID, including a retry
     /// after an interrupted finish. No notification on a failed write.
     /// UserDefaults readback is not a substitute for physical crash testing.

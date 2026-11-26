@@ -1491,11 +1491,12 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     let id: UUID
     var title: String
     var isSports = false
+    var sportName: String? = nil
     var reviewTitleOverride: String? = nil
     var recordedAverageHeartRate: Double? = nil
     var recordedMaximumHeartRate: Double? = nil
 
-    var sportsActivityTitle: String { ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") }
+    var sportsActivityTitle: String { sportName ?? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") }
     var presentationIcon: String { isSports ? "sportscourt.fill" : activity.icon }
 
     func renamed(_ name: String) -> Self {
@@ -1598,7 +1599,10 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
     init(summary: WorkoutSummary) {
         id = summary.id
         isSports = summary.isSports
-        title = summary.isSports ? ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") : summary.activity.rawValue
+        sportName = summary.sportName
+        recordedAverageHeartRate = summary.averageHeartRate
+        recordedMaximumHeartRate = summary.maximumHeartRate
+        title = summary.isSports ? (summary.sportName ?? ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt")) : summary.activity.rawValue
         activity = summary.activity
         startDate = summary.startDate
         endDate = summary.endDate

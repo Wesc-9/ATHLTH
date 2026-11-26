@@ -1861,7 +1861,7 @@ struct PostWorkoutReviewView: View {
     }
 
     private var completionWorkoutTitle: String {
-        if workout.isSports { return ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") }
+        if workout.isSports { return workout.sportName ?? ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") }
         let original = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
         if original.isEmpty || original == "Økt completed" { return completionActivityTitle }
         let genericEnglish = [
@@ -4631,14 +4631,13 @@ struct PostWorkoutReviewView: View {
             for: workout.id
         )
         if workout.isSports {
-            let maximum = session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
-            var seconds = Array(repeating: 0.0, count: 5)
-            let points = completionMeasuredPulse.sorted { $0.date < $1.date }
-            for (point, next) in zip(points, points.dropFirst()) {
-                guard let zone = ATHLTHHeartRateZones.measuredZone(heartRateBPM: point.bpm, maximumBPM: maximum) else { continue }
-                let interval = min(max(next.date.timeIntervalSince(point.date), 0), 15)
-                seconds[zone - 1] += interval
-            }
+            let maximum = ATHLTHHeartRateZones.resolvedMaximumBPM(
+                configured: session.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session.onboardingProfile?.dateOfBirth
+            )
+            let seconds = ATHLTHRunningHeartRateAnalysis.zoneDurations(
+                completionMeasuredPulse, maximumBPM: maximum
+            ).map(\.seconds)
             sportsZoneSeconds = seconds.reduce(0, +) > 0 ? seconds : []
         }
     }
@@ -4694,7 +4693,11 @@ struct PostWorkoutReviewView: View {
 
         if let activity = await social.workoutActivity(for: workout.id) {
             alreadyPublished = true
-            if reviewName == nil, let stored = activity.metadata?["custom_workout_title"] { reviewName = ATHLTHCompletedWorkoutNames.clean(stored) }
+            if reviewName == nil, let stored = activity.metadata?["custom_workout_title"],
+               let clean = ATHLTHCompletedWorkoutNames.clean(stored) {
+                reviewName = clean
+                ATHLTHCompletedWorkoutNames.save(clean, for: workout.id, userID: session.profile.userID)
+            }
 
             if let existingVisibility = ProfileVisibility(rawValue: activity.visibility) {
                 visibility = existingVisibility
@@ -4756,7 +4759,8 @@ struct PostWorkoutReviewView: View {
         let petsSaved = await pets.savePetUsage(
             for: workout, petIDs: selectedPetIDs)
 
-        let reviewWorkout = reviewName.map { workout.renamed($0) } ?? workout
+        var reviewWorkout = reviewName.map { workout.renamed($0) } ?? workout
+        if reviewName == nil { reviewWorkout.title = completionWorkoutTitle }
         let reviewSaved = await social.saveWorkoutReview(
             reviewWorkout,
             visibility: visibility,
