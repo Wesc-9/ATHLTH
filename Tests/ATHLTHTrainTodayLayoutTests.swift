@@ -461,8 +461,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     onQuickCycling: {},
                     onQuickCustom: { _ in },
                     onQuickFreeTraining: {},
-                    onGhostRace: {},
-                     onCompetition: {}
+                    onCompetition: {}
                 )
 
                 let host = UIHostingController(

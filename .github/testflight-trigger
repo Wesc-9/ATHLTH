@@ -367,3 +367,5 @@ ATHLTH 3.0.4 build 144 — user-authorized overnight TestFlight upload, 2026-11-
 
 ATHLTH 3.0.4 build 144 — authorized retry 2026-11-26 after confirmed ATHLTHApp.swift SwiftUI type-check timeout; split scene lifecycle into separately typed stages, retain all observers and exact-commit gates.
 ATHLTH 3.0.4 build 144 — authorized retry 2026-11-26: isolate strength dock callback regression test on MainActor to resolve Swift 6 region isolation compile failure; retain all assertions and five exact-commit gates.
+
+ATHLTH 3.0.5 build 145 — user-authorized TestFlight 2026-11-26; corrected obsolete Ghost Race test initializer and Xcode version. Run unsigned archive in parallel with all five exact-commit acceptance gates, then verify signing and upload. No stale source or gate bypass.
