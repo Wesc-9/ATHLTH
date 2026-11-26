@@ -2616,6 +2616,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        if snapshot.requiresCompanionExecutionOrder == true && !strengthCompanionReachable {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Reconnect to iPhone to continue the custom workout order.",
+                norwegian: "Koble til iPhone for å fortsette med den tilpassede øvelsesrekkefølgen."
+            )
+            return
+        }
         let completedAt = Date()
         guard ATHLTHStrengthModeClockPolicy.permitsCompletion(
             modeRaw: snapshot.strengthModeRaw,
@@ -2677,6 +2684,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             )
 
+        if sent && snapshot.requiresCompanionExecutionOrder == true {
+            publish { self.strengthActionPending = true }
+            requestStrengthSnapshot()
+            return
+        }
         if sent {
             // Watch is the local source of truth for interaction. Advance
             // immediately even when iPhone is reachable; the returned iPhone
@@ -2698,6 +2710,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               snapshot.setCount > 0
         else { return }
 
+        if snapshot.requiresCompanionExecutionOrder == true && !strengthCompanionReachable {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Reconnect to iPhone to continue the custom workout order.",
+                norwegian: "Koble til iPhone for å fortsette med den tilpassede øvelsesrekkefølgen."
+            )
+            return
+        }
         let sent = sendStrengthCommand(
             WatchStrengthCommand(
                 id: UUID(),
@@ -2713,6 +2732,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
         )
         guard sent else { return }
+        if snapshot.requiresCompanionExecutionOrder == true {
+            publish { self.strengthActionPending = true }
+            requestStrengthSnapshot()
+            return
+        }
 
         var updated = snapshot
         updated.timedSetCountdown = nil
@@ -2916,6 +2940,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        if snapshot.requiresCompanionExecutionOrder == true && !strengthCompanionReachable {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Reconnect to iPhone to continue the custom workout order.",
+                norwegian: "Koble til iPhone for å fortsette med den tilpassede øvelsesrekkefølgen."
+            )
+            return
+        }
         let sent =
             sendStrengthCommand(
                 WatchStrengthCommand(
@@ -2935,6 +2966,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             )
 
+        if sent && snapshot.requiresCompanionExecutionOrder == true {
+            publish { self.strengthActionPending = true }
+            requestStrengthSnapshot()
+            return
+        }
         if sent {
             applyOptimisticNextStrengthExercise(
                 snapshot
