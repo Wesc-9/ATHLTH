@@ -76,6 +76,22 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
             query: "lop", place: "trondheim", interest: .running).map(\.id), [local.id])
     }
 
+    func testClubHubDiscoveryRankingUsesInterestAndKnownDistance() {
+        func club(_ name: String, summary: String) -> CommunityGroupRecord {
+            CommunityGroupRecord(id: UUID(), creatorID: UUID(), name: name,
+                summary: summary, locationName: "Oslo", visibility: "public",
+                imageURL: nil, headerImageURL: nil, featuredChallengeID: nil,
+                joinMode: "open", membersCanCreateContent: true,
+                createdAt: Date(), updatedAt: Date())
+        }
+        let run = club("Z", summary: "Løping")
+        let gym = club("A", summary: "Styrke")
+        XCTAssertEqual(ATHLTHClubHubPolicy.ranked([gym, run], preferred: .running,
+            friendCreators: [], distances: [:]).map(\.id), [run.id, gym.id])
+        XCTAssertEqual(ATHLTHClubHubPolicy.ranked([gym, run], preferred: .running,
+            friendCreators: [], distances: [gym.id: 2, run.id: 8]).map(\.id), [gym.id, run.id])
+    }
+
     func testClubHubManagementRequiresCurrentAccountsRole() {
         let account = UUID()
         let club = CommunityGroupRecord(id: UUID(), creatorID: UUID(), name: "Club",

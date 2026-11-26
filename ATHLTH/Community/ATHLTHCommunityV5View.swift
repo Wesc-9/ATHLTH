@@ -1,4 +1,5 @@
 import SwiftUI
+@preconcurrency import CoreLocation
 
 // MARK: - Fellesskap · native premium 2.0.6 rebuild
 // Old Community list and shortcut screens are removed. Club, challenge,
@@ -1689,6 +1690,31 @@ struct ATHLTHClubsHubView: View {
     @State private var busyGroup: UUID?
     @State private var notice: String?
     @State private var searchLoading = false
+    @EnvironmentObject private var social: SocialStore
+    @StateObject private var locationStore = ChallengeLocationStore()
+    @State private var pinnedClubID: UUID?
+    @State private var preferredInterest: CommunityInterest = .all
+    @State private var showingAdministration = false
+    @State private var invitationClub: CommunityGroupRecord?
+    @State private var adminRequests: [CommunityGroupJoinRequestRecord] = []
+    @State private var loadingRequests = false
+    @State private var requestError: String?
+    @State private var distances: [UUID: Double] = [:]
+    @State private var locating = false
+    @State private var locationNotice: String?
+
+    private var preferenceKey: String { "athlth.clubs.hub." + session.profile.userID.uuidString }
+
+    private func reloadPreferences() {
+        pinnedClubID = UserDefaults.standard.string(forKey: preferenceKey + ".pinned").flatMap(UUID.init(uuidString:))
+        preferredInterest = CommunityInterest(rawValue: UserDefaults.standard.string(forKey: preferenceKey + ".interest") ?? "") ?? .all
+    }
+
+    private func togglePinned(_ club: CommunityGroupRecord) {
+        guard memberships.contains(where: { $0.id == club.id }) else { return }
+        pinnedClubID = pinnedClubID == club.id ? nil : club.id
+        UserDefaults.standard.set(pinnedClubID?.uuidString, forKey: preferenceKey + ".pinned")
+    }
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -1709,6 +1735,19 @@ struct ATHLTHClubsHubView: View {
 
     private var managed: [CommunityGroupRecord] { memberships.filter(manages) }
     private var joined: [CommunityGroupRecord] { memberships.filter { !manages($0) } }
+    private var favorite: CommunityGroupRecord? { memberships.first { $0.id == pinnedClubID } }
+    private var activity: [CommunityGroupActivityRecord] {
+        let ids = Set(memberships.map(\.id))
+        return Array(groups.communityActivity.filter { ids.contains($0.groupID) }
+            .sorted { $0.createdAt > $1.createdAt }.prefix(5))
+    }
+
+    // The public club creator is visible in the directory. Private membership
+    // records are never fetched or inferred for recommendations.
+    private var friendCreators: Set<UUID> {
+        guard social.currentUserID == session.profile.userID else { return [] }
+        return Set(social.mutualFollows.map(\.userID))
+    }
 
     private var invites: [CommunityGroupInviteRecord] {
         groups.ownInvites.filter {
@@ -1738,11 +1777,13 @@ struct ATHLTHClubsHubView: View {
 
     private var results: [CommunityGroupRecord] {
         guard session.signedIn else { return [] }
-        return ATHLTHClubHubPolicy.discovery(
+        let matches = ATHLTHClubHubPolicy.discovery(
             groups.groups + groups.searchResults,
             excluded: Set(memberships.map(\.id) + invites.map(\.groupID)),
             query: query, place: place, interest: interest
         )
+        return ATHLTHClubHubPolicy.ranked(matches, preferred: preferredInterest,
+                                         friendCreators: friendCreators, distances: distances)
     }
 
     var body: some View {
@@ -1781,16 +1822,35 @@ struct ATHLTHClubsHubView: View {
         )) {
             Button("OK", role: .cancel) { notice = nil }
         } message: { Text(notice ?? "") }
+        .sheet(item: $invitationClub) { club in
+            CommunityGroupInviteMemberView(group: club)
+        }
+        .sheet(isPresented: $showingAdministration) {
+            NavigationStack {
+                administrationPage
+                    .navigationTitle(tr("Administration", "Administrasjon"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(tr("Done", "Ferdig")) { showingAdministration = false }
+                        }
+                    }
+            }
+        }
         .task(id: session.profile.userID) {
+            reloadPreferences()
             await groups.refresh(force: false)
+            guard !Task.isCancelled else { return }
             await groups.refreshRecentChatActivity()
             await groups.refreshHomeUpcomingEvents()
         }
+        .task(id: managed.map(\.id)) { await reloadAdminRequests() }
         .refreshable {
             await groups.refresh(force: true)
             if discovery && searchTerm.count >= 2 { await groups.search(searchTerm) }
             await groups.refreshRecentChatActivity(force: true)
             await groups.refreshHomeUpcomingEvents(force: true)
+            await reloadAdminRequests()
         }
         .task(id: "\(session.profile.userID)-\(discovery)-\(searchTerm)") {
             guard discovery, searchTerm.count >= 2 else {
@@ -1806,6 +1866,10 @@ struct ATHLTHClubsHubView: View {
         }
         .onChange(of: session.profile.userID) { _, _ in
             query = ""; place = ""; interest = .all; discovery = false
+            pinnedClubID = nil; preferredInterest = .all
+            distances = [:]; locationNotice = nil; adminRequests = []
+            showingAdministration = false; invitationClub = nil
+            reloadPreferences()
         }
         .accessibilityIdentifier("athlth-standalone-clubs-hub")
     }
@@ -1876,6 +1940,25 @@ struct ATHLTHClubsHubView: View {
                     }
                 }
             }
+            if let favorite {
+                heading(tr("Favorite club", "Favorittklubb"), "star.fill")
+                clubGrid([favorite], isManagement: manages(favorite))
+            }
+            if !managed.isEmpty {
+                Button { showingAdministration = true } label: {
+                    HStack {
+                        Label(tr("Administration", "Administrasjon"), systemImage: "person.badge.key")
+                            .font(.headline)
+                        Spacer()
+                        if !adminRequests.isEmpty {
+                            Text("\(adminRequests.count)").monospacedDigit()
+                        }
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                    .padding(15).communityReferenceCard()
+                }.buttonStyle(.plain)
+            }
             heading(tr("Clubs I manage", "Klubber jeg administrerer"), "person.badge.key")
             if managed.isEmpty {
                 empty(tr("No clubs to manage", "Ingen klubber å administrere"),
@@ -1884,7 +1967,7 @@ struct ATHLTHClubsHubView: View {
                     actionLabel(tr("Create club", "Opprett klubb"), "plus")
                 }.buttonStyle(.plain)
             } else {
-                clubGrid(managed, isManagement: true)
+                clubGrid(managed.filter { $0.id != favorite?.id }, isManagement: true)
             }
 
             heading(tr("My memberships", "Mine medlemskap"), "person.3")
@@ -1892,7 +1975,26 @@ struct ATHLTHClubsHubView: View {
                 empty(tr("No other memberships yet", "Ingen andre medlemskap ennå"),
                       tr("Discover a club that suits you.", "Utforsk klubber som passer deg."))
             } else {
-                clubGrid(joined, isManagement: false)
+                clubGrid(joined.filter { $0.id != favorite?.id }, isManagement: false)
+            }
+            if !activity.isEmpty {
+                heading(tr("Latest club activity", "Siste klubbaktivitet"), "bolt")
+                ForEach(activity) { item in
+                    if let club = groups.group(for: item.groupID) {
+                        NavigationLink {
+                            CommunityGroupDetailView(group: club)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(club.name).font(.caption.weight(.semibold))
+                                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                                Text(item.headline).font(.subheadline.weight(.medium))
+                                    .foregroundStyle(CommunityReferenceStyle.ink)
+                                Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption2).foregroundStyle(CommunityReferenceStyle.muted)
+                            }.padding(12).communityReferenceCard()
+                        }.buttonStyle(.plain)
+                    }
+                }
             }
             if !upcomingEvents.isEmpty {
                 heading(tr("Upcoming club events", "Kommende klubbarrangementer"), "calendar")
@@ -1925,11 +2027,22 @@ struct ATHLTHClubsHubView: View {
                         ? (club.creatorID == session.profile.userID
                             ? tr("Owner", "Eier") : tr("Admin", "Administrator"))
                         : tr("Member", "Medlem"))
+                    HStack(spacing: 8) {
+                        Button { togglePinned(club) } label: {
+                            actionLabel(pinnedClubID == club.id ? tr("Pinned", "Festet") : tr("Pin", "Fest"),
+                                        pinnedClubID == club.id ? "star.fill" : "star")
+                        }.buttonStyle(.plain)
+                        if isManagement {
+                            Button { invitationClub = club } label: {
+                                actionLabel(tr("Invite", "Inviter"), "person.badge.plus")
+                            }.buttonStyle(.plain)
+                        }
+                    }
                     if isManagement || groups.unreadClubGroupIDs.contains(club.id) {
                         HStack(spacing: 8) {
                             if isManagement {
                                 NavigationLink {
-                                    CommunityGroupDetailView(group: club, initialTab: .members)
+                                    CommunityGroupMembersView(group: club, managementMode: true)
                                 } label: {
                                     actionLabel(tr("Members", "Medlemmer"), "person.2")
                                 }.buttonStyle(.plain)
@@ -1979,6 +2092,24 @@ struct ATHLTHClubsHubView: View {
                     }
                 }
             }
+            VStack(alignment: .leading, spacing: 9) {
+                Picker(tr("Preferred training interest", "Foretrukket treningsinteresse"), selection: $preferredInterest) {
+                    ForEach(CommunityInterest.allCases) { item in Text(item.title).tag(item) }
+                }
+                .tint(CommunityReferenceStyle.darkGold)
+                .onChange(of: preferredInterest) { _, value in
+                    UserDefaults.standard.set(value.rawValue, forKey: preferenceKey + ".interest")
+                }
+                Button {
+                    Task { await locateNearbyClubs() }
+                } label: {
+                    actionLabel(locating ? tr("Finding clubs…", "Finner klubber…") :
+                                    tr("Sort by nearby", "Sorter etter nærhet"), "location")
+                }.buttonStyle(.plain).disabled(locating)
+                if let locationNotice {
+                    Text(locationNotice).font(.caption).foregroundStyle(CommunityReferenceStyle.muted)
+                }
+            }.padding(12).communityReferenceCard()
             heading(place.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     ? tr("Discover public clubs", "Utforsk offentlige klubber")
                     : tr("Clubs in your area", "Klubber i området"), "location")
@@ -1995,6 +2126,16 @@ struct ATHLTHClubsHubView: View {
                         clubRow(club, status: club.joinMode == "approval"
                                 ? tr("Approval required", "Krever godkjenning")
                                 : tr("Public club", "Offentlig klubb"))
+                        if let km = distances[club.id] {
+                            Text(tr("Approx. \(Int(km.rounded())) km to registered place",
+                                    "Ca. \(Int(km.rounded())) km til registrert sted"))
+                                .font(.caption).foregroundStyle(CommunityReferenceStyle.muted)
+                        }
+                        if friendCreators.contains(club.creatorID) {
+                            Label(tr("Created by a mutual friend", "Opprettet av en gjensidig venn"),
+                                  systemImage: "person.2")
+                                .font(.caption).foregroundStyle(CommunityReferenceStyle.darkGold)
+                        }
                         let pending = requests.contains { $0.groupID == club.id }
                         Button {
                             join(club)
@@ -2021,6 +2162,131 @@ struct ATHLTHClubsHubView: View {
                 .disabled(groups.isLoadingMoreGroups || groups.isLoading)
             }
         }
+    }
+
+    private var administrationPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                heading(tr("Incoming requests", "Innkommende medlemsforespørsler"), "person.badge.plus")
+                if loadingRequests { ProgressView() }
+                if let requestError {
+                    Text(requestError).font(.caption).foregroundStyle(CommunityReferenceStyle.muted)
+                    Button(tr("Retry", "Prøv igjen")) { Task { await reloadAdminRequests() } }
+                } else if adminRequests.isEmpty && !loadingRequests {
+                    empty(tr("No pending requests", "Ingen ventende forespørsler"),
+                          tr("New membership requests appear here.", "Nye medlemsforespørsler vises her."))
+                }
+                ForEach(adminRequests, id: \.self) { request in
+                    if let club = managed.first(where: { $0.id == request.groupID }) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(club.name).font(.caption.weight(.semibold))
+                                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                            if let profile = groups.profileCard(for: request.userID) {
+                                Text(profile.resolvedName).font(.headline)
+                                HStack {
+                                    Button { answer(request, accept: false) } label: {
+                                        actionLabel(tr("Decline", "Avslå"), "xmark")
+                                    }.buttonStyle(.plain)
+                                    Button { answer(request, accept: true) } label: {
+                                        actionLabel(tr("Approve", "Godkjenn"), "checkmark")
+                                    }.buttonStyle(.plain)
+                                }.disabled(busyGroup != nil)
+                            } else {
+                                NavigationLink {
+                                    CommunityGroupMembersView(group: club, managementMode: true)
+                                } label: { actionLabel(tr("Review request", "Se forespørsel"), "person.2") }
+                            }
+                        }.padding(12).communityReferenceCard()
+                    }
+                }
+                heading(tr("Manage clubs", "Administrer klubber"), "gearshape")
+                ForEach(managed) { club in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(club.name).font(.headline)
+                        NavigationLink {
+                            CommunityGroupSettingsView(group: club)
+                        } label: { actionLabel(tr("Club settings", "Klubbinnstillinger"), "gearshape") }
+                        NavigationLink {
+                            CommunityGroupMembersView(group: club, managementMode: true)
+                        } label: { actionLabel(tr("Manage members", "Administrer medlemmer"), "person.2") }
+                        NavigationLink {
+                            CommunityGroupInviteMemberView(group: club)
+                        } label: { actionLabel(tr("Invite people", "Inviter personer"), "person.badge.plus") }
+                    }.padding(12).communityReferenceCard()
+                }
+            }.padding(18)
+        }
+        .background(CommunityReferenceStyle.canvas)
+        .refreshable { await reloadAdminRequests() }
+    }
+
+    private func reloadAdminRequests() async {
+        let account = session.profile.userID
+        loadingRequests = true
+        defer { if session.profile.userID == account { loadingRequests = false } }
+        do {
+            let rows = try await groups.loadHubJoinRequests(groupIDs: managed.map(\.id))
+            guard !Task.isCancelled, session.profile.userID == account else { return }
+            adminRequests = rows; requestError = nil
+        } catch {
+            guard !Task.isCancelled, session.profile.userID == account else { return }
+            requestError = tr("Could not load membership requests.", "Kunne ikke hente medlemsforespørsler.")
+        }
+    }
+
+    private func answer(_ request: CommunityGroupJoinRequestRecord, accept: Bool) {
+        guard busyGroup == nil, managed.contains(where: { $0.id == request.groupID }) else { return }
+        busyGroup = request.groupID
+        let account = session.profile.userID
+        Task {
+            let success = await groups.respondToJoinRequest(groupID: request.groupID,
+                                                              userID: request.userID, accept: accept)
+            guard session.profile.userID == account else { return }
+            busyGroup = nil
+            if success { await reloadAdminRequests() }
+            else { requestError = tr("Could not respond. Try again.", "Kunne ikke svare. Prøv igjen.") }
+        }
+    }
+
+    // Only requested on explicit tap. Coordinates remain local; the geocoder
+    // receives public registered place names, not a member's GPS location.
+    private func locateNearbyClubs() async {
+        guard !locating else { return }
+        locating = true
+        let account = session.profile.userID
+        defer { locating = false }
+        guard let origin = await locationStore.requestCurrentLocation(),
+              session.profile.userID == account else {
+            locationNotice = tr("Location unavailable. Search by city instead.",
+                                "Posisjon utilgjengelig. Søk etter by i stedet.")
+            return
+        }
+        let candidates = Array(results.prefix(20))
+        let geocoder = CLGeocoder()
+        var byPlace: [String: CLLocation] = [:]
+        var attempted = Set<String>()
+        var measured: [UUID: Double] = [:]
+        for club in candidates {
+            guard !Task.isCancelled, session.profile.userID == account else { return }
+            let name = club.locationName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { continue }
+            if !attempted.contains(name), attempted.count < 10 {
+                attempted.insert(name)
+                if let matches = try? await geocoder.geocodeAddressString(name),
+                   matches.count == 1, let point = matches.first?.location {
+                    byPlace[name] = point
+                }
+            }
+            if let point = byPlace[name] {
+                measured[club.id] = origin.distance(from: point) / 1_000
+            }
+        }
+        guard session.profile.userID == account else { return }
+        distances = measured
+        locationNotice = measured.isEmpty
+            ? tr("No unambiguous registered locations found.", "Fant ingen entydige registrerte steder.")
+            : tr("Approximate distances for the first clubs with known places. Not exact club addresses.",
+                 "Omtrentlige avstander for de første klubbene med kjente steder. Ikke eksakte klubbadresser.")
     }
 
     private func searchField(_ placeholder: String, symbol: String, text: Binding<String>) -> some View {
@@ -2136,6 +2402,23 @@ struct ATHLTHClubsHubView: View {
 }
 
 enum ATHLTHClubHubPolicy {
+    static func ranked(_ clubs: [CommunityGroupRecord], preferred: CommunityInterest,
+                       friendCreators: Set<UUID>, distances: [UUID: Double]) -> [CommunityGroupRecord] {
+        clubs.sorted { lhs, rhs in
+            if !distances.isEmpty {
+                let a = distances[lhs.id] ?? .infinity, b = distances[rhs.id] ?? .infinity
+                if a != b { return a < b }
+            }
+            func score(_ club: CommunityGroupRecord) -> Int {
+                (preferred != .all && preferred.matchesClub(club) ? 2 : 0) +
+                    (friendCreators.contains(club.creatorID) ? 1 : 0)
+            }
+            let a = score(lhs), b = score(rhs)
+            if a != b { return a > b }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
     static func manages(_ club: CommunityGroupRecord, memberships: [CommunityGroupMemberRecord],
                         account: UUID) -> Bool {
         club.creatorID == account || memberships.contains {

@@ -2134,8 +2134,9 @@ final class CommunityGroupStore: ObservableObject {
             return true
         }
 
+        guard let currentUserID else { return false }
         return ownMemberships.contains {
-            $0.groupID == group.id &&
+            $0.userID == currentUserID && $0.groupID == group.id &&
             ($0.role == "owner" || $0.role == "admin")
         }
     }
@@ -4217,6 +4218,31 @@ final class CommunityGroupStore: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             return "error"
+        }
+    }
+
+    /// Lightweight cross-club administration; never loads full chats,
+    /// calendars or member histories merely to show pending requests.
+    func loadHubJoinRequests(groupIDs: [UUID]) async throws -> [CommunityGroupJoinRequestRecord] {
+        guard let account = currentUserID else { return [] }
+        let allowed = groupIDs.filter { id in
+            group(for: id).map { canManage($0) } == true
+        }
+        guard !allowed.isEmpty else { return [] }
+        let rows: [CommunityGroupJoinRequestRecord] = try await client
+            .from("community_group_join_requests").select()
+            .in("group_id", values: allowed.map(\.uuidString))
+            .eq("status", value: "pending")
+            .order("created_at", ascending: true)
+            .execute().value
+        let ids = Array(Set(rows.map(\.userID)))
+        let profiles: [SocialProfileCard] = ids.isEmpty ? [] : try await client
+            .from("social_profile_cards").select()
+            .in("user_id", values: ids.map(\.uuidString)).execute().value
+        guard !Task.isCancelled, currentUserID == account else { throw CancellationError() }
+        for profile in profiles { profileCardsByID[profile.userID] = profile }
+        return rows.filter { row in
+            group(for: row.groupID).map { canManage($0) } == true
         }
     }
 
@@ -16316,6 +16342,11 @@ struct CommunityGroupInviteMemberView: View {
     @State private var query = ""
     @State private var sendingIDs: Set<UUID> = []
     @State private var invitedIDs: Set<UUID> = []
+    @State private var inviteFailure: String?
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
     private var existingMemberIDs: Set<UUID> {
         Set(
@@ -16394,7 +16425,7 @@ struct CommunityGroupInviteMemberView: View {
                                 profile.userID
                             ) {
                                 Label(
-                                    "Invited",
+                                    tr("Invited", "Invitert"),
                                     systemImage: "checkmark"
                                 )
                                 .font(.caption.weight(.semibold))
@@ -16402,7 +16433,7 @@ struct CommunityGroupInviteMemberView: View {
                                     ATHLTHTheme.accentDeep
                                 )
                             } else {
-                                Button("Invite") {
+                                Button(tr("Invite", "Inviter")) {
                                     Task {
                                         sendingIDs.insert(
                                             profile.userID
@@ -16423,6 +16454,8 @@ struct CommunityGroupInviteMemberView: View {
                                             invitedIDs.insert(
                                                 profile.userID
                                             )
+                                        } else {
+                                            inviteFailure = groups.errorMessage ?? tr("Could not send invitation.", "Kunne ikke sende invitasjon.")
                                         }
                                     }
                                 }
@@ -16439,9 +16472,14 @@ struct CommunityGroupInviteMemberView: View {
             }
             .searchable(
                 text: $query,
-                prompt: "Search username or name"
+                prompt: tr("Search username or name", "Søk etter brukernavn eller navn")
             )
-            .navigationTitle("Invite Members")
+            .navigationTitle(tr("Invite Members", "Inviter medlemmer"))
+            .alert(tr("Invitation", "Invitasjon"), isPresented: Binding(
+                get: { inviteFailure != nil }, set: { if !$0 { inviteFailure = nil } }
+            )) {
+                Button("OK", role: .cancel) { inviteFailure = nil }
+            } message: { Text(inviteFailure ?? "") }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(
