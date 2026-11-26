@@ -8,8 +8,18 @@ struct ATHLTHTrainTodayCoverView: View {
     @Binding var selection: ATHLTHTrainSection
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private let ink = ATHLTHTrainDesign.ink
+
+    private var coverHeight: CGFloat {
+        let fullHeight = (dynamicTypeSize.isAccessibilitySize ? 465.0 : 378.0)
+            + ATHLTHCoverSafeArea.statusBarTop
+        // Compact phone layouts show more of Today's cards without scaling text.
+        // Keep the original room for larger text sizes and regular-width iPad.
+        return horizontalSizeClass == .compact && dynamicTypeSize <= .large
+            ? fullHeight * 0.8 : fullHeight
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -72,8 +82,7 @@ struct ATHLTHTrainTodayCoverView: View {
                 style: .continuous
             ))
         }
-        .frame(height: (dynamicTypeSize.isAccessibilitySize ? 465 : 378)
-                      + ATHLTHCoverSafeArea.statusBarTop)
+        .frame(height: coverHeight)
         .accessibilityElement(children: .contain)
         .accessibilityValue(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
     }
