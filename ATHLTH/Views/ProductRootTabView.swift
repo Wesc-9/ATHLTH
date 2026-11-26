@@ -9007,17 +9007,21 @@ struct ATHLTHTrainView: View {
             return
         }
         customQuickInitialActivity = activity
-        isFreeTrainingQuickStart = false
-        showingCustomQuickStart = true
+        isFreeTrainingQuickStart = activity == .sports
+        if activity == .sports && !watchConnection.isReady {
+            startFreeTrainingQuick(as: .sports)
+        } else {
+            showingCustomQuickStart = true
+        }
     }
 
     /// One-tap free training starts the existing open-ended iPhone timer.
     /// No setup sheet, no invented workouts and no automatic retrospective log.
     /// The user's finish/discard action still owns whether the workout saves.
-    private func startFreeTrainingQuick() {
+    private func startFreeTrainingQuick(as activity: CustomQuickWorkoutActivity = .other) {
         if let timed = ATHLTHManualTimedCapture.current(
             for: session.profile.userID
-        ), timed.activity == .other {
+        ), timed.activity == activity {
             activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
                 configuration: timed.recoveryConfiguration,
                 mode: .timed
@@ -9035,18 +9039,7 @@ struct ATHLTHTrainView: View {
         social.quickTrainFriendIDs.removeAll()
         social.discardPreparedQuickTrainFriends()
         activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(
-            configuration: CustomQuickWorkoutConfiguration(
-                activity: .other,
-                method: .open,
-                durationMinutes: 45,
-                workSeconds: 40,
-                restSeconds: 20,
-                rounds: 8,
-                titleOverride: ATHLTHLocalization.choose(
-                    english: "Free training",
-                    norwegian: "Fri trening"
-                )
-            ),
+            configuration: .openTimed(activity: activity),
             mode: .timed
         )
     }
@@ -9628,16 +9621,7 @@ struct ATHLTHTrainView: View {
 
         case let .customQuickActivity(activity):
             selectedSection = .today
-            customQuickInitialActivity = activity
-            isFreeTrainingQuickStart = false
-            if customQuickStartAvailable {
-                showingCustomQuickStart = true
-            } else {
-                watchTransferError = ATHLTHLocalization.choose(
-                    english: "Finish your current workout first.",
-                    norwegian: "Avslutt økten som pågår først."
-                )
-            }
+            startCustomQuick(as: activity)
 
         case .customQuick:
             selectedSection = .today

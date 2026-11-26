@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Presents the nine primary training activities in a compact 3 × 3 grid.
+/// Presents the primary training activities in a responsive three-column grid.
 /// Supported activities reuse the existing Train start flow and recorder;
 /// unavailable activities remain visible but cannot be started.
 struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
@@ -22,13 +22,13 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
     enum Category: String, CaseIterable, Identifiable {
         case freeTraining, walking, running
         case strength, cycling, swimming
-        case yoga, meditation, custom
+        case yoga, meditation, sports, custom
 
         var id: String { rawValue }
 
         var isAvailable: Bool {
             switch self {
-            case .freeTraining, .walking, .running, .strength, .custom:
+            case .freeTraining, .walking, .running, .strength, .sports, .custom:
                 return true
             case .cycling, .swimming, .yoga, .meditation:
                 return false
@@ -45,6 +45,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             case .swimming: return tr("Swimming", "Svømming")
             case .yoga: return "Yoga"
             case .meditation: return tr("Meditation", "Meditasjon")
+            case .sports: return tr("Sports", "Idrett")
             case .custom: return tr("Custom", "Egendefinert")
             }
         }
@@ -59,6 +60,8 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
                 return tr("Route, free run or intervals", "Rute, fri løping eller intervall")
             case .strength:
                 return tr("Free strength or saved sessions", "Fri styrke eller lagrede økter")
+            case .sports:
+                return tr("Open timed sport", "Fri idrett med tidtaking")
             case .custom:
                 return tr("Configure your own activity", "Tilpass en egen aktivitet")
             case .cycling, .swimming, .yoga, .meditation:
@@ -76,6 +79,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             case .swimming: return "figure.pool.swim"
             case .yoga: return "figure.yoga"
             case .meditation: return "figure.mind.and.body"
+            case .sports: return "sportscourt.fill"
             case .custom: return "figure.mixed.cardio"
             }
         }
@@ -262,6 +266,8 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             selectedCategory = category
         case .freeTraining:
             choose(.freeTraining)
+        case .sports:
+            choose(.custom(.sports))
         case .custom:
             choose(.custom(.other))
         case .cycling, .swimming, .yoga, .meditation:
@@ -335,7 +341,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
             actionRow(icon: "trophy", title: tr("Competition", "Konkurranse"),
                       detail: tr("Duel, league or cup", "Duell, liga eller cup"),
                       action: .competition(.strength))
-        case .freeTraining, .custom, .cycling, .swimming, .yoga, .meditation:
+        case .freeTraining, .sports, .custom, .cycling, .swimming, .yoga, .meditation:
             EmptyView()
         }
     }

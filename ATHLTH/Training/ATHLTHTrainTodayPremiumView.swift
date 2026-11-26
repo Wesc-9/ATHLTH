@@ -779,7 +779,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     // Click history reflects intentional entry choices, not completed
     // workout statistics. Ordering is per ATHLTH account on this device.
     private enum QuickActivity: String, CaseIterable, Identifiable {
-        case running, walking, strength, cycling, freeTraining, custom
+        case running, walking, strength, cycling, sports, freeTraining, custom
         var id: String { rawValue }
         var isAvailable: Bool { self != .cycling }
 
@@ -789,6 +789,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             case .walking: return "GoalWalking"
             case .strength: return "StrengthQuickHero"
             case .cycling: return "TrainHero"
+            case .sports: return "GoalAdventure"
             case .freeTraining: return "GoalAdventure"
             case .custom: return "GoalAdventure"
             }
@@ -800,6 +801,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             case .walking: return "figure.walk"
             case .strength: return "dumbbell.fill"
             case .cycling: return "bicycle"
+            case .sports: return "sportscourt.fill"
             case .freeTraining: return "figure.cross.training"
             case .custom: return "figure.mixed.cardio"
             }
@@ -815,6 +817,8 @@ struct ATHLTHTrainTodayPremiumView: View {
                 return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
             case .cycling:
                 return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+            case .sports:
+                return ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
             case .freeTraining:
                 return ATHLTHLocalization.choose(
                     english: "Free training", norwegian: "Fri trening"
@@ -850,6 +854,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         case .walking: onQuickTrain(.walking)
         case .strength: onQuickTrain(.strength)
         case .cycling: onQuickCycling()
+        case .sports: onQuickCustom(.sports)
         case .freeTraining: onQuickFreeTraining()
         case .custom: onQuickCustom(.other)
         }
@@ -1137,9 +1142,9 @@ struct ATHLTHTrainTodayPremiumView: View {
                 ),
                 spacing: 9
             ) {
-                // The approved six choices remain in predictable positions
-                // rather than rearranging themselves after each workout.
-                ForEach(QuickActivity.allCases) { activity in
+                // Keep six primary shortcuts; unavailable cycling remains
+                // visible in the full activity catalogue.
+                ForEach(QuickActivity.allCases.filter { $0 != .cycling }) { activity in
                     quickPhotoChoice(activity)
                         .disabled(hasActiveWorkout || !activity.isAvailable)
                 }

@@ -55,7 +55,7 @@ struct CustomQuickIPhoneWorkoutView: View {
                         if isTimed { liveTimer }
                         else { retrospectiveTime }
 
-                        manualMetrics
+                        if configuration.activity != .sports || !isTimed { manualMetrics }
 
                         VStack(alignment: .leading, spacing: 7) {
                             Label(
@@ -64,10 +64,13 @@ struct CustomQuickIPhoneWorkoutView: View {
                             )
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ink)
-                            Text(tr(
-                                "ATHLTH stores this as a manual workout. Time is measured by the iPhone timer or entered by you. Distance and effort are not verified by GPS, Apple Watch or HealthKit.",
-                                "ATHLTH lagrer dette som en manuelt registrert økt. Tiden måles med iPhone-tidtaker eller oppgis av deg. Distanse og innsats er ikke bekreftet av GPS, Apple Watch eller HealthKit."
-                            ))
+                            Text(configuration.activity == .sports && isTimed
+                                ? tr("Only elapsed time is recorded on iPhone. For sensor measurements, start the workout on Apple Watch.",
+                                     "iPhone registrerer kun treningstid. Start økten på Apple Watch for sensormålinger.")
+                                : tr(
+                                    "ATHLTH stores this as a manual workout. Time is measured by the iPhone timer or entered by you. Distance and effort are not verified by GPS, Apple Watch or HealthKit.",
+                                    "ATHLTH lagrer dette som en manuelt registrert økt. Tiden måles med iPhone-tidtaker eller oppgis av deg. Distanse og innsats er ikke bekreftet av GPS, Apple Watch eller HealthKit."
+                                ))
                             .font(.caption)
                             .foregroundStyle(muted)
                             .fixedSize(horizontal: false, vertical: true)

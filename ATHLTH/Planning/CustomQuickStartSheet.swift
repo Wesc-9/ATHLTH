@@ -242,6 +242,13 @@ struct CustomQuickWorkoutConfiguration: Hashable {
 }
 
 extension CustomQuickWorkoutConfiguration {
+    static func openTimed(activity: CustomQuickWorkoutActivity = .other) -> Self {
+        .init(activity: activity, method: .open, durationMinutes: 45,
+              workSeconds: 40, restSeconds: 20, rounds: 8,
+              titleOverride: activity == .sports ? activity.localizedTitle :
+                ATHLTHLocalization.choose(english: "Free training", norwegian: "Fri trening"))
+    }
+
     var trainTogetherInvitePayload: SocialWorkoutInvitePayload {
         let snapshot = PlannedSession(
             id: UUID(),
@@ -280,7 +287,7 @@ struct CustomQuickStartSheet: View {
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let onStart: (CustomQuickWorkoutConfiguration, CustomQuickStartDestination) -> Void
-    /// Only the Free Training shortcut uses the compact, zero-planning view.
+    /// Free Training and Sports reuse the compact, zero-planning view.
     /// Custom / Egendefinert keeps the complete activity and method editor.
     let simpleFreeTraining: Bool
 
@@ -309,7 +316,7 @@ struct CustomQuickStartSheet: View {
         self.watchConnected = watchConnected
         self.onStart = onStart
         self.simpleFreeTraining = simpleFreeTraining
-        _activity = State(initialValue: simpleFreeTraining ? .other : initialActivity)
+        _activity = State(initialValue: simpleFreeTraining && initialActivity != .sports ? .other : initialActivity)
     }
 
     private let ink = ATHLTHTheme.primaryText
@@ -432,7 +439,7 @@ struct CustomQuickStartSheet: View {
             }
             .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
             .navigationTitle(simpleFreeTraining
-                ? tr("Free training", "Fri trening")
+                ? (activity == .sports ? activity.localizedTitle : tr("Free training", "Fri trening"))
                 : tr("Custom workout", "Egendefinert økt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -531,20 +538,24 @@ struct CustomQuickStartSheet: View {
     private var freeTrainingIntro: some View {
         VStack(alignment: .leading, spacing: 18) {
             ATHLTHWorkoutDetailsCard(
-                activityTitle: tr("Free training", "Fri trening"),
-                symbol: "figure.cross.training"
+                activityTitle: activity == .sports ? activity.localizedTitle : tr("Free training", "Fri trening"),
+                symbol: activity == .sports ? activity.systemImage : "figure.cross.training"
             ) {
-                Text(tr(
-                    "No plan. No targets. Just go train.",
-                    "Ingen plan eller mål. Bare dra og tren."
-                ))
+                Text(activity == .sports
+                    ? tr("Play or practice without a distance or time goal. Stop whenever you are done.",
+                         "Kamp eller trening uten distanse- eller tidsmål. Avslutt når du er ferdig.")
+                    : tr("No plan. No targets. Just go train.",
+                         "Ingen plan eller mål. Bare dra og tren."))
                 .font(.subheadline)
                 .foregroundStyle(muted)
             }
 
             Label(
-                tr("Start on your iPhone or Apple Watch. Stop when you're done.",
-                   "Start på iPhone eller Apple Watch. Avslutt når du er ferdig."),
+                activity == .sports
+                    ? tr("iPhone measures time. Apple Watch can also record heart rate and calories when available.",
+                         "iPhone måler tid. Apple Watch kan også registrere puls og kalorier når tilgjengelig.")
+                    : tr("Start on your iPhone or Apple Watch. Stop when you're done.",
+                         "Start på iPhone eller Apple Watch. Avslutt når du er ferdig."),
                 systemImage: "play.circle"
             )
             .font(.subheadline)
@@ -671,7 +682,8 @@ struct CustomQuickStartSheet: View {
     }
 
     private var previewConfiguration: CustomQuickWorkoutConfiguration {
-        CustomQuickWorkoutConfiguration(
+        if simpleFreeTraining { return .openTimed(activity: activity) }
+        return CustomQuickWorkoutConfiguration(
             activity: activity,
             method: method,
             durationMinutes: durationMinutes,

@@ -76,3 +76,26 @@ final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
         }
     }
 }
+
+final class ATHLTHSportsQuickStartTests: XCTestCase {
+    func testSportsUsesAnOpenWorkoutAndIsAvailableInCatalogue() {
+        let category = ATHLTHTrainAllWorkoutCategoriesSheet.Category.sports
+        XCTAssertTrue(category.isAvailable)
+        XCTAssertEqual(category.icon, "sportscourt.fill")
+        let configuration = CustomQuickWorkoutConfiguration.openTimed(activity: .sports)
+        XCTAssertEqual(configuration.activity, .sports)
+        XCTAssertEqual(configuration.method, .open)
+        XCTAssertEqual(configuration.title, CustomQuickWorkoutActivity.sports.localizedTitle)
+        XCTAssertFalse(configuration.audioCoach.enabled)
+        XCTAssertFalse(configuration.activity.watchKind.supportsDistanceMetric)
+        XCTAssertEqual(ATHLTHOtherSportLiveResolver.resolve(
+            kind: configuration.activity.watchKind, distanceMeters: 1_000), .elapsed)
+    }
+
+    func testFreeTrainingRemainsOpenAndSeparate() {
+        let configuration = CustomQuickWorkoutConfiguration.openTimed()
+        XCTAssertEqual(configuration.activity, .other)
+        XCTAssertEqual(configuration.method, .open)
+        XCTAssertNotEqual(configuration.title, CustomQuickWorkoutConfiguration.openTimed(activity: .sports).title)
+    }
+}
