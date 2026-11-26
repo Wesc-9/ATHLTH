@@ -1,352 +1,201 @@
 import SwiftUI
 import UIKit
 
+/// Compact two-person comparison, independent from the legacy ranking UI.
 struct CommunityFriendsVsFriendsCard: View {
+    @EnvironmentObject private var social: SocialStore
+    @Environment(\.scenePhase) private var scenePhase
+
     let currentUserID: UUID
     let currentDisplayName: String
     let currentAvatarURL: URL?
     let friends: [SocialProfileCard]
     let feed: [SocialFeedItem]
     let ownWorkouts: [WorkoutSummary]
+    var isActive = true
 
-    private struct Entry: Identifiable {
-        let id: UUID
-        let name: String
-        let avatarURL: URL?
-        let score: Double
-        let isCurrentUser: Bool
+    @State private var loaded: Snapshot?
+    private struct Snapshot {
+        let owner: UUID
+        let friend: UUID
+        let rows: [SocialActivityRecord]
     }
 
-    /// The preview and detail now use the same all-sport activity score.
-    /// Shared feed rows may omit duration; the completed workout still counts.
-    private var entries: [Entry] {
-        let threshold = Calendar.current.date(
-            byAdding: .day, value: -7, to: Date()
-        ) ?? .distantPast
-        let own = ownWorkouts.filter { $0.startDate >= threshold }
-        let ownDuration = own.reduce(0) { $0 + max($1.duration, 0) } / 60
-        let ownScore = CommunityMatchupVisualPolicy.pointsBreakdown(
-            workouts: Double(own.count),
-            activeMinutes: ownDuration
-        )
-        var result: [Entry] = [
-            Entry(
-                id: currentUserID,
-                name: currentDisplayName.isEmpty ? "You" : currentDisplayName,
-                avatarURL: currentAvatarURL,
-                score: (ownScore?.workoutPoints ?? 0) +
-                    (ownScore?.timePoints ?? 0),
-                isCurrentUser: true
-            )
-        ]
-        for friend in friends {
-            let activities = feed.filter {
-                $0.actor.userID == friend.userID &&
-                $0.activity.createdAt >= threshold &&
-                $0.activity.kind == "workout"
-            }
-            let totalMinutes = activities.reduce(0.0) { total, item in
-                let seconds = Double(
-                    item.activity.metadata?["duration_seconds"] ?? ""
-                ) ?? 0
-                return total + max(seconds, 0) / 60
-            }
-            let parts = CommunityMatchupVisualPolicy.pointsBreakdown(
-                workouts: Double(activities.count),
-                activeMinutes: totalMinutes
-            )
-            result.append(Entry(
-                id: friend.userID,
-                name: friend.resolvedName,
-                avatarURL: friend.avatarURL.flatMap(URL.init(string:)),
-                score: (parts?.workoutPoints ?? 0) +
-                    (parts?.timePoints ?? 0),
-                isCurrentUser: false
-            ))
-        }
-        return Array(result.sorted {
-            if $0.score == $1.score {
-                return $0.name.localizedCaseInsensitiveCompare($1.name)
-                    == .orderedAscending
-            }
-            return $0.score > $1.score
-        }.prefix(4))
+    private let mineTint = Color(red: 0.20, green: 0.62, blue: 0.44)
+    private let theirTint = Color(red: 0.24, green: 0.48, blue: 0.88)
+    private let ink = Color(red: 0.11, green: 0.12, blue: 0.16)
+
+    private var eligibleFriends: [SocialProfileCard] {
+        friends.filter { social.isMutualFollow($0.userID) && !social.isMuted($0.userID) }
+    }
+
+    private var opponent: SocialProfileCard? {
+        // Stable ordering avoids switching rivals when reactions or new feed
+        // posts arrive. The detail destination still offers every mutual friend.
+        eligibleFriends.sorted {
+            let comparison = $0.resolvedName.localizedStandardCompare($1.resolvedName)
+            return comparison == .orderedSame
+                ? $0.userID.uuidString < $1.userID.uuidString
+                : comparison == .orderedAscending
+        }.first
+    }
+
+    private var taskKey: String {
+        "\(currentUserID)|\(opponent?.userID.uuidString ?? "")|\(isActive && scenePhase == .active)"
     }
 
     var body: some View {
-        ATHLTHCard {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Head-to-head",
-                        norwegian: "Head-to-head"
-                    ))
-                        .font(.title3.weight(.bold))
+        if let friend = opponent {
+            let threshold = Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .distantPast
+            let own = ownWorkouts.filter { $0.startDate >= threshold && $0.startDate <= .now }
+            let mine = CommunityMatchupVisualPolicy.totalPoints(
+                workouts: Double(own.count),
+                activeMinutes: own.reduce(0) { $0 + ($1.duration.isFinite ? max(0, $1.duration) : 0) } / 60
+            )
+            let authorizedRows = loaded.flatMap { snapshot -> [SocialActivityRecord]? in
+                guard snapshot.owner == currentUserID, snapshot.friend == friend.userID,
+                      social.currentUserID == currentUserID, social.isMutualFollow(friend.userID),
+                      !social.isMuted(friend.userID) else { return nil }
+                return snapshot.rows
+            }
+            let theirs = authorizedRows.map { rows in
+                rows.filter { $0.kind == "workout" && $0.createdAt >= threshold && $0.createdAt <= .now }
+            }
+            let friendScore = theirs.flatMap { rows in
+                CommunityMatchupVisualPolicy.totalPoints(
+                    workouts: Double(rows.count),
+                    activeMinutes: rows.reduce(0.0) { sum, row in
+                        let seconds = Double(row.metadata?["duration_seconds"] ?? "") ?? 0
+                        return sum + (seconds.isFinite ? max(0, seconds) : 0) / 60
+                    }
+                )
+            }
 
-                    Text(ATHLTHLocalization.choose(
-                        english: "Activity points · last 7 days",
-                        norwegian: "Aktivitetspoeng · siste 7 dager"
-                    ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if !friends.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ATHLTHLocalization.choose(english: "Friends vs friends", norwegian: "Venner mot venner"))
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(ink)
+                        Text(ATHLTHLocalization.choose(english: "Activity points · last 7 days", norwegian: "Aktivitetspoeng · siste 7 dager"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
                     NavigationLink {
                         CommunityFriendsVsFriendsDetailView(
                             currentUserID: currentUserID,
                             currentDisplayName: currentDisplayName,
                             currentAvatarURL: currentAvatarURL,
-                            friends: friends
+                            friends: eligibleFriends,
+                            initialFriendID: friend.userID
                         )
                     } label: {
-                        Text(ATHLTHLocalization.choose(
-                                english: "View", norwegian: "Se"
-                            ))
-                            .font(.caption.weight(.semibold))
-                    }
-                }
-            }
-
-            if friends.isEmpty {
-                NavigationLink {
-                    SocialHubView(initialTab: .discover)
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(
-                            systemName:
-                                "person.2.badge.plus"
-                        )
-                        .font(.title3)
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 3
-                        ) {
-                            Text(
-                                "Follow each other to compete"
-                            )
-                            .font(
-                                .subheadline
-                                    .weight(.semibold)
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-
-                            Text(
-                                "Mutual follows unlock private head-to-head training matchups."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.leading)
+                        HStack(spacing: 5) {
+                            Text(ATHLTHLocalization.choose(english: "See all", norwegian: "Se alle"))
+                            Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                         }
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                "chevron.right"
-                        )
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
-                    .padding(.top, 12)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-            } else {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(
-                        Array(entries.enumerated()),
-                        id: \.element.id
-                    ) { offset, entry in
-                        VStack(spacing: 6) {
-                            ZStack(alignment: .topLeading) {
-                                CommunityShowcaseAvatar(
-                                    url: entry.avatarURL,
-                                    fallback: entry.name,
-                                    size: 48
-                                )
 
-                                Text("\(offset + 1)")
-                                    .font(
-                                        .system(
-                                            size: 9,
-                                            weight: .bold
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        offset == 0
-                                            ? Color.white
-                                            : ATHLTHTheme.primaryText
-                                    )
-                                    .frame(width: 19, height: 19)
-                                    .background(
-                                        offset == 0
-                                            ? ATHLTHTheme.premiumGold
-                                            : Color(.systemGray5),
-                                        in: Circle()
-                                    )
-                                    .offset(x: -5, y: -5)
-                            }
-
-                            Text(
-                                entry.isCurrentUser
-                                    ? "You"
-                                    : firstName(entry.name)
-                            )
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-
-                            Text(
-                                String(
-                                    format: "%.0f p",
-                                    entry.score
-                                )
-                            )
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                            )
-                            .monospacedDigit()
-
-                            ProgressView(
-                                value: entry.score,
-                                total: max(topScore, 1)
-                            )
-                            .tint(
-                                offset == 0
-                                    ? ATHLTHTheme.premiumGold
-                                    : ATHLTHTheme.accentDeep
-                            )
-                        }
-                        .frame(maxWidth: .infinity)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 8) {
+                        athlete(name: ATHLTHLocalization.choose(english: "You", norwegian: "Deg"),
+                                avatarURL: currentAvatarURL, fallback: currentDisplayName,
+                                score: mine, count: own.count, tint: mineTint)
+                        versus
+                        athlete(name: friend.resolvedName.split(separator: " ").first.map(String.init) ?? friend.resolvedName,
+                                avatarURL: friend.avatarURL.flatMap(URL.init(string:)), fallback: friend.resolvedName,
+                                score: friendScore, count: theirs?.count, tint: theirTint)
+                    }
+                    VStack(spacing: 8) {
+                        athlete(name: ATHLTHLocalization.choose(english: "You", norwegian: "Deg"),
+                                avatarURL: currentAvatarURL, fallback: currentDisplayName,
+                                score: mine, count: own.count, tint: mineTint)
+                        versus
+                        athlete(name: friend.resolvedName, avatarURL: friend.avatarURL.flatMap(URL.init(string:)),
+                                fallback: friend.resolvedName, score: friendScore, count: theirs?.count, tint: theirTint)
                     }
                 }
-                .padding(.top, 16)
-
-                NavigationLink {
-                    CommunityFriendsVsFriendsDetailView(
-                        currentUserID: currentUserID,
-                        currentDisplayName: currentDisplayName,
-                        currentAvatarURL: currentAvatarURL,
-                        friends: friends
-                    )
-                } label: {
-                    HStack {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Open comparison",
-                                norwegian: "Åpne sammenligning"
-                            ),
-                            systemImage:
-                                "person.2.gobackward"
-                        )
-                        .font(
-                            .subheadline.weight(
-                                .semibold
-                            )
-                        )
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                "chevron.right"
-                        )
-                        .font(.caption.bold())
-                    }
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .padding(.horizontal, 13)
-                    .frame(height: 44)
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                    )
+                balanceBar(mine: mine, theirs: friendScore)
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 21))
+            .overlay { RoundedRectangle(cornerRadius: 21).strokeBorder(Color.black.opacity(0.06), lineWidth: 0.7).allowsHitTesting(false) }
+            .accessibilityIdentifier("athlth-community-friends-matchup")
+            .task(id: taskKey) {
+                guard isActive, scenePhase == .active else { return }
+                while !Task.isCancelled {
+                    let rows = await social.loadVisibleActivitiesForMatchup(friend.userID, ownerID: currentUserID)
+                    guard !Task.isCancelled, social.currentUserID == currentUserID,
+                          social.isMutualFollow(friend.userID), !social.isMuted(friend.userID) else { return }
+                    loaded = rows.map { Snapshot(owner: currentUserID, friend: friend.userID, rows: $0) }
+                    do { try await Task.sleep(for: .seconds(125)) } catch { return }
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 6)
             }
         }
     }
 
-    private var topScore: Double {
-        entries.map(\.score).max() ?? 0
-    }
-
-    private func firstName(
-        _ value: String
-    ) -> String {
-        value.split(separator: " ").first.map(String.init)
-            ?? value
-    }
-
-    private func runningKilometers(
-        _ activity: SocialActivityRecord
-    ) -> Double {
-        let kind =
-            activity.metadata?["kind"]?
-                .lowercased() ?? ""
-
-        guard kind.contains("run") ||
-                activity.title.lowercased().contains("run")
-        else {
-            return 0
-        }
-
-        if let raw =
-            activity.metadata?["distance_meters"],
-           let meters = Double(raw) {
-            return meters / 1_000
-        }
-
-        guard let subtitle = activity.subtitle else {
-            return 0
-        }
-
-        let parts = subtitle
-            .replacingOccurrences(of: ",", with: ".")
-            .split(separator: " ")
-
-        for index in parts.indices {
-            guard parts[index].lowercased() == "km",
-                  index > parts.startIndex,
-                  let value =
-                    Double(
-                        parts[
-                            parts.index(before: index)
-                        ]
-                    )
-            else {
-                continue
+    private func athlete(name: String, avatarURL: URL?, fallback: String,
+                         score: Double?, count: Int?, tint: Color) -> some View {
+        HStack(spacing: 7) {
+            CommunityShowcaseAvatar(url: avatarURL, fallback: fallback, size: 48)
+                .padding(3)
+                .overlay { Circle().strokeBorder(tint, lineWidth: 2.5) }
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.caption.weight(.semibold)).lineLimit(1)
+                Text(score.map { $0.formatted(.number.precision(.fractionLength(0))) + " p" } ?? "–")
+                    .font(.system(.title3, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                Text(count.map { value in
+                    value == 1 ? ATHLTHLocalization.choose(english: "1 workout", norwegian: "1 økt")
+                        : ATHLTHLocalization.choose(english: "\(value) workouts", norwegian: "\(value) økter")
+                } ?? ATHLTHLocalization.choose(english: "Unavailable", norwegian: "Ikke tilgjengelig"))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-
-            return value
+            .foregroundStyle(ink)
         }
+        .frame(minWidth: 106, maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
 
-        return 0
+    private var versus: some View {
+        ZStack {
+            Rectangle().fill(Color.gray.opacity(0.13)).frame(width: 1, height: 65).rotationEffect(.degrees(19))
+            Text("VS").font(.caption2.weight(.bold))
+                .foregroundStyle(ink)
+                .frame(width: 31, height: 31)
+                .background(.white, in: Circle())
+                .overlay { Circle().strokeBorder(Color.gray.opacity(0.19), lineWidth: 1) }
+        }
+        .frame(width: 34)
+        .accessibilityHidden(true)
+    }
+
+    private func balanceBar(mine: Double?, theirs: Double?) -> some View {
+        GeometryReader { geometry in
+            let total = (mine ?? 0) + (theirs ?? 0)
+            let available = max(0, geometry.size.width - 3)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.gray.opacity(0.12))
+                if mine != nil, theirs != nil, total > 0 {
+                    let share = CommunityMatchupVisualPolicy.share(mine: mine, theirs: theirs)
+                    HStack(spacing: 3) {
+                        Capsule().fill(mineTint).frame(width: available * share)
+                        Capsule().fill(theirTint).frame(width: available * (1 - share))
+                    }
+                }
+            }
+        }
+        .frame(height: 7)
+        .accessibilityHidden(true)
     }
 }
 

@@ -69,4 +69,11 @@ final class CommunityMatchupVisualPolicyTests: XCTestCase {
             accuracy: 0.0001
         )
     }
+
+    func testPreviewUsesEstablishedActivityPointFormula() {
+        XCTAssertEqual(CommunityMatchupVisualPolicy.totalPoints(workouts: 4, activeMinutes: 180), 116)
+        XCTAssertEqual(CommunityMatchupVisualPolicy.totalPoints(workouts: 1, activeMinutes: 400), 44)
+        XCTAssertEqual(CommunityMatchupVisualPolicy.totalPoints(workouts: 2, activeMinutes: nil), 40)
+        XCTAssertNil(CommunityMatchupVisualPolicy.totalPoints(workouts: nil, activeMinutes: nil))
+    }
 }

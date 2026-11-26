@@ -40,6 +40,12 @@ enum CommunityMatchupVisualPolicy {
         return (workoutPoints, cappedMinutes / 5)
     }
 
+    static func totalPoints(workouts: Double?, activeMinutes: Double?) -> Double? {
+        guard let parts = pointsBreakdown(workouts: workouts, activeMinutes: activeMinutes) else { return nil }
+        let total = parts.workoutPoints + parts.timePoints
+        return total.isFinite ? total : nil
+    }
+
     static func fraction(_ numerator: Double?, _ denominator: Double?) -> Double? {
         guard let numerator, let denominator,
               numerator.isFinite, denominator.isFinite,

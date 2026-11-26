@@ -1762,6 +1762,113 @@ struct OfficialWeeklyChallengeArtwork: View {
     }
 }
 
+/// Community-only presentation of the original official weekly challenge.
+/// The existing store, artwork, countdown and details remain authoritative.
+struct CommunityWeeklyChallengeHero: View {
+    @EnvironmentObject private var store: OfficialWeeklyChallengeStore
+    @EnvironmentObject private var health: HealthKitManager
+    let challenge: OfficialWeeklyChallenge
+    let profiles: [SocialProfileCard]
+
+    var body: some View {
+        NavigationLink {
+            OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                Label(ATHLTHLocalization.choose(english: "WEEKLY CHALLENGE", norwegian: "UKENS CHALLENGE"), systemImage: "trophy.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color(red: 0.36, green: 0.25, blue: 0.09))
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(Color(red: 0.98, green: 0.88, blue: 0.65), in: Capsule())
+                Text(OfficialWeeklyNorwegianCopy.title(challenge.title))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                Text(OfficialWeeklyNorwegianCopy.subtitle(challenge.subtitle))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.94))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 2)
+                HStack(spacing: 8) {
+                    participantAvatars
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("\(store.participantCount(for: challenge.id).formatted()) " +
+                              ATHLTHLocalization.choose(english: "participants", norwegian: "deltar"), systemImage: "person.2.fill")
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            Label(challenge.startsAt > context.date
+                                ? ATHLTHLocalization.choose(english: "Starts ", norwegian: "Starter ") + challenge.startsAt.formatted(.dateTime.month(.abbreviated).day())
+                                : OfficialWeeklyChallengeCountdown.remaining(until: challenge.endsAt, now: context.date),
+                                  systemImage: "clock")
+                        }
+                    }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 38, height: 38)
+                        .background(.white, in: Circle())
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 168, alignment: .leading)
+            .background {
+                GeometryReader { geometry in
+                    OfficialWeeklyChallengeArtwork(challenge: challenge, preserveOriginalColors: true)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                }
+                .overlay {
+                    LinearGradient(stops: [
+                        .init(color: .black.opacity(0.86), location: 0),
+                        .init(color: .black.opacity(0.58), location: 0.53),
+                        .init(color: .black.opacity(0.13), location: 1)
+                    ], startPoint: .leading, endPoint: .trailing)
+                }
+                .overlay {
+                    LinearGradient(colors: [.clear, .black.opacity(0.42)], startPoint: .top, endPoint: .bottom)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .contentShape(RoundedRectangle(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-community-weekly-challenge")
+        .task(id: health.workouts.map(\.id)) {
+            // Merely browsing Community never enrolls a user.
+            guard store.isJoined(challenge.id) else { return }
+            await store.syncCompletionState(workouts: health.workouts)
+        }
+    }
+
+    private var participantAvatars: some View {
+        let ids = Set(store.participantIDs(for: challenge.id))
+        let visible = profiles.filter { ids.contains($0.userID) }
+        let shown = Array(visible.prefix(3))
+        let remaining = max(0, store.participantCount(for: challenge.id) - shown.count)
+        return HStack(spacing: -7) {
+            ForEach(shown, id: \.userID) { profile in
+                OfficialChallengeAvatar(url: profile.avatarURL.flatMap(URL.init(string:)),
+                                        fallback: profile.resolvedName, size: 28)
+                    .overlay { Circle().strokeBorder(.white, lineWidth: 1.5) }
+            }
+            if remaining > 0 {
+                Text("+\(remaining.formatted(.number.notation(.compactName)))")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 5)
+                    .frame(minWidth: 28, minHeight: 28)
+                    .background(Color.black.opacity(0.65), in: Capsule())
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+
 struct OfficialWeeklyChallengeCard: View {
     @EnvironmentObject private var store: OfficialWeeklyChallengeStore
     @EnvironmentObject private var health: HealthKitManager

@@ -1037,6 +1037,20 @@ final class SocialStore: ObservableObject {
         return .none
     }
 
+    /// Unlike the legacy detail API, the compact preview must distinguish
+    /// a failed fetch from a successful empty activity history.
+    func loadVisibleActivitiesForMatchup(_ userID: UUID, ownerID: UUID) async -> [SocialActivityRecord]? {
+        guard currentUserID == ownerID, isMutualFollow(userID), !isMuted(userID) else { return nil }
+        do {
+            let rows = try await service.loadActivities(for: userID)
+            guard !Task.isCancelled, currentUserID == ownerID,
+                  isMutualFollow(userID), !isMuted(userID) else { return nil }
+            return rows
+        } catch {
+            return nil
+        }
+    }
+
     func loadActivitiesForMatchup(
         _ userID: UUID
     ) async -> [SocialActivityRecord] {

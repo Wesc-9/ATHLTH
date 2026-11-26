@@ -264,10 +264,7 @@ struct ATHLTHCommunityV5View: View {
 
     private var overview: some View {
         VStack(spacing: 15) {
-            weeklyChallengeSection
-            HomeActiveFriendsStrip(isActive: isActive)
-                .padding(14)
-                .communityReferenceCard()
+            weeklyChallengeHighlight
             if !social.mutualFollows.isEmpty {
                 CommunityFriendsVsFriendsCard(
                     currentUserID: session.profile.userID,
@@ -275,9 +272,13 @@ struct ATHLTHCommunityV5View: View {
                     currentAvatarURL: session.profile.avatarURL,
                     friends: social.mutualFollows,
                     feed: social.feed,
-                    ownWorkouts: health.workouts
+                    ownWorkouts: health.workouts,
+                    isActive: isActive
                 )
             }
+            HomeActiveFriendsStrip(isActive: isActive)
+                .padding(14)
+                .communityReferenceCard()
             shortcuts
             trainTogetherOverviewCard
             myClubsSection
@@ -364,29 +365,6 @@ struct ATHLTHCommunityV5View: View {
         .communityReferenceCard()
     }
 
-    // The weekly challenge lives once, at the top of Overview.
-    // Keep its existing progress and detail navigation unchanged.
-    private var weeklyChallengeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                communitySectionHeading(
-                    tr("This week's challenge", "Ukens utfordring"),
-                    icon: "star.fill"
-                )
-                Spacer()
-                NavigationLink {
-                    ChallengeHubView()
-                } label: {
-                    Text(tr("See all", "Se alle"))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(CommunityReferenceStyle.darkGold)
-                }
-            }
-            weeklyChallengeHighlight
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     // MARK: - Fellesskap 2.0.6: native editorial components
     // Screenshot images inform the layout. These cards read real store state
     // and route into the existing, authoritative detail editors.
@@ -405,10 +383,9 @@ struct ATHLTHCommunityV5View: View {
     private var weeklyChallengeHighlight: some View {
         Group {
             if let challenge = weekly.activeChallenge {
-                OfficialWeeklyChallengeCard(
+                CommunityWeeklyChallengeHero(
                     challenge: challenge,
-                    profiles: social.mutualFollows,
-                    automaticallyJoin: false
+                    profiles: social.mutualFollows
                 )
                 .accessibilityIdentifier("athlth-community-weekly-challenge")
             } else {
