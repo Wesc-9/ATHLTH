@@ -213,6 +213,7 @@ struct ATHLTHTournamentCreator: View {
             continuation?.approvePlayerChanges ?? false)
         _warmupRounds = State(initialValue:
             continuation?.warmupRounds ?? [])
+        _selectedSeasonID = State(initialValue: continuation?.seasonID)
         _proposalsCloseAt = State(initialValue:
             continuation?.proposalsCloseAt ??
                 Date().addingTimeInterval(2 * 86_400))
@@ -628,17 +629,19 @@ struct ATHLTHTournamentCreator: View {
     // competitionSettings. Scroll movement is saved on lifecycle transitions,
     // not on every frame.
     private var additionalCheckpointFields: [String] {
-        [title, format.rawValue, String(groupSize), String(qualifiersPerGroup),
-         String(cadenceDays), rotationMode.rawValue,
-         restWeekdays.sorted().map(String.init).joined(separator: ","),
-         String(winPoints), String(drawPoints), String(allowExtensions),
-         String(publicResults), String(approvePlayerChanges),
-         String(proposalsCloseAt.timeIntervalSinceReferenceDate),
-         String(votesCloseAt.timeIntervalSinceReferenceDate),
-         selectedSeasonID?.uuidString ?? "", selectedClubID?.uuidString ?? "",
-         inviteSource.rawValue,
-         chosenIDs.map(\.uuidString).sorted().joined(separator: ","),
-         warmupRounds.map { $0.id.uuidString + ":" + $0.title }.joined(separator: "|")]
+        var fields = [title, format.rawValue, String(groupSize), String(qualifiersPerGroup),
+                      String(cadenceDays), rotationMode.rawValue]
+        fields.append(restWeekdays.sorted().map { String($0) }.joined(separator: ","))
+        fields.append(contentsOf: [String(winPoints), String(drawPoints), String(allowExtensions),
+                                   String(publicResults), String(approvePlayerChanges)])
+        fields.append(String(proposalsCloseAt.timeIntervalSinceReferenceDate))
+        fields.append(String(votesCloseAt.timeIntervalSinceReferenceDate))
+        fields.append(selectedSeasonID?.uuidString ?? "")
+        fields.append(selectedClubID?.uuidString ?? "")
+        fields.append(inviteSource.rawValue)
+        fields.append(chosenIDs.map(\.uuidString).sorted().joined(separator: ","))
+        fields.append(warmupRounds.map { $0.id.uuidString + ":" + $0.title }.joined(separator: "|"))
+        return fields
     }
 
     private func checkpoint() {
@@ -687,7 +690,7 @@ struct ATHLTHTournamentCreator: View {
             groupSize: groupSize,
             qualifiersPerGroup: qualifiersPerGroup,
             participants: athletes,
-            warmupRounds: warmupRounds.enumerated().map { index, round in
+            warmupRounds: forCheckpoint ? warmupRounds : warmupRounds.enumerated().map { index, round in
                 var copy = round
                 let clean = round.title.trimmingCharacters(
                     in: .whitespacesAndNewlines
@@ -990,7 +993,7 @@ struct ATHLTHTournamentCreator: View {
     private var rematchExerciseSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle(isRematch ? "Velg øvelser til rematch" : "Konkurranseøvelser")
-            Text(isRematch ? "Behold øvelsene fra forrige duell, eller velg nye." : "Velg fra biblioteket nå, eller la deltakerne velge øvelser senere.")
+            Text(isRematch ? "Behold øvelsene fra forrige duell, eller velg nye." : isDuel ? "Velg øvelser og treningsøkter før invitasjonen sendes." : "Velg fra biblioteket nå, eller la deltakerne velge øvelser senere.")
                 .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
             if !usesExplicitExercises {
                 Label("Øvelser velges senere · " + exerciseMode.title, systemImage: "clock")
