@@ -367,13 +367,14 @@ struct ATHLTHTournamentLobbyCloudService {
         browse: Bool = false
     ) async throws -> [ATHLTHTournamentExerciseSearchResult] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !allowed.isEmpty, clean.count >= 2 || (browse && clean.isEmpty) else { return [] }
+        let operationalActivities = allowed.filter(\.isAvailableForCreation)
+        guard !operationalActivities.isEmpty, clean.count >= 2 || (browse && clean.isEmpty) else { return [] }
         // Browsing is explicit and bounded. The existing lobby's search-only
         // callers retain their previous minimum query length.
         let base = client.from("athlth_tournament_activity_templates")
             .select("id,title,activity_type,metric")
             .eq("is_active", value: true)
-            .in("activity_type", values: allowed.map(\.rawValue))
+            .in("activity_type", values: operationalActivities.map(\.rawValue))
         let presets: [ATHLTHTournamentActivityTemplateRemote]
         if clean.isEmpty {
             presets = try await base.order("title").limit(40).execute().value
@@ -387,7 +388,7 @@ struct ATHLTHTournamentLobbyCloudService {
                 metric: $0.metric ?? "repetitions", activity: $0.activityType
             )
         }
-        if allowed.contains(.strength) {
+        if operationalActivities.contains(.strength) {
             let exercises: [ATHLTHTournamentLibraryExerciseRemote]
             if clean.isEmpty {
                 exercises = try await client.from("exercise_catalog").select("id,name")
