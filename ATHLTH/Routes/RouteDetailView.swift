@@ -90,6 +90,7 @@ struct RouteDetailView: View {
     @StateObject private var routeLocation = HomeLocationStore()
 
     let route: TrainingRoute
+    var ghostCompetitionSetup = false
 
     @State private var showingDeleteConfirmation = false
     @State private var showingFullLeaderboard = false
@@ -236,10 +237,45 @@ struct RouteDetailView: View {
         return index + 1
     }
 
+    private var ghostOpponentCard: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Velg motstander").font(.headline)
+                NavigationLink {
+                    TargetGhostSetupView(route: directedRoute)
+                } label: {
+                    Label("Digital motstander · sluttid eller tempo", systemImage: "timer")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                ForEach(ownAttempts.filter { $0.leaderboardEligible }) { attempt in
+                    Button {
+                        Task { await startGhostRace(attempt: attempt) }
+                    } label: {
+                        HStack {
+                            Label(attempt.startedAt.formatted(date: .abbreviated, time: .omitted), systemImage: "person.crop.circle")
+                            Spacer()
+                            Text(clock(attempt.durationSeconds)).monospacedDigit()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(startingGhostAttemptID != nil || phoneWorkout.active != nil)
+                }
+                if ownAttempts.filter({ $0.leaderboardEligible }).isEmpty {
+                    Text("Ingen kvalifiserte egne ruteforsøk tilgjengelig ennå.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     private var routePrimaryContent: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 overviewCard
+                if ghostCompetitionSetup {
+                    ghostOpponentCard
+                }
                 mapCard
                 startDirectionsCard
                 elevationCard
