@@ -1268,6 +1268,8 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     // The guest may propose adding exercises only if the organizer allows it.
     // All proposed modifications still require organizer approval.
     var allowInviteeExercises: Bool? = nil
+    /// Shared planning environment, independent of the chosen exercise recipe.
+    var trainTogetherIndoor: Bool? = nil
 
 
     var sharedSourceOwnerID: UUID? = nil
