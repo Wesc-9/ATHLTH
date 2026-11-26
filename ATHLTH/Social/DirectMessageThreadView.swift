@@ -2744,6 +2744,24 @@ struct DirectMessageThreadView: View {
                         norwegian: "Invitasjonen er ikke lenger åpen.")
                     return
                 }
+                // Date counterproposals are server-owned, not historical chat snapshots.
+                // Never accept an outdated invitation while its date is being negotiated.
+                var agreedWorkout = workout
+                if accept {
+                    let live = TrainTogetherLiveDraftStore()
+                    await live.refresh(sourceID)
+                    if let error = live.errorMessage {
+                        plannedInviteError = error
+                        return
+                    }
+                    if live.draft?.proposedStart != nil {
+                        plannedInviteError = "Avklar det nye datoforslaget i fellesøkten før du godtar invitasjonen."
+                        return
+                    }
+                    if let current = live.workout {
+                        agreedWorkout = current
+                    }
+                }
                 let decision: PlannedWorkoutInviteDecision = accept
                     ? .accepted : .declined
                 let response = PlannedWorkoutInviteResponse(
@@ -2752,7 +2770,7 @@ struct DirectMessageThreadView: View {
                 )
                 let shared = try MessageShareDraft(
                     kind: .workout,
-                    title: workout.title,
+                    title: agreedWorkout.title,
                     subtitle: accept
                         ? ATHLTHLocalization.choose(
                             english: "Invitation accepted", norwegian: "Invitasjonen er godtatt"
@@ -2802,7 +2820,7 @@ struct DirectMessageThreadView: View {
                     return
                 }
                 if accept {
-                    var copy = workout
+                    var copy = agreedWorkout
                     copy.gearIDs = []
                     copy.spotifyPlaylist = nil
                     copy.spotifyAutoplayOnStart = false
