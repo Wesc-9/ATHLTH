@@ -79,6 +79,13 @@ struct WatchRunIntervalFocusPage: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(WatchTheme.accentDeep)
                         .accessibilityIdentifier("athlth-watch-interval-ghost-lead")
+                        if workout.structuredRunningWorkout?.soloGhostRace == true,
+                           let pace = step.ghostPaceSecondsPerKilometer,
+                           let gap = ATHLTHSoloGhostComparison.timeGap(leadMeters: lead, pace: pace) {
+                            Text("\(Int(abs(gap).rounded())) sek \(gap >= 0 ? "foran" : "bak")")
+                                .font(.system(size: 10, weight: .medium))
+                                .monospacedDigit()
+                        }
                     }
                     HStack(spacing: 9) {
                         if let target = targetPace(step) {

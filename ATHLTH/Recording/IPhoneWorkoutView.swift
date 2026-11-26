@@ -921,11 +921,12 @@ private struct IPhoneStructuredStepCard: View {
                                             elapsedSeconds: effortSeconds,
                                             distanceMeters: effortMeters
                                         ) {
+                                        let solo = workout.structuredRunningWorkout?.soloGhostRace == true
                                         Label(
-                                            ATHLTHLocalization.choose(
+                                            (solo ? "Ghost Race" : ATHLTHLocalization.choose(
                                                 english: "Interval Ghost",
                                                 norwegian: "Intervall-Ghost"
-                                            ) + " · \(Int(abs(ghostLead).rounded())) m " +
+                                            )) + " · \(Int(abs(ghostLead).rounded())) m " +
                                             ATHLTHLocalization.choose(
                                                 english: ghostLead >= 0 ? "ahead" : "behind",
                                                 norwegian: ghostLead >= 0 ? "foran" : "bak"
@@ -933,6 +934,11 @@ private struct IPhoneStructuredStepCard: View {
                                             systemImage: "figure.run.circle"
                                         )
                                         .font(.subheadline.weight(.semibold))
+                                        if solo, let pace = step.ghostPaceSecondsPerKilometer,
+                                           let gap = ATHLTHSoloGhostComparison.timeGap(leadMeters: ghostLead, pace: pace) {
+                                            Text("\(Int(abs(gap).rounded())) sek \(gap >= 0 ? "foran" : "bak") · Ghost \(GhostTargetPaceFormatter.text(secondsPerKilometer: pace))/km")
+                                                .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                                        }
                                     }
 
                                     HStack(spacing: 8) {
@@ -1691,6 +1697,23 @@ struct IPhoneWorkoutView: View {
                                         result.activeSeconds / 60
                                     )
                                 )
+                                if let plan = workout.structuredRunningWorkout, plan.soloGhostRace == true,
+                                   let step = plan.steps.first, let pace = step.ghostPaceSecondsPerKilometer,
+                                   let lead = ATHLTHSoloGhostComparison.lead(
+                                       elapsed: result.activeSeconds, meters: result.distanceMeters, pace: pace),
+                                   let gap = ATHLTHSoloGhostComparison.timeGap(leadMeters: lead, pace: pace) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Ghost Race · resultat").font(.subheadline.weight(.semibold))
+                                        Text("\(Int(abs(lead).rounded())) m \(lead >= 0 ? "foran" : "bak") · \(Int(abs(gap).rounded())) sek")
+                                            .font(.caption.monospacedDigit())
+                                        Text("Ghost \(GhostTargetPaceFormatter.text(secondsPerKilometer: pace))/km")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        if step.measure == .distance,
+                                           let target = step.distanceMeters, result.distanceMeters < target {
+                                            Text("Distansemålet ble ikke fullført.").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
                                 if result.pausedSeconds > 0.5 {
                                     Text(
                                         ATHLTHLocalization.choose(

@@ -283,3 +283,21 @@ enum ATHLTHIntervalGhostPacer {
             (step.ghostPaceSecondsPerKilometer ?? 0) > 0
     }
 }
+
+
+/// Shared constant-pace comparison; seconds are an equivalent time gap at
+/// the ghost's speed, not a prediction of future finish time.
+enum ATHLTHSoloGhostComparison {
+    static func timeGap(leadMeters: Double, pace: Double) -> Double? {
+        guard leadMeters.isFinite, pace.isFinite, (120...1_800).contains(pace) else { return nil }
+        let gap = leadMeters * pace / 1_000
+        return gap.isFinite ? gap : nil
+    }
+
+    static func lead(elapsed: Double, meters: Double, pace: Double) -> Double? {
+        guard elapsed.isFinite, meters.isFinite, elapsed >= 0, meters >= 0,
+              pace.isFinite, (120...1_800).contains(pace) else { return nil }
+        let result = meters - elapsed * 1_000 / pace
+        return result.isFinite ? result : nil
+    }
+}

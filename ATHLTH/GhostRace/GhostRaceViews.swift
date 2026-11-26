@@ -4003,7 +4003,10 @@ struct ATHLTHSoloGhostSetupView: View {
                     .font(ATHLTHTrainDesign.pageSubtitle)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                 NavigationLink {
-                    ATHLTHSoloGhostRoutePicker(onCreate: { showingBuilder = true })
+                    ATHLTHSoloGhostRoutePicker(onCreate: {
+                        createdRoute = nil
+                        showingBuilder = true
+                    })
                 } label: {
                     choice("Rute", detail: "Velg en løype og en motstander eller måltid.", icon: "map")
                 }.buttonStyle(.plain)
@@ -4175,6 +4178,7 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
     @State private var device: WorkoutCaptureDevice = .iPhone
     @State private var starting = false
     @State private var reviewing = false
+    @State private var startedSuccessfully = false
     @State private var errorMessage: String?
 
     private var meters: Double? {
@@ -4218,7 +4222,9 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
         }
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $reviewing) { review }
+        .sheet(isPresented: $reviewing, onDismiss: {
+            if startedSuccessfully { onStarted() }
+        }) { review }
         .alert("Ghost Race", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
@@ -4272,6 +4278,34 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
                                 .background(pace == option ? ATHLTHTrainDesign.bronze.opacity(0.19) : ATHLTHTheme.surfaceStone,
                                             in: RoundedRectangle(cornerRadius: 10))
                         }.buttonStyle(.plain)
+                    }
+                }
+                if fixedDistance, let meters {
+                    let matching = health.workouts.filter { run in
+                        guard run.activity == .running, let distance = run.distanceMeters,
+                              distance > 0, abs(distance - meters) <= max(100, meters * 0.03)
+                        else { return false }
+                        let average = run.duration * 1_000 / distance
+                        return (120...1_800).contains(average)
+                    }.sorted { $0.startDate > $1.startDate }
+                    if !matching.isEmpty {
+                        Menu {
+                            ForEach(Array(matching.prefix(10))) { run in
+                                Button {
+                                    if let distance = run.distanceMeters, distance > 0 {
+                                        pace = GhostTargetPaceFormatter.text(secondsPerKilometer: run.duration * 1_000 / distance)
+                                    }
+                                } label: {
+                                    Text(run.startDate.formatted(date: .abbreviated, time: .omitted) +
+                                         " · " + formatDuration(run.duration))
+                                }
+                            }
+                        } label: {
+                            Label("Bruk snittfart fra tidligere økt", systemImage: "clock.arrow.circlepath")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        Text("Dette setter en digital fartsholder, ikke en GPS-replay.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if let meters, let paceSeconds {
@@ -4337,8 +4371,8 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
                 maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
                     configured: session.onboardingProfile?.maximumHeartRateBPM,
                     dateOfBirth: session.onboardingProfile?.dateOfBirth))
+            startedSuccessfully = true
             reviewing = false
-            onStarted()
         } catch {
             reviewing = false
             errorMessage = error.localizedDescription

@@ -31,6 +31,7 @@ enum ATHLTHSoloGhostPacePolicy {
         configuration.coverage = .entireWorkout
         var transfer = WatchRunningWorkoutTransfer(title: "Ghost Race", steps: [step])
         transfer.intervalGhostConfiguration = configuration
+        transfer.soloGhostRace = true
         transfer.autoAdvanceTimedSteps = true
         return transfer
     }
@@ -62,6 +63,12 @@ enum GhostRaceStartService {
         }
         if captureDevice == .appleWatch && !watchConnection.isReady {
             throw failure("Apple Watch er ikke klar til å starte.")
+        }
+        try await watchConnection.requireNoActiveWatchWorkout()
+        guard phoneWorkout.active == nil, !phoneWorkout.hasPendingLaunch,
+              !watchConnection.hasActiveIPhoneWorkout,
+              !watchConnection.workoutLaunchInProgress else {
+            throw failure("En annen treningsøkt er aktiv eller i ferd med å starte.")
         }
         transfer.heartRateZoneMaximumBPM = maximumHeartRateBPM
         var audio = settings.audioCoachConfiguration(enabled: settings.audioCoachEnabledByDefault,

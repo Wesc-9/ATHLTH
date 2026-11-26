@@ -151,10 +151,19 @@ final class ATHLTHGhostPaceTimeConversionTests: XCTestCase {
 
 // Verify route-free competition uses the same transfer on phone and Watch.
 final class ATHLTHSoloGhostPacePolicyTests: XCTestCase {
+    func testSignedTimeGapAndInvalidData() throws {
+        let lead = try XCTUnwrap(ATHLTHSoloGhostComparison.lead(elapsed: 300, meters: 1_100, pace: 300))
+        XCTAssertEqual(lead, 100, accuracy: 0.001)
+        XCTAssertEqual(ATHLTHSoloGhostComparison.timeGap(leadMeters: lead, pace: 300), 30)
+        XCTAssertEqual(ATHLTHSoloGhostComparison.timeGap(leadMeters: -100, pace: 300), -30)
+        XCTAssertNil(ATHLTHSoloGhostComparison.timeGap(leadMeters: 100, pace: 0))
+    }
+
     func testPresetDistancesAndOpenWorkout() throws {
         XCTAssertEqual(ATHLTHSoloGhostPacePolicy.presets.map(\.meters), [1_000, 2_000, 5_000, 10_000, 21_097.5, 42_195])
         let plan = try XCTUnwrap(ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: 330, distanceMeters: nil, durationSeconds: nil))
         XCTAssertEqual(plan.steps.count, 1)
+        XCTAssertEqual(plan.soloGhostRace, true)
         XCTAssertEqual(plan.steps.first?.measure, .open)
         XCTAssertNil(plan.steps.first?.distanceMeters)
         XCTAssertEqual(plan.intervalGhostConfiguration?.coverage, .entireWorkout)

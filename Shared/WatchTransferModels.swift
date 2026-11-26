@@ -1378,6 +1378,8 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     /// Virtual Ghost settings travel with the structured Watch workout.
     /// Nil preserves legacy workouts and route-based Ghost behavior.
     var intervalGhostConfiguration: ATHLTHIntervalGhostPacer.WorkoutConfiguration? = nil
+    /// Identifies route-free solo competition, not ordinary interval Ghost.
+    var soloGhostRace: Bool? = nil
 }
 
 
