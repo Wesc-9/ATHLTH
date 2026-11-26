@@ -1837,6 +1837,7 @@ struct RunQuickStartSheet: View {
                     composerIsPresented: showingDetailedWorkoutBuilder
                 ) {
                     VStack(spacing: isAdvancedSetup ? 16 : 12) {
+                    ATHLTHQuickDailyFormAdvice()
                     if isAdvancedSetup {
                         // Preserve the detailed editable card in Advanced.
                         advancedWorkoutDetailsCard
@@ -3938,6 +3939,7 @@ struct WalkQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    ATHLTHQuickDailyFormAdvice()
                     if isAdvancedSetup {
                         ATHLTHWorkoutDetailsCard(
                             activityTitle: ATHLTHLocalization.choose(
@@ -4331,6 +4333,7 @@ struct StrengthQuickStartSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    ATHLTHQuickDailyFormAdvice()
                     ATHLTHWorkoutDetailsCard(
                         activityTitle: ATHLTHLocalization.choose(
                             english: "Strength", norwegian: "Styrketrening"
