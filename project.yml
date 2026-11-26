@@ -18,6 +18,10 @@ settings:
     MARKETING_VERSION: "3.0.4"
     CURRENT_PROJECT_VERSION: "144"
     DEVELOPMENT_TEAM: D3AX7B6RMW
+  configs:
+    Release:
+      DEAD_CODE_STRIPPING: YES
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
 targets:
   ATHLTH:
     type: application
