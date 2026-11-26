@@ -55,6 +55,11 @@ struct ATHLTHCompetitionRaceRulesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
+            if workoutOnly {
+                Text("Registrering og utstyr")
+                    .font(.system(size: 21, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+            } else {
             HStack(spacing: 12) {
                 Image(systemName: "trophy")
                     .font(.title2)
@@ -79,6 +84,7 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                 }
             }
 
+            }
             if settings.race.discipline == .sprint {
                 Picker("Sprintform", selection: race.sprintMode) {
                     ForEach(ATHLTHCompetitionSprintMode.allCases) { mode in
