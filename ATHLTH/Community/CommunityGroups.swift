@@ -4221,6 +4221,32 @@ final class CommunityGroupStore: ObservableObject {
         }
     }
 
+    /// Member and invitation screens need only member identities and,
+    /// for managers, pending requests. Avoid fetching 150 chat messages,
+    /// challenges and leaderboards each time the member screen opens.
+    func loadHubClubMembers(_ groupID: UUID) async {
+        guard let account = currentUserID, let group = group(for: groupID),
+              joinedGroupIDs.contains(groupID) || isOwner(of: group) else { return }
+        do {
+            let members: [CommunityGroupMemberRecord] = try await client
+                .from("community_group_members").select()
+                .eq("group_id", value: groupID).execute().value
+            let requests = canManage(group) ? try await loadHubJoinRequests(groupIDs: [groupID]) : []
+            let ids = Array(Set(members.map(\.userID)))
+            let profiles: [SocialProfileCard] = ids.isEmpty ? [] : try await client
+                .from("social_profile_cards").select()
+                .in("user_id", values: ids.map(\.uuidString)).execute().value
+            guard !Task.isCancelled, currentUserID == account,
+                  joinedGroupIDs.contains(groupID) || isOwner(of: group) else { return }
+            membersByGroup[groupID] = members
+            joinRequestsByGroup[groupID] = requests
+            for profile in profiles { profileCardsByID[profile.userID] = profile }
+        } catch {
+            guard !Task.isCancelled, currentUserID == account else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
     /// Lightweight cross-club administration; never loads full chats,
     /// calendars or member histories merely to show pending requests.
     func loadHubJoinRequests(groupIDs: [UUID]) async throws -> [CommunityGroupJoinRequestRecord] {
@@ -6986,6 +7012,7 @@ struct CommunityGroupDetailView: View {
     @State private var showingCreateWeeklyChallenge = false
     @State private var dismissedEmptyWeeklyChallenge = false
     @State private var showingGroupSettings = false
+    @State private var showingHubInvite = false
     @State private var showingNotificationSettings = false
     @State private var showingUpcomingOverview = false
     @State private var updateDraft = ""
@@ -7143,6 +7170,9 @@ struct CommunityGroupDetailView: View {
                 group: currentGroup,
                 isWeeklyChallenge: true
             )
+        }
+        .sheet(isPresented: $showingHubInvite) {
+            CommunityGroupInviteMemberView(group: currentGroup)
         }
         .sheet(isPresented: $showingGroupSettings) {
             CommunityGroupManagementView(
@@ -7549,9 +7579,14 @@ struct CommunityGroupDetailView: View {
 
                     Spacer()
 
-                    // Membership, notifications and management now have
-                    // dedicated destinations rather than competing with
-                    // the hero artwork in the header.
+                    if groups.canManage(currentGroup) {
+                        Button { showingHubInvite = true } label: {
+                            headerCircleButton(icon: "person.badge.plus")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Invite members", norwegian: "Inviter medlemmer"))
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(
@@ -7589,8 +7624,8 @@ struct CommunityGroupDetailView: View {
                         .font(
                             .system(
                                 size: 31,
-                                weight: .bold,
-                                design: .rounded
+                                weight: .medium,
+                                design: .serif
                             )
                         )
                         .foregroundStyle(.white)
@@ -7771,7 +7806,8 @@ struct CommunityGroupDetailView: View {
             ATHLTHArtworkImage(
                 reference: value,
                 fallbackAssetName:
-                    "CommunityHero"
+                    "CommunityHero",
+                maxPixelSize: 1200
             )
             .athlthBoundedFill()
             .frame(
@@ -7881,7 +7917,7 @@ struct CommunityGroupDetailView: View {
     }
 
     private var overview: some View {
-        VStack(spacing: 12) {
+        LazyVStack(spacing: 12) {
             // Immediately below Club tabs: the curated weekly challenge
             // appears before the post composer and the four action tiles.
             // Regular route/activity challenges remain under Challenges.
@@ -16384,13 +16420,13 @@ struct CommunityGroupInviteMemberView: View {
                 if candidates.isEmpty {
                     ContentUnavailableView(
                         query.isEmpty
-                            ? "Find people to invite"
-                            : "No matching users",
+                            ? tr("Find people to invite", "Finn personer å invitere")
+                            : tr("No matching users", "Ingen brukere funnet"),
                         systemImage: "person.badge.plus",
                         description: Text(
                             query.isEmpty
-                                ? "Search by username or name."
-                                : "Try another search."
+                                ? tr("Search by username or name.", "Søk etter brukernavn eller navn.")
+                                : tr("Try another search.", "Prøv et annet søk.")
                         )
                     )
                     .listRowBackground(Color.clear)
@@ -16485,11 +16521,12 @@ struct CommunityGroupInviteMemberView: View {
                 ToolbarItem(
                     placement: .confirmationAction
                 ) {
-                    Button("Done") {
+                    Button(tr("Done", "Ferdig")) {
                         dismiss()
                     }
                 }
             }
+            .task { await groups.loadHubClubMembers(group.id) }
             .task(id: query) {
                 let clean = query
                     .trimmingCharacters(
@@ -16692,10 +16729,9 @@ struct CommunityGroupMembersView: View {
             }
         }
         .task {
-            await groups.loadGroupContent(
-                group.id
-            )
+            if !embedded { await groups.loadHubClubMembers(group.id) }
         }
+        .refreshable { await groups.loadHubClubMembers(group.id) }
     }
 
     private func joinRequestRow(

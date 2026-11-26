@@ -1844,7 +1844,7 @@ struct ATHLTHClubsHubView: View {
             await groups.refreshRecentChatActivity()
             await groups.refreshHomeUpcomingEvents()
         }
-        .task(id: managed.map(\.id)) { await reloadAdminRequests() }
+        .task(id: "\(session.profile.userID)-\(managed.map(\.id))") { await reloadAdminRequests() }
         .refreshable {
             await groups.refresh(force: true)
             if discovery && searchTerm.count >= 2 { await groups.search(searchTerm) }
@@ -1868,6 +1868,7 @@ struct ATHLTHClubsHubView: View {
             query = ""; place = ""; interest = .all; discovery = false
             pinnedClubID = nil; preferredInterest = .all
             distances = [:]; locationNotice = nil; adminRequests = []
+            busyGroup = nil; requestError = nil; loadingRequests = false
             showingAdministration = false; invitationClub = nil
             reloadPreferences()
         }
@@ -2221,6 +2222,7 @@ struct ATHLTHClubsHubView: View {
     }
 
     private func reloadAdminRequests() async {
+        guard session.signedIn else { adminRequests = []; return }
         let account = session.profile.userID
         loadingRequests = true
         defer { if session.profile.userID == account { loadingRequests = false } }
