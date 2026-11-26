@@ -3223,6 +3223,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     private var persistedCompletedWorkoutID = ""
     @State private var completedWorkoutPath: [UUID] = []
     @State private var confirmingDeleteWorkoutDraft = false
+    @State private var dailyFormEntry: RecoverySorenessEntry?
 
     private var hasWorkoutDraft: Bool {
         ATHLTHStandaloneWorkoutDraftStore.hasDraft(for: session.profile.userID)
@@ -3368,6 +3369,8 @@ private struct HomeWeeklyProgressDaySheet: View {
                 if distinct.count == maxCandidates { break }
             }
         }
+        if Calendar.current.isDateInToday(selection.date),
+           ATHLTHDailyFormPolicy.assess(entry: dailyFormEntry, measuredScore: nil).illnessReported { return [] }
         return HomeCoachWorkoutSelection.ordered(
             distinct,
             planned: coachRelevantPlanned,
@@ -3404,15 +3407,19 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private var coachReadiness: HomeDailyRecommendationPolicy.Readiness {
-        guard Calendar.current.isDateInToday(selection.date),
-              health.recovery.score != nil else { return .unavailable }
-        switch health.recovery.state {
-        case .ready: return .ready
-        case .balanced: return .balanced
-        case .takeItEasy: return .takeItEasy
-        case .recover: return .recover
-        case .buildingBaseline: return .unavailable
+        guard Calendar.current.isDateInToday(selection.date) else { return .unavailable }
+        let measured: HomeDailyRecommendationPolicy.Readiness
+        if health.recovery.score == nil { measured = .unavailable }
+        else {
+            switch health.recovery.state {
+            case .ready: measured = .ready
+            case .balanced: measured = .balanced
+            case .takeItEasy: measured = .takeItEasy
+            case .recover: measured = .recover
+            case .buildingBaseline: measured = .unavailable
+            }
         }
+        return ATHLTHDailyFormPolicy.recommendationReadiness(measured, entry: dailyFormEntry)
     }
 
     private var coachRelevantPlanned: [PlannedSession] {
@@ -3437,6 +3444,10 @@ private struct HomeWeeklyProgressDaySheet: View {
 
     private var coachExplanation: String {
         let today = Calendar.current.isDateInToday(selection.date)
+        let assessment = ATHLTHDailyFormPolicy.assess(entry: dailyFormEntry, measuredScore: nil)
+        if today && (assessment.recommendation == .rest || assessment.recommendation == .lighter) {
+            return assessment.explanation
+        }
         if today && (coachReadiness == .recover || coachReadiness == .takeItEasy) {
             return ATHLTHLocalization.choose(
                 english: "Apple Health suggests a lighter day. Only gentle sessions are proposed; your plan stays unchanged.",
@@ -3557,7 +3568,11 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
             }
             .onAppear {
+                dailyFormEntry = RecoverySorenessStore(accountID: session.profile.userID).todayEntry
                 restoreCompletedWorkoutIfNeeded()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
+                dailyFormEntry = RecoverySorenessStore(accountID: session.profile.userID).todayEntry
             }
             .onChange(of: completedWorkoutPath) { _, next in
                 if scenePhase == .active {
