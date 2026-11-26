@@ -26,7 +26,9 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
 
             LazyVGrid(columns: columns, spacing: 9) {
                 ForEach(ATHLTHTournamentActivity.allCases) { activity in
+                    let available = activity.isAvailableForCreation
                     Button {
+                        guard available else { return }
                         if activities.contains(activity) {
                             activities.remove(activity)
                         } else {
@@ -43,7 +45,7 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                                 .lineLimit(1)
                                 .foregroundStyle(ATHLTHArenaV3Style.ink)
                             Spacer(minLength: 1)
-                            Image(systemName: activities.contains(activity)
+                            Image(systemName: !available ? "lock" : activities.contains(activity)
                                   ? "checkmark.circle.fill" : "circle")
                                 .font(.caption)
                                 .foregroundStyle(activities.contains(activity)
@@ -55,11 +57,17 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                         .background(ATHLTHArenaV3Style.panel())
                     }
                     .buttonStyle(.plain)
+                    .disabled(!available)
+                    .opacity(available ? 1 : 0.42)
                     .accessibilityValue(
-                        activities.contains(activity) ? "Valgt" : "Ikke valgt"
+                        !available ? "Kommer senere" : activities.contains(activity) ? "Valgt" : "Ikke valgt"
                     )
                 }
             }
+
+            Text("Sykling, svømming og tur kommer senere.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
             if !activities.isEmpty {
                 Label("Valgt gren: " + ATHLTHTournamentActivity.allCases
