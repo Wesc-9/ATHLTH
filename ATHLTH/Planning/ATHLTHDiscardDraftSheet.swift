@@ -9,9 +9,15 @@ struct ATHLTHDiscardDraftSheet: View {
         case standaloneWorkoutDraft
         case trainingPlan
         case savedTrainingPlanDraft
+        case competition
 
         var title: String {
             switch self {
+            case .competition:
+                return ATHLTHLocalization.choose(
+                    english: "Leave setup?",
+                    norwegian: "Avslutte oppsett?"
+                )
             case .workout:
                 return ATHLTHLocalization.choose(
                     english: "Leave workout planning?",
@@ -37,6 +43,11 @@ struct ATHLTHDiscardDraftSheet: View {
 
         var description: String {
             switch self {
+            case .competition:
+                return ATHLTHLocalization.choose(
+                    english: "Your competition is not published yet. Keep your draft to continue later, or discard only this unfinished setup.",
+                    norwegian: "Konkurransen er ikke publisert ennå. Behold utkastet for å fortsette senere, eller forkast dette oppsettet."
+                )
             case .workout:
                 return ATHLTHLocalization.choose(
                     english: "Your changes are not yet saved as a workout. Keep editing or save the draft for later.",
@@ -62,7 +73,7 @@ struct ATHLTHDiscardDraftSheet: View {
 
         var destructiveTitle: String {
             switch self {
-            case .workout, .trainingPlan:
+            case .workout, .trainingPlan, .competition:
                 return ATHLTHLocalization.choose(
                     english: "Discard draft", norwegian: "Forkast utkast"
                 )
@@ -85,6 +96,8 @@ struct ATHLTHDiscardDraftSheet: View {
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
 
+    private var prioritizesSaving: Bool { kind == .trainingPlan || kind == .competition }
+
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
@@ -100,7 +113,7 @@ struct ATHLTHDiscardDraftSheet: View {
                         .padding(.bottom, 17)
                 }
 
-                Image(systemName: kind == .trainingPlan
+                Image(systemName: kind == .competition ? "doc.text" : kind == .trainingPlan
                     ? "square.and.arrow.down" : "square.and.pencil")
                     .font(.system(size: 21, weight: .medium))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -111,9 +124,9 @@ struct ATHLTHDiscardDraftSheet: View {
                     .padding(.bottom, 14)
 
                 Text(kind.title)
-                    .font(.system(size: kind == .trainingPlan ? 27 : 23,
-                                  weight: kind == .trainingPlan ? .medium : .semibold,
-                                  design: kind == .trainingPlan ? .serif : .rounded))
+                    .font(.system(size: prioritizesSaving ? 27 : 23,
+                                  weight: prioritizesSaving ? .medium : .semibold,
+                                  design: prioritizesSaving ? .serif : .rounded))
                     .foregroundStyle(ink)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -137,11 +150,13 @@ struct ATHLTHDiscardDraftSheet: View {
                 }
 
                 VStack(spacing: 10) {
-                    if kind == .trainingPlan {
+                    if prioritizesSaving {
                         if let onSaveDraftAndClose {
                             Button(action: onSaveDraftAndClose) {
                                 Label(
-                                    tr("Save draft and close", "Lagre utkast og lukk"),
+                                    kind == .competition
+                                        ? tr("Keep draft", "Behold utkast")
+                                        : tr("Save draft and close", "Lagre utkast og lukk"),
                                     systemImage: "square.and.arrow.down"
                                 )
                                 .font(.system(size: 15, weight: .semibold))
@@ -150,7 +165,8 @@ struct ATHLTHDiscardDraftSheet: View {
                                 .background(bronze.gradient,
                                             in: RoundedRectangle(cornerRadius: 16))
                             }
-                            .accessibilityIdentifier("athlth-plan-save-draft-and-close")
+                            .accessibilityIdentifier(kind == .competition
+                                ? "athlth-competition-keep-draft" : "athlth-plan-save-draft-and-close")
                         }
 
                         Button {
@@ -168,7 +184,8 @@ struct ATHLTHDiscardDraftSheet: View {
                                         .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 1)
                                 }
                         }
-                        .accessibilityIdentifier("athlth-plan-keep-editing")
+                        .accessibilityIdentifier(kind == .competition
+                            ? "athlth-competition-keep-editing" : "athlth-plan-keep-editing")
                     } else {
                         Button {
                             onKeepEditing()
@@ -218,7 +235,8 @@ struct ATHLTHDiscardDraftSheet: View {
                             .frame(maxWidth: .infinity, minHeight: 42)
                             .contentShape(Rectangle())
                     }
-                    .accessibilityIdentifier("athlth-plan-discard-draft")
+                    .accessibilityIdentifier(kind == .competition
+                        ? "athlth-competition-discard-draft" : "athlth-plan-discard-draft")
                     .accessibilityHint(tr(
                         "Permanently delete only this unfinished draft",
                         "Sletter kun dette uferdige utkastet permanent"
@@ -234,8 +252,10 @@ struct ATHLTHDiscardDraftSheet: View {
         }
         .scrollIndicators(.hidden)
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-        .presentationDetents(kind == .trainingPlan
-            ? [.height(435), .large]
+        .presentationDetents(kind == .competition
+            ? [.height(410), .large]
+            : kind == .trainingPlan
+                ? [.height(435), .large]
             : onSaveDraftAndClose == nil
                 ? [.height(310), .medium, .large]
                 : [.height(383), .medium, .large])

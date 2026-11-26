@@ -228,6 +228,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var checkpointOwner: UUID?
     @State private var restoredRuleScrollID: String?
     @State private var confirmDiscard = false
+    @State private var closeAfterDraftDecision = false
 
     // Keep the caller interface for the route and activity shortcuts.
     let initialActivity: ATHLTHQuickStartActivity
@@ -274,7 +275,7 @@ struct ATHLTHCompetitionCreationView: View {
 
     private func persistCheckpoint(inRules: Bool? = nil) {
         guard let owner = checkpointOwner, owner == session.profile.userID,
-              session.signedIn, !finishAfterRules else { return }
+              session.signedIn, !finishAfterRules, !closeAfterDraftDecision else { return }
         ATHLTHCompetitionCreationCheckpoint(owner: owner, format: format.rawValue,
             leagueStyle: leagueStyle, customTitle: competitionTitle,
             opponents: chosenIDs.sorted { $0.uuidString < $1.uuidString },
@@ -433,10 +434,28 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .onChange(of: session.profile.userID) { _, _ in dismiss() }
         .onChange(of: session.signedIn) { _, signedIn in if !signedIn { dismiss() } }
-        .confirmationDialog("Avslutte oppsett?", isPresented: $confirmDiscard, titleVisibility: .visible) {
-            Button("Behold utkast og lukk") { persistCheckpoint(inRules: false); dismiss() }
-            Button("Forkast utkast", role: .destructive) { clearCheckpoint(); dismiss() }
-            Button("Fortsett", role: .cancel) {}
+        .sensoryFeedback(.selection, trigger: confirmDiscard) { _, isPresented in isPresented }
+        .sheet(isPresented: $confirmDiscard, onDismiss: {
+            // Swipe down or continue editing closes only the decision sheet.
+            // Close the setup after the sheet transition, not simultaneously.
+            if closeAfterDraftDecision { dismiss() }
+        }) {
+            ATHLTHDiscardDraftSheet(
+                kind: .competition,
+                onKeepEditing: {},
+                onSaveDraftAndClose: {
+                    persistCheckpoint(inRules: false)
+                    closeAfterDraftDecision = true
+                    confirmDiscard = false
+                },
+                onDiscard: {
+                    // Prevent a scene change during dismissal from recreating
+                    // the checkpoint immediately after the explicit discard.
+                    closeAfterDraftDecision = true
+                    clearCheckpoint()
+                    confirmDiscard = false
+                }
+            )
         }
     }
 
