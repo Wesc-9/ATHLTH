@@ -13,6 +13,7 @@ struct ATHLTHCompetitionEntryView: View {
     @State private var invitedIDs: Set<UUID> = []
     @State private var selectedTournament: ATHLTHTournamentRemote?
     @State private var showingFormats = false
+    @State private var showingPersonalGhost = false
     @State private var loading = false
     @State private var errorMessage: String?
     private let cloud = ATHLTHTournamentCloudService()
@@ -30,7 +31,7 @@ struct ATHLTHCompetitionEntryView: View {
                 VStack(alignment: .leading, spacing: 15) {
                     ATHLTHTrainPageTitle(title: "Konkurranse")
                     if !isDirectEntry && !showingFormats { hubContent } else {
-                    Text("Velg hvordan dere vil konkurrere.")
+                    Text("Velg hvordan du vil konkurrere.")
                         .font(ATHLTHTrainDesign.pageSubtitle)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 14)], spacing: 14) {
@@ -43,6 +44,24 @@ struct ATHLTHCompetitionEntryView: View {
                             .accessibilityLabel(Text(format.title + ", " + format.subtitle))
                             .accessibilityValue(Text(participantLabel(format)))
                             .accessibilityIdentifier("athlth-competition-entry-\(format.rawValue)")
+                        }
+                        if !isDirectEntry {
+                            Button { showingPersonalGhost = true } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "timer.circle.fill").font(.system(size: 32))
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text("Ghost Race").font(.system(.title2, design: .serif).weight(.semibold))
+                                        Text("Utfordre en tidligere økt eller en digital motstander.").font(.subheadline)
+                                    }
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "arrow.up.right")
+                                }
+                                .foregroundStyle(.white)
+                                .padding(16)
+                                .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+                                .background(LinearGradient(colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.ink], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
+                            }.buttonStyle(.plain)
+                            .accessibilityIdentifier("athlth-competition-entry-ghost")
                         }
                     }
                     }
@@ -68,6 +87,12 @@ struct ATHLTHCompetitionEntryView: View {
                 initialFormat: format, preselectedFriend: preselectedFriend,
                 choosesActivityInRules: !locksRunningActivity
             ))
+        }
+        .fullScreenCover(isPresented: $showingPersonalGhost) {
+            NavigationStack {
+                GhostRaceHubView(personalCompetitionOnly: true)
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { showingPersonalGhost = false } } }
+            }
         }
         .fullScreenCover(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
             NavigationStack {
