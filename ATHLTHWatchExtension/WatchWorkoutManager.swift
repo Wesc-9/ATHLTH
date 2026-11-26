@@ -256,6 +256,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastGhostAnnouncedLeadMeters: Double?
     private var lastGhostLeadAlertAt: Date?
     private var lastGhostLeadSign = 0
+    private var soloGhostCueTracker = ATHLTHSoloGhostCueTracker()
     private var ghostOvertakeTracker = ATHLTHGhostLeadTracker()
     private var ghostFinalPhaseAnnounced = false
     private var lastLiveGhostConnectionText: String?
@@ -5425,6 +5426,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func resetAudioCoachThresholds() {
+        soloGhostCueTracker = .init()
         latestRunningCoachReport = nil
         lastGoalEncouragementAt = nil
         measuredCoachZoneCandidate = nil
@@ -5753,6 +5755,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               audioCoachConfiguration.enabled
         else {
             return
+        }
+
+        if structuredRunningWorkout?.soloGhostRace == true,
+           !structuredWorkoutComplete, !awaitingMainStart,
+           let step = currentStructuredRunningStep,
+           let pace = step.ghostPaceSecondsPerKilometer,
+           let cue = soloGhostCueTracker.evaluate(
+               stepID: step.id, elapsed: currentStructuredStepElapsedTime,
+               meters: currentStructuredStepDistanceMeters,
+               pace: pace, targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds,
+               norwegian: coachPhrase(english: "en", norwegian: "no") == "no") {
+            speak(cue.text, priority: .routineCoach,
+                  event: ATHLTHCoachEvent(kind: .ghostUpdate, key: cue.key, priority: .routineCoach, validFor: 10))
         }
 
         let customDue = evaluateCustomAudioCoachRules()

@@ -641,6 +641,7 @@ final class IPhoneWorkoutStore:
     /// planned course; an offset or wrong initial route must not shout 180 m.
     private var routeAlertArmed = false
     private var routeOnTrackSamples = 0
+    private var soloGhostCueTracker = ATHLTHSoloGhostCueTracker()
     private var nextGhostDistanceAnnouncementMeters: Double?
     private var nextGhostTimeAnnouncementSeconds: TimeInterval?
     private var lastGhostAnnouncedLeadMeters: Double?
@@ -3353,6 +3354,7 @@ final class IPhoneWorkoutStore:
             WatchAudioCoachConfiguration?
     ) {
         lastGoalEncouragementAt = nil
+        soloGhostCueTracker = .init()
         phoneAdaptiveCoach.reset()
         phoneAdaptiveWorkoutID = nil
         phoneAdaptiveLastSample = nil
@@ -5108,6 +5110,24 @@ final class IPhoneWorkoutStore:
               configuration.enabled
         else {
             return
+        }
+
+        if workout.structuredRunningWorkout?.soloGhostRace == true,
+           workout.structuredWorkoutComplete != true,
+           workout.awaitingMainStart != true,
+           workout.resumedAt != nil,
+           let step = workout.structuredRunningWorkout?.steps.first,
+           let pace = step.ghostPaceSecondsPerKilometer,
+           let cue = soloGhostCueTracker.evaluate(
+               stepID: step.id,
+               elapsed: max(0, workout.elapsed(at: Date()) - (workout.structuredStepStartElapsedTime ?? 0)),
+               meters: max(0, workout.distanceMeters - (workout.structuredStepStartDistanceMeters ?? 0)),
+               pace: pace, targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds,
+               norwegian: localizedCoachPhrase(english: "en", norwegian: "no", configuration: configuration) == "no") {
+            speak(cue.text, configuration: configuration, priority: .routineCoach,
+                  event: ATHLTHCoachEvent(kind: .ghostUpdate, key: cue.key, priority: .routineCoach, validFor: 10))
+        } else if workout.resumedAt == nil {
+            soloGhostCueTracker.invalidatePending()
         }
 
         announceFuelIfDue(workout, configuration: configuration)

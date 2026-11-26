@@ -660,3 +660,31 @@ final class ATHLTHSoloGhostSampledStatsTests: XCTestCase {
             targetMeters: nil, targetSeconds: nil)?.sampledStats)
     }
 }
+
+final class ATHLTHSoloGhostCueTrackerTests: XCTestCase {
+    func testFinalStretchOnlyOnceAndNotForOpenRace() {
+        var tracker = ATHLTHSoloGhostCueTracker()
+        let id = UUID()
+        XCTAssertNil(tracker.evaluate(stepID: id, elapsed: 100, meters: 700, pace: 300,
+            targetMeters: 1000, targetSeconds: nil, norwegian: true))
+        XCTAssertNotNil(tracker.evaluate(stepID: id, elapsed: 240, meters: 810, pace: 300,
+            targetMeters: 1000, targetSeconds: nil, norwegian: true))
+        XCTAssertNil(tracker.evaluate(stepID: id, elapsed: 250, meters: 850, pace: 300,
+            targetMeters: 1000, targetSeconds: nil, norwegian: true))
+        var open = ATHLTHSoloGhostCueTracker()
+        XCTAssertNil(open.evaluate(stepID: id, elapsed: 250, meters: 850, pace: 300,
+            targetMeters: nil, targetSeconds: nil, norwegian: true))
+    }
+    func testStableLeadChangeOnlyAfterUniqueSamples() {
+        var tracker = ATHLTHSoloGhostCueTracker()
+        let id = UUID()
+        XCTAssertNil(tracker.evaluate(stepID: id, elapsed: 30, meters: 120, pace: 300,
+            targetMeters: nil, targetSeconds: nil, norwegian: true))
+        XCTAssertNil(tracker.evaluate(stepID: id, elapsed: 60, meters: 180, pace: 300,
+            targetMeters: nil, targetSeconds: nil, norwegian: true))
+        XCTAssertNil(tracker.evaluate(stepID: id, elapsed: 60, meters: 180, pace: 300,
+            targetMeters: nil, targetSeconds: nil, norwegian: true))
+        XCTAssertNotNil(tracker.evaluate(stepID: id, elapsed: 63, meters: 185, pace: 300,
+            targetMeters: nil, targetSeconds: nil, norwegian: true))
+    }
+}

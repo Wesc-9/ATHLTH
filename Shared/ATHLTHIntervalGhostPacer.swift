@@ -384,3 +384,65 @@ enum ATHLTHSoloGhostComparison {
         return result.isFinite ? result : nil
     }
 }
+
+
+/// Independent ghost cues reuse the recording clock and existing voice
+/// delivery gate. Stable lead changes require multiple distinct samples.
+struct ATHLTHSoloGhostCueTracker {
+    struct Cue {
+        let key: String
+        let text: String
+    }
+    private var stepID: UUID?
+    private var tracker = ATHLTHGhostLeadTracker()
+    private var lastCueElapsed: Double?
+    private var lastElapsed: Double?
+    private var lastMeters: Double?
+    private var pendingLead: Int?
+    private var serial = 0
+    private var finalAnnounced = false
+
+    mutating func evaluate(stepID: UUID, elapsed: Double, meters: Double,
+                           pace: Double, targetMeters: Double?, targetSeconds: Double?,
+                           norwegian: Bool) -> Cue? {
+        if self.stepID != stepID || elapsed < (lastElapsed ?? 0) || meters < (lastMeters ?? 0) {
+            self = .init()
+            self.stepID = stepID
+        }
+        guard let gap = ATHLTHSoloGhostComparison.lead(elapsed: elapsed, meters: meters, pace: pace),
+              elapsed > (lastElapsed ?? -1) else { return nil }
+        lastElapsed = elapsed
+        lastMeters = meters
+        if tracker.observe(signedGapMeters: gap, elapsedSeconds: elapsed) {
+            pendingLead = tracker.confirmedSign
+        }
+        if let pendingLead, pendingLead != tracker.confirmedSign { self.pendingLead = nil }
+        let remainingMeters = targetMeters.map { $0 - meters }
+        let remainingSeconds = targetSeconds.map { $0 - elapsed }
+        let finalMeters = remainingMeters.map { $0 > 0 && $0 <= min(1_000, (targetMeters ?? 0) * 0.2) } ?? false
+        let finalTime = remainingSeconds.map { $0 > 0 && $0 <= min(60, (targetSeconds ?? 0) * 0.2) } ?? false
+        if !finalAnnounced && (finalMeters || finalTime) {
+            finalAnnounced = true
+            lastCueElapsed = elapsed
+            let text = finalMeters
+                ? (norwegian ? "Siste del av distansen." : "Final stretch of the distance.")
+                : (norwegian ? "Siste del av tiden." : "Final stretch of the timed race.")
+            return Cue(key: stepID.uuidString + "-finish", text: text)
+        }
+        guard let pending = pendingLead, elapsed >= 10,
+              elapsed - (lastCueElapsed ?? -60) >= 20,
+              (pending > 0 && gap >= 8) || (pending < 0 && gap <= -8) else { return nil }
+        pendingLead = nil
+        serial += 1
+        lastCueElapsed = elapsed
+        return Cue(key: stepID.uuidString + "-lead-" + String(serial),
+                   text: pending > 0
+                    ? (norwegian ? "Du har tatt ledelsen." : "You have taken the lead.")
+                    : (norwegian ? "Ghosten har tatt ledelsen." : "The ghost has taken the lead."))
+    }
+
+    mutating func invalidatePending() {
+        tracker.invalidatePending()
+        pendingLead = nil
+    }
+}
