@@ -563,7 +563,7 @@ struct GhostRaceHubView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 ForEach(Array(availableTargetGhostRoutes.prefix(3))) { route in
                     NavigationLink {
-                        RouteDetailView(route: route)
+                        RouteDetailView(route: route, ghostCompetitionSetup: true)
                     } label: {
                         HStack(spacing: 12) {
                             RouteMapSnapshotThumbnail(route: route, height: 64)
