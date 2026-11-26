@@ -252,6 +252,17 @@ struct ATHLTHTournamentCreator: View {
         return String(title.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
     }
 
+    private var publishHint: String {
+        if allowedActivities.isEmpty { return "Velg minst én gren." }
+        if isDuel && athletes.count != 2 { return "Velg én motstander." }
+        if usesExplicitExercises && (competitionSettings.selectedExerciseIDs ?? []).isEmpty { return "Legg til minst én konkurranseøvelse." }
+        if !scoringValid { return "Kontroller øvelser, mål og resultatgodkjenning." }
+        if !competitionSettings.environmentsCanPublish(activities: allowedActivities) {
+            return "Valgte miljøkrav støttes ikke ved publisering ennå."
+        }
+        return "Kontroller regler og obligatoriske felt før invitasjon."
+    }
+
     private var canSaveTemplate: Bool {
         effectiveTitle.count >= 3 &&
         !allowedActivities.isEmpty && competitionSettings.isValid &&
@@ -304,11 +315,17 @@ struct ATHLTHTournamentCreator: View {
                             set: { newValue in
                                 if fixedActivity == nil {
                                     if usesExplicitExercises && newValue != allowedActivities {
-                                        competitionSettings.selectedExerciseIDs = []
-                                        competitionSettings.exerciseEnvironments = [:]
-                                        competitionSettings.race.scoringGoals = nil
-                                        competitionSettings.race.exerciseWeights = nil
-                                        exerciseCount = 0
+                                        let removed = Set((competitionSettings.selectedExerciseIDs ?? []).filter {
+                                            guard let activity = exerciseActivities[$0] else { return false }
+                                            return !newValue.contains(activity)
+                                        })
+                                        competitionSettings.selectedExerciseIDs?.removeAll { removed.contains($0) }
+                                        for id in removed {
+                                            competitionSettings.exerciseEnvironments.removeValue(forKey: id)
+                                            competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+                                            competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+                                        }
+                                        exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
                                     }
                                     competitionSettings.activityEnvironments = competitionSettings.activityEnvironments.filter { key, _ in
                                          newValue.contains { $0.rawValue == key }
@@ -420,7 +437,12 @@ struct ATHLTHTournamentCreator: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 9) {
+                VStack(spacing: 8) {
+                    if !canSave && !publishing {
+                        Text(publishHint).font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                     Button {
                         Task { await publishTournament() }
                     } label: {
@@ -980,7 +1002,7 @@ struct ATHLTHTournamentCreator: View {
             Text("\(competitionSettings.selectedExerciseIDs?.count ?? 0) av 12 valgt").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
         .padding(15).background(ATHLTHArenaV3Style.panel())
-        .sheet(isPresented: $showingExerciseLibrary) {
+        .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
                 selected: Set(competitionSettings.selectedExerciseIDs ?? [])) { item in
                 var ids = competitionSettings.selectedExerciseIDs ?? []
@@ -1427,77 +1449,94 @@ struct ATHLTHTournamentCreator: View {
         }
     }
 
-    private var preview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Gjennomgang før invitasjon")
-            Text(effectiveTitle).font(ATHLTHTrainDesign.cardTitle)
-            Label("Valgt gren: " + allowedActivities.sorted { $0.rawValue < $1.rawValue }.map(\.title).joined(separator: " og "), systemImage: "figure.mixed.cardio")
-                .font(.subheadline)
-            Label(exerciseMode == .open ? "Åpen øvelsesliste" : "\(exerciseCount) øvelser", systemImage: "list.bullet").font(.subheadline)
-            Label(competitionSettings.startMode.title, systemImage: "calendar").font(.subheadline)
-            Label(competitionSettings.unlock.title, systemImage: "list.bullet").font(.subheadline)
-            if competitionSettings.race.discipline == .workout {
-                Label(competitionSettings.race.scoringSummary, systemImage: "chart.bar").font(.subheadline)
-                if !(competitionSettings.selectedExerciseIDs ?? []).isEmpty {
-                    DisclosureGroup("Eksempel på poengberegning", isExpanded: $expandedScoringExample) { scoringExample }
-                        .font(.caption.weight(.semibold))
-                }
-                Label("Godkjenningsfrist: \(competitionSettings.race.reviewHours ?? 48) timer", systemImage: "clock.badge.checkmark").font(.caption)
-                ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
-                    let metric = exerciseMetrics[id] ?? "repetitions"
-                    let unit = metric == "duration" ? "m" : metric == "distance" || metric == "time" ? "sek" : "repetisjoner"
-                    HStack {
-                        Text(rematchNames[id] ?? "Øvelse")
-                        Spacer()
-                        if let goal = competitionSettings.race.goal(for: id), competitionSettings.race.effectiveScoringMode.needsGoal {
-                            Text(goal.formatted() + " " + unit)
-                        }
-                        Text("\(competitionSettings.race.weight(for: id))×")
-                    }.font(.caption)
-                }
-                ForEach(athletes.filter { competitionSettings.race.handicap(for: $0.id) > 0 }, id: \.id) { athlete in
-                    Text("Handicap: " + athlete.username + " · " + String(competitionSettings.race.handicap(for: athlete.id)) + " %").font(.caption)
-                }
-            }
-            if !isSingleEvent {
-                Label("Sesong \(continuationSeasonNumber ?? 1)", systemImage: "calendar").font(.subheadline)
-            }
-            if let start = competitionSettings.startsAt {
-                Text(start.formatted(date: .abbreviated, time: .shortened)).font(.caption)
-            }
-            if let end = competitionSettings.endsAt {
-                Label("Slutt: " + end.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar.badge.clock").font(.caption)
-            }
-            ForEach(athletes, id: \.id) { athlete in
-                Label(athlete.username, systemImage: "person.crop.circle").font(.caption)
-            }
-            Text(isSingleEvent
-                ? "Én felles hendelse · \(athletes.count) deltakere"
-                : format == .cup
-                ? "\(ATHLTHTournamentStructure.bracketSize(athletes.count))-plassers cupoppsett"
-                : format == .league
-                ? "\(ATHLTHTournamentStructure.leagueMatchCount(athletes.count)) oppgjør i én liga"
-                : "\(ATHLTHTournamentStructure.groups(athletes, size: groupSize).count) grupper")
-                .font(.headline)
+    private func reviewRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            Spacer(minLength: 8)
+            Text(value).fontWeight(.medium)
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
-            if !warmupRounds.isEmpty {
-                Label("\(warmupRounds.count) oppvarmingsrunder · 0 poeng · ingen utslag",
-                      systemImage: "figure.run")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(.subheadline)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var preview: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("KLAR FOR INVITASJON").font(.caption2.weight(.semibold))
+                .tracking(1.5).foregroundStyle(ATHLTHArenaV3Style.gold)
+            Text(effectiveTitle).font(.system(size: 25, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHArenaV3Style.ink)
+            if isDuel {
+                HStack(spacing: 12) {
+                    ForEach(Array(athletes.prefix(2).enumerated()), id: \.element.id) { index, athlete in
+                        if index == 1 {
+                            Text("VS").font(.caption.weight(.bold)).foregroundStyle(ATHLTHArenaV3Style.gold)
+                        }
+                        VStack(spacing: 6) {
+                            Text(String(athlete.username.prefix(2)).uppercased())
+                                .font(.headline)
+                                .frame(width: 45, height: 45)
+                                .background(ATHLTHArenaV3Style.cream, in: Circle())
+                            Text(athlete.username).font(.caption.weight(.medium))
+                                .lineLimit(2).multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.vertical, 8)
+            } else {
+                reviewRow("Deltakere", "\(athletes.count)")
+                if !isSingleEvent { reviewRow("Sesong", "\(continuationSeasonNumber ?? 1)") }
+                if !warmupRounds.isEmpty { reviewRow("Oppvarming", "\(warmupRounds.count) runder · 0 poeng") }
             }
-            if let season = clubSeasons.first(where: { $0.id == selectedSeasonID }) {
-                Label(season.title, systemImage: "calendar")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+            Divider()
+            Text("Konkurransen").font(.headline)
+            reviewRow("Grener", ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title).joined(separator: " · "))
+            reviewRow("Øvelser", exerciseMode == .open ? "Åpen liste" : "\(exerciseCount)")
+            ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: exerciseActivities[id]?.symbol ?? "figure.mixed.cardio")
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    Text(rematchNames[id] ?? "Valgt øvelse").fontWeight(.medium)
+                    Spacer()
+                    if let goal = competitionSettings.race.goal(for: id), competitionSettings.race.effectiveScoringMode.needsGoal {
+                        Text(goal.formatted())
+                    }
+                    Text("\(competitionSettings.race.weight(for: id))×")
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }.font(.caption)
             }
-            Text(isSingleEvent
-                ? "Én konkurranse for alle inviterte. Alle må godta og trykke Klar. Resultater vises når alle er ferdige."
-                : "Oppsettet er et utkast. Trekningen gjøres ved start, og bare godkjente resultater teller.")
+            Divider()
+            Text("Start og frister").font(.headline)
+            reviewRow("Start", competitionSettings.startMode.title)
+            if let start = competitionSettings.startsAt { reviewRow("Tidspunkt", start.formatted(date: .abbreviated, time: .shortened)) }
+            reviewRow("Tilgjengelighet", competitionSettings.unlock.title)
+            reviewRow("Gjennomføringsfrist", ATHLTHTournamentCadence.window(competitionSettings.completionHours))
+            if let end = competitionSettings.endsAt { reviewRow("Slutt", end.formatted(date: .abbreviated, time: .shortened)) }
+            reviewRow("Svarfrist", "\(competitionSettings.invitationDays) dager")
+            Divider()
+            Text("Regler og poeng").font(.headline)
+            reviewRow("Treningsmiljø", competitionSettings.environment.title)
+            reviewRow("Registrering", competitionSettings.race.recordingDevice.title)
+            if competitionSettings.race.discipline == .workout {
+                reviewRow("Poeng", competitionSettings.race.scoringSummary)
+                reviewRow("Resultatgodkjenning", ATHLTHTournamentCadence.window(competitionSettings.race.reviewHours ?? 48))
+                ForEach(athletes.filter { competitionSettings.race.handicap(for: $0.id) > 0 }, id: \.id) { athlete in
+                    reviewRow("Handicap · " + athlete.username, "\(competitionSettings.race.handicap(for: athlete.id)) %")
+                }
+                if !(competitionSettings.selectedExerciseIDs ?? []).isEmpty {
+                    DisclosureGroup("Eksempel på poengberegning", isExpanded: $expandedScoringExample) {
+                        if expandedScoringExample { scoringExample }
+                    }
+                    .font(.caption.weight(.medium)).tint(ATHLTHArenaV3Style.gold)
+                }
+            }
+            Text("Alle deltakere må godkjenne reglene før start.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
-        .padding(15)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHArenaV3Style.panel())
     }
