@@ -33,6 +33,12 @@ enum ATHLTHTournamentFormat: String, Codable, CaseIterable, Identifiable {
 
 enum ATHLTHTournamentActivity: String, Codable, CaseIterable, Identifiable {
     case running, strength, cycling, walking, swimming, hiking
+    /// Keep legacy cases decodable, but only expose operational activities for new competitions.
+    static let supportedForCreation: Set<Self> = [.running, .walking, .strength]
+    var isAvailableForCreation: Bool { Self.supportedForCreation.contains(self) }
+    static func canCreate(with activities: Set<Self>) -> Bool {
+        !activities.isEmpty && activities.isSubset(of: supportedForCreation)
+    }
     var id: String { rawValue }
     var title: String {
         switch self {
