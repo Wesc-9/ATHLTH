@@ -2760,18 +2760,9 @@ struct ATHLTHHomeView: View {
                 accountID: session.profile.userID,
                 isActive: isActive,
                 occupied: universalRecordingOccupied,
-                onSelect: { category in
-                    social.quickTrainFriendIDs.removeAll()
-                    social.discardPreparedQuickTrainFriends()
-                    switch category {
-                    case .running: onOpenTrain(.quick(.running))
-                    case .strength: onOpenTrain(.quick(.strength))
-                    case .walking: onOpenTrain(.quick(.walking))
-                    case .sports: onOpenTrain(.customQuickActivity(.sports))
-                    case .freeTraining: onOpenTrain(.freeTrainingQuick)
-                    case .custom: onOpenTrain(.customQuickActivity(.other))
-                    default: break
-                    }
+                watchAvailable: watchConnection.isVerifiedForLiveLaunch,
+                onSelect: { category, choice in
+                    onOpenTrain(.homeBasicQuick(category, choice, owner: session.profile.userID))
                 },
                 onAll: { onOpenTrain(.allWorkoutCategories) }
             )
@@ -9098,6 +9089,99 @@ struct ATHLTHTrainView: View {
         )
     }
 
+    /// Home favorites bypass the setup sheet. All capture still goes through
+    /// the existing Run/Walk/Strength coordinators or open custom recorder.
+    private func startHomeBasicQuick(
+        _ category: ATHLTHTrainAllWorkoutCategoriesSheet.Category,
+        choice: ATHLTHHomeQuickCaptureChoice,
+        owner: UUID
+    ) {
+        guard session.profile.userID == owner, category.isAvailable,
+              !hasOngoingTrainWorkout else { return }
+        guard let device = choice.resolve(watchAvailable: watchConnection.isVerifiedForLiveLaunch) else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "Apple Watch is not currently available. Choose iPhone or reconnect Watch.",
+                norwegian: "Apple Watch er ikke tilgjengelig akkurat nå. Velg iPhone eller koble til klokken."
+            )
+            return
+        }
+
+        // A solo shortcut must not inherit an old shared workout setup.
+        social.quickTrainFriendIDs.removeAll()
+        social.discardPreparedQuickTrainFriends()
+        social.prepareForAnotherWorkout()
+        pendingPlannedEnduranceWorkout = nil
+
+        if category == .sports || category == .freeTraining || category == .custom {
+            var configuration = CustomQuickWorkoutConfiguration.openTimed(
+                activity: category == .sports ? .sports : .other
+            )
+            if category == .custom { configuration.titleOverride = category.title }
+            if device == .appleWatch {
+                startCustomWorkoutOnWatch(configuration)
+            } else {
+                guard !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive else { return }
+                activeCustomIPhoneQuick = CustomIPhoneQuickLaunch(configuration: configuration, mode: .timed)
+            }
+            return
+        }
+
+        Task { @MainActor in
+            guard session.profile.userID == owner, !hasOngoingTrainWorkout else { return }
+            do {
+                switch category {
+                case .running:
+                    var alerts = settings.routeAlertConfiguration
+                    alerts.enabled = false
+                    let configuration = RunQuickStartConfiguration(
+                        mode: .free, route: nil, workout: nil,
+                        captureDevice: device, environment: .outdoor,
+                        treadmillInclinePercent: nil, audioCoach: .disabled,
+                        routeAlerts: alerts, ghostTargetDurationSeconds: nil, ghostUpdates: nil,
+                        autoPauseEnabled: settings.autoPauseOutdoorWorkouts,
+                        spotifyPlaylist: nil, spotifyAutoplay: false,
+                        friends: [], socialMode: .physical, gearIDs: [],
+                        watchStartMode: .immediate,
+                        customWorkoutTitle: ATHLTHLocalization.choose(english: "Free run", norwegian: "Fri løping")
+                    )
+                    try await WorkoutLaunchCoordinator.startRunQuick(
+                        configuration: configuration, session: session, settings: settings,
+                        gear: gear, phoneWorkout: phoneWorkout, watchConnection: watchConnection,
+                        spotify: spotifyPlayback, ghostRace: ghostRace, workoutMirroring: workoutMirroring
+                    )
+                case .walking:
+                    let configuration = WalkQuickStartConfiguration(
+                        captureDevice: device, audioCoach: .disabled,
+                        autoPauseEnabled: settings.autoPauseOutdoorWorkouts,
+                        spotifyPlaylist: nil, spotifyAutoplay: false,
+                        friends: [], socialMode: .physical, gearIDs: []
+                    )
+                    try await WorkoutLaunchCoordinator.startWalkQuick(
+                        configuration: configuration, settings: settings,
+                        gear: gear, phoneWorkout: phoneWorkout, watchConnection: watchConnection,
+                        spotify: spotifyPlayback, workoutMirroring: workoutMirroring, session: session
+                    )
+                case .strength:
+                    let started = try await WorkoutLaunchCoordinator.startStrength(
+                        workout: quickStrengthSession, captureDevice: device,
+                        trackingMode: .simple, selectedFriends: [], audioCoach: .disabled,
+                        advancedConfiguration: .standard, session: session, settings: settings,
+                        social: social, strengthWorkout: strengthWorkout,
+                        watchConnection: watchConnection, spotify: spotifyPlayback
+                    )
+                    if started, session.profile.userID == owner { showingStrengthWorkout = true }
+                default:
+                    return
+                }
+            } catch {
+                // A failed Watch acknowledgement does not prove that its
+                // HealthKit session failed. Never retry on iPhone implicitly.
+                guard session.profile.userID == owner else { return }
+                watchTransferError = error.localizedDescription
+            }
+        }
+    }
+
     private func handleWorkoutCategoryAction(
         _ action: ATHLTHTrainAllWorkoutCategoriesSheet.Action
     ) {
@@ -9669,6 +9753,10 @@ struct ATHLTHTrainView: View {
             } else {
                 selectedSection = .plan
             }
+
+        case let .homeBasicQuick(category, choice, owner):
+            selectedSection = .today
+            startHomeBasicQuick(category, choice: choice, owner: owner)
 
         case .allWorkoutCategories:
             selectedSection = .today

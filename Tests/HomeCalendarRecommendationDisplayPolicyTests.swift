@@ -56,4 +56,12 @@ final class HomeCalendarRecommendationDisplayPolicyTests: XCTestCase {
         XCTAssertEqual(ATHLTHQuickActivityUsage.counts(for: other, defaults: defaults), [:])
         XCTAssertNil(ATHLTHQuickActivityUsage.record(.cycling, for: owner, defaults: defaults)["cycling"])
     }
+
+    func testHomeBasicQuickChoosesVerifiedWatchOrPhone() {
+        XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.automatic.resolve(watchAvailable: true), .appleWatch)
+        XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.automatic.resolve(watchAvailable: false), .iPhone)
+        XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.iPhone.resolve(watchAvailable: true), .iPhone)
+        XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: true), .appleWatch)
+        XCTAssertNil(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: false))
+    }
 }

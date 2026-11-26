@@ -5940,13 +5940,27 @@ private struct PlannedWorkoutInvitationLobby: View {
     }
 }
 
+/// Explicit device override applies to this launch only, never user settings.
+enum ATHLTHHomeQuickCaptureChoice: String {
+    case automatic, iPhone, appleWatch
+
+    func resolve(watchAvailable: Bool) -> WorkoutCaptureDevice? {
+        switch self {
+        case .automatic: return watchAvailable ? .appleWatch : .iPhone
+        case .iPhone: return .iPhone
+        case .appleWatch: return watchAvailable ? .appleWatch : nil
+        }
+    }
+}
+
 /// A small, local-only entry card; the Train tab owns all setup and capture.
 struct ATHLTHHomeQuickStartCard: View {
     typealias Category = ATHLTHTrainAllWorkoutCategoriesSheet.Category
     let accountID: UUID
     let isActive: Bool
     let occupied: Bool
-    let onSelect: (Category) -> Void
+    let watchAvailable: Bool
+    let onSelect: (Category, ATHLTHHomeQuickCaptureChoice) -> Void
     let onAll: () -> Void
 
     @State private var loadedOwner: UUID?
@@ -5965,13 +5979,30 @@ struct ATHLTHHomeQuickStartCard: View {
 
             ForEach(favorites) { category in
                 Button {
-                    counts = ATHLTHQuickActivityUsage.record(category, for: accountID)
-                    loadedOwner = accountID
-                    onSelect(category)
+                    launch(category, choice: .automatic)
                 } label: {
                     shortcut(title: category.title, icon: category.icon, all: false)
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button {
+                        launch(category, choice: .iPhone)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Start on iPhone", norwegian: "Start på iPhone"), systemImage: "iphone")
+                    }
+                    .disabled(occupied)
+                    Button {
+                        launch(category, choice: .appleWatch)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Start on Apple Watch", norwegian: "Start på Apple Watch"), systemImage: "applewatch")
+                    }
+                    .disabled(occupied || !watchAvailable)
+                }
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Starts a simple workout. Hold to choose a device.",
+                    norwegian: "Starter en enkel økt. Hold inne for å velge enhet."
+                ))
+                .accessibilityValue(watchAvailable ? "Apple Watch" : "iPhone")
                 .disabled(occupied)
                 .accessibilityIdentifier("athlth-home-quick-start-\(category.rawValue)")
             }
@@ -6000,6 +6031,13 @@ struct ATHLTHHomeQuickStartCard: View {
         .accessibilityIdentifier("athlth-home-quick-start-card")
     }
 
+    private func launch(_ category: Category, choice: ATHLTHHomeQuickCaptureChoice) {
+        guard !occupied, category.isAvailable, choice.resolve(watchAvailable: watchAvailable) != nil else { return }
+        counts = ATHLTHQuickActivityUsage.record(category, for: accountID)
+        loadedOwner = accountID
+        onSelect(category, choice)
+    }
+
     private func shortcut(title: String, icon: String, all: Bool) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
@@ -6014,8 +6052,8 @@ struct ATHLTHHomeQuickStartCard: View {
                 .minimumScaleFactor(0.85)
                 .multilineTextAlignment(.leading)
             Spacer(minLength: 1)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 8, weight: .semibold))
+            Image(systemName: all ? "chevron.right" : (watchAvailable ? "applewatch" : "iphone"))
+                .font(.system(size: all ? 8 : 12, weight: .semibold))
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
                 .accessibilityHidden(true)
         }
