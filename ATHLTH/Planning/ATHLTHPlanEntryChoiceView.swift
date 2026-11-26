@@ -15,6 +15,7 @@ struct ATHLTHPlanEntryChoiceView: View {
     let onCancel: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var widthClass
 
     private let paper = ATHLTHTrainDesign.canvas
     private let ink = ATHLTHTrainDesign.ink
@@ -44,7 +45,10 @@ struct ATHLTHPlanEntryChoiceView: View {
                             cards(cardHeight: 430)
                         }
                     } else {
-                        let horizontal = available.size.width > 500 && available.size.width > available.size.height
+                        // In the regular-width iPad workspace, each choice is a full-width
+                        // banner, not a half-width column. Keep the compact landscape
+                        // layout for narrow windows and iPhone.
+                        let horizontal = widthClass != .regular && viewport.size.width < 740 && available.size.width > 500 && available.size.width > available.size.height
                         cards(
                             cardHeight: max(0, horizontal ? available.size.height : (available.size.height - 12) / 2),
                             horizontal: horizontal
@@ -54,7 +58,7 @@ struct ATHLTHPlanEntryChoiceView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
-            .frame(maxWidth: 740)
+            .frame(maxWidth: widthClass == .regular || viewport.size.width >= 740 ? .infinity : 740)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(paper.ignoresSafeArea())
@@ -250,6 +254,7 @@ struct ATHLTHPlanEntryChoiceView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
             }
+            .frame(maxWidth: .infinity)
             .frame(height: cardHeight)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
