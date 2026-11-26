@@ -1,5 +1,41 @@
 import SwiftUI
 
+/// Shared on-device account-scoped usage, using the existing Train tap
+/// history so Home inherits preferences instead of starting a second ranking.
+enum ATHLTHQuickActivityUsage {
+    typealias Category = ATHLTHTrainAllWorkoutCategoriesSheet.Category
+
+    static func storageKey(for owner: UUID) -> String {
+        "athlth.train.today.quickTaps." + owner.uuidString
+    }
+
+    static func counts(for owner: UUID, defaults: UserDefaults = .standard) -> [String: Int] {
+        defaults.dictionary(forKey: storageKey(for: owner)) as? [String: Int] ?? [:]
+    }
+
+    @discardableResult
+    static func record(_ category: Category, for owner: UUID, defaults: UserDefaults = .standard) -> [String: Int] {
+        var values = counts(for: owner, defaults: defaults)
+        guard category.isAvailable else { return values }
+        values[category.rawValue] = min(max(values[category.rawValue, default: 0], 0), 99_999) + 1
+        defaults.set(values, forKey: storageKey(for: owner))
+        return values
+    }
+
+    static func favorites(counts: [String: Int]) -> [Category] {
+        let defaults: [Category] = [.running, .strength, .walking, .freeTraining, .sports, .custom]
+        return Array(defaults.enumerated()
+            .filter { $0.element.isAvailable }
+            .sorted { lhs, rhs in
+                let left = max(0, counts[lhs.element.rawValue, default: 0])
+                let right = max(0, counts[rhs.element.rawValue, default: 0])
+                return left == right ? lhs.offset < rhs.offset : left > right
+            }
+            .prefix(2)
+            .map(\.element))
+    }
+}
+
 /// Presents the primary training activities in a responsive three-column grid.
 /// Supported activities reuse the existing Train start flow and recorder;
 /// unavailable activities remain visible but cannot be started.
@@ -90,6 +126,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedCategory: Category?
 
@@ -260,6 +297,7 @@ struct ATHLTHTrainAllWorkoutCategoriesSheet: View {
         // Keep the activity unavailable at the routing level as well,
         // not just visually disabled, so it cannot start via this sheet.
         guard category.isAvailable else { return }
+        ATHLTHQuickActivityUsage.record(category, for: session.profile.userID)
 
         switch category {
         case .running, .walking, .strength:

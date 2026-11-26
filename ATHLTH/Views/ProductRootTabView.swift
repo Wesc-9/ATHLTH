@@ -1445,7 +1445,7 @@ struct ATHLTHHomeView: View {
 
                     homeSocialStatusStrip
 
-                    homeTodayCalendarCard
+                    homeQuickStartAndCalendar
 
                     HomePersonalRecentActivitySection()
                 }
@@ -2754,6 +2754,33 @@ struct ATHLTHHomeView: View {
         }
     }
 
+    private var homeQuickStartAndCalendar: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ATHLTHHomeQuickStartCard(
+                accountID: session.profile.userID,
+                isActive: isActive,
+                occupied: universalRecordingOccupied,
+                onSelect: { category in
+                    social.quickTrainFriendIDs.removeAll()
+                    social.discardPreparedQuickTrainFriends()
+                    switch category {
+                    case .running: onOpenTrain(.quick(.running))
+                    case .strength: onOpenTrain(.quick(.strength))
+                    case .walking: onOpenTrain(.quick(.walking))
+                    case .sports: onOpenTrain(.customQuickActivity(.sports))
+                    case .freeTraining: onOpenTrain(.freeTrainingQuick)
+                    case .custom: onOpenTrain(.customQuickActivity(.other))
+                    default: break
+                    }
+                },
+                onAll: { onOpenTrain(.allWorkoutCategories) }
+            )
+            .frame(maxWidth: .infinity)
+            homeTodayCalendarCard
+                .frame(maxWidth: .infinity)
+        }
+    }
+
     private var homeTodayCalendarCard:
         some View {
         let plan =
@@ -2809,9 +2836,11 @@ struct ATHLTHHomeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.80)
 
-                    Spacer()
+                    Spacer(minLength: 2)
 
                     Text("Se alle")
+                        .lineLimit(1)
+                        .fixedSize()
                         .font(
                             .system(
                                 size: 9.5,
@@ -2966,8 +2995,8 @@ struct ATHLTHHomeView: View {
                     alignment: .top
                 )
             } else {
-                // Show a quiet empty state only; starting a workout belongs
-                // in Training, not in the compact Home calendar preview.
+                // Keep the empty calendar quiet; the adjacent shortcut card
+                // is the single Home entry into training.
                 VStack(alignment: .center, spacing: 8) {
                     Image(systemName: "calendar")
                         .font(.system(size: 19, weight: .light))
@@ -2991,10 +3020,7 @@ struct ATHLTHHomeView: View {
 
         }
         .padding(10)
-        .frame(
-            maxWidth: .infinity,
-            alignment: .topLeading
-        )
+        .frame(maxWidth: .infinity, minHeight: 166, alignment: .topLeading)
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -3028,47 +3054,35 @@ struct ATHLTHHomeView: View {
         isTrainTogether: Bool = false,
         trainingPartner: String? = nil
     ) -> some View {
-        HStack(alignment: .center, spacing: 7) {
-            // Keep the time column slim: recorded finish sits under start.
-            VStack(alignment: .leading, spacing: 2) {
-                Text(time?.formatted(date: .omitted, time: .shortened) ??
-                     ATHLTHLocalization.choose(
-                        english: "—:—", norwegian: "—:—"
-                     ))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                if let endTime {
-                    Text("–" + endTime.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                }
-            }
-            .monospacedDigit()
-            .frame(width: 48, alignment: .leading)
-            .accessibilityElement(children: .combine)
-
-            Rectangle()
-                .fill(ATHLTHTrainDesign.bronze.opacity(0.40))
-                .frame(width: 2, height: 30)
-
+        HStack(alignment: .center, spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
-                .frame(width: 19)
+                .frame(width: 16)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(ATHLTHTrainDesign.ink)
-                    .lineLimit(isTrainTogether ? 1 : 2)
+                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
+                HStack(spacing: 2) {
+                    Text(time?.formatted(date: .omitted, time: .shortened) ?? "—:—")
+                    if let endTime {
+                        Text("–" + endTime.formatted(date: .omitted, time: .shortened))
+                    }
+                }
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
 
                 if isTrainTogether {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english: "Train together", norwegian: "Tren sammen"
-                        ) + (trainingPartner.map { " · \($0)" } ?? ""),
+                        ATHLTHLocalization.choose(english: "Train together", norwegian: "Tren sammen")
+                        + (trainingPartner.map { " · \($0)" } ?? ""),
                         systemImage: "person.2.fill"
                     )
                     .font(.system(size: 9))
@@ -3078,13 +3092,10 @@ struct ATHLTHHomeView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(
-            ATHLTHTrainDesign.canvas.opacity(0.55),
-            in: RoundedRectangle(cornerRadius: 11)
-        )
+        .background(ATHLTHTrainDesign.canvas.opacity(0.55), in: RoundedRectangle(cornerRadius: 11))
     }
 
     // The compact Home card displays two slots, but "See all" must expose
@@ -9658,6 +9669,14 @@ struct ATHLTHTrainView: View {
             } else {
                 selectedSection = .plan
             }
+
+        case .allWorkoutCategories:
+            selectedSection = .today
+            if !hasOngoingTrainWorkout { showingAllWorkoutCategories = true }
+
+        case .freeTrainingQuick:
+            selectedSection = .today
+            startFreeTrainingQuick()
 
         case let .quick(kind):
             selectedSection = .today

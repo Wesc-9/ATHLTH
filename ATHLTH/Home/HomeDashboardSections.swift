@@ -5939,3 +5939,92 @@ private struct PlannedWorkoutInvitationLobby: View {
         }
     }
 }
+
+/// A small, local-only entry card; the Train tab owns all setup and capture.
+struct ATHLTHHomeQuickStartCard: View {
+    typealias Category = ATHLTHTrainAllWorkoutCategoriesSheet.Category
+    let accountID: UUID
+    let isActive: Bool
+    let occupied: Bool
+    let onSelect: (Category) -> Void
+    let onAll: () -> Void
+
+    @State private var loadedOwner: UUID?
+    @State private var counts: [String: Int] = [:]
+
+    private var favorites: [Category] {
+        ATHLTHQuickActivityUsage.favorites(counts: loadedOwner == accountID ? counts : [:])
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(ATHLTHLocalization.choose(english: "Train now", norwegian: "Tren nå"))
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .padding(.bottom, 2)
+
+            ForEach(favorites) { category in
+                Button {
+                    counts = ATHLTHQuickActivityUsage.record(category, for: accountID)
+                    loadedOwner = accountID
+                    onSelect(category)
+                } label: {
+                    shortcut(title: category.title, icon: category.icon, all: false)
+                }
+                .buttonStyle(.plain)
+                .disabled(occupied)
+                .accessibilityIdentifier("athlth-home-quick-start-\(category.rawValue)")
+            }
+            Button(action: onAll) {
+                shortcut(title: ATHLTHLocalization.choose(english: "All workout modes", norwegian: "Alle treningsmodus"),
+                         icon: "square.grid.2x2", all: true)
+            }
+            .buttonStyle(.plain)
+            .disabled(occupied)
+            .accessibilityIdentifier("athlth-home-quick-start-all")
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 166, alignment: .topLeading)
+        .background(ATHLTHTrainDesign.paper, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+        .opacity(occupied ? 0.65 : 1)
+        .task(id: "\(accountID.uuidString)|\(isActive)") {
+            guard isActive else { return }
+            loadedOwner = accountID
+            counts = ATHLTHQuickActivityUsage.counts(for: accountID)
+        }
+        .accessibilityIdentifier("athlth-home-quick-start-card")
+    }
+
+    private func shortcut(title: String, icon: String, all: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 19)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .multilineTextAlignment(.leading)
+            Spacer(minLength: 1)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+        .background(
+            all ? ATHLTHTrainDesign.paleGold.opacity(0.45) : ATHLTHTrainDesign.canvas.opacity(0.65),
+            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+        )
+        .contentShape(Rectangle())
+    }
+}

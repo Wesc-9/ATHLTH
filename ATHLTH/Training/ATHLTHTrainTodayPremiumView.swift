@@ -215,12 +215,11 @@ struct ATHLTHTrainTodayPremiumView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .task(id: isActive) {
             guard isActive else { return }
+            quickActivityTapCounts = ATHLTHQuickActivityUsage.counts(for: session.profile.userID)
             reloadCheckIn()
         }
         .task(id: session.profile.userID) {
-            quickActivityTapCounts =
-                UserDefaults.standard.dictionary(forKey: quickActivityStorageKey)
-                    as? [String: Int] ?? [:]
+            quickActivityTapCounts = ATHLTHQuickActivityUsage.counts(for: session.profile.userID)
             temporarilyFeaturedGoalID = nil
         }
         .sheet(item: $customDelayWorkout) { workout in
@@ -831,17 +830,9 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
     }
 
-    private var quickActivityStorageKey: String {
-        "athlth.train.today.quickTaps." + String(describing: session.profile.userID)
-    }
-
     private func recordQuickActivityTap(_ activity: QuickActivity) {
-        var counts = quickActivityTapCounts
-        counts[activity.rawValue] = min(
-            counts[activity.rawValue, default: 0] + 1, 100_000
-        )
-        quickActivityTapCounts = counts
-        UserDefaults.standard.set(counts, forKey: quickActivityStorageKey)
+        guard let category = ATHLTHTrainAllWorkoutCategoriesSheet.Category(rawValue: activity.rawValue) else { return }
+        quickActivityTapCounts = ATHLTHQuickActivityUsage.record(category, for: session.profile.userID)
     }
 
     private func openQuickActivity(_ activity: QuickActivity) {

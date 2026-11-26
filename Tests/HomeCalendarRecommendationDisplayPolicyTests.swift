@@ -37,4 +37,23 @@ final class HomeCalendarRecommendationDisplayPolicyTests: XCTestCase {
             tournamentCount: 1
         ))
     }
+
+    func testHomeQuickStartDefaultsAndRanksByExistingTrainSelections() {
+        XCTAssertEqual(ATHLTHQuickActivityUsage.favorites(counts: [:]), [.running, .strength])
+        XCTAssertEqual(ATHLTHQuickActivityUsage.favorites(counts: ["walking": 9]), [.walking, .running])
+        XCTAssertEqual(ATHLTHQuickActivityUsage.favorites(counts: ["sports": 8, "freeTraining": 7, "cycling": 999]), [.sports, .freeTraining])
+        XCTAssertEqual(ATHLTHQuickActivityUsage.favorites(counts: ["strength": 3, "running": 3]), [.running, .strength])
+    }
+
+    func testQuickStartUsesExistingAccountScopedTapHistory() {
+        let suite = "athlth-quick-start-test-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let owner = UUID()
+        let other = UUID()
+        defaults.set(["walking": 4], forKey: ATHLTHQuickActivityUsage.storageKey(for: owner))
+        XCTAssertEqual(ATHLTHQuickActivityUsage.record(.walking, for: owner, defaults: defaults)["walking"], 5)
+        XCTAssertEqual(ATHLTHQuickActivityUsage.counts(for: other, defaults: defaults), [:])
+        XCTAssertNil(ATHLTHQuickActivityUsage.record(.cycling, for: owner, defaults: defaults)["cycling"])
+    }
 }

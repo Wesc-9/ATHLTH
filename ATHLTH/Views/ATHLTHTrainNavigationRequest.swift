@@ -8,6 +8,8 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
     case sendPlannedWorkoutToWatch(planID: UUID, workoutID: UUID)
     case startPlannedWorkoutAfter(planID: UUID, workoutID: UUID, seconds: TimeInterval)
     case quick(WorkoutKind)
+    case allWorkoutCategories
+    case freeTrainingQuick
     case customQuick
     case customQuickActivity(CustomQuickWorkoutActivity)
     case ghost
@@ -30,6 +32,10 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
             return "delayed:\(planID.uuidString):\(workoutID.uuidString):\(seconds.bitPattern)"
         case let .quick(kind):
             return "quick:\(kind.title)"
+        case .allWorkoutCategories:
+            return "quick:allCategories"
+        case .freeTrainingQuick:
+            return "quick:freeTraining"
         case .customQuick:
             return "quick:custom"
         case let .customQuickActivity(activity):
