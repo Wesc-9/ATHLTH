@@ -163,7 +163,7 @@ struct ATHLTHTournamentLiveDetailView: View {
         }
         .scrollIndicators(.hidden)
         .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
-        .navigationTitle(current.title)
+        .navigationTitle(current.displayFormatTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if isOwner && current.status == "inviting" {
@@ -263,6 +263,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .font(.system(size: 33, weight: .regular, design: .serif))
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
                 .fixedSize(horizontal: false, vertical: true)
+            if current.isDuel { duelParticipants }
             HStack(spacing: 13) {
                 Label("\(confirmedEntries.count)/\(confirmedEntries.count + pendingCount) bekreftet", systemImage: "person.2")
                 if !current.singleEventMode {
@@ -393,6 +394,34 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .background(ATHLTHArenaV3Style.panel())
             }
         }
+    }
+
+    private var duelParticipants: some View {
+        let athletes = entries.filter { $0.response == "accepted" || $0.response == "invited" }
+            .sorted { $0.userID == current.ownerID && $1.userID != current.ownerID }
+        return HStack(spacing: 12) {
+            ForEach(Array(athletes.prefix(2).enumerated()), id: \.element.id) { index, entry in
+                if index == 1 {
+                    Text("VS").font(.system(size: 15, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+                VStack(spacing: 7) {
+                    Text(String(name(entry.userID).prefix(2)).uppercased())
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        .frame(width: 56, height: 56)
+                        .background(ATHLTHArenaV3Style.cream, in: Circle())
+                    Text(name(entry.userID)).font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text(entry.response == "invited" ? "Invitert" : entry.isReady ? "Klar" : "Ikke klar")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(ATHLTHArenaV3Style.panel())
     }
 
     private var statusLabel: String {
@@ -722,7 +751,10 @@ struct ATHLTHTournamentLiveDetailView: View {
             ForEach(visible) { candidate in
                 NavigationLink {
                     if let id = candidate.exerciseID, let entry = library.allExercises.first(where: { $0.id == id }) {
-                        ExerciseDetailView(entry: entry, selectionTitle: nil, onSelect: nil)
+                        VStack(spacing: 0) {
+                            competitionExerciseRules(candidate)
+                            ExerciseDetailView(entry: entry, selectionTitle: nil, onSelect: nil)
+                        }
                     } else {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(exerciseNames[candidate.lookupID] ?? "Øvelse")
@@ -766,6 +798,24 @@ struct ATHLTHTournamentLiveDetailView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHArenaV3Style.panel())
+    }
+
+    private func competitionExerciseRules(_ candidate: ATHLTHTournamentExerciseCandidateRemote) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(current.raceRules.scoringSummary, systemImage: "trophy")
+                .font(.subheadline.weight(.semibold))
+            Text(current.raceRules.effectiveScoringMode.detail).font(.caption)
+            if let goal = current.raceRules.goal(for: candidate.lookupID) {
+                Text("Mål: " + goal.formatted()).font(.caption)
+            }
+            Text("Frist: \(current.completionHours) timer · Vekt: \(current.raceRules.weight(for: candidate.lookupID))×")
+                .font(.caption)
+        }
+        .foregroundStyle(ATHLTHArenaV3Style.ink)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(ATHLTHArenaV3Style.panel())
+        .padding(.horizontal, 16)
     }
 
     private var eventInformation: some View {
