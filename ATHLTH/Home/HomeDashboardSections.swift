@@ -1861,58 +1861,16 @@ struct HomeWeeklyProgressStrip:
             alignment: .leading,
             spacing: 6
         ) {
-            HStack(spacing: 7) {
-                Text("Ukens fremdrift")
-                    .font(
-                        .system(
-                            size: 15,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-
-                Text(
-                    "Uke \(calendar.component(.weekOfYear, from: visibleWeekInterval.start))"
-                )
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(1)
-
-                Spacer(minLength: 2)
-
-                if weekOffset != 0 {
-                    Button {
-                        withAnimation(.snappy(duration: 0.22)) {
-                            weekOffset = 0
-                        }
-                    } label: {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Back to current week",
-                            norwegian: "Tilbake til denne uken"
-                        )
-                    )
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 7) {
+                    weeklyProgressHeading
+                    Spacer(minLength: 3)
+                    weekPicker
                 }
-
-                Text(progressText)
-                    .font(
-                        .system(
-                            size: 11,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    weeklyProgressHeading
+                    weekPicker.frame(maxWidth: .infinity, alignment: .trailing)
+                }
             }
 
             ProgressView(
@@ -1926,33 +1884,11 @@ struct HomeWeeklyProgressStrip:
             )
 
             HStack(spacing: 3) {
-                weekNavigationButton(
-                    systemImage: "chevron.left"
-                ) {
-                    withAnimation(.snappy(duration: 0.22)) {
-                        weekOffset -= 1
-                    }
-                }
-
-                ForEach(
-                    visibleWeekDates,
-                    id: \.self
-                ) { date in
+                ForEach(visibleWeekDates, id: \.self) { date in
                     dayButton(date)
                 }
-
-                weekNavigationButton(
-                    systemImage: "chevron.right"
-                ) {
-                    withAnimation(
-                        .snappy(
-                            duration: 0.22
-                        )
-                    ) {
-                        weekOffset += 1
-                    }
-                }
             }
+            .accessibilityIdentifier("athlth-home-weekly-progress-days")
 
             Divider()
                 .opacity(0.30)
@@ -2320,7 +2256,7 @@ struct HomeWeeklyProgressStrip:
                     )
                     .font(
                         .system(
-                            size: 10,
+                            size: 12,
                             weight: .bold
                         )
                     )
@@ -2336,7 +2272,7 @@ struct HomeWeeklyProgressStrip:
                     )
                     .font(
                         .system(
-                            size: 10,
+                            size: 12,
                             weight:
                                 .semibold
                         )
@@ -2353,7 +2289,7 @@ struct HomeWeeklyProgressStrip:
                     )
                     .font(
                         .system(
-                            size: 10,
+                            size: 12,
                             weight:
                                 .semibold
                         )
@@ -2365,8 +2301,8 @@ struct HomeWeeklyProgressStrip:
                 }
             }
             .frame(
-                width: 24,
-                height: 24
+                width: 30,
+                height: 30
             )
             .overlay {
                 if isToday {
@@ -2385,7 +2321,7 @@ struct HomeWeeklyProgressStrip:
             )
             .font(
                 .system(
-                    size: 8.5,
+                    size: 9.5,
                     weight:
                         isToday
                             ? .bold
@@ -2406,6 +2342,49 @@ struct HomeWeeklyProgressStrip:
         .contentShape(
             Rectangle()
         )
+    }
+
+    private var weeklyProgressHeading: some View {
+        HStack(spacing: 7) {
+            Text("Ukens fremdrift")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(progressText)
+                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var weekPicker: some View {
+        HStack(spacing: 2) {
+            weekNavigationButton(systemImage: "chevron.left") {
+                withAnimation(.snappy(duration: 0.22)) { weekOffset -= 1 }
+            }
+            Button {
+                withAnimation(.snappy(duration: 0.22)) { weekOffset = 0 }
+            } label: {
+                Text("Uke \(calendar.component(.weekOfYear, from: visibleWeekInterval.start))")
+                    .font(.system(size: 10, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(weekOffset == 0 ? ATHLTHTheme.mutedText : ATHLTHTheme.accentDeep)
+                    .fixedSize()
+                    .frame(minHeight: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Return to the current week",
+                norwegian: "Gå tilbake til denne uken"
+            ))
+            .accessibilityIdentifier("athlth-home-weekly-progress-week-label")
+            weekNavigationButton(systemImage: "chevron.right") {
+                withAnimation(.snappy(duration: 0.22)) { weekOffset += 1 }
+            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityIdentifier("athlth-home-weekly-progress-week-picker")
     }
 
     private func weekNavigationButton(
@@ -2434,10 +2413,7 @@ struct HomeWeeklyProgressStrip:
                         .mutedText
                         .opacity(0.35)
             )
-            .frame(
-                width: 27,
-                height: 27
-            )
+            .frame(width: 25, height: 25)
             .background(
                 Color.white.opacity(
                     enabled
@@ -2455,6 +2431,8 @@ struct HomeWeeklyProgressStrip:
                         lineWidth: 0.7
                     )
             }
+            .frame(width: 30, height: 32)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
