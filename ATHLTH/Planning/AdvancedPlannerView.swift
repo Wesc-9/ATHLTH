@@ -7710,7 +7710,7 @@ struct SessionEditorView: View {
                     onSwitchToBasic: importedAdvancedModeExit,
                     saveButtonTitle: isStandalone && selectedPartnerID != nil &&
                         onPreparedWorkout == nil && selectedScratchWorkoutType != nil
-                        ? ATHLTHLocalization.choose(english: "Save and open lobby", norwegian: "Lagre og åpne lobby") : nil,
+                        ? ATHLTHLocalization.choose(english: "Invite and open lobby", norwegian: "Inviter og åpne lobby") : nil,
                     onCloseRequested: {
                         if !showingImportedAdvancedWorkout {
                             scratchBuilderClosedIntentionally = true
@@ -7727,7 +7727,7 @@ struct SessionEditorView: View {
                         discardStoredStandaloneDraft()
                         hasSelectedWorkoutSource = false
                     },
-                    onSaveSharedRevision: isStandalone && selectedPartnerID != nil &&
+                    onFinalizeSharedWorkout: isStandalone && selectedPartnerID != nil &&
                         onPreparedWorkout == nil && selectedScratchWorkoutType != nil
                         ? { workout in await finalizeSharedWorkoutAndQueueLobby(workout) } : nil
                 )
