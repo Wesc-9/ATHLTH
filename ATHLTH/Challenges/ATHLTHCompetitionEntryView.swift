@@ -15,6 +15,7 @@ struct ATHLTHCompetitionEntryView: View {
     @State private var selectedTournament: ATHLTHTournamentRemote?
     @State private var showingFormats = false
     @State private var showingPersonalGhost = false
+    @State private var dismissAfterPersonalGhost = false
     @State private var loading = false
     @State private var errorMessage: String?
     private let cloud = ATHLTHTournamentCloudService()
@@ -48,19 +49,13 @@ struct ATHLTHCompetitionEntryView: View {
                         }
                         if !isDirectEntry {
                             Button { showingPersonalGhost = true } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "timer.circle.fill").font(.system(size: 32))
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text("Ghost Race").font(.system(.title2, design: .serif).weight(.semibold))
-                                        Text("Utfordre en tidligere økt eller en digital motstander.").font(.subheadline)
-                                    }
-                                    Spacer(minLength: 0)
-                                    Image(systemName: "arrow.up.right")
-                                }
-                                .foregroundStyle(.white)
-                                .padding(16)
-                                .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
-                                .background(LinearGradient(colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.ink], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
+                                competitionArtworkCard(
+                                    artwork: "GoalRunning",
+                                    participants: "1 deltaker · Alene",
+                                    symbol: "figure.run",
+                                    title: "Ghost Race",
+                                    subtitle: "Løp alene mot en tidligere økt eller en digital fartsholder."
+                                )
                             }.buttonStyle(.plain)
                             .accessibilityIdentifier("athlth-competition-entry-ghost")
                         }
@@ -89,10 +84,17 @@ struct ATHLTHCompetitionEntryView: View {
                 choosesActivityInRules: !locksRunningActivity
             ))
         }
-        .fullScreenCover(isPresented: $showingPersonalGhost) {
+        .fullScreenCover(isPresented: $showingPersonalGhost, onDismiss: {
+            if dismissAfterPersonalGhost {
+                dismissAfterPersonalGhost = false
+                dismiss()
+            }
+        }) {
             NavigationStack {
-                GhostRaceHubView(personalCompetitionOnly: true)
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { showingPersonalGhost = false } } }
+                ATHLTHSoloGhostSetupView(onStarted: {
+                    dismissAfterPersonalGhost = true
+                    showingPersonalGhost = false
+                })
             }
         }
         .fullScreenCover(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
@@ -141,7 +143,13 @@ struct ATHLTHCompetitionEntryView: View {
             default: return "TrainHero"
             }
         }()
-        return ZStack(alignment: .bottomLeading) {
+        return competitionArtworkCard(artwork: artwork, participants: participantLabel(format),
+                                      symbol: format.symbol, title: format.title, subtitle: format.subtitle)
+    }
+
+    private func competitionArtworkCard(artwork: String, participants: String, symbol: String,
+                                        title: String, subtitle: String) -> some View {
+        ZStack(alignment: .bottomLeading) {
             GeometryReader { geometry in
                 Image(artwork)
                     .resizable()
@@ -157,13 +165,13 @@ struct ATHLTHCompetitionEntryView: View {
             )
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(participantLabel(format), systemImage: format.symbol)
+                    Label(participants, systemImage: symbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Color(red: 0.97, green: 0.88, blue: 0.68))
-                    Text(format.title)
+                    Text(title)
                         .font(.system(.title2, design: .serif).weight(.semibold))
                         .foregroundStyle(.white)
-                    Text(format.subtitle)
+                    Text(subtitle)
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.92))
                         .fixedSize(horizontal: false, vertical: true)

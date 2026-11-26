@@ -1,8 +1,97 @@
 import CoreLocation
 import Foundation
 
+/// A route-free Ghost uses the normal structured run transfer and shared
+/// virtual pacer. No fabricated map, route ID, or second workout clock.
+enum ATHLTHSoloGhostPacePolicy {
+    struct Preset {
+        let title: String
+        let meters: Double
+    }
+    static let presets: [Preset] = [
+        .init(title: "1 km", meters: 1_000), .init(title: "2 km", meters: 2_000),
+        .init(title: "5 km", meters: 5_000), .init(title: "10 km", meters: 10_000),
+        .init(title: "Halvmaraton", meters: 21_097.5), .init(title: "Maraton", meters: 42_195)
+    ]
+
+    static func transfer(paceSeconds: Double, distanceMeters: Double?,
+                         durationSeconds: Double?) -> WatchRunningWorkoutTransfer? {
+        guard paceSeconds.isFinite, (120...1_800).contains(paceSeconds),
+              distanceMeters == nil || durationSeconds == nil else { return nil }
+        if let distanceMeters, !distanceMeters.isFinite || !(200...100_000).contains(distanceMeters) { return nil }
+        if let durationSeconds, !durationSeconds.isFinite || !(60...86_400).contains(durationSeconds) { return nil }
+        let step = WatchRunningWorkoutStep(
+            id: UUID(), title: "Ghost Race",
+            measure: distanceMeters != nil ? .distance : durationSeconds != nil ? .time : .open,
+            distanceMeters: distanceMeters, durationSeconds: durationSeconds,
+            intensityText: nil, phase: "work", ghostPaceSecondsPerKilometer: paceSeconds)
+        var configuration = ATHLTHIntervalGhostPacer.WorkoutConfiguration()
+        configuration.isEnabled = true
+        configuration.defaultPaceSecondsPerKilometer = paceSeconds
+        configuration.coverage = .entireWorkout
+        var transfer = WatchRunningWorkoutTransfer(title: "Ghost Race", steps: [step])
+        transfer.intervalGhostConfiguration = configuration
+        transfer.autoAdvanceTimedSteps = true
+        return transfer
+    }
+}
+
 @MainActor
 enum GhostRaceStartService {
+    static func startSoloPace(
+        paceSeconds: Double, distanceMeters: Double?, durationSeconds: Double?,
+        ghostRace: GhostRaceStore, realtime: ATHLTHRealtimeSocialStore,
+        watchConnection: AppleWatchConnectionStore, phoneWorkout: IPhoneWorkoutStore,
+        captureDevice: WorkoutCaptureDevice, settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
+    ) async throws {
+        func failure(_ message: String) -> NSError {
+            NSError(domain: "ATHLTH.SoloGhost", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        guard var transfer = ATHLTHSoloGhostPacePolicy.transfer(
+            paceSeconds: paceSeconds, distanceMeters: distanceMeters, durationSeconds: durationSeconds
+        ) else { throw failure("Velg en gyldig målfart og distanse.") }
+        guard phoneWorkout.active == nil, !phoneWorkout.hasPendingLaunch,
+              !watchConnection.workoutLaunchInProgress else {
+            throw failure("Avslutt den aktive treningsøkten før du starter Ghost Race.")
+        }
+        if captureDevice == .iPhone && !phoneWorkout.canStartSynchronizedOutdoorWorkout {
+            phoneWorkout.requestLiveGhostLocationPermissionIfNeeded()
+            throw failure("Gi ATHLTH stedstilgang og prøv å starte igjen.")
+        }
+        if captureDevice == .appleWatch && !watchConnection.isReady {
+            throw failure("Apple Watch er ikke klar til å starte.")
+        }
+        transfer.heartRateZoneMaximumBPM = maximumHeartRateBPM
+        var audio = settings.audioCoachConfiguration(enabled: settings.audioCoachEnabledByDefault,
+                                                    routeDistanceMeters: distanceMeters)
+        if captureDevice == .appleWatch {
+            audio.preferIPhoneAudioWhenReachable = false
+            audio.useAcknowledgedVoiceLease = false
+        }
+        // Reset only stale route Ghost state; the workout owns all pace progress.
+        realtime.selectLiveGhost(nil)
+        ghostRace.cancel()
+        watchConnection.sendWorkoutRouteSelection(nil)
+        watchConnection.clearGhostRace()
+        if captureDevice == .iPhone {
+            phoneWorkout.start(walking: false, title: transfer.title,
+                               audioCoach: audio, structuredWorkout: transfer)
+            guard phoneWorkout.active != nil else {
+                throw failure("Ghost Race kunne ikke starte. Kontroller stedstilgang og aktiv økt.")
+            }
+        } else {
+            watchConnection.sendAudioCoachConfiguration(audio)
+            watchConnection.sendRunningWorkout(transfer)
+            try await watchConnection.startWorkoutOnWatch(.running)
+            watchConnection.sendWorkoutRouteSelection(nil)
+            watchConnection.clearGhostRace()
+            watchConnection.sendAudioCoachConfiguration(audio)
+            watchConnection.sendRunningWorkout(transfer)
+        }
+    }
+
     static func start(
         workoutID: UUID,
         title: String,

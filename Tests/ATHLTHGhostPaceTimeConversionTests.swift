@@ -147,3 +147,27 @@ final class ATHLTHGhostPaceTimeConversionTests: XCTestCase {
         ))
     }
 }
+
+
+// Verify route-free competition uses the same transfer on phone and Watch.
+final class ATHLTHSoloGhostPacePolicyTests: XCTestCase {
+    func testPresetDistancesAndOpenWorkout() throws {
+        XCTAssertEqual(ATHLTHSoloGhostPacePolicy.presets.map(\.meters), [1_000, 2_000, 5_000, 10_000, 21_097.5, 42_195])
+        let plan = try XCTUnwrap(ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: 330, distanceMeters: nil, durationSeconds: nil))
+        XCTAssertEqual(plan.steps.count, 1)
+        XCTAssertEqual(plan.steps.first?.measure, .open)
+        XCTAssertNil(plan.steps.first?.distanceMeters)
+        XCTAssertEqual(plan.intervalGhostConfiguration?.coverage, .entireWorkout)
+        XCTAssertEqual(plan.intervalGhostConfiguration?.defaultPaceSecondsPerKilometer, 330)
+    }
+
+    func testDistanceAndTimeStaySeparateAndRejectInvalidValues() throws {
+        let race = try XCTUnwrap(ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: 300, distanceMeters: 21_097.5, durationSeconds: nil))
+        XCTAssertEqual(race.steps.first?.measure, .distance)
+        XCTAssertEqual(race.steps.first?.distanceMeters, 21_097.5)
+        let timed = try XCTUnwrap(ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: 300, distanceMeters: nil, durationSeconds: 900))
+        XCTAssertEqual(timed.steps.first?.measure, .time)
+        XCTAssertNil(ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: .nan, distanceMeters: nil, durationSeconds: nil))
+        XCTAssertNil(ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: 300, distanceMeters: 1_000, durationSeconds: 900))
+    }
+}

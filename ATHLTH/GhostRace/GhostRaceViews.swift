@@ -121,6 +121,7 @@ private enum GhostReplaySort: String, CaseIterable, Identifiable {
 
 struct GhostRaceHubView: View {
     var personalCompetitionOnly = false
+    var replayOnly = false
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -210,10 +211,10 @@ struct GhostRaceHubView: View {
         ScrollView {
             LazyVStack(spacing: 14) {
                 hero
-                if personalCompetitionOnly {
+                if personalCompetitionOnly && !replayOnly {
                     personalRouteEntry
                 }
-                modeOverview
+                if !replayOnly { modeOverview }
                 ghostExperiencePicker
 
                 if ATHLTHDeviceRole.isIPad,
@@ -286,10 +287,11 @@ struct GhostRaceHubView: View {
             loadReplayFavorites()
             async let runs: Void =
                 loadRuns()
-            async let live: Void =
-                realtime
-                    .refreshVisibleLiveSessions()
-            _ = await (runs, live)
+            if personalCompetitionOnly { await runs }
+            else {
+                async let live: Void = realtime.refreshVisibleLiveSessions()
+                _ = await (runs, live)
+            }
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -3980,5 +3982,371 @@ struct ATHLTHGhostRuntimeObserver: View {
                     context
                 )
         }
+    }
+}
+
+
+// MARK: - Solo competition entry (shared recording engine)
+
+struct ATHLTHSoloGhostSetupView: View {
+    var onStarted: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingBuilder = false
+    @State private var createdRoute: TrainingRoute?
+    @State private var openCreatedRoute = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ATHLTHTrainPageTitle(title: "Ghost Race")
+                Text("Konkurrer alene. Velg rute, distanse eller løp fritt mot en fast fart.")
+                    .font(ATHLTHTrainDesign.pageSubtitle)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                NavigationLink {
+                    ATHLTHSoloGhostRoutePicker(onCreate: { showingBuilder = true })
+                } label: {
+                    choice("Rute", detail: "Velg en løype og en motstander eller måltid.", icon: "map")
+                }.buttonStyle(.plain)
+                NavigationLink {
+                    ATHLTHSoloGhostPaceSetupView(fixedDistance: true, onStarted: onStarted)
+                } label: {
+                    choice("Fast distanse", detail: "1 km til maraton, eller din egen distanse.", icon: "flag.checkered")
+                }.buttonStyle(.plain)
+                NavigationLink {
+                    ATHLTHSoloGhostPaceSetupView(fixedDistance: false, onStarted: onStarted)
+                } label: {
+                    choice("Fri løping", detail: "Velg ghostens tempo. Ingen rute eller målstrek.", icon: "figure.run")
+                }.buttonStyle(.plain)
+                NavigationLink {
+                    GhostRaceHubView(personalCompetitionOnly: true, replayOnly: true)
+                } label: {
+                    choice("Tidligere GPS-økt", detail: "Løp mot din egen registrerte GPS-replay.", icon: "clock.arrow.circlepath")
+                }.buttonStyle(.plain)
+            }
+            .padding(18).frame(maxWidth: 760).frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { dismiss() } } }
+        .sheet(isPresented: $showingBuilder, onDismiss: {
+            if createdRoute != nil { openCreatedRoute = true }
+        }) {
+            NavigationStack {
+                RunRouteBuilderView(onSavedRoute: { route in createdRoute = route })
+            }
+        }
+        .navigationDestination(isPresented: $openCreatedRoute) {
+            if let createdRoute {
+                RouteDetailView(route: createdRoute, ghostCompetitionSetup: true)
+            }
+        }
+    }
+
+    private func choice(_ title: String, detail: String, icon: String) -> some View {
+        ATHLTHUnifiedCard {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 23, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 48, height: 48)
+                    .background(ATHLTHTrainDesign.bronze.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title).font(.system(.title2, design: .serif).weight(.semibold))
+                    Text(detail).font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct ATHLTHSoloGhostRoutePicker: View {
+    let onCreate: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ATHLTHTrainPageTitle(title: "Velg rute")
+                NavigationLink {
+                    ATHLTHSoloGhostSavedRoutesView(ownOnly: false)
+                } label: {
+                    row("Lagrede ruter", "Alle brukbare ruter i ditt bibliotek.", "bookmark")
+                }.buttonStyle(.plain)
+                NavigationLink {
+                    ATHLTHSoloGhostSavedRoutesView(ownOnly: true)
+                } label: {
+                    row("Mine ruter", "Ruter du selv har opprettet.", "person.crop.circle")
+                }.buttonStyle(.plain)
+                NavigationLink {
+                    RouteLibraryListView(source: .database, ghostCompetitionSetup: true)
+                } label: {
+                    row("Utforsk ruter", "Finn en offentlig rute.", "globe.europe.africa")
+                }.buttonStyle(.plain)
+                Button(action: onCreate) {
+                    row("Lag ny rute", "Tegn og lagre en løype før du velger ghost.", "plus")
+                }.buttonStyle(.plain)
+            }.padding(18).frame(maxWidth: 760).frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func row(_ title: String, _ detail: String, _ icon: String) -> some View {
+        ATHLTHUnifiedCard {
+            HStack(spacing: 14) {
+                Image(systemName: icon).font(.title2).foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                    Text(detail).font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption)
+            }.foregroundStyle(ATHLTHTheme.primaryText)
+        }
+    }
+}
+
+private struct ATHLTHSoloGhostSavedRoutesView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    let ownOnly: Bool
+    @State private var query = ""
+
+    private var routes: [TrainingRoute] {
+        session.savedRoutes.filter { route in
+            GhostTargetRouteEligibility.isUsable(route) &&
+            (!ownOnly || route.ownerID == session.profile.userID) &&
+            (query.isEmpty || route.title.localizedCaseInsensitiveContains(query))
+        }.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                if routes.isEmpty {
+                    ContentUnavailableView("Ingen tilgjengelige ruter", systemImage: "map",
+                                           description: Text("Velg en annen rute eller lag en ny."))
+                }
+                ForEach(routes) { route in
+                    NavigationLink {
+                        RouteDetailView(route: route, ghostCompetitionSetup: true)
+                    } label: {
+                        ATHLTHUnifiedCard {
+                            HStack(spacing: 12) {
+                                RouteMapSnapshotThumbnail(route: route, height: 62)
+                                    .frame(width: 84, height: 62)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(route.title).font(.headline)
+                                    Text(String(format: "%.2f km", route.distanceKilometers))
+                                        .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption)
+                            }.foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+                    }.buttonStyle(.plain)
+                }
+            }.padding(16).frame(maxWidth: 760).frame(maxWidth: .infinity)
+        }
+        .searchable(text: $query, prompt: "Søk etter rute")
+        .navigationTitle(ownOnly ? "Mine ruter" : "Lagrede ruter")
+        .navigationBarTitleDisplayMode(.inline)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+}
+
+private struct ATHLTHSoloGhostPaceSetupView: View {
+    let fixedDistance: Bool
+    let onStarted: () -> Void
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @State private var selectedMeters: Double = 5_000
+    @State private var customDistance = ""
+    @State private var pace = "5:30"
+    @State private var durationMinutes = 0
+    @State private var device: WorkoutCaptureDevice = .iPhone
+    @State private var starting = false
+    @State private var reviewing = false
+    @State private var errorMessage: String?
+
+    private var meters: Double? {
+        guard fixedDistance else { return nil }
+        if selectedMeters > 0 { return selectedMeters }
+        guard let km = Double(customDistance.replacingOccurrences(of: ",", with: ".")),
+              km.isFinite, (0.2...100).contains(km) else { return nil }
+        return km * 1_000
+    }
+    private var paceSeconds: Double? { GhostTargetPaceFormatter.secondsPerKilometer(from: pace) }
+    private var valid: Bool { paceSeconds != nil && (!fixedDistance || meters != nil) }
+    private var title: String { fixedDistance ? "Fast distanse" : "Fri løping" }
+    private var duration: Double? { !fixedDistance && durationMinutes > 0 ? Double(durationMinutes * 60) : nil }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 15) {
+                ATHLTHTrainPageTitle(title: title)
+                if fixedDistance { distanceCard }
+                paceCard
+                if !fixedDistance { timeCard }
+                ATHLTHUnifiedCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Registrer med").font(.headline)
+                        Picker("Enhet", selection: $device) {
+                            Text("iPhone").tag(WorkoutCaptureDevice.iPhone)
+                            Text("Apple Watch").tag(WorkoutCaptureDevice.appleWatch)
+                        }.pickerStyle(.segmented)
+                        if device == .appleWatch && !watchConnection.isReady {
+                            Text("Koble til Apple Watch før start.").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Button { reviewing = true } label: {
+                    Text("Se gjennom Ghost Race").font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }.buttonStyle(.borderedProminent).tint(ATHLTHTrainDesign.ink)
+                    .disabled(!valid || starting)
+            }
+            .padding(18).frame(maxWidth: 760).frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $reviewing) { review }
+        .alert("Ghost Race", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(errorMessage ?? "") }
+    }
+
+    private var distanceCard: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Velg distanse").font(.headline)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+                    ForEach(ATHLTHSoloGhostPacePolicy.presets, id: \.meters) { preset in
+                        Button { selectedMeters = preset.meters } label: {
+                            Text(preset.title).font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(selectedMeters == preset.meters ? ATHLTHTrainDesign.bronze.opacity(0.19) : ATHLTHTheme.surfaceStone,
+                                            in: RoundedRectangle(cornerRadius: 12))
+                        }.buttonStyle(.plain).accessibilityAddTraits(selectedMeters == preset.meters ? .isSelected : [])
+                    }
+                    Button { selectedMeters = 0 } label: {
+                        Text("Egendefinert").font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(selectedMeters == 0 ? ATHLTHTrainDesign.bronze.opacity(0.19) : ATHLTHTheme.surfaceStone,
+                                        in: RoundedRectangle(cornerRadius: 12))
+                    }.buttonStyle(.plain)
+                }
+                if selectedMeters == 0 {
+                    HStack {
+                        TextField("Distanse", text: $customDistance).keyboardType(.decimalPad)
+                        Text("km").foregroundStyle(.secondary)
+                    }.padding(12).background(ATHLTHTheme.surfaceStone, in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
+        }
+    }
+
+    private var paceCard: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Ghostens målfart").font(.headline)
+                Text("Digital fartsholder med konstant tempo.").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    TextField("5:30", text: $pace)
+                        .font(.system(.largeTitle, design: .monospaced).weight(.semibold))
+                    Text("min/km").foregroundStyle(.secondary)
+                }.padding(12).background(ATHLTHTheme.surfaceStone, in: RoundedRectangle(cornerRadius: 12))
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
+                    ForEach(["7:00", "6:30", "6:00", "5:30", "5:00", "4:30", "4:00"], id: \.self) { option in
+                        Button { pace = option } label: {
+                            Text(option).font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(pace == option ? ATHLTHTrainDesign.bronze.opacity(0.19) : ATHLTHTheme.surfaceStone,
+                                            in: RoundedRectangle(cornerRadius: 10))
+                        }.buttonStyle(.plain)
+                    }
+                }
+                if let meters, let paceSeconds {
+                    Text("Ghostens sluttid: " + formatDuration(meters / 1_000 * paceSeconds))
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+        }
+    }
+
+    private var timeCard: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Varighet (valgfritt)").font(.headline)
+                Picker("Varighet", selection: $durationMinutes) {
+                    Text("Ingen tidsgrense").tag(0)
+                    ForEach([15, 20, 30, 45, 60, 90], id: \.self) { value in Text("\(value) min").tag(value) }
+                }.pickerStyle(.menu)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var review: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ATHLTHTrainPageTitle(title: "Se gjennom Ghost Race")
+                    ATHLTHUnifiedCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            LabeledContent("Type", value: title)
+                            LabeledContent("Motstander", value: "Digital fartsholder")
+                            LabeledContent("Målfart", value: (paceSeconds.map { GhostTargetPaceFormatter.text(secondsPerKilometer: $0) } ?? "—") + " /km")
+                            if let meters { LabeledContent("Distanse", value: String(format: "%.3g km", meters / 1_000)) }
+                            else { LabeledContent("Varighet", value: durationMinutes == 0 ? "Fri økt" : "\(durationMinutes) min") }
+                            LabeledContent("Enhet", value: device == .iPhone ? "iPhone" : "Apple Watch")
+                        }
+                    }
+                    Text("Under økten viser treningsmotoren avstanden foran eller bak ghosten. Pauser følger den aktive øktklokken.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    Button {
+                        Task { await start() }
+                    } label: {
+                        Text(starting ? "Starter …" : "Start Ghost Race").font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }.buttonStyle(.borderedProminent).tint(ATHLTHTrainDesign.ink)
+                        .disabled(starting || !valid || (device == .appleWatch && !watchConnection.isReady))
+                }.padding(18)
+            }.background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Tilbake") { reviewing = false }.disabled(starting) } }
+        }
+        .interactiveDismissDisabled(starting)
+    }
+
+    @MainActor private func start() async {
+        guard !starting, valid, let paceSeconds else { return }
+        starting = true
+        defer { starting = false }
+        do {
+            try await GhostRaceStartService.startSoloPace(
+                paceSeconds: paceSeconds, distanceMeters: meters, durationSeconds: duration,
+                ghostRace: ghostRace, realtime: realtime, watchConnection: watchConnection,
+                phoneWorkout: phoneWorkout, captureDevice: device, settings: settings,
+                maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                    configured: session.onboardingProfile?.maximumHeartRateBPM,
+                    dateOfBirth: session.onboardingProfile?.dateOfBirth))
+            reviewing = false
+            onStarted()
+        } catch {
+            reviewing = false
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func formatDuration(_ seconds: Double) -> String {
+        let n = Int(seconds.rounded())
+        return String(format: "%d:%02d:%02d", n / 3_600, (n / 60) % 60, n % 60)
     }
 }
