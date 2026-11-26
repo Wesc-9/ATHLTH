@@ -7,6 +7,7 @@ struct CoachPlanAdaptationView: View {
     @EnvironmentObject private var health: HealthKitManager
 
     @State private var userNotes = ""
+    @State private var dailyFormAssessment: ATHLTHDailyFormPolicy.Assessment?
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var infoMessage: String?
@@ -98,6 +99,7 @@ struct CoachPlanAdaptationView: View {
                         if let proposal {
                             proposalContent(proposal)
                         } else {
+                            dailyFormSuggestion
                             recoverySuggestion
                             requestCard(plan)
                         }
@@ -126,6 +128,8 @@ struct CoachPlanAdaptationView: View {
                 }
             }
         }
+        .task(id: session.profile.userID) { refreshDailyForm() }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in refreshDailyForm() }
     }
 
     private var intro: some View {
@@ -201,6 +205,44 @@ struct CoachPlanAdaptationView: View {
                 style: .continuous
             )
         )
+    }
+
+    @ViewBuilder private var dailyFormSuggestion: some View {
+        if let assessment = dailyFormAssessment,
+           assessment.recommendation == .lighter || assessment.recommendation == .rest {
+            let request = assessment.illnessReported
+                ? ATHLTHLocalization.choose(english: "Suggest a recovery day today and explain how to resume the plan gradually.", norwegian: "Foreslå en hviledag i dag, og forklar hvordan jeg gradvis kan fortsette planen.")
+                : ATHLTHLocalization.choose(english: "Suggest a lighter session today without changing my overall goal.", norwegian: "Foreslå en roligere økt i dag uten å endre hovedmålet.")
+            VStack(alignment: .leading, spacing: 10) {
+                Label(assessment.recommendation.title, systemImage: "heart.text.square")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(assessment.explanation)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Button {
+                    if !userNotes.contains(request) {
+                        userNotes = [userNotes, request].filter { !$0.isEmpty }.joined(separator: "\n\n")
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Add request to Coach", norwegian: "Legg til forespørsel til Coach"), systemImage: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .buttonStyle(.plain)
+                Text(ATHLTHLocalization.choose(english: "Your check-in values stay local. Only the request you select is added.", norwegian: "Innsjekkverdiene forblir lokale. Bare forespørselen du velger, legges til."))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            .padding(16)
+            .athlthTrainPaper()
+        }
+    }
+
+    private func refreshDailyForm() {
+        dailyFormAssessment = session.signedIn
+            ? ATHLTHDailyFormPolicy.assess(entry: RecoverySorenessStore(accountID: session.profile.userID).todayEntry, measuredScore: nil)
+            : nil
     }
 
     @ViewBuilder private var recoverySuggestion: some View {
