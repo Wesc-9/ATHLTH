@@ -5,6 +5,7 @@ struct ATHLTHCompetitionEntryView: View {
     var preselectedFriend: SocialProfileCard? = nil
     var initialFormat: ATHLTHCompetitionFormat? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @State private var hubTab: HubTab = .mine
     @State private var tournaments: [ATHLTHTournamentRemote] = []
@@ -79,7 +80,7 @@ struct ATHLTHCompetitionEntryView: View {
                 }
             }
         }
-        .fullScreenCover(item: $selectedFormat) { format in
+        .fullScreenCover(item: $selectedFormat.keepingPresentedItemWhenInactive(scenePhase)) { format in
             AnyView(ATHLTHCompetitionCreationView(
                 initialActivity: .running, advanced: true,
                 initialFormat: format, preselectedFriend: preselectedFriend,
@@ -101,7 +102,14 @@ struct ATHLTHCompetitionEntryView: View {
         .onAppear {
             guard !initialized else { return }
             initialized = true
-            selectedFormat = initialFormat
+            if let initialFormat { selectedFormat = initialFormat }
+            else if session.signedIn {
+                let friend = preselectedFriend?.userID.uuidString ?? "none"
+                selectedFormat = ATHLTHCompetitionFormat.allCases.first { format in
+                    ATHLTHCompetitionCreationCheckpoint.load(owner: session.profile.userID,
+                        entry: format.rawValue + "." + friend + ".running.true")?.inRules == true
+                }
+            }
         }
     }
 
