@@ -370,65 +370,49 @@ struct ATHLTHProfileCompactTrophyCard: View {
     private let dim = ATHLTHPlanDesign.secondaryInk
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 5) {
-                Image(systemName: "trophy.fill")
-                    .foregroundStyle(gold)
-                    .font(.caption)
-                Text(ATHLTHLocalization.choose(english: "Trophies", norwegian: "Troféer"))
-                    .font(.system(size: 17, weight: .medium, design: .serif))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-            }
+        NavigationLink {
+            TrophyCollectionView(startInCabinet: true)
+        } label: {
             HStack(spacing: 8) {
-                ForEach(0..<2, id: \.self) { index in
-                    if trophies.indices.contains(index) {
-                        ATHLTHTrophyCoreView(trophy: trophies[index], size: 45)
-                            .frame(width: 46, height: 52)
-                            .accessibilityLabel(trophies[index].title)
-                    } else {
-                        Image(systemName: "plus")
-                            .font(.subheadline.weight(.light))
-                            .foregroundStyle(gold.opacity(0.7))
-                            .frame(width: 46, height: 52)
-                            .background(ATHLTHPlanDesign.selectedSurface,
-                                        in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trophy.fill").font(.caption).foregroundStyle(gold)
+                        Text(ATHLTHLocalization.choose(english: "Trophies", norwegian: "Troféer"))
+                            .font(.system(size: 16, weight: .medium, design: .serif))
+                            .foregroundStyle(ink)
+                    }
+                    Text(ATHLTHLocalization.choose(english: "\(unlockedCount) unlocked", norwegian: "\(unlockedCount) låst opp"))
+                        .font(.caption2).foregroundStyle(dim)
+                        .lineLimit(1)
+                }.layoutPriority(1)
+                Spacer(minLength: 3)
+                HStack(spacing: 3) {
+                    ForEach(Array(trophies.prefix(4))) { trophy in
+                        ATHLTHTrophyCoreView(trophy: trophy, size: 30)
+                            .frame(width: 33, height: 40)
+                            .accessibilityLabel(trophy.title)
+                    }
+                    if trophies.isEmpty {
+                        Image(systemName: "plus").font(.caption.weight(.medium))
+                            .foregroundStyle(gold)
+                            .frame(width: 33, height: 40)
+                            .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 9))
                     }
                 }
-                Spacer(minLength: 0)
-            }
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "\(unlockedCount) unlocked",
-                    norwegian: "\(unlockedCount) låst opp"
-                )
-            )
-            .font(.caption2)
-            .foregroundStyle(dim)
-            if let syncWarning {
-                Label(syncWarning, systemImage: "icloud.slash")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(dim)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-            NavigationLink {
-                TrophyCollectionView(startInCabinet: true)
-            } label: {
-                HStack(spacing: 5) {
-                    Text(ATHLTHLocalization.choose(english: "See all", norwegian: "Se alle"))
-                    Image(systemName: "chevron.right").font(.caption2)
+                if let syncWarning {
+                    Image(systemName: "icloud.slash").font(.caption2)
+                        .foregroundStyle(dim).accessibilityLabel(syncWarning)
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(gold)
-                .frame(minHeight: 36, alignment: .leading)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    .foregroundStyle(gold)
             }
+            .padding(.horizontal, 13).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .athlthTrainPaper()
+            .contentShape(Rectangle())
         }
-        .padding(13)
-        .frame(maxWidth: .infinity, minHeight: 210, alignment: .topLeading)
-        .athlthTrainPaper()
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(english: "Open trophy collection", norwegian: "Åpne trofésamlingen"))
         .accessibilityIdentifier("athlth-profile-trophy-compact")
     }
 }

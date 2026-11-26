@@ -33,3 +33,23 @@ final class ATHLTHProfileHighlightsTests: XCTestCase {
         )
     }
 }
+
+
+final class ATHLTHDigitalTrainingProfileTests: XCTestCase {
+    func testRelativeIndexUsesPersonalBaselineAndRejectsMissingEvidence() {
+        XCTAssertEqual(ATHLTHDigitalTrainingProfile.relativeIndex(current: 20, baseline: 20), 50)
+        XCTAssertEqual(ATHLTHDigitalTrainingProfile.relativeIndex(current: 30, baseline: 20), 75)
+        XCTAssertEqual(ATHLTHDigitalTrainingProfile.relativeIndex(current: 100, baseline: 20), 100)
+        XCTAssertNil(ATHLTHDigitalTrainingProfile.relativeIndex(current: 20, baseline: 0))
+        XCTAssertNil(ATHLTHDigitalTrainingProfile.relativeIndex(current: .infinity, baseline: 20))
+    }
+
+    func testEmptyHistoryDoesNotInventAbilityOrRecovery() {
+        let snapshot = ATHLTHDigitalTrainingProfile.build(workouts: [], strength: [], recoveryScore: nil)
+        XCTAssertEqual(snapshot.metrics.count, 6)
+        XCTAssertEqual(snapshot.availableCount, 0)
+        let recoveryOnly = ATHLTHDigitalTrainingProfile.build(workouts: [], strength: [], recoveryScore: 84)
+        XCTAssertEqual(recoveryOnly.availableCount, 1)
+        XCTAssertEqual(recoveryOnly.metrics.first(where: { $0.axis == .recovery })?.score, 84)
+    }
+}

@@ -9768,6 +9768,7 @@ struct ATHLTHProfileView: View {
     @State private var profilePerformanceWorkoutHistory:
         [WorkoutSummary] = []
     @State private var mostTrainedItems: [ATHLTHProfileHighlights.TrainedItem] = []
+    @State private var digitalTrainingProfile = ATHLTHDigitalTrainingProfile.Snapshot.empty
     @State private var mostTrainedSyncTask: Task<Void, Never>?
     @State private var mostTrainedRefreshTask: Task<Void, Never>?
     @State private var featuredRecordRefreshTask: Task<Void, Never>?
@@ -9830,8 +9831,9 @@ struct ATHLTHProfileView: View {
         } content: {
             LazyVStack(spacing: 12) {
                 ATHLTHProfileCompetitionCard(userID: session.profile.userID)
+                compactProfileTrophies
                 HStack(alignment: .top, spacing: 10) {
-                    compactProfileTrophies
+                    ATHLTHDigitalTrainingProfileCard(snapshot: digitalTrainingProfile)
                     ATHLTHProfileMostTrainedCard(items: mostTrainedItems)
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
@@ -9884,6 +9886,8 @@ struct ATHLTHProfileView: View {
         }
         .onChange(of: session.profile.userID) { _, _ in
             cachedFeaturedRecordValues = [:]
+            digitalTrainingProfile = .empty
+            profilePerformanceWorkoutHistory = []
             mostTrainedItems = []
             mostTrainedSyncTask?.cancel()
             mostTrainedPendingItems = nil
@@ -9899,10 +9903,13 @@ struct ATHLTHProfileView: View {
         .onChange(of: featuredRecordSelectionRaw) { _, _ in
             scheduleFeaturedRecordRefresh()
         }
-        .onChange(of: health.workouts.count) { _, _ in
+        .onChange(of: health.workouts) { _, _ in
             scheduleFeaturedRecordRefresh()
         }
-        .onChange(of: strengthWorkout.workoutHistory.count) { _, _ in
+        .onChange(of: health.recovery) { _, _ in
+            scheduleFeaturedRecordRefresh()
+        }
+        .onChange(of: strengthWorkout.workoutHistory) { _, _ in
             scheduleMostTrainedRefresh()
             scheduleFeaturedRecordRefresh()
         }
@@ -10567,8 +10574,7 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    /// The profile shows two equally important compact cards; the full trophy
-    /// editor and collection remain available from the preview's See all link.
+    /// One low, full-width trophy shelf above the paired profile cards.
     private var compactProfileTrophies: some View {
         ATHLTHProfileCompactTrophyCard(
             trophies: profileTrophySlots,
@@ -10666,6 +10672,21 @@ struct ATHLTHProfileView: View {
         // full weekly/monthly history for every SwiftUI body evaluation.
         let workouts = profilePerformanceWorkoutHistory.isEmpty
             ? health.workouts : profilePerformanceWorkoutHistory
+        let recovery = ATHLTHDailyFormPolicy.assess(
+            entry: RecoverySorenessStore(accountID: session.profile.userID).todayEntry,
+            measuredScore: health.recovery.score
+        )
+        let combined = ATHLTHRecordedWorkoutProjection().recordings(
+            account: session.profile.userID,
+            health: workouts + health.workouts,
+            strength: strengthWorkout.workoutHistory
+        )
+        let profile = ATHLTHDigitalTrainingProfile.build(
+            workouts: combined,
+            strength: strengthWorkout.workoutHistory,
+            recoveryScore: recovery.displayScore
+        )
+        if digitalTrainingProfile != profile { digitalTrainingProfile = profile }
         var updated: [ProfileFeaturedRecordKind: String] = [:]
         for kind in featuredRecordKinds {
             updated[kind] = kind.displayValue(
@@ -11948,6 +11969,7 @@ struct ATHLTHProfileView: View {
         defer { ATHLTHPerformance.end("OwnerProfileRefresh", id: signpost) }
 
         loadingProfileData = true
+        let refreshOwner = session.profile.userID
         defer {
             loadingProfileData = false
         }
@@ -11994,6 +12016,7 @@ struct ATHLTHProfileView: View {
                 historyTask
             )
 
+            guard session.profile.userID == refreshOwner, !Task.isCancelled else { return }
             performanceStats =
                 loadedStats
             personalRecords =
