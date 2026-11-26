@@ -248,7 +248,7 @@ struct RouteDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
-                ForEach(ownAttempts.filter { $0.leaderboardEligible }) { attempt in
+                ForEach(ownAttempts.filter { $0.leaderboardEligible && $0.activityType == "running" }) { attempt in
                     Button {
                         Task { await startGhostRace(attempt: attempt) }
                     } label: {
@@ -261,9 +261,38 @@ struct RouteDetailView: View {
                     .buttonStyle(.bordered)
                     .disabled(startingGhostAttemptID != nil || phoneWorkout.active != nil)
                 }
-                if ownAttempts.filter({ $0.leaderboardEligible }).isEmpty {
+                if ownAttempts.filter({ $0.leaderboardEligible && $0.activityType == "running" }).isEmpty {
                     Text("Ingen kvalifiserte egne ruteforsøk tilgjengelig ennå.")
                         .font(.caption).foregroundStyle(.secondary)
+                }
+                if leaderboardAvailable {
+                    Divider()
+                    Text("Andre løpere").font(.subheadline.weight(.semibold))
+                    Text("Bruk en synlig sluttid fra resultatlisten som digital fartsholder. Dette er ikke en GPS-Replay.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach(Array(leaderboard.filter {
+                        $0.userID != session.profile.userID &&
+                        $0.activityType == "running" &&
+                        $0.leaderboardEligible &&
+                        $0.durationSeconds.isFinite &&
+                        (60...86_400).contains($0.durationSeconds)
+                    }.prefix(10))) { attempt in
+                        NavigationLink {
+                            TargetGhostSetupView(
+                                route: directedRoute,
+                                challengeTitle: "Måltid · " + attempt.athleteName,
+                                suggestedDurationSeconds: attempt.durationSeconds
+                            )
+                        } label: {
+                            HStack {
+                                routeAttemptAvatar(attempt)
+                                Text(attempt.athleteName)
+                                Spacer()
+                                Text(clock(attempt.durationSeconds)).monospacedDigit()
+                                Image(systemName: "chevron.right").font(.caption)
+                            }
+                        }.buttonStyle(.plain)
+                    }
                 }
             }
         }
