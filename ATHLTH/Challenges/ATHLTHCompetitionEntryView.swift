@@ -105,10 +105,14 @@ struct ATHLTHCompetitionEntryView: View {
             if let initialFormat { selectedFormat = initialFormat }
             else if session.signedIn {
                 let friend = preselectedFriend?.userID.uuidString ?? "none"
-                selectedFormat = ATHLTHCompetitionFormat.allCases.first { format in
-                    ATHLTHCompetitionCreationCheckpoint.load(owner: session.profile.userID,
-                        entry: format.rawValue + "." + friend + ".running.true")?.inRules == true
+                let pending = ATHLTHCompetitionFormat.allCases.compactMap { format -> (ATHLTHCompetitionFormat, ATHLTHCompetitionCreationCheckpoint)? in
+                    guard let saved = ATHLTHCompetitionCreationCheckpoint.load(owner: session.profile.userID,
+                        entry: format.rawValue + "." + friend + ".running.true"), saved.hasProgress else { return nil }
+                    return (format, saved)
                 }
+                selectedFormat = pending.max {
+                    ($0.1.updatedAt ?? .distantPast) < ($1.1.updatedAt ?? .distantPast)
+                }?.0
             }
         }
     }
