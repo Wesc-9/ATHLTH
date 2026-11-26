@@ -6659,7 +6659,8 @@ struct SessionEditorView: View {
         workout.trainTogetherMode = physicalMeetup ? .physical : .sameWorkout
         workout.invitedPartnerID = partnerID
         workout.allowInviteeExercises = allowInviteeExercises
-        workout.meetingPoint = meetingPoint
+        workout.trainTogetherIndoor = directPartnerID != nil ? directSetupIndoor : nil
+        workout.meetingPoint = physicalMeetup ? meetingPoint : nil
         guard let bound = libraryBoundWorkout(workout) else {
             return ATHLTHLocalization.choose(
                 english: "Resolve the exercises in your library first.",
@@ -7374,6 +7375,16 @@ struct SessionEditorView: View {
 
             partnerPlanningSection
 
+            if directPartnerID != nil {
+                Section("Treningsmiljø") {
+                    Picker("Treningsmiljø", selection: $directSetupIndoor) {
+                        Text("Utendørs").tag(false)
+                        Text("Innendørs").tag(true)
+                    }.pickerStyle(.segmented)
+                    .disabled(collaborationInvitationSent)
+                }
+            }
+
             Section {
                 DatePicker(
                     ATHLTHLocalization.choose(
@@ -7662,6 +7673,7 @@ struct SessionEditorView: View {
                                 ? scheduledTime : nil
                             latest.invitedPartnerID = selectedPartnerID
                             latest.allowInviteeExercises = allowInviteeExercises
+                            latest.trainTogetherIndoor = directPartnerID != nil ? directSetupIndoor : latest.trainTogetherIndoor
                             latest.trainTogetherMode = physicalMeetup ? .physical : .sameWorkout
                             latest.meetingPoint = physicalMeetup ? meetingPoint : nil
                             guard let bound = libraryBoundWorkout(latest)
@@ -7753,6 +7765,7 @@ struct SessionEditorView: View {
                                 prepared.trainTogetherMode = source.trainTogetherMode
                                 prepared.invitedPartnerID = source.invitedPartnerID
                                 prepared.allowInviteeExercises = source.allowInviteeExercises
+                                prepared.trainTogetherIndoor = source.trainTogetherIndoor
                             }
                             guard let bound = libraryBoundWorkout(prepared) else {
                                 return false
@@ -11267,6 +11280,7 @@ struct SessionEditorView: View {
                 : selectedPartnerID == nil ? nil : allowInviteeExercises
         )
         prepared.spotifyIntervalTrack = selectedSpotifyIntervalTrack
+        prepared.trainTogetherIndoor = onPreparedWorkout != nil ? initialSourceWorkout?.trainTogetherIndoor : (directPartnerID != nil ? directSetupIndoor : nil)
         return prepared
     }
 
@@ -11569,6 +11583,8 @@ struct SessionEditorView: View {
         saveToActivePlan = draft.saveToActivePlan ?? false
         selectedPartnerID = directPartnerID ?? draft.selectedPartnerID
         physicalMeetup = draft.physicalMeetup ?? (draft.workout.trainTogetherMode != .sameWorkout)
+        directSetupIndoor = draft.workout.trainTogetherIndoor ?? (runEnvironment != .outdoor)
+        directSetupName = draft.workout.title
         editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode
         targetPaceEnabled = draft.targetPaceEnabled
         heartRateTargetEnabled = draft.heartRateTargetEnabled
