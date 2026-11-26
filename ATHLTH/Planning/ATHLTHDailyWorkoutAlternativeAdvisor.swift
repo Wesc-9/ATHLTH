@@ -112,11 +112,14 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
         let overallSoreness: Int?
         let muscleRatings: [String: RecoverySorenessLevel]
         let readiness: RecoveryReadinessSummary?
+        var motivation: Int? = nil
+        var sleepQuality: Int? = nil
+        var feelsUnwell: Bool? = nil
 
         var lowerLimbFatigue: Bool {
             // Feet must be explicitly reported. Calves and shins are not
             // silently translated into a claim about foot pain.
-            ["Feet", "Shins", "Calves"].contains { key in
+            ["Feet", "Shins", "Calves", "Quads", "Hamstrings", "Glutes", "Adductors", "Hip Flexors"].contains { key in
                 (muscleRatings[key]?.rawValue ?? 0) >= 2
             }
         }
@@ -132,13 +135,18 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
         }
         var needsAlternative: Bool {
             lowerLimbFatigue || strongFatigue || highStress ||
-            lowWearableReadiness
+            lowWearableReadiness || feelsUnwell == true ||
+            motivation.map { $0 <= 2 } == true || sleepQuality.map { $0 <= 2 } == true ||
+            muscleRatings.values.contains { $0.rawValue >= 2 }
         }
         var reason: String {
+            if feelsUnwell == true {
+                return ATHLTHLocalization.choose(english: "You reported feeling ill. Consider resting and seek medical advice if symptoms are concerning.", norwegian: "Du har oppgitt sykdomsfølelse. Vurder hvile og kontakt helsepersonell ved bekymringsfulle symptomer.")
+            }
             if lowerLimbFatigue {
                 return ATHLTHLocalization.choose(
-                    english: "You reported sore feet or lower legs. A low-impact activity avoids adding the planned running load.",
-                    norwegian: "Du har registrert ømme føtter eller legger. En skånsom aktivitet unngår den planlagte løpebelastningen.")
+                    english: "You reported soreness in the lower body. Consider a break from the planned running load.",
+                    norwegian: "Du har registrert ømhet i underkroppen. Vurder å redusere den planlagte løpebelastningen.")
             }
             if energy.map({ $0 <= 2 }) == true {
                 return ATHLTHLocalization.choose(
@@ -155,6 +163,15 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
                     english: "You reported elevated stress. A lighter activity may be preferable today.",
                     norwegian: "Du har rapportert høyt stress. En lettere aktivitet kan passe bedre i dag.")
             }
+            if sleepQuality.map({ $0 <= 2 }) == true {
+                return ATHLTHLocalization.choose(english: "You reported poor sleep quality.", norwegian: "Du har oppgitt lav søvnkvalitet.")
+            }
+            if motivation.map({ $0 <= 2 }) == true {
+                return ATHLTHLocalization.choose(english: "You reported low motivation. Consider a shorter session.", norwegian: "Du har oppgitt lav motivasjon. Vurder en kortere økt.")
+            }
+            if muscleRatings.values.contains(where: { $0.rawValue >= 2 }) {
+                return ATHLTHLocalization.choose(english: "You reported muscle soreness.", norwegian: "Du har rapportert muskelømhet.")
+            }
             return ATHLTHLocalization.choose(
                 english: "Your recent Watch recovery signals suggest reducing training load today.",
                 norwegian: "Nylige restitusjonssignaler fra klokken tilsier at det kan være klokt å redusere belastningen i dag.")
@@ -169,6 +186,7 @@ enum ATHLTHDailyWorkoutAlternativeAdvisor {
               signals.needsAlternative else { return [] }
 
         let reason = signals.reason
+        if signals.feelsUnwell == true { return [Suggestion(choice: .rest, reason: reason, distanceKilometers: nil)] }
         let legFatigue = signals.lowerLimbFatigue ||
             (signals.overallSoreness.map { $0 >= 4 } ?? false)
         let significantMuscleSoreness =
