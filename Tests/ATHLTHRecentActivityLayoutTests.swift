@@ -101,4 +101,12 @@ final class ATHLTHRecentActivityLayoutTests: XCTestCase {
         XCTAssertEqual(HomeRecentFollowingSelection.indices(candidates, excluding: [], limit: 6), Array(0..<6))
         XCTAssertEqual(HomeRecentFollowingSelection.indices([], excluding: [], limit: 6), [])
     }
+
+    func testFiveFriendsFitAcrossAvailableStripWidth() {
+        for width: CGFloat in [260, 292, 320, 375, 440, 820, 1200] {
+            let tile = ATHLTHFriendsStripLayout.tileWidth(for: width)
+            XCTAssertEqual(tile * 5 + ATHLTHFriendsStripLayout.spacing * 4, width, accuracy: 0.01)
+            XCTAssertLessThanOrEqual(ATHLTHFriendsStripLayout.avatarSize(for: tile) + 10, tile)
+        }
+    }
 }

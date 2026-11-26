@@ -685,6 +685,19 @@ private struct HomeRecentActivityRevision:
 
 // Small, low-cost Home presence strip. Uses the same server-authorized
 // mutual-follow status and avatar indicators as the rest of ATHLTH.
+enum ATHLTHFriendsStripLayout {
+    static let visibleCount = 5
+    static let spacing: CGFloat = 6
+
+    static func tileWidth(for availableWidth: CGFloat) -> CGFloat {
+        max(1, (availableWidth - CGFloat(visibleCount - 1) * spacing) / CGFloat(visibleCount))
+    }
+
+    static func avatarSize(for tileWidth: CGFloat) -> CGFloat {
+        max(1, min(57, tileWidth - 10))
+    }
+}
+
 struct HomeActiveFriendsStrip: View {
     var isActive: Bool = true
     var showsAll: Bool = false
@@ -694,6 +707,7 @@ struct HomeActiveFriendsStrip: View {
     @EnvironmentObject private var messaging: MessagingStore
     @Environment(\.scenePhase) private var scenePhase
 
+    @State private var stripWidth: CGFloat = 300
     @State private var lastKnownFriends: [SocialProfileCard] = []
     @State private var cachedForUserID: UUID?
     @State private var selectedFriendID: UUID?
@@ -866,10 +880,21 @@ struct HomeActiveFriendsStrip: View {
                     }
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(alignment: .top, spacing: 10) {
-                            ForEach(visibleFriends) { friend in friendTile(friend) }
-                        }.padding(.vertical, 3)
+                        LazyHStack(alignment: .top, spacing: ATHLTHFriendsStripLayout.spacing) {
+                            ForEach(visibleFriends) { friend in
+                                friendTile(friend, width: ATHLTHFriendsStripLayout.tileWidth(for: stripWidth))
+                            }
+                        }
+                        .padding(.vertical, 3)
                     }
+                    .onGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.size.width
+                    } action: { width in
+                        if width > 0 && abs(stripWidth - width) >= 0.25 {
+                            stripWidth = width
+                        }
+                    }
+                    .accessibilityIdentifier("athlth-community-friends-strip")
                 }
             }
             .padding(.top, 2)
@@ -980,22 +1005,30 @@ struct HomeActiveFriendsStrip: View {
         let tint: Color = training ? .orange : online ? .green : ATHLTHTheme.mutedText
         return HStack(spacing: 3) {
             Circle().fill(tint).frame(width: 5, height: 5)
-            Text(label).font(.system(size: 9, weight: .medium))
-                .lineLimit(1).minimumScaleFactor(0.75)
-        }.foregroundStyle(tint)
+            Text(label).font(.system(size: 10, weight: .medium))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+        }
+        .foregroundStyle(tint)
+        .frame(minHeight: 24)
+        .accessibilityElement(children: .combine)
     }
 
-    private func friendTile(_ friend: SocialProfileCard) -> some View {
-        Button {
+    private func friendTile(_ friend: SocialProfileCard, width: CGFloat = 86) -> some View {
+        let avatarSize = ATHLTHFriendsStripLayout.avatarSize(for: width)
+        let mutual = social.isMutualFollow(friend.userID)
+        let hasVisibleStatus = mutual && (realtime.isTrainingNow(friend.userID) || realtime.isOnline(friend.userID))
+        return Button {
             selectedFriendID = friend.userID
         } label: {
             VStack(spacing: 3) {
                 ATHLTHSocialStatusAvatar(
-                    profile: friend, size: 57
+                    profile: friend, size: avatarSize
                 )
-                .frame(width: 67, height: 67)
+                .frame(width: avatarSize + 10, height: avatarSize + 10)
                 .overlay {
-                    if !realtime.isTrainingNow(friend.userID) && !realtime.isOnline(friend.userID) {
+                    if !hasVisibleStatus {
                         Circle().strokeBorder(ATHLTHTheme.mutedText.opacity(0.30), lineWidth: 1.5)
                             .allowsHitTesting(false)
                     }
@@ -1009,7 +1042,7 @@ struct HomeActiveFriendsStrip: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(1)
             }
-            .frame(width: 86)
+            .frame(width: width)
             .frame(minHeight: 104, alignment: .top)
             .contentShape(Rectangle())
         }
@@ -1093,13 +1126,13 @@ private struct HomeFriendQuickActionsPopover: View {
     private var status: String {
         if isTraining { return tr("Training now", "Trener nå") }
         if isOnline { return tr("Online", "Pålogget") }
-        return tr("Friend", "Venn")
+        return tr("No live status", "Ingen status")
     }
 
     private var statusColor: Color {
         if isTraining { return .orange }
         if isOnline { return .green }
-        return ATHLTHTheme.premiumGold
+        return ATHLTHTheme.mutedText
     }
 
     var body: some View {
