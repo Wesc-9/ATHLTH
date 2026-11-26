@@ -45,6 +45,10 @@ struct ATHLTHTournamentCreator: View {
         guard competitionSettings.race.discipline == .workout else { return true }
         guard proofMode == .opponent else { return false }
         let ids = competitionSettings.selectedExerciseIDs ?? []
+        if ids.contains(where: { id in
+            guard let activity = exerciseActivities[id] else { return true }
+            return !activity.isAvailableForCreation || !allowedActivities.contains(activity)
+        }) { return false }
         if usesExplicitExercises && (ids.isEmpty || exerciseMode != .owner || ids.count != exerciseCount) { return false }
         if competitionSettings.race.effectiveScoringMode.needsGoal {
             return ids.allSatisfy { competitionSettings.race.goal(for: $0).map { $0.isFinite && $0 > 0 } == true }
@@ -254,6 +258,7 @@ struct ATHLTHTournamentCreator: View {
 
     private var publishHint: String {
         if allowedActivities.isEmpty { return "Velg minst én gren." }
+        if !ATHLTHTournamentActivity.canCreate(with: allowedActivities) { return "Fjern grener som ikke er tilgjengelige ennå." }
         if isDuel && athletes.count != 2 { return "Velg én motstander." }
         if usesExplicitExercises && (competitionSettings.selectedExerciseIDs ?? []).isEmpty { return "Legg til minst én konkurranseøvelse." }
         if !scoringValid { return "Kontroller øvelser, mål og resultatgodkjenning." }
@@ -265,7 +270,7 @@ struct ATHLTHTournamentCreator: View {
 
     private var canSaveTemplate: Bool {
         effectiveTitle.count >= 3 &&
-        !allowedActivities.isEmpty && competitionSettings.isValid &&
+        ATHLTHTournamentActivity.canCreate(with: allowedActivities) && competitionSettings.isValid &&
         competitionSettings.environmentsValid(activities: allowedActivities, exerciseActivities: exerciseActivities) &&
         !templateSaving && !publishing
     }
@@ -274,7 +279,7 @@ struct ATHLTHTournamentCreator: View {
         effectiveTitle.count >= 3 &&
         // The shared event engine has distinct roster limits for duel and single event.
         (isDuel ? athletes.count == 2 : athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
-        !busy && !allowedActivities.isEmpty &&
+        !busy && ATHLTHTournamentActivity.canCreate(with: allowedActivities) &&
         (!isDuel || competitionSettings.race.discipline == .workout) &&
         (!isSingleEvent || competitionSettings.race.discipline == .workout ||
             (allowedActivities.count == 1 && exerciseCount == 1 && exerciseMode != .open)) &&
@@ -304,8 +309,8 @@ struct ATHLTHTournamentCreator: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     if fixedInvitees == nil {
-                        titleSection
-                        formatSection
+                        titleSection.id("title")
+                        formatSection.id("format")
                     }
                     ATHLTHTournamentRuleConfigurationSection(
                         activities: Binding(
@@ -368,14 +373,14 @@ struct ATHLTHTournamentCreator: View {
                             .padding(13)
                             .background(ATHLTHArenaV3Style.panel())
                     }
-                    if competitionSettings.race.discipline == .workout && usesExplicitExercises {
+                    if competitionSettings.race.discipline == .workout {
                         rematchExerciseSection.id("exercises")
                     }
                     if competitionSettings.race.discipline == .workout { scoringSettingsSection.id("scoring") }
                     if !(competitionSettings.race.discipline == .workout && usesExplicitExercises) {
-                        coachEntry
-                        templateEntry
-                        exerciseRulesSection
+                        coachEntry.id("coach")
+                        templateEntry.id("template")
+                        exerciseRulesSection.id("exercise-rules")
                     }
                     ATHLTHTournamentAdvancedRulesSection(
                         rotation: $rotationMode,
@@ -402,10 +407,10 @@ struct ATHLTHTournamentCreator: View {
                         usesIndividualExerciseDeadlines: isSingleEvent && competitionSettings.race.discipline == .workout
                     ).id("timing")
                     if !isSingleEvent { warmupSection }
-                    if format == .groups { groupsSection }
+                    if format == .groups { groupsSection.id("groups") }
                     if fixedInvitees == nil {
-                        inviteSection
-                        if activeClubID != nil { seasonSection }
+                        inviteSection.id("participants")
+                        if activeClubID != nil { seasonSection.id("season") }
                     }
                     preview.id("review")
                     Text("Invitasjoner og regler godkjennes før start. Konkurransen starter manuelt, automatisk når alle er klare eller på valgt tidspunkt, slik du har valgt.")
@@ -484,12 +489,51 @@ struct ATHLTHTournamentCreator: View {
                 .background(ATHLTHArenaV3Style.cream)
             }
         }
+        .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
+            ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
+                selected: Set(competitionSettings.selectedExerciseIDs ?? [])) { item in
+                var ids = competitionSettings.selectedExerciseIDs ?? []
+                guard ids.count < 12, !ids.contains(item.id), item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
+                exerciseMode = .owner
+                competitionSettings.coachExerciseIDs = []
+                ids.append(item.id)
+                rematchNames[item.id] = item.name
+                exerciseMetrics[item.id] = item.metric
+                exerciseActivities[item.id] = item.activity
+                competitionSettings.selectedExerciseIDs = ids
+                exerciseCount = ids.count
+            }
+        }
+        .task(id: competitionSettings.selectedExerciseIDs ?? []) {
+            let missing = (competitionSettings.selectedExerciseIDs ?? []).filter {
+                rematchNames[$0] == nil || exerciseActivities[$0] == nil || exerciseMetrics[$0] == nil
+            }
+            guard !missing.isEmpty else { return }
+            do {
+                let service = ATHLTHTournamentLobbyCloudService()
+                async let labels = service.exerciseLabels(ids: missing)
+                async let metrics = service.exerciseMetrics(ids: missing)
+                async let activities = service.exerciseActivities(ids: missing)
+                let (names, measures, kinds) = try await (labels, metrics, activities)
+                guard !Task.isCancelled else { return }
+                for (id, name) in names { rematchNames[id] = name }
+                for (id, metric) in measures { exerciseMetrics[id] = metric }
+                for (id, activity) in kinds {
+                    exerciseActivities[id] = activity
+                    if exerciseMetrics[id] == nil { exerciseMetrics[id] = "repetitions" }
+                }
+                rematchSearchError = nil
+            } catch {
+                if !Task.isCancelled { rematchSearchError = "Kunne ikke hente øvelsesdetaljer. Prøv igjen når du er tilkoblet." }
+            }
+        }
         .onChange(of: competitionSettings) { _, _ in checkpoint() }
         .onChange(of: allowedActivities) { _, _ in checkpoint() }
         .onChange(of: rulesAuthority) { _, _ in checkpoint() }
         .onChange(of: proofMode) { _, _ in checkpoint() }
         .onChange(of: exerciseCount) { _, _ in checkpoint() }
         .onChange(of: exerciseMode) { _, _ in checkpoint() }
+        .onChange(of: additionalCheckpointFields) { _, _ in checkpoint() }
         .onChange(of: scenePhase) { _, phase in if phase != .active { checkpoint() } }
         .onAppear { checkpoint() }
         .environment(\.colorScheme, .light)
@@ -578,6 +622,23 @@ struct ATHLTHTournamentCreator: View {
             guard !Task.isCancelled else { return }
             discovered = result
         }
+    }
+
+    // A cheap value snapshot of the small editable fields not covered by
+    // competitionSettings. Scroll movement is saved on lifecycle transitions,
+    // not on every frame.
+    private var additionalCheckpointFields: [String] {
+        [title, format.rawValue, String(groupSize), String(qualifiersPerGroup),
+         String(cadenceDays), rotationMode.rawValue,
+         restWeekdays.sorted().map(String.init).joined(separator: ","),
+         String(winPoints), String(drawPoints), String(allowExtensions),
+         String(publicResults), String(approvePlayerChanges),
+         String(proposalsCloseAt.timeIntervalSinceReferenceDate),
+         String(votesCloseAt.timeIntervalSinceReferenceDate),
+         selectedSeasonID?.uuidString ?? "", selectedClubID?.uuidString ?? "",
+         inviteSource.rawValue,
+         chosenIDs.map(\.uuidString).sorted().joined(separator: ","),
+         warmupRounds.map { $0.id.uuidString + ":" + $0.title }.joined(separator: "|")]
     }
 
     private func checkpoint() {
@@ -779,6 +840,10 @@ struct ATHLTHTournamentCreator: View {
             errorMessage = "Denne malen har en annen konkurranseform."
             return
         }
+        guard ATHLTHTournamentActivity.canCreate(with: Set(saved.allowedActivities)) else {
+            errorMessage = "Malen inneholder grener som ikke er tilgjengelige ennå."
+            return
+        }
         if let fixedActivity,
            !saved.allowedActivities.contains(fixedActivity) {
             errorMessage = "Denne malen er ikke laget for \(fixedActivity.title)."
@@ -886,19 +951,6 @@ struct ATHLTHTournamentCreator: View {
                 set: { competitionSettings.race.pointsPerExercise = $0 }), in: 1...10) {
                 Text("Grunnpoeng: \(competitionSettings.race.pointsPerExercise ?? 1)")
             }.font(.subheadline)
-            if !isDuel && !isRematch && !competitionSettings.race.effectiveScoringMode.needsGoal {
-                Toggle("Velg konkrete øvelser nå", isOn: Binding(
-                    get: { competitionSettings.selectedExerciseIDs != nil },
-                    set: { enabled in
-                        competitionSettings.selectedExerciseIDs = enabled ? [] : nil
-                        competitionSettings.exerciseEnvironments = [:]
-                        competitionSettings.coachExerciseIDs = []
-                        competitionSettings.race.scoringGoals = nil
-                        competitionSettings.race.exerciseWeights = nil
-                        exerciseCount = enabled ? 0 : 3
-                        exerciseMode = .owner
-                    }))
-            }
             Divider()
             Text("Godkjenningsfrist").font(.subheadline.weight(.semibold))
             Picker("Tid til å godkjenne eller bestride", selection: Binding(
@@ -938,8 +990,13 @@ struct ATHLTHTournamentCreator: View {
     private var rematchExerciseSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle(isRematch ? "Velg øvelser til rematch" : "Konkurranseøvelser")
-            Text(isRematch ? "Behold øvelsene fra forrige duell, eller velg nye." : "Velg øvelser og eventuelle mål og poengvekter før invitasjonen sendes.")
+            Text(isRematch ? "Behold øvelsene fra forrige duell, eller velg nye." : "Velg fra biblioteket nå, eller la deltakerne velge øvelser senere.")
                 .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if !usesExplicitExercises {
+                Label("Øvelser velges senere · " + exerciseMode.title, systemImage: "clock")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
             ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
                 VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -994,50 +1051,29 @@ struct ATHLTHTournamentCreator: View {
                     .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
-            .disabled(allowedActivities.isEmpty || (competitionSettings.selectedExerciseIDs?.count ?? 0) >= 12)
+            .disabled(!ATHLTHTournamentActivity.canCreate(with: allowedActivities) || (competitionSettings.selectedExerciseIDs?.count ?? 0) >= 12)
             if allowedActivities.isEmpty {
                 Text("Velg minst én gren først.").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
             if let rematchSearchError { Text(rematchSearchError).font(.caption).foregroundStyle(.red) }
-            Text("\(competitionSettings.selectedExerciseIDs?.count ?? 0) av 12 valgt").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if usesExplicitExercises {
+                Text("\(competitionSettings.selectedExerciseIDs?.count ?? 0) av 12 valgt").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                if !isDuel && !isRematch && !competitionSettings.race.effectiveScoringMode.needsGoal {
+                    Button("Velg øvelser senere i stedet") {
+                        competitionSettings.selectedExerciseIDs = nil
+                        competitionSettings.exerciseEnvironments = [:]
+                        competitionSettings.race.scoringGoals = nil
+                        competitionSettings.race.exerciseWeights = nil
+                        exerciseCount = 4
+                        exerciseMode = .owner
+                    }
+                    .font(.caption.weight(.medium))
+                    .tint(ATHLTHArenaV3Style.gold)
+                }
+            }
         }
         .padding(15).background(ATHLTHArenaV3Style.panel())
-        .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
-            ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
-                selected: Set(competitionSettings.selectedExerciseIDs ?? [])) { item in
-                var ids = competitionSettings.selectedExerciseIDs ?? []
-                guard ids.count < 12, !ids.contains(item.id), allowedActivities.contains(item.activity) else { return }
-                ids.append(item.id)
-                rematchNames[item.id] = item.name
-                exerciseMetrics[item.id] = item.metric
-                exerciseActivities[item.id] = item.activity
-                competitionSettings.selectedExerciseIDs = ids
-                exerciseCount = ids.count
-            }
-        }
-        .task(id: competitionSettings.selectedExerciseIDs ?? []) {
-            let missing = (competitionSettings.selectedExerciseIDs ?? []).filter {
-                rematchNames[$0] == nil || exerciseActivities[$0] == nil || exerciseMetrics[$0] == nil
-            }
-            guard !missing.isEmpty else { return }
-            do {
-                let service = ATHLTHTournamentLobbyCloudService()
-                async let labels = service.exerciseLabels(ids: missing)
-                async let metrics = service.exerciseMetrics(ids: missing)
-                async let activities = service.exerciseActivities(ids: missing)
-                let (names, measures, kinds) = try await (labels, metrics, activities)
-                guard !Task.isCancelled else { return }
-                for (id, name) in names { rematchNames[id] = name }
-                for (id, metric) in measures { exerciseMetrics[id] = metric }
-                for (id, activity) in kinds {
-                    exerciseActivities[id] = activity
-                    if exerciseMetrics[id] == nil { exerciseMetrics[id] = "repetitions" }
-                }
-                rematchSearchError = nil
-            } catch {
-                if !Task.isCancelled { rematchSearchError = "Kunne ikke hente øvelsesdetaljer. Prøv igjen når du er tilkoblet." }
-            }
-        }
+
     }
 
     private func exerciseVenuePicker(id: UUID, activity: ATHLTHTournamentActivity) -> some View {
