@@ -2225,7 +2225,7 @@ struct GhostRaceHubView: View {
     // data, and reuse HealthKitManager's route cache.
     private func loadRuns() async {
         // A pull-to-refresh must not reset an in-flight route scan.
-        guard !verifyingReplay else { return }
+        guard !loading, !verifyingReplay else { return }
         loading = true
         defer { loading = false }
 
@@ -2237,7 +2237,8 @@ struct GhostRaceHubView: View {
         }
 
         let history = (try? await health.workoutHistory()) ?? health.workouts
-        replayCandidates = history
+        guard !Task.isCancelled else { return }
+        let updatedCandidates = history
             .filter {
                 $0.activity == .running &&
                 ($0.distanceMeters ?? 0) >= 250 &&
@@ -2245,7 +2246,9 @@ struct GhostRaceHubView: View {
             }
             .sorted { $0.startDate > $1.startDate }
 
-        recentRuns = []
+        let previousIDs = Set(recentRuns.map(\.id))
+        replayCandidates = updatedCandidates
+        recentRuns = updatedCandidates.filter { previousIDs.contains($0.id) }
         replayCheckedCount = 0
         await verifyNextReplayBatch()
     }
@@ -2258,18 +2261,24 @@ struct GhostRaceHubView: View {
         // In Basic, keep looking for up to three usable runs instead of
         // forcing the user to repeatedly press "Show more" after empty batches.
         // The fixed cap prevents a large HealthKit history from stalling UI.
-        let desiredCount = replayAdvancedMode ? 12 : 3
+        let desiredCount = recentRuns.count + (replayAdvancedMode ? 12 : 3)
         let batchEnd = min(replayCheckedCount + 36, replayCandidates.count)
 
         while replayCheckedCount < batchEnd &&
               recentRuns.count < desiredCount {
             if Task.isCancelled { break }
             let workout = replayCandidates[replayCheckedCount]
+            if recentRuns.contains(where: { $0.id == workout.id }) {
+                replayCheckedCount += 1
+                continue
+            }
             let route = await health.workoutRoute(for: workout.id)
+            guard !Task.isCancelled else { return }
             replayCheckedCount += 1
 
             if GhostRaceTrackEligibility.hasUsableGPS(route) {
                 recentRuns.append(workout)
+                recentRuns.sort { $0.startDate > $1.startDate }
             }
         }
     }
