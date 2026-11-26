@@ -625,6 +625,7 @@ private struct HomeRecentActivityRevision:
 // mutual-follow status and avatar indicators as the rest of ATHLTH.
 struct HomeActiveFriendsStrip: View {
     var isActive: Bool = true
+    var showsAll: Bool = false
 
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
@@ -769,91 +770,39 @@ struct HomeActiveFriendsStrip: View {
         VStack(alignment: .leading, spacing: 0) {
         if !visibleFriends.isEmpty {
             VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Friends", norwegian: "Venner"
-                    ))
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    if activeCount > 0 {
-                        Text(ATHLTHLocalization.choose(
-                            english: "\(activeCount) active",
-                            norwegian: "\(activeCount) aktive"
-                        ))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
+                HStack {
+                    Text(ATHLTHLocalization.choose(english: "Activity center", norwegian: "Aktivitetssenter"))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
                     Spacer(minLength: 0)
-                }
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 10) {
-                        ForEach(visibleFriends) { friend in
-                            Button {
-                                selectedFriendID = friend.userID
-                            } label: {
-                                VStack(spacing: 3) {
-                                    ATHLTHSocialStatusAvatar(
-                                        profile: friend, size: 43
-                                    )
-                                    .frame(width: 52, height: 52)
-
-                                    Text(friend.resolvedName
-                                        .components(separatedBy: " ")
-                                        .first ?? friend.resolvedName)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
-                                        .lineLimit(1)
-                                }
-                                .frame(width: 58)
-                                .contentShape(Rectangle())
+                    if !showsAll {
+                        NavigationLink {
+                            ScrollView {
+                                HomeActiveFriendsStrip(isActive: isActive, showsAll: true)
+                                    .padding(16)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityHint(ATHLTHLocalization.choose(
-                                english: "Show quick actions",
-                                norwegian: "Vis hurtighandlinger"
-                            ))
-                            .popover(
-                                isPresented: Binding(
-                                    get: {
-                                        selectedFriendID == friend.userID
-                                    },
-                                    set: { presented in
-                                        if !presented &&
-                                           selectedFriendID == friend.userID {
-                                            selectedFriendID = nil
-                                        }
-                                    }
-                                ),
-                                attachmentAnchor: .rect(.bounds),
-                                arrowEdge: .bottom
-                            ) {
-                                HomeFriendQuickActionsPopover(
-                                    friend: friend,
-                                    isTraining: realtime.isTrainingNow(friend.userID),
-                                    isOnline: realtime.isOnline(friend.userID),
-                                    onMessage: {
-                                        openAction(.message(friend))
-                                    },
-                                    onChallenge: {
-                                        openAction(.challenge(friend))
-                                    },
-                                    onProfile: {
-                                        openAction(.profile(friend.userID))
-                                    },
-                                    onTrainTogether: {
-                                        openAction(.trainTogether(friend))
-                                    },
-                                    onShare: { kind in
-                                        openAction(.share(friend, kind))
-                                    }
-                                )
-                                .presentationCompactAdaptation(.popover)
-                            }
-                        }
+                            .navigationTitle(ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner"))
+                            .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(english: "See all", norwegian: "Se alle"), systemImage: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }.buttonStyle(.plain)
                     }
-                    .padding(.vertical, 1)
+                }
+                Text(ATHLTHLocalization.choose(english: "Friends right now", norwegian: "Venner akkurat nå"))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                if showsAll {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 10)], spacing: 12) {
+                        ForEach(visibleFriends) { friend in friendTile(friend) }
+                    }
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(alignment: .top, spacing: 10) {
+                            ForEach(visibleFriends) { friend in friendTile(friend) }
+                        }.padding(.vertical, 3)
+                    }
                 }
             }
             .padding(.top, 2)
@@ -904,6 +853,19 @@ struct HomeActiveFriendsStrip: View {
             .foregroundStyle(ATHLTHTheme.mutedText)
             .frame(height: 75, alignment: .top)
             .padding(.top, 2)
+        } else {
+            VStack(alignment: .leading, spacing: 9) {
+                Text(ATHLTHLocalization.choose(english: "Activity center", norwegian: "Aktivitetssenter"))
+                    .font(.headline)
+                Text(ATHLTHLocalization.choose(english: "Friends you connect with appear here.", norwegian: "Venner du knytter kontakt med, vises her."))
+                    .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                NavigationLink {
+                    SocialHubView(initialTab: .discover)
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Find friends", norwegian: "Finn venner"), systemImage: "person.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                }.buttonStyle(.plain)
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
         }
         .task(id: activeSessionID) {
@@ -915,6 +877,7 @@ struct HomeActiveFriendsStrip: View {
                 guard !Task.isCancelled else { return }
                 if !visibleFriends.isEmpty {
                     await realtime.refreshOnlineUsers()
+                    await realtime.refreshTrainingNowUsers()
                 }
                 do {
                     try await Task.sleep(for: .seconds(125))
@@ -936,6 +899,87 @@ struct HomeActiveFriendsStrip: View {
                   shareRequest?.kind == kind else { return }
             shareRequest = nil
             selectedFriendID = nil
+        }
+    }
+
+    private func statusLabel(_ friend: SocialProfileCard) -> some View {
+        let mutual = social.isMutualFollow(friend.userID)
+        let training = mutual && realtime.isTrainingNow(friend.userID)
+        let online = mutual && realtime.isOnline(friend.userID)
+        let label = training
+            ? ATHLTHLocalization.choose(english: "Training now", norwegian: "Trener nå")
+            : online ? ATHLTHLocalization.choose(english: "Online", norwegian: "Pålogget")
+            : ATHLTHLocalization.choose(english: "No live status", norwegian: "Ingen status")
+        let tint: Color = training ? .orange : online ? .green : ATHLTHTheme.mutedText
+        return HStack(spacing: 3) {
+            Circle().fill(tint).frame(width: 5, height: 5)
+            Text(label).font(.system(size: 9, weight: .medium))
+                .lineLimit(1).minimumScaleFactor(0.75)
+        }.foregroundStyle(tint)
+    }
+
+    private func friendTile(_ friend: SocialProfileCard) -> some View {
+        Button {
+            selectedFriendID = friend.userID
+        } label: {
+            VStack(spacing: 3) {
+                ATHLTHSocialStatusAvatar(
+                    profile: friend, size: 57
+                )
+                 .frame(width: 67, height: 67)
+
+                statusLabel(friend)
+                    Text(friend.resolvedName
+                    .components(separatedBy: " ")
+                    .first ?? friend.resolvedName)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+            }
+            .frame(width: 86, minHeight: 104, alignment: .top)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Show quick actions",
+            norwegian: "Vis hurtighandlinger"
+        ))
+        .popover(
+            isPresented: Binding(
+                get: {
+                    selectedFriendID == friend.userID
+                },
+                set: { presented in
+                    if !presented &&
+                       selectedFriendID == friend.userID {
+                        selectedFriendID = nil
+                    }
+                }
+            ),
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .bottom
+        ) {
+            HomeFriendQuickActionsPopover(
+                friend: friend,
+                isTraining: realtime.isTrainingNow(friend.userID),
+                isOnline: realtime.isOnline(friend.userID),
+                onMessage: {
+                    openAction(.message(friend))
+                },
+                onChallenge: {
+                    openAction(.challenge(friend))
+                },
+                onProfile: {
+                    openAction(.profile(friend.userID))
+                },
+                onTrainTogether: {
+                    openAction(.trainTogether(friend))
+                },
+                onShare: { kind in
+                    openAction(.share(friend, kind))
+                }
+            )
+            .presentationCompactAdaptation(.popover)
         }
     }
 

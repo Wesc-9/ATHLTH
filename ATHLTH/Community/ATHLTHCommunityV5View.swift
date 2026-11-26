@@ -139,11 +139,9 @@ struct ATHLTHCommunityV5View: View {
     /// until its tab is actually foregrounded, keeping its cached UI alive.
     var isActive = true
     @EnvironmentObject private var groups: CommunityGroupStore
-    @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var weekly: OfficialWeeklyChallengeStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -158,26 +156,9 @@ struct ATHLTHCommunityV5View: View {
 
     // Only mutual followers may expose online/training presence, and only
     // when they have opted in. Do not infer status from their membership.
-    private var activeMembers: [SocialProfileCard] {
-        social.mutualFollows.filter {
-            realtime.isOnline($0.userID) ||
-            realtime.isTrainingNow($0.userID)
-        }
-    }
-
-    private var activeDuel: ATHLTHChallenge? {
-        challenges.trainingChallenges(for: session.profile.userID)
-            .first {
-                $0.hasAcceptedOpponent &&
-                !$0.expiredWithoutOpponent() &&
-                $0.participants.filter {
-                    $0.state == .creator || $0.state == .accepted
-                }.count == 2
-            }
-    }
-
     private var upcomingGathering: CommunityGroupEventRecord? {
-        groups.calendarEvents
+        guard groups.homeUpcomingEventsAccountID == session.profile.userID else { return nil }
+        return groups.homeUpcomingEvents
             .filter {
                 $0.status != "cancelled" &&
                 $0.status != "draft" &&
@@ -194,11 +175,10 @@ struct ATHLTHCommunityV5View: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         cover
-                            .padding(.horizontal, -14)
 
                         overview
-                        .padding(.top, 12)
-                        .padding(.bottom, 34)
+                        .padding(.top, 16)
+                        .padding(.bottom, 112)
                         .zIndex(1)
                     }
                     .padding(.horizontal, 14)
@@ -210,7 +190,6 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
-                .ignoresSafeArea(.container, edges: .top)
                 .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -242,73 +221,65 @@ struct ATHLTHCommunityV5View: View {
     // MARK: - Hero images: one per Community destination.
 
     private var cover: some View {
-        ZStack(alignment: .topLeading) {
-            GeometryReader { geo in
-                Image(ATHLTHCommunityMainTab.overview.heroAssetName)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .clipped()
-            }
-            LinearGradient(
-                stops: [
-                    .init(color: .white.opacity(0.21), location: 0),
-                    .init(color: .white.opacity(0.10), location: 0.30),
-                    .init(color: .white.opacity(0.04), location: 0.56),
-                    .init(color: .white.opacity(0.30), location: 1)
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-            LinearGradient(
-                colors: [.white.opacity(0.60), .white.opacity(0.03)],
-                startPoint: .leading, endPoint: .trailing
-            )
-            .allowsHitTesting(false)
-            VStack(alignment: .leading, spacing: 0) {
-                // The hero is image-and-title only. Global icons belong in
-                // their respective destinations, not atop Fellesskap.
-                Spacer(minLength: 0)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "COMMUNITY", norwegian: "FELLESSKAP"
-                    ))
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(2.6)
-                    .foregroundStyle(CommunityReferenceStyle.ink.opacity(0.78))
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Community", norwegian: "Fellesskap"
-                    ))
-                    .font(.system(size: 39, weight: .regular, design: .serif))
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(tr("Community", "Fellesskap"))
+                    .font(.system(size: 34, weight: .medium, design: .serif))
                     .foregroundStyle(CommunityReferenceStyle.ink)
-                    .minimumScaleFactor(0.8)
-                }
-                .padding(.leading, 20)
-                .padding(.bottom, 24)
+                    .accessibilityAddTraits(.isHeader)
+                Text(tr("Friends, clubs and shared goals", "Venner, klubber og felles mål"))
+                    .font(.subheadline)
+                    .foregroundStyle(CommunityReferenceStyle.muted)
             }
+            Spacer(minLength: 0)
+            NavigationLink {
+                MessageInboxDestinationView()
+            } label: {
+                headerIcon("envelope", tr("Inbox", "Innboks"))
+            }.buttonStyle(.plain)
+            NavigationLink {
+                ATHLTHNotificationCenterView()
+            } label: {
+                headerIcon("bell", tr("Notifications", "Varsler"))
+            }.buttonStyle(.plain)
         }
-        .frame(height: 195)
-        .clipShape(
-            UnevenRoundedRectangle(
-                bottomLeadingRadius: 21, bottomTrailingRadius: 21
-            )
-        )
-        .accessibilityElement(children: .contain)
+        .padding(.top, 10)
+        .accessibilityIdentifier("athlth-community-header")
+    }
+
+    private func headerIcon(_ symbol: String, _ title: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(CommunityReferenceStyle.ink)
+            .frame(width: 44, height: 44)
+            .communityReferenceCard()
+            .accessibilityLabel(title)
     }
 
     // MARK: - Community sections
 
     private var overview: some View {
-        VStack(spacing: 12) {
+        LazyVStack(spacing: 15) {
             weeklyChallengeSection
-            // Keep Train Together discoverable without duplicating its marketplace.
+            HomeActiveFriendsStrip(isActive: isActive)
+                .padding(14)
+                .communityReferenceCard()
+            if !social.mutualFollows.isEmpty {
+                CommunityFriendsVsFriendsCard(
+                    currentUserID: session.profile.userID,
+                    currentDisplayName: session.profile.displayName,
+                    currentAvatarURL: session.profile.avatarURL,
+                    friends: social.mutualFollows,
+                    feed: social.feed,
+                    ownWorkouts: health.workouts
+                )
+            }
+            shortcuts
             trainTogetherOverviewCard
-            arenaDuelCard
-            nextGatheringCard
-            membersStrip
+            myClubsSection
+            if upcomingGathering != nil { nextGatheringCard }
         }
+        .accessibilityIdentifier("athlth-community-overview")
     }
 
     /// Compact shortcut between the weekly challenge and the club / Arena
@@ -428,193 +399,112 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private var weeklyChallengeHighlight: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Group {
             if let challenge = weekly.activeChallenge {
-                NavigationLink {
-                    OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
-                } label: {
-                    HStack(spacing: 11) {
-                        Image("GoalMountain")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 89, height: 96)
-                            .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(challenge.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(CommunityReferenceStyle.ink)
-                                .lineLimit(2)
-                            Text(challenge.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(CommunityReferenceStyle.muted)
-                                .lineLimit(3)
-                            Text(weekly.isJoined(challenge.id)
-                                ? OfficialWeeklyChallengeProgress.valueText(
-                                    challenge: challenge, workouts: health.workouts)
-                                : tr("Join to track your progress", "Bli med for å følge fremgangen"))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(CommunityReferenceStyle.darkGold)
-                        }
-                        // Long titles must wrap within the remaining width
-                        // beside the fixed-size image.
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                progressDots(challenge)
+                OfficialWeeklyChallengeCard(
+                    challenge: challenge,
+                    profiles: social.mutualFollows,
+                    automaticallyJoin: false
+                )
+                .accessibilityIdentifier("athlth-community-weekly-challenge")
             } else {
-                Text(tr(
-                    "The next official challenge appears here when published.",
-                    "Neste offisielle utfordring vises her når den er publisert."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(CommunityReferenceStyle.muted)
-                NavigationLink {
-                    ChallengeHubView()
-                } label: {
-                    creamButton(tr("Explore", "Utforsk"), symbol: "arrow.right")
-                }
-                .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(tr("The next official challenge appears here when published.",
+                            "Neste offisielle utfordring vises her når den er publisert."))
+                        .font(.subheadline).foregroundStyle(CommunityReferenceStyle.muted)
+                    NavigationLink {
+                        ChallengeHubView()
+                    } label: {
+                        creamButton(tr("Explore", "Utforsk"), symbol: "arrow.right")
+                    }.buttonStyle(.plain)
+                }.padding(14).communityReferenceCard()
             }
         }
-        .padding(13)
-        .communityReferenceCard()
     }
 
-    private var arenaDuelCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            cardHeading(ATHLTHLocalization.choose(
-                english: "Competition", norwegian: "Konkurranse"
-            ), icon: "trophy.fill")
-
-            if let duel = activeDuel {
-                let leaders = challenges.leaderboard(for: duel.id)
-                HStack(spacing: 6) {
-                    ForEach(Array(leaders.prefix(2))) { entry in
-                        VStack(spacing: 4) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 33))
-                                .foregroundStyle(CommunityReferenceStyle.gold)
-                            Text(entry.participant.displayName)
-                                .font(.system(size: 10, weight: .semibold))
-                                .lineLimit(1)
-                                .foregroundStyle(CommunityReferenceStyle.ink)
-                            Text(scoreText(entry, for: duel))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(CommunityReferenceStyle.ink)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity)
-                        if entry.id == leaders.first?.id, leaders.count >= 2 {
-                            Text("VS")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(CommunityReferenceStyle.darkGold)
-                                .frame(width: 29, height: 29)
-                                .background(CommunityReferenceStyle.cream, in: Circle())
-                        }
-                    }
-                }
-                Text(duel.title)
-                    .font(.system(size: 10))
-                    .lineLimit(1)
-                    .foregroundStyle(CommunityReferenceStyle.muted)
-                Spacer(minLength: 0)
-            } else {
-                HStack {
-                    Image(systemName: "person.crop.circle")
-                    Text("VS")
-                        .font(.caption.weight(.semibold))
-                        .padding(7)
-                        .background(CommunityReferenceStyle.cream, in: Circle())
-                    Image(systemName: "person.crop.circle")
-                }
-                .font(.system(size: 34))
-                .foregroundStyle(CommunityReferenceStyle.gold.opacity(0.75))
-                .frame(maxWidth: .infinity)
-                Text(ATHLTHLocalization.choose(
-                    english: "No active duel yet",
-                    norwegian: "Ingen aktiv duell ennå"
-                ))
-                .font(.system(size: 11))
-                .foregroundStyle(CommunityReferenceStyle.muted)
-                .frame(maxWidth: .infinity)
-                Spacer(minLength: 0)
-            }
+    private var shortcuts: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
+            NavigationLink {
+                ATHLTHClubsHubView()
+            } label: { shortcutTile(tr("Clubs", "Klubber"), "person.3.fill") }
+                .buttonStyle(.plain)
             NavigationLink {
                 ATHLTHCompetitionEntryView()
-            } label: {
-                creamButton(activeDuel == nil
-                    ? ATHLTHLocalization.choose(
-                        english: "Find a duel", norwegian: "Finn en duell")
-                    : ATHLTHLocalization.choose(
-                        english: "View duel", norwegian: "Se duell"),
-                    symbol: "person.2.fill"
-                )
-            }
-            .buttonStyle(.plain)
+            } label: { shortcutTile(tr("Competition", "Konkurranse"), "trophy.fill") }
+                .buttonStyle(.plain)
+            NavigationLink {
+                ChallengeHubView()
+            } label: { shortcutTile(tr("Challenges", "Utfordringer"), "flag.checkered") }
+                .buttonStyle(.plain)
+            NavigationLink {
+                MessageInboxDestinationView()
+            } label: { shortcutTile(tr("Messages", "Meldinger"), "bubble.left.and.bubble.right.fill") }
+                .buttonStyle(.plain)
         }
-        .padding(11)
-        .frame(height: 184, alignment: .topLeading)
+    }
+
+    private func shortcutTile(_ title: String, _ symbol: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                .frame(width: 39, height: 39)
+                .background(CommunityReferenceStyle.cream, in: RoundedRectangle(cornerRadius: 12))
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+                .lineLimit(1).minimumScaleFactor(0.72)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, minHeight: 84)
         .communityReferenceCard()
     }
 
-    private func scoreText(
-        _ entry: ChallengeLeaderboardEntry,
-        for challenge: ATHLTHChallenge
-    ) -> String {
-        guard let score = entry.score, score.isFinite else { return "—" }
-        if challenge.rules.scoring == .mostDistance {
-            return String(format: "%.1f km", score / 1_000)
-        }
-        return score.formatted(.number.precision(.fractionLength(0...1)))
-    }
-
-    private func progressDots(_ challenge: OfficialWeeklyChallenge) -> some View {
-        let target = max(1, Int(challenge.targetValue.rounded(.up)))
-        let total = min(5, target)
-        let current = weekly.isJoined(challenge.id)
-            ? OfficialWeeklyChallengeProgress.currentValue(
-                challenge: challenge, workouts: health.workouts
-              ) : 0
-        let fraction = max(0, min(current / max(challenge.targetValue, 1), 1))
-        let completed = min(total, Int((fraction * Double(total)).rounded(.down)))
-
-        return VStack(spacing: 6) {
-            HStack(spacing: 6) {
-                ForEach(0..<total, id: \.self) { index in
-                    ZStack {
-                        Circle()
-                            .fill(index < completed
-                                  ? CommunityReferenceStyle.gold
-                                  : CommunityReferenceStyle.canvas)
-                        Circle()
-                            .strokeBorder(
-                                CommunityReferenceStyle.edge,
-                                style: StrokeStyle(lineWidth: 1, dash: [3, 3])
-                            )
-                        if index < completed {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
+    private var myClubsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(tr("My clubs", "Mine klubber"))
+                    .font(.headline).foregroundStyle(CommunityReferenceStyle.ink)
+                Spacer()
+                NavigationLink {
+                    ATHLTHClubsHubView()
+                } label: {
+                    Label(tr("See all", "Se alle"), systemImage: "chevron.right")
+                        .font(.caption.weight(.semibold)).foregroundStyle(CommunityReferenceStyle.darkGold)
+                }.buttonStyle(.plain)
+            }
+            if groups.joinedGroups.isEmpty {
+                NavigationLink {
+                    ATHLTHClubsHubView()
+                } label: {
+                    creamButton(tr("Find your club", "Finn din klubb"), symbol: "person.3")
+                }.buttonStyle(.plain)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 9) {
+                        ForEach(groups.joinedGroups) { club in
+                            NavigationLink {
+                                CommunityGroupDetailView(group: club)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    ATHLTHArtworkImage(reference: club.headerImageURL ?? club.imageURL,
+                                                       fallbackAssetName: "CommunityClubsHero", maxPixelSize: 400)
+                                        .athlthBoundedFill()
+                                        .frame(width: 146, height: 62)
+                                        .clipped().clipShape(RoundedRectangle(cornerRadius: 10))
+                                    Text(club.name).font(.caption.weight(.semibold))
+                                        .foregroundStyle(CommunityReferenceStyle.ink).lineLimit(1)
+                                    if !club.locationName.isEmpty {
+                                        Text(club.locationName).font(.caption2)
+                                            .foregroundStyle(CommunityReferenceStyle.muted).lineLimit(1)
+                                    }
+                                }.padding(8).frame(width: 162, alignment: .leading)
+                                    .communityReferenceCard()
+                            }.buttonStyle(.plain)
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 28)
                 }
             }
-            Text(weekly.isJoined(challenge.id)
-                ? OfficialWeeklyChallengeProgress.valueText(
-                    challenge: challenge, workouts: health.workouts
-                  )
-                : ATHLTHLocalization.choose(
-                    english: "Not joined yet", norwegian: "Ikke påmeldt ennå"
-                  ))
-                .font(.system(size: 9))
-                .foregroundStyle(CommunityReferenceStyle.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
         }
     }
 
@@ -708,83 +598,6 @@ struct ATHLTHCommunityV5View: View {
         .communityReferenceCard()
     }
 
-    private var membersStrip: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Label(ATHLTHLocalization.choose(
-                    english: "Active members", norwegian: "Aktive medlemmer"
-                ), systemImage: "person.3.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CommunityReferenceStyle.ink)
-                Spacer()
-                NavigationLink {
-                    ATHLTHCommunityActiveMembersDirectoryView()
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "See all", norwegian: "Se alle"
-                    ))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(CommunityReferenceStyle.muted)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9))
-                        .foregroundStyle(CommunityReferenceStyle.muted)
-                }
-                .buttonStyle(.plain)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 12) {
-                    NavigationLink {
-                        SocialHubView(initialTab: .discover)
-                    } label: {
-                        VStack(spacing: 5) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .light))
-                                .foregroundStyle(CommunityReferenceStyle.gold)
-                                .frame(width: 43, height: 43)
-                                .background(CommunityReferenceStyle.canvas, in: Circle())
-                            Text(ATHLTHLocalization.choose(
-                                english: "Invite", norwegian: "Inviter"
-                            ))
-                            .font(.system(size: 9))
-                            .foregroundStyle(CommunityReferenceStyle.muted)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    ForEach(Array(activeMembers.prefix(12))) { friend in
-                        NavigationLink {
-                            FriendProfileView(userID: friend.userID)
-                        } label: {
-                            VStack(spacing: 5) {
-                                ATHLTHSocialStatusAvatar(
-                                    profile: friend, size: 39
-                                )
-                                Text(friend.resolvedName.components(separatedBy: " ").first ?? friend.resolvedName)
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(CommunityReferenceStyle.ink)
-                                    .lineLimit(1)
-                                    .frame(width: 47)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if activeMembers.isEmpty {
-                        Text(ATHLTHLocalization.choose(
-                            english: "No friends sharing active status right now.",
-                            norwegian: "Ingen venner deler aktiv status akkurat nå."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(CommunityReferenceStyle.muted)
-                        .frame(minHeight: 43)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .communityReferenceCard()
-    }
-
     // MARK: - Shared screenshot controls
 
     private func cardHeading(_ title: String, icon: String) -> some View {
@@ -823,100 +636,13 @@ struct ATHLTHCommunityV5View: View {
     @MainActor
     private func refreshContent(force: Bool) async {
         async let a: Void = groups.refresh(force: force)
-        async let b: Void = groups.refreshCalendarContent()
-        async let c: Void = community.refresh(force: force)
+        async let b: Void = groups.refreshHomeUpcomingEvents(force: force)
         async let d: Void = messaging.refresh(force: force)
         async let e: Void = weekly.refresh(force: force)
         async let f: Void = force
             ? social.refresh(challengeStore: challenges)
             : social.refreshIfStale(challengeStore: challenges)
-        _ = await (a, b, c, d, e, f)
-    }
-}
-
-
-/// A privacy-respecting directory for the screenshot's "Active members" row.
-/// Online status is *never* inferred from group membership or last activity.
-private struct ATHLTHCommunityActiveMembersDirectoryView: View {
-    @EnvironmentObject private var social: SocialStore
-    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
-
-    private var activeFriends: [SocialProfileCard] {
-        social.mutualFollows.filter {
-            realtime.isTrainingNow($0.userID) ||
-            realtime.isOnline($0.userID)
-        }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Active members", norwegian: "Aktive medlemmer"
-                ))
-                .font(.system(size: 31, weight: .regular, design: .serif))
-                .foregroundStyle(CommunityReferenceStyle.ink)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Only mutual followers who have chosen to share their status appear here.",
-                    norwegian: "Her vises bare gjensidige følgere som har valgt å dele statusen sin."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(CommunityReferenceStyle.muted)
-
-                if activeFriends.isEmpty {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "No active members are sharing their status now.",
-                            norwegian: "Ingen aktive medlemmer deler status akkurat nå."
-                        ),
-                        systemImage: "person.3"
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(CommunityReferenceStyle.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-                    .communityReferenceCard()
-                } else {
-                    ForEach(activeFriends) { member in
-                        NavigationLink {
-                            FriendProfileView(userID: member.userID)
-                        } label: {
-                            HStack(spacing: 13) {
-                                ATHLTHSocialStatusAvatar(
-                                    profile: member, size: 43
-                                )
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(member.resolvedName)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(CommunityReferenceStyle.ink)
-                                    if !member.usernameLabel.isEmpty {
-                                        Text(member.usernameLabel)
-                                            .font(.caption)
-                                            .foregroundStyle(CommunityReferenceStyle.muted)
-                                    }
-                                }
-                                Spacer(minLength: 2)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(CommunityReferenceStyle.gold)
-                            }
-                            .padding(14)
-                            .communityReferenceCard()
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .padding(17)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
-        }
-        .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
-        .navigationTitle(ATHLTHLocalization.choose(
-            english: "Members", norwegian: "Medlemmer"
-        ))
-        .navigationBarTitleDisplayMode(.inline)
+        _ = await (a, b, d, e, f)
     }
 }
 

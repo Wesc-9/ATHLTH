@@ -1442,7 +1442,7 @@ struct ATHLTHHomeView: View {
 
                     homeSocialStatusStrip
 
-                    homeFriendsAndCalendarRow
+                    homeTodayCalendarCard
 
                     HomePersonalRecentActivitySection()
                 }
@@ -2524,7 +2524,6 @@ struct ATHLTHHomeView: View {
     // Two real scheduled workouts fit in both compact Home cards.
     // Keep a little breathing room for localized titles.
     private let homeCalendarContentMinHeight: CGFloat = 70
-    private let homeFriendsCalendarCardHeight: CGFloat = 154
 
     private var homeChallengeInvitationCount: Int {
         challenges.incomingInvitations(for: session.profile.userID).count
@@ -2657,70 +2656,6 @@ struct ATHLTHHomeView: View {
         .padding(.horizontal, 7)
         .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
         .contentShape(Rectangle())
-    }
-
-    // Keep Friends and Calendar compact to protect Recent Activity space.
-    // Daily recommendations now belong only to Train > Today on open days.
-    private var homeFriendsAndCalendarRow: some View {
-        Group {
-            if homeDynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 10) {
-                    homeTodayCalendarCard
-                    homeFriendsCard
-                }
-            } else {
-                HStack(alignment: .top, spacing: 10) {
-                    homeFriendsCard
-                        .frame(maxWidth: .infinity)
-                    homeTodayCalendarCard
-                        .frame(maxWidth: .infinity)
-                }
-            }
-        }
-    }
-
-    private var homeFriendsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // The existing strip owns actual friend status and quick actions.
-            HomeActiveFriendsStrip(isActive: isActive)
-            if social.mutualFollows.isEmpty && !social.isHomeFriendsRefreshing {
-                VStack(alignment: .leading, spacing: 7) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Friends", norwegian: "Venner"
-                        ),
-                        systemImage: "person.2"
-                    )
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Friends you connect with appear here.",
-                        norwegian: "Venner du knytter kontakt med, vises her."
-                    ))
-                    .font(.system(size: 11))
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, 7)
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(10)
-        .frame(
-            height: homeDynamicTypeSize.isAccessibilitySize
-                ? nil : homeFriendsCalendarCardHeight,
-            alignment: .topLeading
-        )
-        .background(
-            ATHLTHTrainDesign.paper,
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34), lineWidth: 0.8)
-        }
     }
 
     /// HealthKit, completed iPhone workouts and finished ATHLTH strength logs
@@ -3035,11 +2970,6 @@ struct ATHLTHHomeView: View {
         .padding(10)
         .frame(
             maxWidth: .infinity,
-            alignment: .topLeading
-        )
-        .frame(
-            height: homeDynamicTypeSize.isAccessibilitySize
-                ? nil : homeFriendsCalendarCardHeight,
             alignment: .topLeading
         )
         .background(

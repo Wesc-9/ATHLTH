@@ -1769,6 +1769,7 @@ struct OfficialWeeklyChallengeCard: View {
 
     let challenge: OfficialWeeklyChallenge
     let profiles: [SocialProfileCard]
+    var automaticallyJoin: Bool = true
 
     @State private var showingDetails = false
 
@@ -1777,6 +1778,7 @@ struct OfficialWeeklyChallengeCard: View {
     }
 
     private var progress: Double {
+        guard joined || automaticallyJoin else { return 0 }
         let localValue =
             OfficialWeeklyChallengeProgress.currentValue(
                 challenge: challenge,
@@ -1907,6 +1909,14 @@ struct OfficialWeeklyChallengeCard: View {
                 Spacer(minLength: 12)
 
                 HStack(alignment: .bottom, spacing: 12) {
+                    Label("\(store.participantCount(for: challenge.id).formatted()) " +
+                          ATHLTHLocalization.choose(english: "participants", norwegian: "deltakere"),
+                          systemImage: "person.2.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.38), in: Capsule())
                     Spacer(minLength: 8)
 
                     NavigationLink {
@@ -1929,9 +1939,11 @@ struct OfficialWeeklyChallengeCard: View {
                 HStack {
                     Spacer()
 
-                    progressRing
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 48)
+                    if joined || automaticallyJoin {
+                        progressRing
+                            .padding(.trailing, 16)
+                            .padding(.bottom, 48)
+                    }
                 }
             }
             .allowsHitTesting(false)
@@ -1971,7 +1983,8 @@ struct OfficialWeeklyChallengeCard: View {
             )
         }
         .task(id: health.workouts.map(\.id)) {
-            await store.ensureParticipation(for: challenge)
+            if automaticallyJoin { await store.ensureParticipation(for: challenge) }
+            guard store.isJoined(challenge.id) else { return }
             await store.syncCompletionState(
                 workouts: health.workouts
             )
@@ -2017,7 +2030,7 @@ struct OfficialWeeklyChallengeCard: View {
             VStack(spacing: 0) {
                 Text("\(Int((progress * 100).rounded()))%")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                Text("complete")
+                Text(ATHLTHLocalization.choose(english: "complete", norwegian: "fullført"))
                     .font(.system(size: 8, weight: .medium))
             }
             .foregroundStyle(.white)
