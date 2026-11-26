@@ -947,7 +947,8 @@ struct HomeActiveFriendsStrip: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     .lineLimit(1)
             }
-            .frame(width: 86, minHeight: 104, alignment: .top)
+            .frame(width: 86)
+            .frame(minHeight: 104, alignment: .top)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
