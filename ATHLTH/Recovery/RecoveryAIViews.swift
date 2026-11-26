@@ -755,8 +755,12 @@ struct RecoveryCoachInboxDestinationView:
                 )
             }
         }
-        .task {
+        .task(id: session.profile.userID) {
+            sorenessStore.reloadFromStorage()
             await loadCoachContext()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
+            sorenessStore.reloadFromStorage()
         }
     }
 
