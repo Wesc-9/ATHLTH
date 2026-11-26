@@ -611,3 +611,23 @@ final class GhostRacePrivacyTests: XCTestCase {
         )
     }
 }
+
+final class ATHLTHSharedSoloGhostPolicyTests: XCTestCase {
+    func testOnlyAcceptedUnexpiredPersonalInvitationsForRecipient() {
+        let owner = UUID(), friend = UUID(), now = Date()
+        func item(_ status: GhostFriendRaceStatus = .accepted, source: String? = "previous_workout",
+                  arena: UUID? = nil, expires: Double = 300) -> GhostFriendRaceChallengeRecord {
+            .init(id: UUID(), senderID: friend, recipientID: owner, title: "Ghost Race",
+                referenceDurationSeconds: 300, distanceMeters: 1000, routePoints: [],
+                privacyTrimmed: true, sourceKind: source, arenaRoundID: arena, status: status,
+                createdAt: now, respondedAt: now, expiresAt: now.addingTimeInterval(expires))
+        }
+        XCTAssertTrue(ATHLTHSharedSoloGhostPolicy.canReplay(item(), recipientID: owner, mutualFriend: true, now: now))
+        XCTAssertFalse(ATHLTHSharedSoloGhostPolicy.canReplay(item(), recipientID: UUID(), mutualFriend: true, now: now))
+        XCTAssertFalse(ATHLTHSharedSoloGhostPolicy.canReplay(item(), recipientID: owner, mutualFriend: false, now: now))
+        XCTAssertFalse(ATHLTHSharedSoloGhostPolicy.canReplay(item(.pending), recipientID: owner, mutualFriend: true, now: now))
+        XCTAssertFalse(ATHLTHSharedSoloGhostPolicy.canReplay(item(expires: -1), recipientID: owner, mutualFriend: true, now: now))
+        XCTAssertFalse(ATHLTHSharedSoloGhostPolicy.canReplay(item(arena: UUID()), recipientID: owner, mutualFriend: true, now: now))
+        XCTAssertFalse(ATHLTHSharedSoloGhostPolicy.canReplay(item(source: "planned_route"), recipientID: owner, mutualFriend: true, now: now))
+    }
+}

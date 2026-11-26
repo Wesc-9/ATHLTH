@@ -98,3 +98,25 @@ final class ATHLTHExploreRoutePolicyTests: XCTestCase {
         }
     }
 }
+
+final class ATHLTHRouteGhostTemplateTests: XCTestCase {
+    func testTemplateRetainsDirectionAndDoesNotDuplicateOrRestoreDeletedRoute() throws {
+        let route = TrainingRoute(
+            id: UUID(), ownerID: UUID(), title: "Test route",
+            visibility: .publicProfile, coordinates: (0..<10).map {
+                RouteCoordinate(latitude: 63.4 + Double($0) * 0.001,
+                                longitude: 10.4, altitude: nil, sequence: $0)
+            }, distanceKilometers: 1, elevationGainMeters: 0,
+            importedFilename: nil, createdAt: Date(), startName: "A", endName: "B"
+        )
+        let reverse = ATHLTHExploreRoutePolicy.reversedForWorkout(route)
+        let link = try XCTUnwrap(ATHLTHRouteGhostTemplate.matchingLibraryRoute(reverse, in: [route]))
+        XCTAssertTrue(link.reversed)
+        let template = ATHLTHRouteGhostTemplate(id: UUID(), name: "Reverse", routeID: link.id,
+            reversed: link.reversed, durationSeconds: 300, strategy: .even)
+        XCTAssertEqual(template.resolve(in: [route])?.coordinates.first?.latitude,
+                       reverse.coordinates.first?.latitude)
+        XCTAssertNil(template.resolve(in: []))
+        XCTAssertNil(ATHLTHRouteGhostTemplate.matchingLibraryRoute(route, in: []))
+    }
+}

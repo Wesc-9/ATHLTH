@@ -118,6 +118,15 @@ struct GhostFriendRaceChallengeRecord:
     }
 }
 
+enum ATHLTHSharedSoloGhostPolicy {
+    static func canReplay(_ item: GhostFriendRaceChallengeRecord,
+                          recipientID: UUID, mutualFriend: Bool, now: Date = Date()) -> Bool {
+        mutualFriend && item.recipientID == recipientID && item.senderID != recipientID &&
+            item.status == .accepted && item.expiresAt > now && item.arenaRoundID == nil &&
+            (item.sourceKind == nil || item.sourceKind == "previous_workout")
+    }
+}
+
 private struct GhostFriendRaceInsert: Encodable {
     let senderID: UUID
     let recipientID: UUID

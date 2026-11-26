@@ -4517,10 +4517,8 @@ private struct ATHLTHSharedSoloGhostView: View {
         guard session.signedIn, shares.currentUserID == session.profile.userID,
               shares.errorMessage == nil else { return [] }
         return shares.incoming.filter {
-            $0.recipientID == session.profile.userID && $0.status == .accepted &&
-            $0.expiresAt > Date() && $0.arenaRoundID == nil &&
-            ($0.sourceKind == nil || $0.sourceKind == "previous_workout") &&
-            social.isMutualFollow($0.senderID)
+            ATHLTHSharedSoloGhostPolicy.canReplay($0, recipientID: session.profile.userID,
+                                               mutualFriend: social.isMutualFollow($0.senderID))
         }
     }
 
@@ -4588,7 +4586,7 @@ private struct ATHLTHSharedSoloGhostView: View {
         // Revalidate server-side visibility and revocation immediately before launch.
         await social.refresh()
         await shares.refresh()
-        guard !Task.isCancelled, account == session.profile.userID,
+        guard !Task.isCancelled, account == session.profile.userID, !shares.isLoading,
               let fresh = available.first(where: { $0.id == item.id }) else {
             error = "GPS-økten er ikke lenger tilgjengelig."
             return
