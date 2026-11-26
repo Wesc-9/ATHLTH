@@ -5188,6 +5188,15 @@ final class IPhoneWorkoutStore:
                 configuration: configuration
             ) == "no"
 
+        if standardAllowed,
+           workout.structuredRunningWorkout?.soloGhostRace == true,
+           let pace = activeStep?.ghostPaceSecondsPerKilometer,
+           let lead = intervalGhostLiveLeadMeters(),
+           let phrase = ATHLTHSoloGhostComparison.coachPhrase(
+               leadMeters: lead, pace: pace, norwegian: norwegian) {
+            parts.append(phrase)
+        }
+
         if standardAllowed, configuration.announceDistance, !customMetrics.contains(.distance) {
             parts.append(
                 String(

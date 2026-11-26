@@ -5807,6 +5807,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         var standard = ""
         if maySpeakRoutine {
             standard = metricsAnnouncement(excluding: coveredMetrics)
+            if structuredRunningWorkout?.soloGhostRace == true,
+               !structuredWorkoutComplete,
+               let pace = currentStructuredRunningStep?.ghostPaceSecondsPerKilometer,
+               let lead = intervalGhostLiveLeadMeters,
+               let phrase = ATHLTHSoloGhostComparison.coachPhrase(
+                   leadMeters: lead, pace: pace, norwegian: coachPhrase(english: "en", norwegian: "no") == "no") {
+                standard += standard.isEmpty ? phrase : ". " + phrase
+            }
             if let feedback = ATHLTHCoachGoalEncouragement.phrase(
                 style: audioCoachConfiguration.speechStyle ?? .balanced,
                 step: currentStructuredRunningStep,

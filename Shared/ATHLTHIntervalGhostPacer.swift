@@ -319,6 +319,17 @@ enum ATHLTHSoloGhostComparison {
         return Result(leadMeters: lead, timeGapSeconds: finishGap, outcome: outcome)
     }
 
+    static func coachPhrase(leadMeters: Double, pace: Double, norwegian: Bool) -> String? {
+        guard let gap = timeGap(leadMeters: leadMeters, pace: pace),
+              abs(gap) <= 86_400 else { return nil }
+        let seconds = Int(abs(gap).rounded())
+        if seconds < 1 { return norwegian ? "Du holder samme fart som ghosten." : "You are level with the ghost." }
+        if norwegian {
+            return gap > 0 ? "Du ligger \(seconds) sekunder foran ghosten." : "Du ligger \(seconds) sekunder bak ghosten."
+        }
+        return gap > 0 ? "You are \(seconds) seconds ahead of the ghost." : "You are \(seconds) seconds behind the ghost."
+    }
+
     static func timeGap(leadMeters: Double, pace: Double) -> Double? {
         guard leadMeters.isFinite, pace.isFinite, (120...1_800).contains(pace) else { return nil }
         let gap = leadMeters * pace / 1_000

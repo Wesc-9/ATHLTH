@@ -266,36 +266,59 @@ struct RouteDetailView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if leaderboardAvailable {
-                    Divider()
-                    Text("Andre løpere").font(.subheadline.weight(.semibold))
-                    Text("Bruk en synlig sluttid fra resultatlisten som digital fartsholder. Dette er ikke en GPS-Replay.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    ForEach(Array(leaderboard.filter {
+                    let eligible = leaderboard.filter {
                         $0.userID != session.profile.userID &&
-                        $0.activityType == "running" &&
-                        $0.leaderboardEligible &&
-                        $0.durationSeconds.isFinite &&
-                        (60...86_400).contains($0.durationSeconds)
-                    }.prefix(10))) { attempt in
-                        NavigationLink {
-                            TargetGhostSetupView(
-                                route: directedRoute,
-                                challengeTitle: "Måltid · " + attempt.athleteName,
-                                suggestedDurationSeconds: attempt.durationSeconds
-                            )
-                        } label: {
-                            HStack {
-                                routeAttemptAvatar(attempt)
-                                Text(attempt.athleteName)
-                                Spacer()
-                                Text(clock(attempt.durationSeconds)).monospacedDigit()
-                                Image(systemName: "chevron.right").font(.caption)
-                            }
-                        }.buttonStyle(.plain)
+                        $0.activityType == "running" && $0.leaderboardEligible &&
+                        $0.durationSeconds.isFinite && (60...86_400).contains($0.durationSeconds)
+                    }
+                    let friends = eligible.filter { social.isMutualFollow($0.userID) }
+                    Divider()
+                    Text("Synlige ruterekorder").font(.subheadline.weight(.semibold))
+                    Text("Bruk en synlig sluttid som digital fartsholder. Ingen GPS-spor eller private helsedata deles.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if !friends.isEmpty {
+                        Text("Venner").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        ForEach(Array(friends.prefix(10))) { attempt in
+                            ghostTimeOpponent(attempt)
+                        }
+                    }
+                    Text("Resultatliste").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    let others = eligible.filter { !social.isMutualFollow($0.userID) }
+                    if let record = others.first {
+                        ghostTimeOpponent(record, record: true)
+                        ForEach(Array(others.dropFirst().prefix(9))) { attempt in
+                            ghostTimeOpponent(attempt)
+                        }
+                    } else if friends.isEmpty {
+                        Text("Ingen synlige, kvalifiserte rutetider ennå.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
         }
+    }
+
+    private func ghostTimeOpponent(_ attempt: RouteAttemptRecord, record: Bool = false) -> some View {
+        NavigationLink {
+            TargetGhostSetupView(
+                route: directedRoute,
+                challengeTitle: "Måltid · " + attempt.athleteName,
+                suggestedDurationSeconds: attempt.durationSeconds
+            )
+        } label: {
+            HStack {
+                routeAttemptAvatar(attempt)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(attempt.athleteName)
+                    if record {
+                        Text("Raskeste øvrige synlige tid").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Text(clock(attempt.durationSeconds)).monospacedDigit()
+                Image(systemName: "chevron.right").font(.caption)
+            }
+        }.buttonStyle(.plain)
     }
 
     private var routePrimaryContent: some View {

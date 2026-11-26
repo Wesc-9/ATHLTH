@@ -640,3 +640,15 @@ final class ATHLTHSoloGhostTemplateTests: XCTestCase {
             distanceMeters: nil, durationSeconds: nil).isValid)
     }
 }
+
+final class ATHLTHSoloGhostCoachTests: XCTestCase {
+    func testCoachReportsSignedEquivalentTimeAndTie() {
+        XCTAssertEqual(ATHLTHSoloGhostComparison.coachPhrase(leadMeters: 100, pace: 300, norwegian: true),
+                       "Du ligger 30 sekunder foran ghosten.")
+        XCTAssertEqual(ATHLTHSoloGhostComparison.coachPhrase(leadMeters: -100, pace: 300, norwegian: false),
+                       "You are 30 seconds behind the ghost.")
+        XCTAssertEqual(ATHLTHSoloGhostComparison.coachPhrase(leadMeters: 0, pace: 300, norwegian: true),
+                       "Du holder samme fart som ghosten.")
+        XCTAssertNil(ATHLTHSoloGhostComparison.coachPhrase(leadMeters: .nan, pace: 300, norwegian: true))
+    }
+}
