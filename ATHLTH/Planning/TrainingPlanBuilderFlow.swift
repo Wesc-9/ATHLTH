@@ -499,6 +499,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // Bound metadata decoding for the full plan wizard; an unbounded
         // SwiftUI generic chain exhausted the iPhone main-thread stack.
         AnyView(planPresentations)
+            .allowsHitTesting(!showingPlanExitSheet)
+            .accessibilityHidden(showingPlanExitSheet)
+            .overlay {
+                if showingPlanExitSheet {
+                    AnyView(planExitOverlay)
+                }
+            }
             .tint(ATHLTHTrainDesign.bronze)
             .interactiveDismissDisabled(!completedPlanCreation)
     }
@@ -992,57 +999,70 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    // One presentation owner for the exit decision. A nested sheet can be
+    // dropped by the iPad sheet host when other builder presentations are
+    // registered. This local modal layer is independent of UIKit routing.
+    private var planExitOverlay: some View {
+        GeometryReader { viewport in
+            ZStack {
+                Color.black.opacity(0.32)
+                    .ignoresSafeArea()
+                    .accessibilityHidden(true)
+                    .onTapGesture { } // Block taps to the editor.
+                ATHLTHDiscardDraftSheet(
+                    kind: .trainingPlan,
+                    onKeepEditing: {
+                        planDiscardError = nil
+                        showingPlanExitSheet = false
+                    },
+                    onSaveDraftAndClose: {
+                        planDiscardError = nil
+                        guard saveResumableDraft() else {
+                            planDiscardError = creationError ??
+                                ATHLTHLocalization.choose(
+                                    english: "Could not save the draft. Your plan is still open.",
+                                    norwegian: "Kunne ikke lagre utkastet. Planen er fortsatt åpen."
+                                )
+                            creationError = nil
+                            return
+                        }
+                        draftStore.setEditing(false,
+                            userID: session.profile.userID, draftID: draftID)
+                        showingPlanExitSheet = false
+                        dismiss()
+                    },
+                    onDiscard: {
+                        planDiscardError = nil
+                        guard draftStore.deleteDraft(
+                            userID: session.profile.userID, draftID: draftID
+                        ) else {
+                            planDiscardError = ATHLTHLocalization.choose(
+                                english: "The draft could not be deleted. Nothing was discarded.",
+                                norwegian: "Utkastet kunne ikke slettes. Ingenting ble forkastet."
+                            )
+                            return
+                        }
+                        deliberatelyDiscardedPlanDraft = true
+                        pendingPlanCheckpoint?.cancel()
+                        showingPlanExitSheet = false
+                        dismiss()
+                    },
+                    errorMessage: planDiscardError,
+                    embedded: true
+                )
+                .frame(width: min(460, max(0, viewport.size.width - 32)),
+                       height: min(500, max(0, viewport.size.height - 32)))
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+                .accessibilityAddTraits(.isModal)
+                .accessibilityIdentifier("athlth-plan-exit-decision")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
     private var planPresentations: some View {
         AnyView(planSecondaryObservers)
-        .sheet(isPresented: $showingPlanExitSheet.keepingPresentedWhenInactive(scenePhase)) {
-            ATHLTHDiscardDraftSheet(
-                kind: .trainingPlan,
-                onKeepEditing: {
-                    planDiscardError = nil
-                    showingPlanExitSheet = false
-                },
-                onSaveDraftAndClose: {
-                    planDiscardError = nil
-                    guard saveResumableDraft() else {
-                        planDiscardError = creationError ??
-                            ATHLTHLocalization.choose(
-                                english: "Could not save the draft. Your plan is still open.",
-                                norwegian: "Kunne ikke lagre utkastet. Planen er fortsatt åpen."
-                            )
-                        return
-                    }
-                    // Explicitly close a saved draft. Merely backgrounding
-                    // the app must not clear the interrupted-editor marker.
-                    draftStore.setEditing(false,
-                        userID: session.profile.userID, draftID: draftID)
-                    showingPlanExitSheet = false
-                    Task { @MainActor in
-                        await Task.yield()
-                        dismiss()
-                    }
-                },
-                onDiscard: {
-                    planDiscardError = nil
-                    guard draftStore.deleteDraft(
-                        userID: session.profile.userID, draftID: draftID
-                    ) else {
-                        planDiscardError = ATHLTHLocalization.choose(
-                            english: "The draft could not be deleted. Nothing was discarded.",
-                            norwegian: "Utkastet kunne ikke slettes. Ingenting ble forkastet."
-                        )
-                        return
-                    }
-                    deliberatelyDiscardedPlanDraft = true
-                    showingPlanExitSheet = false
-                    Task { @MainActor in
-                        await Task.yield()
-                        dismiss()
-                    }
-                },
-                errorMessage: planDiscardError
-            )
-            .presentationCompactAdaptation(.sheet)
-        }
         .alert(
             ATHLTHLocalization.choose(
                 english: "Could not create plan",
@@ -1750,7 +1770,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(sourceInk)
                     .padding(.horizontal, 13)
-                    .frame(height: 38)
+                    .frame(minHeight: 44)
                     .background(
                         .white.opacity(0.84),
                         in: Capsule()
@@ -1761,6 +1781,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-plan-cancel")
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Cancel plan creation",
                     norwegian: "Avbryt planopprettelse"

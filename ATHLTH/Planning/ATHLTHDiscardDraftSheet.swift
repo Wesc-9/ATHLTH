@@ -92,6 +92,8 @@ struct ATHLTHDiscardDraftSheet: View {
     let onSaveDraftAndClose: (() -> Void)?
     let onDiscard: () -> Void
     var errorMessage: String? = nil
+    // Embedded callers own dismissal; do not dismiss their navigation host.
+    var embedded = false
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
@@ -171,7 +173,7 @@ struct ATHLTHDiscardDraftSheet: View {
 
                         Button {
                             onKeepEditing()
-                            dismiss()
+                            if !embedded { dismiss() }
                         } label: {
                             Text(tr("Continue editing", "Fortsett redigering"))
                                 .font(.system(size: 14, weight: .semibold))
@@ -189,7 +191,7 @@ struct ATHLTHDiscardDraftSheet: View {
                     } else {
                         Button {
                             onKeepEditing()
-                            dismiss()
+                            if !embedded { dismiss() }
                         } label: {
                             Label(
                                 kind == .savedTrainingPlanDraft
