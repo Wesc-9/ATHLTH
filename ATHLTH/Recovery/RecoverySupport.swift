@@ -164,13 +164,38 @@ struct RecoverySorenessEntry: Codable, Hashable {
     var stress: Int?
     var overallSoreness: Int?
     var motivation: Int?
+    var sleepQuality: Int? = nil
+    var feelsUnwell: Bool? = nil
 }
 
 final class RecoverySorenessStore: ObservableObject {
     @Published private(set) var entries: [RecoverySorenessEntry]
 
     private let defaults: UserDefaults
-    private let storageKey = "recovery.soreness.entries"
+    private static let legacyStorageKey = "recovery.soreness.entries"
+    private static let ownerKey = "recovery.soreness.activeOwner"
+    private var storageKey: String
+    private let explicitlyScoped: Bool
+
+    /// Never assign unowned legacy wellness data to a newly signed-in user.
+    /// Keep the old file untouched until ownership can be verified.
+    static func configureAccount(_ id: UUID?) {
+        let defaults = UserDefaults.standard
+        let previous = defaults.string(forKey: ownerKey)
+        let next = id?.uuidString
+        guard previous != next else { return }
+        defaults.set(next, forKey: ownerKey)
+        NotificationCenter.default.post(name: Notification.Name("athlth.dailyCheckInDidUpdate"), object: nil)
+    }
+
+    private static func key(defaults: UserDefaults, accountID: UUID? = nil) -> String {
+        if let accountID { return legacyStorageKey + "." + accountID.uuidString }
+        if defaults !== UserDefaults.standard { return legacyStorageKey }
+        guard let owner = defaults.string(forKey: ownerKey), UUID(uuidString: owner) != nil else {
+            return legacyStorageKey + ".unassigned"
+        }
+        return legacyStorageKey + "." + owner
+    }
 
     static let muscleGroups = [
         "Chest",
@@ -189,8 +214,11 @@ final class RecoverySorenessStore: ObservableObject {
         "Feet"
     ]
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, accountID: UUID? = nil) {
         self.defaults = defaults
+        self.explicitlyScoped = accountID != nil
+        self.storageKey = Self.key(defaults: defaults, accountID: accountID)
+        let storageKey = self.storageKey
 
         if let data = defaults.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode(
@@ -202,26 +230,23 @@ final class RecoverySorenessStore: ObservableObject {
             entries = []
         }
 
-        trimAndPersistIfNeeded()
+        // Reads must not cause repeated writes from SwiftUI views.
+        entries = Self.cleaned(entries)
     }
 
     /// Refresh a shared daily check-in after another ATHLTH screen saves it.
     /// Reuses the existing local record instead of creating profile-specific
     /// duplicate measurements.
     func reloadFromStorage() {
-        guard let data = defaults.data(forKey: storageKey),
-              let stored = try? JSONDecoder().decode(
-                [RecoverySorenessEntry].self, from: data
-              ) else { return }
-        let cutoff = Calendar.current.date(
-            byAdding: .day, value: -30, to: Date()
-        ) ?? Date().addingTimeInterval(-2_592_000)
-        let cleaned = stored.filter { $0.date >= cutoff }
-            .sorted { $0.date > $1.date }
+        if !explicitlyScoped { storageKey = Self.key(defaults: defaults) }
+        let stored = defaults.data(forKey: storageKey).flatMap {
+            try? JSONDecoder().decode([RecoverySorenessEntry].self, from: $0)
+        } ?? []
+        let cleaned = Self.cleaned(stored)
         if cleaned != entries { entries = cleaned }
     }
 
-    private var todayEntry: RecoverySorenessEntry? {
+    var todayEntry: RecoverySorenessEntry? {
         let calendar = Calendar.current
         return entries.first {
             calendar.isDateInToday($0.date)
@@ -253,6 +278,7 @@ final class RecoverySorenessStore: ObservableObject {
         todayStress != nil ||
         todayOverallSoreness != nil ||
         todayMotivation != nil ||
+        todayEntry?.sleepQuality != nil || todayEntry?.feelsUnwell != nil ||
         !todayRatings.isEmpty
     }
 
@@ -284,6 +310,10 @@ final class RecoverySorenessStore: ObservableObject {
             if let motivation = draft.motivation {
                 entry.motivation = Self.normalizedCheckInValue(motivation)
             }
+            if let sleep = draft.sleepQuality {
+                entry.sleepQuality = Self.normalizedCheckInValue(sleep)
+            }
+            if let unwell = draft.feelsUnwell { entry.feelsUnwell = unwell }
             for (muscle, level) in draft.muscles {
                 entry.ratings[muscle] = level
             }
@@ -327,6 +357,12 @@ final class RecoverySorenessStore: ObservableObject {
     private func updateTodayEntry(
         _ update: (inout RecoverySorenessEntry) -> Void
     ) {
+        // A stale sheet must not overwrite another signed-in account.
+        guard explicitlyScoped || storageKey == Self.key(defaults: defaults) else {
+            reloadFromStorage()
+            return
+        }
+        reloadFromStorage()
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
@@ -367,16 +403,16 @@ final class RecoverySorenessStore: ObservableObject {
         min(max(value, 1), 5)
     }
 
-    private func trimAndPersistIfNeeded() {
-        let cutoff = Calendar.current.date(
-            byAdding: .day,
-            value: -30,
-            to: Date()
-        ) ?? Date().addingTimeInterval(-2_592_000)
-
-        entries = entries
-            .filter { $0.date >= cutoff }
+    private static func cleaned(_ entries: [RecoverySorenessEntry]) -> [RecoverySorenessEntry] {
+        let now = Date()
+        let cutoff = Calendar.current.date(byAdding: .day, value: -90, to: now)
+            ?? now.addingTimeInterval(-7_776_000)
+        return entries.filter { $0.date >= cutoff && $0.date <= now }
             .sorted { $0.date > $1.date }
+    }
+
+    private func trimAndPersistIfNeeded() {
+        entries = Self.cleaned(entries)
 
         if let data = try? JSONEncoder().encode(entries) {
             defaults.set(data, forKey: storageKey)
@@ -3665,11 +3701,13 @@ struct RecoveryPartialCheckInDraft {
     var stress: Int?
     var overallSoreness: Int?
     var motivation: Int?
+    var sleepQuality: Int?
+    var feelsUnwell: Bool?
     var muscles: [String: RecoverySorenessLevel] = [:]
 
     var hasAnswers: Bool {
         energy != nil || stress != nil || overallSoreness != nil ||
-            motivation != nil || !muscles.isEmpty
+            motivation != nil || sleepQuality != nil || feelsUnwell != nil || !muscles.isEmpty
     }
 
     func apply(to store: RecoverySorenessStore) {
@@ -3798,6 +3836,32 @@ struct RecoverySorenessLogView: View {
                                 symbol: "flame.fill",
                                 value: draft.motivation
                             ) { draft.motivation = $0 }
+
+                            Divider().opacity(0.45)
+                            ratingRow(
+                                title: recoveryText("Sleep quality", "Opplevd søvnkvalitet"),
+                                hint: recoveryText("Poor → good", "Dårlig → god"),
+                                symbol: "moon.stars",
+                                value: draft.sleepQuality
+                            ) { draft.sleepQuality = $0 }
+                            Divider().opacity(0.45)
+                            Text(recoveryText("Feeling ill today?", "Føler du deg syk i dag?"))
+                                .font(.subheadline.weight(.semibold))
+                            HStack {
+                                ForEach([false, true], id: \.self) { answer in
+                                    Button {
+                                        draft.feelsUnwell = draft.feelsUnwell == answer ? nil : answer
+                                    } label: {
+                                        Text(answer ? recoveryText("Yes", "Ja") : recoveryText("No", "Nei"))
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity, minHeight: 44)
+                                            .background(draft.feelsUnwell == answer ? ATHLTHPlanDesign.accentInk.opacity(0.16) : Color.clear,
+                                                        in: RoundedRectangle(cornerRadius: 12))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityAddTraits(draft.feelsUnwell == answer ? .isSelected : [])
+                                }
+                            }
                         }
                     }
 
@@ -3879,8 +3943,8 @@ struct RecoverySorenessLogView: View {
                     }
 
                     Label(recoveryText(
-                        "Responses may adapt training advice and muscle recovery. Apple Watch readiness is not changed.",
-                        "Svarene kan tilpasse treningsråd og muskelrestitusjon. Dagsform fra Apple Watch endres ikke."
+                        "Your answers personalize local training advice. Nothing changes automatically. The measured recovery score remains separate.",
+                        "Svarene tilpasser lokale treningsråd. Ingenting endres automatisk. Målt restitusjonsscore holdes separat."
                     ), systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -3898,6 +3962,8 @@ struct RecoverySorenessLogView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button {
+                    guard session.signedIn else { return }
+                    store.reloadFromStorage()
                     draft.apply(to: store)
                     notifications.reconcileDailyCheckIn(
                         enabled: settings.dailyCheckInRemindersEnabled,
