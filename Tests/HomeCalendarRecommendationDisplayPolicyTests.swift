@@ -64,4 +64,19 @@ final class HomeCalendarRecommendationDisplayPolicyTests: XCTestCase {
         XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: true), .appleWatch)
         XCTAssertNil(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: false))
     }
+
+    func testHomeQuickDevicePickerUsesOneSelectionForBothFavorites() {
+        let automatic = ATHLTHHomeQuickCaptureChoice.automatic
+        XCTAssertEqual(automatic.displayedChoice(watchAvailable: true), .appleWatch)
+        XCTAssertEqual(automatic.displayedChoice(watchAvailable: false), .iPhone)
+        let phone = automatic.toggled(watchAvailable: true)
+        XCTAssertEqual(phone, .iPhone)
+        XCTAssertEqual(phone.displayedChoice(watchAvailable: true), .iPhone)
+        let watch = phone.toggled(watchAvailable: true)
+        XCTAssertEqual(watch, .appleWatch)
+        XCTAssertEqual(watch.displayedChoice(watchAvailable: false), .iPhone)
+        XCTAssertEqual(watch.displayedChoice(watchAvailable: true), .appleWatch)
+        XCTAssertEqual(phone.toggled(watchAvailable: false), .iPhone)
+        XCTAssertNil(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: false))
+    }
 }

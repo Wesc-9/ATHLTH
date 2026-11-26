@@ -5944,6 +5944,18 @@ private struct PlannedWorkoutInvitationLobby: View {
 enum ATHLTHHomeQuickCaptureChoice: String {
     case automatic, iPhone, appleWatch
 
+    /// The icon and the normal tap use the same explicit, currently
+    /// available device. Losing connectivity before tapping shows iPhone.
+    func displayedChoice(watchAvailable: Bool) -> Self {
+        guard watchAvailable, self != .iPhone else { return .iPhone }
+        return .appleWatch
+    }
+
+    func toggled(watchAvailable: Bool) -> Self {
+        guard watchAvailable else { return self }
+        return displayedChoice(watchAvailable: true) == .appleWatch ? .iPhone : .appleWatch
+    }
+
     func resolve(watchAvailable: Bool) -> WorkoutCaptureDevice? {
         switch self {
         case .automatic: return watchAvailable ? .appleWatch : .iPhone
@@ -5965,6 +5977,16 @@ struct ATHLTHHomeQuickStartCard: View {
 
     @State private var loadedOwner: UUID?
     @State private var counts: [String: Int] = [:]
+    @State private var capturePreference: ATHLTHHomeQuickCaptureChoice = .automatic
+
+    private var selectedDevice: ATHLTHHomeQuickCaptureChoice {
+        let preference = loadedOwner == accountID ? capturePreference : .automatic
+        return preference.displayedChoice(watchAvailable: watchAvailable)
+    }
+
+    private var selectedDeviceName: String {
+        selectedDevice == .appleWatch ? "Apple Watch" : "iPhone"
+    }
 
     private var favorites: [Category] {
         ATHLTHQuickActivityUsage.favorites(counts: loadedOwner == accountID ? counts : [:])
@@ -5972,14 +5994,17 @@ struct ATHLTHHomeQuickStartCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(ATHLTHLocalization.choose(english: "Train now", norwegian: "Tren nå"))
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .padding(.bottom, 2)
+            HStack(spacing: 4) {
+                Text(ATHLTHLocalization.choose(english: "Train now", norwegian: "Tren nå"))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                Spacer(minLength: 0)
+                devicePicker
+            }
 
             ForEach(favorites) { category in
                 Button {
-                    launch(category, choice: .automatic)
+                    launch(category, choice: selectedDevice)
                 } label: {
                     shortcut(title: category.title, icon: category.icon, all: false)
                 }
@@ -6002,7 +6027,7 @@ struct ATHLTHHomeQuickStartCard: View {
                     english: "Starts a simple workout. Hold to choose a device.",
                     norwegian: "Starter en enkel økt. Hold inne for å velge enhet."
                 ))
-                .accessibilityValue(watchAvailable ? "Apple Watch" : "iPhone")
+                .accessibilityValue(selectedDeviceName)
                 .disabled(occupied)
                 .accessibilityIdentifier("athlth-home-quick-start-\(category.rawValue)")
             }
@@ -6015,7 +6040,7 @@ struct ATHLTHHomeQuickStartCard: View {
             .accessibilityIdentifier("athlth-home-quick-start-all")
         }
         .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 166, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 175, alignment: .topLeading)
         .background(ATHLTHTrainDesign.paper, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -6025,14 +6050,42 @@ struct ATHLTHHomeQuickStartCard: View {
         .opacity(occupied ? 0.65 : 1)
         .task(id: "\(accountID.uuidString)|\(isActive)") {
             guard isActive else { return }
+            if loadedOwner != accountID { capturePreference = .automatic }
             loadedOwner = accountID
             counts = ATHLTHQuickActivityUsage.counts(for: accountID)
         }
         .accessibilityIdentifier("athlth-home-quick-start-card")
     }
 
+    private var devicePicker: some View {
+        Button {
+            if loadedOwner != accountID {
+                capturePreference = .automatic
+                counts = ATHLTHQuickActivityUsage.counts(for: accountID)
+                loadedOwner = accountID
+            }
+            capturePreference = capturePreference.toggled(watchAvailable: watchAvailable)
+        } label: {
+            Image(systemName: selectedDevice == .appleWatch ? "applewatch" : "iphone")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 32, height: 26)
+                .background(ATHLTHTrainDesign.paleGold.opacity(0.45), in: Capsule())
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(occupied || !watchAvailable)
+        .accessibilityLabel(ATHLTHLocalization.choose(english: "Workout device", norwegian: "Treningsenhet"))
+        .accessibilityValue(selectedDeviceName)
+        .accessibilityHint(watchAvailable
+            ? ATHLTHLocalization.choose(english: "Switch between Apple Watch and iPhone", norwegian: "Bytt mellom Apple Watch og iPhone")
+            : ATHLTHLocalization.choose(english: "Apple Watch is unavailable", norwegian: "Apple Watch er ikke tilgjengelig"))
+        .accessibilityIdentifier("athlth-home-quick-start-device")
+    }
+
     private func launch(_ category: Category, choice: ATHLTHHomeQuickCaptureChoice) {
         guard !occupied, category.isAvailable, choice.resolve(watchAvailable: watchAvailable) != nil else { return }
+        if loadedOwner != accountID { capturePreference = .automatic }
         counts = ATHLTHQuickActivityUsage.record(category, for: accountID)
         loadedOwner = accountID
         onSelect(category, choice)
@@ -6052,8 +6105,8 @@ struct ATHLTHHomeQuickStartCard: View {
                 .minimumScaleFactor(0.85)
                 .multilineTextAlignment(.leading)
             Spacer(minLength: 1)
-            Image(systemName: all ? "chevron.right" : (watchAvailable ? "applewatch" : "iphone"))
-                .font(.system(size: all ? 8 : 12, weight: .semibold))
+            Image(systemName: all ? "chevron.right" : "play.fill")
+                .font(.system(size: all ? 8 : 10, weight: .semibold))
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
                 .accessibilityHidden(true)
         }

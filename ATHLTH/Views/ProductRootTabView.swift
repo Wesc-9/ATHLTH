@@ -3011,7 +3011,7 @@ struct ATHLTHHomeView: View {
 
         }
         .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 166, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 175, alignment: .topLeading)
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
