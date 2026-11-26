@@ -33,13 +33,16 @@ REQUIRED = {
         r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*(?:196|workoutHeroHeight)\)",
         r"\.containerRelativeFrame\(\.horizontal\)",
     ),
-    # The reference screenshot replaces V5 with a single full-bleed cover
-    # and 2x2 cards. Guard both the bounded hero and club/event artwork,
-    # rather than requiring retired V5 card methods.
+    # Community now has an image-free compact header and a standalone
+    # club hub. Guard the actual viewport and all remaining artwork.
+    # Restrict image patterns to their own method, so a different card
+    # cannot accidentally satisfy a missing bounds check.
     "ATHLTH/Community/ATHLTHCommunityV5View.swift": (
-        r"private var cover: some View.*?GeometryReader\s*\{\s*geo\s+in.*?\.scaledToFill\(\)\s*\.frame\(width:\s*geo\.size\.width,\s*height:\s*geo\.size\.height\)",
-        r"private func clubSummary.*?\.athlthBoundedFill\(\)",
-        r"private var nextGatheringCard.*?\.athlthBoundedFill\(\)",
+        r"GeometryReader\s*\{\s*viewport\s+in.*?\.frame\(width:\s*min\(viewport\.size\.width,\s*760\)\)",
+        r"private var cover: some View\s*\{(?:(?!\n    private ).)*?\.accessibilityIdentifier\(\"athlth-community-header\"\)",
+        r"private var myClubsSection: some View\s*\{(?:(?!\n    private ).)*?\.athlthBoundedFill\(\)\s*\.frame\(width:\s*146,\s*height:\s*62\)",
+        r"private func clubRow\((?:(?!\n    private ).)*?\.athlthBoundedFill\(\)\s*\.frame\(height:\s*96\)\s*\.frame\(maxWidth:\s*\.infinity\)",
+        r"private var nextGatheringCard: some View\s*\{(?:(?!\n    private ).)*?\.athlthBoundedFill\(\)\s*\.frame\(height:\s*61\)\s*\.frame\(maxWidth:\s*\.infinity\)",
     ),
     "ATHLTH/Social/SocialViews.swift": (
         r"Image\(\"CommunityHero\"\)\s*\.resizable\(\)\s*\.scaledToFill\(\)\s*\.athlthBoundedFill\(\)",
@@ -71,6 +74,11 @@ def main() -> int:
         for pattern in patterns:
             if not re.search(pattern, source, re.DOTALL):
                 errors.append(f"{relative}: lost responsive artwork guard: {pattern}")
+
+    community = (ROOT / "ATHLTH/Community/ATHLTHCommunityV5View.swift").read_text(encoding="utf-8")
+    header = re.search(r"private var cover: some View\s*\{(?:(?!\n    private ).)*", community, re.DOTALL)
+    if header and (".scaledToFill()" in header.group() or "ATHLTHArtworkImage(" in header.group()):
+        errors.append("Community compact header reintroduced unbounded hero artwork")
 
     performance = (ROOT / "ATHLTH/Profile/ProfilePerformanceViews.swift").read_text(encoding="utf-8")
     if re.search(r'Image\("(?:GoalSprint|StrengthPostWorkoutHero)"\)', performance):

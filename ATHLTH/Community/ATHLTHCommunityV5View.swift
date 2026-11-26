@@ -576,6 +576,7 @@ struct ATHLTHCommunityV5View: View {
                 Image("GoalAdventure")
                     .resizable()
                     .scaledToFill()
+                    .athlthBoundedFill()
                     .frame(height: 65)
                     .frame(maxWidth: .infinity)
                     .clipped()
