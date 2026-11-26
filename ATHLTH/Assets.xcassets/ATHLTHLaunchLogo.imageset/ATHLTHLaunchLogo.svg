@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="74" height="40" viewBox="0 0 74 40">
+  <!-- The pulse centerline mirrors Shared/ATHLTHBrandMark.swift at compact size (30 x 22). The wordmark is outlined for native launch rendering. -->
+  <g transform="translate(22 0)" fill="none" stroke="#080808" stroke-width="3.41" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2.4 14.74 L8.4 14.74 C10.2 14.74 12.9 4.4 15 1.76 C17.1 2.42 19.2 12.1 21.6 12.76 L25.2 12.76 M14.7 10.78 L17.7 19.36 L20.7 14.3 L27.6 14.3"/>
+  </g>
+  <g fill="#080808" transform="translate(2 27)">
+    <path fill-rule="evenodd" d="M0 10 3.5 0h3.2l3.5 10H7.4l-.58-1.9H3.3L2.7 10ZM4 6h2.12L5.06 2.5Z"/>
+    <path transform="translate(12.6 0)" d="M0 0h9.2v2.5H6V10H3.2V2.5H0Z"/>
+    <path transform="translate(25 0)" d="M0 0h2.8v3.7h3.7V0h2.8v10H6.5V6.1H2.8V10H0Z"/>
+    <path transform="translate(37.5 0)" d="M0 0h2.8v7.5H8V10H0Z"/>
+    <path transform="translate(48.7 0)" d="M0 0h9.2v2.5H6V10H3.2V2.5H0Z"/>
+    <path transform="translate(61 0)" d="M0 0h2.8v3.7h3.7V0h2.8v10H6.5V6.1H2.8V10H0Z"/>
+  </g>
+</svg>

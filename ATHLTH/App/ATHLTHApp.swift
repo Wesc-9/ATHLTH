@@ -790,38 +790,19 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
 
 private struct ATHLTHLaunchGateView: View {
     var body: some View {
-        ZStack {
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.55)
-            )
+        // Match the system-owned cold-launch surface exactly. No network,
+        // animation timer, progress spinner or artificial minimum duration.
+        Color("ATHLTHLaunchBackground")
             .ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                ATHLTHBrandMark(
-                    size: .compact,
-                    showTagline: false,
-                    wordmarkWeight: .medium,
-                    markStrokeScale: 0.72
-                )
-
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(
-                        ATHLTHTheme.accent
-                    )
-
+            .overlay {
+                Image("ATHLTHLaunchLogo")
+                    .renderingMode(.original)
+                    .accessibilityHidden(true)
             }
-            .padding(28)
-        }
-        .accessibilityElement(
-            children: .combine
-        )
-        .accessibilityLabel(
-            "Opening ATHLTH"
-        )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Opening ATHLTH", norwegian: "Åpner ATHLTH"
+            ))
     }
 }
 
@@ -1524,6 +1505,7 @@ struct AppRootView: View {
                 AnyView(ProductRootTabView())
             } else if appSession.signedIn && !startupAuthenticationResolved {
                 ATHLTHLaunchGateView()
+                    .transition(.opacity)
             } else if offlineAccountRecoveryNeeded && appSession.signedIn {
                 ATHLTHOfflineAccountRecoveryView(
                     retry: {
@@ -1547,6 +1529,10 @@ struct AppRootView: View {
                 AnyView(ProductRootTabView())
             }
         }
+        // Animate only the one-time local authentication handoff. No
+        // animation on foreground reactivation and no delayed auth state.
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18),
+                   value: startupAuthenticationResolved)
         )
     }
 

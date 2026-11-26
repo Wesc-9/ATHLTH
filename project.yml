@@ -78,7 +78,10 @@ targets:
         ATHLTHLegalOperatorName: "$(ATHLTH_LEGAL_OPERATOR_NAME)"
         ATHLTHPrivacyContactEmail: "$(ATHLTH_PRIVACY_CONTACT_EMAIL)"
         ATHLTHSupportURL: "$(ATHLTH_SUPPORT_URL)"
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: ATHLTHLaunchBackground
+          UIImageName: ATHLTHLaunchLogo
+          UIImageRespectsSafeAreaInsets: false
         UIUserInterfaceStyle: Light
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
