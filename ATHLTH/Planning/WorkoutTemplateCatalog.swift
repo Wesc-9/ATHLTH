@@ -4990,6 +4990,7 @@ struct WorkoutTemplateBuilderView: View {
     /// automatically saving a template in My Workouts.
     private let onAddStandalone: ((PlannedSession) -> Bool)?
     private let onSaveSharedRevision: ((PlannedSession) async -> String?)?
+    private let onFinalizeSharedWorkout: ((PlannedSession) async -> String?)?
     /// The imported-session planner keeps its compact grouped Basic view in
     /// SessionEditorView. Switching modes returns the complete unsaved recipe.
     private let onSwitchToBasic: ((PlannedSession) -> Void)?
@@ -5047,7 +5048,8 @@ struct WorkoutTemplateBuilderView: View {
         onKeepEditingInline: (() -> Void)? = nil,
         focusedPlannerDay: Date? = nil,
         draftDestinationDate: Date? = nil,
-        onSaveSharedRevision: ((PlannedSession) async -> String?)? = nil
+        onSaveSharedRevision: ((PlannedSession) async -> String?)? = nil,
+        onFinalizeSharedWorkout: ((PlannedSession) async -> String?)? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -5157,6 +5159,7 @@ struct WorkoutTemplateBuilderView: View {
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
         self.onSaveSharedRevision = onSaveSharedRevision
+        self.onFinalizeSharedWorkout = onFinalizeSharedWorkout
         self.onSwitchToBasic = onSwitchToBasic
         self.onValidateSave = onValidateSave
         self.saveButtonTitle = saveButtonTitle
@@ -5920,7 +5923,7 @@ struct WorkoutTemplateBuilderView: View {
                     detail: tr("Shoes and devices", "Sko og enheter")
                 ) { selectedWorkoutExtra = .gear }
 
-                if onSaveSharedRevision == nil {
+                if onSaveSharedRevision == nil && onFinalizeSharedWorkout == nil {
                     workoutSettingButton(
                         tr("Plan with a friend", "Planlegg med en venn"),
                         icon: "person.2",
@@ -6062,7 +6065,7 @@ struct WorkoutTemplateBuilderView: View {
         NavigationStack {
             editorWithDraftLifecycle
         }
-        .interactiveDismissDisabled(onSaveSharedRevision != nil && collaborationInviteSending)
+        .interactiveDismissDisabled((onSaveSharedRevision != nil || onFinalizeSharedWorkout != nil) && collaborationInviteSending)
         .sheet(isPresented: $showingWorkoutReview) {
             ATHLTHWorkoutReviewSheet(
                 title: workoutSnapshot().title,
@@ -10043,11 +10046,11 @@ struct WorkoutTemplateBuilderView: View {
             actionNotice = issue
             return
         }
-        if let onSaveSharedRevision {
+        if let finalize = onFinalizeSharedWorkout ?? onSaveSharedRevision {
             guard !collaborationInviteSending else { return }
             collaborationInviteSending = true
             Task { @MainActor in
-                let error = await onSaveSharedRevision(workout)
+                let error = await finalize(workout)
                 collaborationInviteSending = false
                 if let error {
                     actionNotice = error
