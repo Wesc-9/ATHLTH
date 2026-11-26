@@ -5576,6 +5576,8 @@ struct SessionEditorView: View {
     @State private var showingAllTrainingPartners = false
     @State private var allowInviteeExercises = false
     @State private var directPartnerID: UUID?
+    @State private var directSetupName = ""
+    @State private var directSetupIndoor = false
     @State private var physicalMeetup = true
     @State private var meetingPoint: PlannedWorkoutMeetingPoint?
     @State private var reminderMinutesBefore = 0
@@ -6580,9 +6582,7 @@ struct SessionEditorView: View {
         partnerScratchReadyForInvite = false
         collaborationInvitationSent = false
         collaborationInviteBaseline = nil
-        if selectedPartnerID != nil {
-            // A direct friend invite starts with exercise suggestions enabled.
-            // Proposals still require creator approval in Messages.
+        if selectedPartnerID != nil && directPartnerID == nil {
             allowInviteeExercises = true
         }
         scratchTimelineDraftID = UUID()
@@ -6592,7 +6592,7 @@ struct SessionEditorView: View {
         }
         persistOpenNavigationStage(.scratchBuilder)
         hasSelectedWorkoutSource = true
-        title = ""
+        title = directPartnerID != nil ? directSetupName.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         notes = ""
         durationMinutes = 0
         strengthDurationAdjustmentMinutes = 0
@@ -6604,7 +6604,7 @@ struct SessionEditorView: View {
         plannedExercises = []
         selectedRunningWorkouts = []
         selectedRouteID = nil
-        runEnvironment = .outdoor
+        runEnvironment = directPartnerID != nil && directSetupIndoor ? .indoor : .outdoor
         saveToActivePlan = false
         workoutCategory = type.rawValue
         kind = type.scratchWorkoutKind
@@ -7004,8 +7004,7 @@ struct SessionEditorView: View {
         // before the full-screen unified builder is attached.
         if directPartnerID != nil && isStandalone && existingWorkout == nil &&
             !partnerScratchReadyForInvite {
-            ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
-                .toolbar(.hidden, for: .navigationBar)
+            AnyView(directTrainTogetherSetup)
         } else if ATHLTHScratchComposerPresentationPolicy.hidesLegacyStandaloneHost(
             isStandalone: isStandalone,
             hasScratchSource: selectedScratchWorkoutType != nil ||
@@ -7246,6 +7245,89 @@ struct SessionEditorView: View {
     /// Friend-profile scratch flow: the shared builder is the only workout
     /// editor. This follow-up confirms the invitation, date and meeting place
     /// without exposing or recreating the legacy "Planlegg ekstra økt" form.
+    private var directTrainTogetherSetup: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                ATHLTHTrainPageTitle(title: "Tren sammen")
+                Text("Avtal hvordan dere vil trene før dere setter sammen økten.")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                lockedTrainingPartnerCard
+                ATHLTHPlanSurface {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Hvordan skal økten lages?").font(.headline)
+                        Picker("Hvordan skal økten lages?", selection: $allowInviteeExercises) {
+                            Text("Send ferdig økt").tag(false)
+                            Text("Lag en sammen").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        Text(allowInviteeExercises
+                             ? "Begge kan legge til og endre øvelser før dere godkjenner."
+                             : "Velg en økt fra biblioteket. Vennen kan se og godkjenne, men ikke endre øvelsene.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                }
+                ATHLTHPlanSurface {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Hvordan skal dere trene?").font(.headline)
+                        Picker("Hvordan skal dere trene?", selection: $physicalMeetup) {
+                            Text("Fysisk sammen").tag(true)
+                            Text("Hver for dere").tag(false)
+                        }.pickerStyle(.segmented)
+                        Divider()
+                        Text("Treningsmiljø").font(.headline)
+                        Picker("Treningsmiljø", selection: $directSetupIndoor) {
+                            Text("Utendørs").tag(false)
+                            Text("Innendørs").tag(true)
+                        }.pickerStyle(.segmented)
+                    }
+                }
+                ATHLTHPlanSurface {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Øktdetaljer").font(.headline)
+                        TextField("Navn på treningsøkten", text: $directSetupName)
+                            .textFieldStyle(.roundedBorder)
+                        DatePicker("Dato og klokkeslett", selection: $scheduledTime,
+                                   in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                        Text("Dere godkjenner økten før trening.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                }
+                Button {
+                    title = directSetupName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    runEnvironment = directSetupIndoor ? .indoor : .outdoor
+                    scheduledTimeEnabled = true
+                    if allowInviteeExercises {
+                        showingScratchTypePicker = true
+                    } else {
+                        showingSavedWorkoutPicker = true
+                    }
+                } label: {
+                    Label(allowInviteeExercises ? "Velg treningsform" : "Velg treningsøkt",
+                          systemImage: "arrow.right")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(scheduledTime <= Date())
+            }
+            .padding(18)
+            .frame(maxWidth: 650)
+            .frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle("Tren sammen")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Lukk") { dismiss() }
+            }
+        }
+    }
+
     private var partnerScratchInvitationReview: some View {
         Form {
             Section {
@@ -7560,7 +7642,7 @@ struct SessionEditorView: View {
                         ? scratchTimelineDraftID : nil,
                     collaborationInviteSent: collaborationInvitationSent,
                     onInviteToBuild: isStandalone && selectedPartnerID != nil &&
-                        onPreparedWorkout == nil &&
+                        allowInviteeExercises && onPreparedWorkout == nil &&
                         selectedScratchWorkoutType != nil
                         ? { draft in await invitePartnerToBuild(draft) } : nil,
                     collaborationRules: isStandalone && onPreparedWorkout == nil &&
@@ -7718,16 +7800,7 @@ struct SessionEditorView: View {
                 onDismiss: {
                     guard openScratchComposerAfterPickerDismiss else {
                         if directPartnerID != nil && selectedScratchWorkoutType == nil {
-                            // Back/cancel returns to the friend, not the blank
-                            // compatibility host. A background dismissal is
-                            // restored on activation instead.
-                            if scenePhase == .active {
-                                draftFinalized = true
-                                Task { @MainActor in
-                                    await Task.yield()
-                                    dismiss()
-                                }
-                            }
+                            // Cancel returns to the shared workout setup, preserving the choices.
                         } else if scenePhase == .active && !draftFinalized {
                             persistOpenNavigationStage(.source)
                         }
@@ -7773,7 +7846,16 @@ struct SessionEditorView: View {
                 }
             }) {
                 ATHLTHPlannedWorkoutTypePickerView { workout, _ in
+                    let chosenPhysical = physicalMeetup
+                    let chosenCollaboration = allowInviteeExercises
                     applySavedWorkout(workout)
+                    if directPartnerID != nil {
+                        physicalMeetup = chosenPhysical
+                        allowInviteeExercises = chosenCollaboration
+                        runEnvironment = directSetupIndoor ? .indoor : .outdoor
+                        let name = directSetupName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !name.isEmpty { title = name }
+                    }
                     // Preserve the chosen workout name in the new independent
                     // session. The athlete can still rename it in Basics.
                     selectedScratchWorkoutType = directPartnerID != nil
@@ -7783,7 +7865,6 @@ struct SessionEditorView: View {
                     persistDraft()
                     if directPartnerID != nil {
                         partnerScratchReadyForInvite = false
-                        allowInviteeExercises = true
                     } else {
                         persistOpenNavigationStage(.legacyEditor)
                     }
@@ -7939,18 +8020,8 @@ struct SessionEditorView: View {
                 if directPartnerID != nil && isStandalone &&
                     existingWorkout == nil && onPreparedWorkout == nil &&
                     !draftRestored {
-                    // Friend profile -> Train Together starts at the same
-                    // activity picker as solo planning. Keep the preselected
-                    // friend and meeting details, but never assume running.
+                    // Collect shared workout rules before choosing a source.
                     draftRestored = true
-                    Task { @MainActor in
-                        await Task.yield()
-                        guard !draftFinalized,
-                              selectedScratchWorkoutType == nil,
-                              !showingUnifiedWorkoutComposer,
-                              !showingScratchTypePicker else { return }
-                        showingScratchTypePicker = true
-                    }
                 } else if restoreOpenNavigationStageIfNeeded() {
                     // The account-scoped route owns this presentation.
                 } else if !draftRestored, isStandalone, onPreparedWorkout == nil,
@@ -8051,12 +8122,6 @@ struct SessionEditorView: View {
                     // iOS can tear down a sheet without tearing down the
                     // editor view. Re-present its saved destination on wake.
                     presentQueuedNavigationIfNeeded()
-                    if directPartnerID != nil && isStandalone &&
-                        !draftFinalized && selectedScratchWorkoutType == nil &&
-                        !showingScratchTypePicker && !showingUnifiedWorkoutComposer &&
-                        !openScratchComposerAfterPickerDismiss {
-                        showingScratchTypePicker = true
-                    }
                     if shouldTrackOpenNavigation && queuedNavigationStage == nil,
                        let stage = ATHLTHStandaloneWorkoutDraftStore.navigationStage(
                             for: session.profile.userID
@@ -11503,8 +11568,7 @@ struct SessionEditorView: View {
         scheduledTimeEnabled = draft.scheduledTimeEnabled
         saveToActivePlan = draft.saveToActivePlan ?? false
         selectedPartnerID = directPartnerID ?? draft.selectedPartnerID
-        // Legacy draft modes are normalized to in-person invitations.
-        physicalMeetup = true
+        physicalMeetup = draft.physicalMeetup ?? (draft.workout.trainTogetherMode != .sameWorkout)
         editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode
         targetPaceEnabled = draft.targetPaceEnabled
         heartRateTargetEnabled = draft.heartRateTargetEnabled
