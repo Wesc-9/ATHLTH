@@ -1088,7 +1088,7 @@ settingsSection(ATHLTHLocalization.choose(
                                 ? "Unavailable"
                                 : !health.hasRequestedAuthorization
                                     ? "Connect"
-                                    : healthSyncStateTitle,
+                                    : (healthSyncStateTitle == ATHLTHLocalization.choose(english: "Synced", norwegian: "Synkronisert") ? ATHLTHLocalization.choose(english: "Connected", norwegian: "Tilkoblet") : healthSyncStateTitle),
                         showChevron: true,
                         loading: healthRequestInProgress || health.isRefreshing
                     )
@@ -1911,7 +1911,7 @@ if session.currentRole.canAccessControlCenter {
     private var watchDeviceTrailingTitle: String {
         switch watchConnection.state {
         case .ready:
-            return "Apple Watch"
+            return ATHLTHLocalization.choose(english: "Connected", norwegian: "Tilkoblet")
         case .checking:
             return ATHLTHLocalization.choose(
                 english: "Checking",
