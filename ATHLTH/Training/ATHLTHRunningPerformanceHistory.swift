@@ -12,6 +12,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
     var minutes: [ATHLTHRecordedRunningMinute]? = nil
     /// Link to the HealthKit activity shown in the actual post-run detail.
     var healthWorkoutUUID: UUID? = nil
+    var soloGhostResult: ATHLTHSoloGhostComparison.Result? = nil
 
     var workSteps: [ATHLTHRecordedRunningStep] {
         steps.filter { !["warmup", "cooldown", "recovery", "rest"]
@@ -50,11 +51,21 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
 
     init?(phone: PhoneWorkout) {
         guard let finished = phone.end,
-              phone.structuredWorkoutComplete == true,
               let recipe = phone.structuredRunningWorkout,
-              let recorded = phone.recordedRunningSteps,
-              Self.validFullRecording(recorded, expectedCount: recipe.steps.count)
+              let recorded = phone.recordedRunningSteps
         else { return nil }
+        let full = phone.structuredWorkoutComplete == true &&
+            Self.validFullRecording(recorded, expectedCount: recipe.steps.count)
+        let solo: ATHLTHSoloGhostComparison.Result? = {
+            guard recipe.soloGhostRace == true, let step = recipe.steps.first,
+                  let pace = step.ghostPaceSecondsPerKilometer,
+                  let phase = recorded.first(where: { $0.index == 0 }),
+                  phase.activeSeconds > 0 else { return nil }
+            return ATHLTHSoloGhostComparison.result(
+                elapsed: phase.activeSeconds, meters: phase.distanceMeters, pace: pace,
+                targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds)
+        }()
+        guard full || solo != nil else { return nil }
         id = phone.id
         workoutID = phone.plannedSessionID ?? recipe.sourceWorkoutID
         // The structured recipe is more informative than a generic
@@ -70,7 +81,8 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         }
         completedAt = finished
         source = "iPhone"
-        steps = recorded
+        steps = full ? recorded : []
+        soloGhostResult = solo
         minutes = phone.recordedRunningMinutes
         healthWorkoutUUID = phone.healthID
     }
@@ -91,17 +103,20 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
             $0.recordedDistanceMeters > 0
         }
         let hasMeasuredMinutes = !verifiedMinutes.isEmpty
+        let solo = watch.soloGhostResult.flatMap { result in
+            result.leadMeters.isFinite && result.timeGapSeconds.isFinite ? result : nil
+        }
         guard (watch.kind == .running || watch.kind == .walking),
               watch.startedAt.timeIntervalSince1970.isFinite,
               watch.endedAt.timeIntervalSince1970.isFinite,
               watch.endedAt >= watch.startedAt,
               watch.duration.isFinite, watch.duration > 0,
-              fullyStructured || hasMeasuredMinutes else { return nil }
+              fullyStructured || hasMeasuredMinutes || solo != nil else { return nil }
         id = watch.id
         workoutID = watch.structuredWorkoutSourceID
         let fallbackTitle = watch.kind == .walking ? "Gåtur" : "Løpeøkt"
         title = ATHLTHRunningResultPresentation.titleForRun(
-            watch.structuredWorkoutTitle ?? fallbackTitle,
+            watch.structuredWorkoutTitle ?? (solo != nil ? "Ghost Race" : fallbackTitle),
             fallback: fallbackTitle
         )
         completedAt = watch.endedAt
@@ -110,6 +125,7 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         // but a partial interval transfer is not proof the interval plan
         // was completed. Do not promote its incomplete steps to a PR.
         steps = fullyStructured ? recorded : []
+        soloGhostResult = solo
         minutes = verifiedMinutes.isEmpty ? nil : verifiedMinutes
         healthWorkoutUUID = watch.healthKitWorkoutUUID
     }
@@ -190,6 +206,9 @@ enum ATHLTHRunningPerformanceHistory {
         with existing: [ATHLTHCompletedRunningPerformance]
     ) -> ATHLTHCompletedRunningPerformance? {
         var result = incoming
+        if let previous = existing.first(where: { $0.id == incoming.id }) {
+            if result.soloGhostResult == nil { result.soloGhostResult = previous.soloGhostResult }
+        }
         if let previous = existing.first(where: { $0.id == incoming.id }),
            let saved = previous.healthWorkoutUUID {
             if let newLink = incoming.healthWorkoutUUID, newLink != saved {
@@ -204,6 +223,14 @@ enum ATHLTHRunningPerformanceHistory {
             return nil
         }
         return result
+    }
+
+    static func soloGhostResult(userID: UUID, workoutID: UUID) -> ATHLTHSoloGhostComparison.Result? {
+        let exact = load(userID: userID).filter {
+            $0.id == workoutID || $0.healthWorkoutUUID == workoutID
+        }
+        guard exact.count == 1 else { return nil }
+        return exact.first?.soloGhostResult
     }
 
     static func load(userID: UUID) -> [ATHLTHCompletedRunningPerformance] {
@@ -272,13 +299,19 @@ enum ATHLTHRunningPerformanceHistory {
         knownWorkoutIDs: Set<UUID>,
         knownHealthWorkoutIDs: Set<UUID> = []
     ) {
+        // Solo results must have a known, exact owner. Never assign a
+        // delayed result to a different account or infer ownership from time.
+        if let owner = result.accountOwnerID, owner != userID { return }
+        if result.soloGhostResult != nil && result.accountOwnerID != userID { return }
         guard let record = ATHLTHCompletedRunningPerformance(watch: result)
         else { return }
         let recognizedPlan = record.workoutID.map { knownWorkoutIDs.contains($0) } ?? false
         let recognizedHealth = record.healthWorkoutUUID.map {
             knownHealthWorkoutIDs.contains($0)
         } ?? false
-        guard recognizedPlan || recognizedHealth else { return }
+        let ownedSolo = record.soloGhostResult != nil && result.accountOwnerID == userID &&
+            record.healthWorkoutUUID != nil
+        guard recognizedPlan || recognizedHealth || ownedSolo else { return }
         var history = load(userID: userID)
         // A late HealthKit export may add the UUID; a delayed packet must
         // never erase it or create another result for the same recording.

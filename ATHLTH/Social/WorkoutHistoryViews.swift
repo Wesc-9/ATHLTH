@@ -412,6 +412,10 @@ struct WorkoutHistoryDetailView: View {
                 )
 
                 if workout.activity == .running {
+                    if let result = ATHLTHRunningPerformanceHistory.soloGhostResult(
+                        userID: session.profile.userID, workoutID: workout.id) {
+                        ATHLTHSoloGhostHistoryCard(result: result)
+                    }
                     ghostRaceCard
                 }
 
@@ -1138,6 +1142,11 @@ struct PostWorkoutReviewView: View {
                             result: result,
                             reference: reference
                         )
+                    }
+
+                    if let solo = ATHLTHRunningPerformanceHistory.soloGhostResult(
+                        userID: session.profile.userID, workoutID: workout.id) {
+                        ATHLTHSoloGhostHistoryCard(result: solo)
                     }
 
                     reflectionCard
@@ -4896,5 +4905,33 @@ enum ATHLTHStationaryTimeEstimator {
         // A tiny route fragment must never report zero waiting for a long run.
         guard observedSeconds >= max(30, workoutDuration * 0.45) else { return nil }
         return min(waitingSeconds, workoutDuration)
+    }
+}
+
+private struct ATHLTHSoloGhostHistoryCard: View {
+    let result: ATHLTHSoloGhostComparison.Result
+    private var title: String {
+        switch result.outcome {
+        case .ahead: return ATHLTHLocalization.choose(english: "You beat the ghost", norwegian: "Du slo ghosten")
+        case .behind: return ATHLTHLocalization.choose(english: "The ghost won", norwegian: "Ghosten vant")
+        case .tied: return ATHLTHLocalization.choose(english: "Tie", norwegian: "Uavgjort")
+        case .incomplete: return ATHLTHLocalization.choose(english: "Goal not completed", norwegian: "Målet ble ikke fullført")
+        }
+    }
+    var body: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Ghost Race", systemImage: "flag.checkered")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(title).font(.system(.title2, design: .serif).weight(.semibold))
+                Text(String(format: "%.0f", abs(result.timeGapSeconds)) + " " +
+                    ATHLTHLocalization.choose(
+                        english: result.timeGapSeconds >= 0 ? "sec ahead" : "sec behind",
+                        norwegian: result.timeGapSeconds >= 0 ? "sek foran" : "sek bak"))
+                    .font(.headline.monospacedDigit())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }

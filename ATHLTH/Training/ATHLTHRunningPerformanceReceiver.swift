@@ -27,6 +27,7 @@ struct ATHLTHRunningPerformanceReceiver: ViewModifier {
             session.savedWorkoutTemplates.map(\.id)
         )
         for result in watch.pendingWorkoutResults {
+            if let owner = result.accountOwnerID, owner != session.profile.userID { continue }
             ATHLTHRunningPerformanceHistory.saveWatch(
                 result,
                 userID: session.profile.userID,
