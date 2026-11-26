@@ -124,7 +124,7 @@ struct ATHLTHSideMenuDeepLinkView: View {
             ATHLTHArenaV3HomeView()
 
         case .clubs:
-            ATHLTHCommunityV5View(initialTab: .clubs)
+            ATHLTHClubsHubView()
 
         case .home, .trainNow, .search, .inbox, .notifications,
              .trainingLibrary, .myExercises, .myRoutes,

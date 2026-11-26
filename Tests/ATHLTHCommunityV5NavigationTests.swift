@@ -2,14 +2,13 @@ import XCTest
 import UIKit
 @testable import ATHLTH
 
-/// The approved 2026 reference has four tabs in one redesigned shell.
-/// This must not return to the previous three-tab Community V5 dashboard.
+/// Clubs is a standalone sidebar destination, not a Community tab.
 final class ATHLTHCommunityV5NavigationTests: XCTestCase {
-    func testCommunityHasFourReferenceDestinations() {
+    func testCommunityHasThreeDestinationsWithoutClubs() {
         XCTAssertEqual(ATHLTHCommunityMainTab.allCases,
-                       [.overview, .clubs, .arena, .events])
+                       [.overview, .arena, .events])
         XCTAssertEqual(
-            Set(ATHLTHCommunityMainTab.allCases.map(\.id)).count, 4)
+            Set(ATHLTHCommunityMainTab.allCases.map(\.id)).count, 3)
     }
 
     func testCommunityTabLabelsAreNotBlank() {
@@ -46,7 +45,6 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
     func testOnlyThreeNewCommunityHeroAssets() throws {
         let mapping: [ATHLTHCommunityMainTab: String] = [
             .overview: "CommunityHero",
-            .clubs: "CommunityClubsHero",
             .arena: "CommunityArenaHero",
             .events: "CommunityEventsHero"
         ]

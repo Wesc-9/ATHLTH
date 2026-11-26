@@ -124,7 +124,7 @@ struct ATHLTHiPadSidebarPageView: View {
         case .profile:
             ATHLTHProfileView()
         case .clubs:
-            ATHLTHCommunityV5View(initialTab: .clubs)
+            ATHLTHClubsHubView()
         default:
             ContentUnavailableView(
                 ATHLTHLocalization.choose(
