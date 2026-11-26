@@ -1,7 +1,7 @@
 import SwiftUI
 
 private enum WatchShortcutDestination: Hashable {
-    case routes, ghostRace, favorites, favoriteWorkouts, favoriteRoutes, sent, planned, recommendation, menu, other
+    case routes, ghostRace, favoriteWorkouts, favoriteRoutes, sent, planned, recommendation, dailyForm, connection, walking, running, other
 }
 
 struct WatchHomeView: View {
@@ -23,6 +23,11 @@ struct WatchHomeView: View {
     private var recommendation: WatchHomeDashboardTransfer? {
         guard let dashboard, dashboard.isCurrent(for: routeStore.companionAccountID) else { return nil }
         return dashboard
+    }
+
+    private var dailyForm: WatchDailyFormTransfer? {
+        guard let form = dashboard?.dailyForm, form.isCurrent() else { return nil }
+        return form
     }
 
     private var upcoming: [WatchTodayWorkoutTransfer] {
@@ -68,13 +73,15 @@ struct WatchHomeView: View {
                 case .routes: WatchRoutesListView()
                 case .ghostRace: WatchGhostRaceShortcutView()
                 case .other: WatchWorkoutStartView(route: nil, otherActivitiesOnly: true)
-                case .favorites: favoritesPage
                 case .favoriteWorkouts: favoriteWorkoutsPage
                 case .favoriteRoutes: favoriteRoutesPage
                 case .sent: sentPage
                 case .planned: plannedPage
                 case .recommendation: recommendationPage
-                case .menu: menuPage
+                case .dailyForm: dailyFormPage
+                case .connection: connectionPage
+                case .walking: activityPage(.walking)
+                case .running: activityPage(.running)
                 }
             }
         }
@@ -110,12 +117,23 @@ struct WatchHomeView: View {
 
     private var header: some View {
         HStack(spacing: 5) {
-            Button { shortcutPath.append(.menu) } label: {
-                Image(systemName: workoutManager.errorMessage == nil ? "line.3.horizontal" : "exclamationmark.circle")
-                    .font(.system(size: 13, weight: .medium))
-                    .frame(width: 30, height: 30)
-                    .background(.white, in: Circle())
-            }.buttonStyle(.plain).accessibilityLabel(tr("Menu", "Meny"))
+            Button { shortcutPath.append(.dailyForm) } label: {
+                ZStack {
+                    Circle().fill(WatchTheme.planSelected)
+                    Circle().strokeBorder(WatchTheme.planBorder, lineWidth: 2)
+                    if let score = dailyForm?.validScore {
+                        Circle().trim(from: 0, to: CGFloat(score) / 100)
+                            .stroke(formTint, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .rotationEffect(.degrees(-90)).padding(1)
+                    }
+                    Text(dailyForm?.validScore.map(String.init) ?? "–")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(formTint)
+                        .monospacedDigit()
+                }.frame(width: 30, height: 30)
+            }.buttonStyle(.plain)
+            .accessibilityLabel(tr("Daily form", "Dagens form"))
+            .accessibilityValue(dailyForm?.validScore.map { String($0) + " / 100" } ?? tr("Unavailable", "Ikke tilgjengelig"))
             Spacer(minLength: 0)
             HStack(spacing: 4) {
                 ATHLTHMarkShape(strokeScale: 0.72)
@@ -129,9 +147,19 @@ struct WatchHomeView: View {
                 }.lineLimit(1).minimumScaleFactor(0.75)
             }.foregroundStyle(.black)
             Spacer(minLength: 0)
-            Circle().fill(routeStore.companionLinked ? WatchTheme.planConnected : WatchTheme.planSecondary)
-                .frame(width: 5, height: 5)
-                .accessibilityLabel(routeStore.companionLinked ? tr("Connected", "Tilkoblet") : tr("Offline", "Frakoblet"))
+            Button { shortcutPath.append(.connection) } label: {
+                Group {
+                    if workoutManager.errorMessage != nil {
+                        Image(systemName: "exclamationmark.circle").font(.system(size: 12))
+                            .foregroundStyle(WatchTheme.warning)
+                    } else {
+                        Circle().fill(routeStore.companionLinked ? WatchTheme.planConnected : WatchTheme.planSecondary)
+                            .frame(width: 6, height: 6)
+                    }
+                }.frame(width: 26, height: 30).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            .accessibilityLabel(tr("Connection and status", "Tilkobling og status"))
+            .accessibilityValue(routeStore.companionLinked ? tr("Connected", "Tilkoblet") : tr("Offline", "Frakoblet"))
         }
     }
 
@@ -203,8 +231,8 @@ struct WatchHomeView: View {
 
     private func quickActions(height: CGFloat) -> some View {
         HStack(spacing: 4) {
-            quickTile(tr("Walk", "Gå"), "figure.walk") { quickStart(.walking) }
-            quickTile(tr("Run", "Løping"), "figure.run") { quickStart(.running) }
+            quickTile(tr("Walk", "Gå"), "figure.walk") { shortcutPath.append(.walking) }
+            quickTile(tr("Run", "Løping"), "figure.run") { shortcutPath.append(.running) }
             quickTile(tr("Strength", "Styrke"), "dumbbell.fill") { quickStart(.strength) }
             quickTile(tr("Other", "Andre økter"), "square.grid.2x2") { shortcutPath.append(.other) }
         }.frame(height: height)
@@ -289,14 +317,6 @@ struct WatchHomeView: View {
         }
     }
 
-    private var favoritesPage: some View {
-        page(tr("Favorites", "Favoritter")) {
-            link(.favoriteWorkouts, tr("Favorite workouts", "Favorittøkter"), "star")
-            link(.favoriteRoutes, tr("Favorite routes", "Favorittruter"), "map")
-            link(.sent, tr("Sent to Watch", "Sendt til klokken"), "applewatch")
-        }
-    }
-
     private var favoriteWorkoutsPage: some View {
         page(tr("Favorite workouts", "Favorittøkter")) {
             let favorites = dashboard?.favorites ?? []
@@ -323,6 +343,7 @@ struct WatchHomeView: View {
                     Label(route.title, systemImage: "map").font(.subheadline).padding(8).watchSurface()
                 }.buttonStyle(.plain)
             }
+            link(.routes, tr("All routes", "Alle ruter"), "map")
         }
     }
 
@@ -342,15 +363,106 @@ struct WatchHomeView: View {
         }.buttonStyle(.plain)
     }
 
-    private var menuPage: some View {
-        page(tr("Menu", "Meny")) {
-            link(.favorites, tr("Favorites", "Favoritter"), "star")
-            link(.planned, tr("Planned workouts", "Planlagte økter"), "calendar")
-            link(.routes, tr("All routes", "Alle ruter"), "map")
-            link(.ghostRace, "Ghost Race", "figure.run")
+    private var formTint: Color {
+        switch dailyForm?.state {
+        case "recover": return WatchTheme.danger
+        case "takeItEasy": return WatchTheme.warning
+        default: return Color(red: 0.52, green: 0.37, blue: 0.19)
+        }
+    }
+
+    private func formStateTitle(_ state: String) -> String {
+        switch state {
+        case "ready": return tr("Ready", "God form")
+        case "balanced": return tr("Balanced", "Balansert")
+        case "takeItEasy": return tr("Take it easier", "Ta det roligere")
+        case "recover": return tr("Prioritize recovery", "Prioriter restitusjon")
+        default: return tr("Building baseline", "Bygger grunnlag")
+        }
+    }
+
+    private func formMetric(_ title: String, _ value: String, _ icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon).foregroundStyle(WatchTheme.planAccent).frame(width: 18)
+            Text(title).font(.caption)
+            Spacer(minLength: 2)
+            Text(value).font(.caption.weight(.semibold)).monospacedDigit()
+        }.padding(8).watchSurface(radius: 11)
+    }
+
+    private func formNumber(_ value: Double?, suffix: String) -> String {
+        guard let value, value.isFinite, value > 0, value < Double(Int.max) else { return "–" }
+        return "\(Int(value.rounded())) \(suffix)"
+    }
+
+    private func sleepText(_ seconds: Double?) -> String {
+        guard let seconds, seconds.isFinite, seconds > 0, seconds < 48 * 3600 else { return "–" }
+        let minutes = Int(seconds / 60)
+        return "\(minutes / 60)t \(minutes % 60)m"
+    }
+
+    private var dailyFormPage: some View {
+        page(tr("Daily form", "Dagens form")) {
+            if let form = dailyForm {
+                VStack(spacing: 5) {
+                    ZStack {
+                        Circle().stroke(WatchTheme.planBorder, lineWidth: 5)
+                        if let score = form.validScore {
+                            Circle().trim(from: 0, to: CGFloat(score) / 100)
+                                .stroke(formTint, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        VStack(spacing: 0) {
+                            Text(form.validScore.map(String.init) ?? "–")
+                                .font(.system(size: 32, weight: .semibold, design: .rounded))
+                            Text("/100").font(.caption2).foregroundStyle(WatchTheme.planSecondary)
+                        }
+                    }.frame(width: 74, height: 74)
+                    Text(formStateTitle(form.state)).font(.headline).multilineTextAlignment(.center)
+                    if let advice = form.advice { Text(advice).font(.caption2).multilineTextAlignment(.center) }
+                }.frame(maxWidth: .infinity).padding(10).watchSurface(radius: 15)
+                formMetric(tr("Recovery", "Restitusjon"), form.measuredScore.map { "\($0)/100" } ?? "–", "heart.fill")
+                formMetric(tr("Sleep", "Søvn"), sleepText(form.sleepSeconds), "moon.zzz.fill")
+                formMetric("HRV", formNumber(form.hrvMilliseconds, suffix: "ms"), "waveform.path.ecg")
+                formMetric(tr("Resting HR", "Hvilepuls"), formNumber(form.restingHeartRate, suffix: "bpm"), "heart")
+                formMetric(tr("Training load", "Belastning"), form.trainingLoadRatio.flatMap { $0.isFinite && $0 > 0 ? String(format: "%.2f×", $0) : nil } ?? "–", "chart.bar.fill")
+                if form.validScore == nil {
+                    empty(tr("Not enough current data for a score.", "Ikke nok aktuelle data til en score."))
+                }
+                if let explanation = form.explanation { empty(explanation) }
+                Text(tr("Updated", "Oppdatert") + " " + form.updatedAt.formatted(date: .omitted, time: .shortened))
+                    .font(.caption2).foregroundStyle(WatchTheme.planSecondary)
+            } else {
+                empty(tr("Today's form is not available yet. Open ATHLTH on iPhone to sync.", "Dagens form er ikke tilgjengelig ennå. Åpne ATHLTH på iPhone for å synkronisere."))
+            }
+            Button { routeStore.requestTodayWorkoutSnapshot() } label: {
+                Label(tr("Refresh", "Oppdater"), systemImage: "arrow.clockwise")
+            }.font(.caption)
+        }
+    }
+
+    private func activityPage(_ kind: WatchWorkoutKind) -> some View {
+        page(kind == .walking ? tr("Walk", "Gå") : tr("Run", "Løping")) {
+            Button { quickStart(kind) } label: {
+                Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
+                    .font(.headline).frame(maxWidth: .infinity).padding(10)
+                    .background(WatchTheme.planSelected, in: RoundedRectangle(cornerRadius: 13))
+            }.buttonStyle(.plain)
             WatchPetSelectionButton()
+            link(.favoriteRoutes, tr("Favorite routes", "Favorittruter"), "star")
+            link(.routes, tr("All routes", "Alle ruter"), "map")
+            if kind == .running { link(.ghostRace, "Ghost Race", "figure.run") }
             if let message = workoutManager.errorMessage { empty(message) }
-            Text(routeStore.connectionText).font(.caption2)
+        }
+    }
+
+    private var connectionPage: some View {
+        page(tr("Connection", "Tilkobling")) {
+            empty(routeStore.companionLinked ? tr("iPhone connected", "iPhone tilkoblet") : tr("Watch ready for standalone workouts", "Klokken kan registrere økter alene"))
+            if let message = workoutManager.errorMessage { empty(message) }
+            Button { routeStore.requestTodayWorkoutSnapshot() } label: {
+                Label(tr("Sync with iPhone", "Synkroniser med iPhone"), systemImage: "arrow.clockwise")
+            }.font(.caption)
         }
     }
 }

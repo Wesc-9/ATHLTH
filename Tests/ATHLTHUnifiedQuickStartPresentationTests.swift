@@ -158,3 +158,24 @@ final class ATHLTHWatchHomeSentQueueTests: XCTestCase {
         XCTAssertTrue(WatchHomeSentQueue.visible([old], owner: UUID(), now: now).isEmpty)
     }
 }
+
+
+final class ATHLTHWatchDailyFormTransferTests: XCTestCase {
+    func testDailyFormScoreAndFreshness() throws {
+        let now = Date()
+        let form = WatchDailyFormTransfer(score: 76, measuredScore: 80, state: "balanced",
+            advice: nil, explanation: nil, sleepSeconds: 25000, hrvMilliseconds: 45,
+            restingHeartRate: 53, trainingLoadRatio: 1.1, baselineDays: 10, updatedAt: now)
+        XCTAssertEqual(form.validScore, 76)
+        XCTAssertTrue(form.isCurrent(now: now))
+        var expired = form
+        expired.updatedAt = now.addingTimeInterval(-25 * 3600)
+        XCTAssertFalse(expired.isCurrent(now: now))
+        expired.score = 101
+        XCTAssertNil(expired.validScore)
+        expired.score = nil
+        XCTAssertNil(expired.validScore)
+        let decoded = try JSONDecoder().decode(WatchDailyFormTransfer.self, from: JSONEncoder().encode(form))
+        XCTAssertEqual(decoded, form)
+    }
+}

@@ -813,13 +813,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 return
             }
 
+            if let dashboard = snapshot.dashboard, dashboard.ownerID != companionAccountID { return }
             let currentUpdatedAt =
-                todayWorkout?.updatedAt ??
                 UserDefaults.standard.object(
-                    forKey:
-                        "athlth.watch.todayWorkoutSnapshotDate.v1"
-                ) as? Date ??
-                .distantPast
+                    forKey: "athlth.watch.todayWorkoutSnapshotDate.v1"
+                ) as? Date ?? .distantPast
 
             // A newer snapshot always wins. This protects against older queued
             // transferUserInfo payloads arriving after a fresh clear/update.
@@ -832,7 +830,6 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 forKey:
                     "athlth.watch.todayWorkoutSnapshotDate.v1"
             )
-            if let dashboard = snapshot.dashboard, dashboard.ownerID != companionAccountID { return }
             storeTodayWorkout(snapshot.workout)
             storeTodayWorkouts(snapshot.scheduledWorkouts)
             if let dashboard = snapshot.dashboard {

@@ -1044,6 +1044,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         sendWatchPayload(snapshot, kind: .todayWorkout)
     }
 
+    /// Refresh only the form projection; don't rebuild routes or recipes.
+    func updateWatchDailyForm(_ form: WatchDailyFormTransfer, ownerID: UUID) {
+        guard latestTodaySnapshot.dashboard?.ownerID == ownerID,
+              latestTodaySnapshot.dashboard?.dailyForm != form else { return }
+        latestTodaySnapshot.dashboard?.dailyForm = form
+        latestTodaySnapshot.updatedAt = Date()
+        sendWatchPayload(latestTodaySnapshot, kind: .todayWorkout)
+    }
+
     func sendLiveSurfaceConfiguration(
         _ configuration: ATHLTHLiveWorkoutSurfaceConfiguration
     ) {

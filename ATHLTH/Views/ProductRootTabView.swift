@@ -1946,6 +1946,7 @@ struct ATHLTHHomeView: View {
                 let trend = await health.recoveryTrendSnapshot(days: 14)
                 guard !Task.isCancelled, isActive else { return }
                 homeRecoveryTrendSnapshot = trend
+                refreshWatchDailyForm()
             }
             // Social feeds and group calendars are secondary to the Health
             // cards. Give the native tab transition the first render frames.
@@ -1955,7 +1956,12 @@ struct ATHLTHHomeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
                 if isActive { homeDailyForm = RecoverySorenessStore(accountID: session.profile.userID).todayEntry }
+                refreshWatchDailyForm()
             }
+            .onChange(of: health.recovery) { refreshWatchDailyForm() }
+            .onChange(of: health.sleep) { refreshWatchDailyForm() }
+            .onChange(of: health.heart.hrvDate) { refreshWatchDailyForm() }
+            .onChange(of: health.heart.restingHeartRateDate) { refreshWatchDailyForm() }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)-social") {
                 guard isActive, !session.previewModeEnabled else { return }
                 let userID = session.profile.userID
@@ -4067,6 +4073,36 @@ struct ATHLTHHomeView: View {
         )
     }
 
+    private func watchDailyFormSnapshot() -> WatchDailyFormTransfer {
+        let now = Date()
+        let checkIn = RecoverySorenessStore(accountID: session.profile.userID).todayEntry
+        let assessment = ATHLTHDailyFormPolicy.assess(
+            entry: checkIn, measuredScore: health.recovery.score, now: now)
+        let state = assessment.displayState(measuredState: health.recovery.state)
+        func recent(_ date: Date?) -> Bool {
+            date.map { (0...48 * 3600).contains(now.timeIntervalSince($0)) } ?? false
+        }
+        func positive(_ value: Double?) -> Double? {
+            value.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        }
+        return WatchDailyFormTransfer(
+            score: assessment.displayScore, measuredScore: assessment.measuredScore,
+            state: state.rawValue,
+            advice: assessment.recommendation == .unavailable ? nil : assessment.recommendation.title,
+            explanation: assessment.recommendation == .unavailable ? nil : assessment.explanation,
+            sleepSeconds: recent(health.sleep.sleepEnd) ? positive(health.sleep.totalAsleep) : nil,
+            hrvMilliseconds: recent(health.heart.hrvDate) ? positive(health.heart.hrvMilliseconds) : nil,
+            restingHeartRate: recent(health.heart.restingHeartRateDate) ? positive(health.heart.restingHeartRate) : nil,
+            trainingLoadRatio: positive(homeRecoveryTrendSnapshot.trainingLoad.ratio),
+            baselineDays: health.recovery.baselineDays, updatedAt: now
+        )
+    }
+
+    private func refreshWatchDailyForm() {
+        guard session.signedIn, !session.previewModeEnabled else { return }
+        watchConnection.updateWatchDailyForm(watchDailyFormSnapshot(), ownerID: session.profile.userID)
+    }
+
     private func syncHomeTodayWorkoutToWatch() {
         guard session.signedIn, !session.previewModeEnabled else { return }
         let owner = session.profile.userID
@@ -4143,7 +4179,8 @@ struct ATHLTHHomeView: View {
             .flatMap { watchHomeRecipe($0) }
         let dashboard = WatchHomeDashboardTransfer(ownerID: owner, favorites: Array(favorites),
             favoriteRouteIDs: routeIDs, recommendationTitle: advice?.suggestedTitle,
-            recommendationDetail: advice?.suggestedDetail, recommendation: recommended, updatedAt: Date())
+            recommendationDetail: advice?.suggestedDetail, recommendation: recommended, updatedAt: Date(),
+            dailyForm: watchDailyFormSnapshot())
         watchConnection.sendTodayWorkouts(transfers, dashboard: dashboard)
     }
 

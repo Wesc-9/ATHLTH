@@ -1656,6 +1656,28 @@ struct WatchHomeFavoriteWorkout: Codable, Hashable, Identifiable {
     var recipe: WatchPreparedWorkoutTransfer?
 }
 
+/// Private, display-only projection of the phone's existing Daily Form
+/// assessment. Watch never re-scores recovery or uploads these signals.
+struct WatchDailyFormTransfer: Codable, Hashable {
+    var score: Int?
+    var measuredScore: Int?
+    var state: String
+    var advice: String?
+    var explanation: String?
+    var sleepSeconds: Double?
+    var hrvMilliseconds: Double?
+    var restingHeartRate: Double?
+    var trainingLoadRatio: Double?
+    var baselineDays: Int
+    var updatedAt: Date
+
+    var validScore: Int? { score.flatMap { (0...100).contains($0) ? $0 : nil } }
+
+    func isCurrent(now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        updatedAt <= now && calendar.isDate(updatedAt, inSameDayAs: now)
+    }
+}
+
 struct WatchHomeDashboardTransfer: Codable, Hashable {
     var ownerID: UUID
     var favorites: [WatchHomeFavoriteWorkout]
@@ -1664,6 +1686,7 @@ struct WatchHomeDashboardTransfer: Codable, Hashable {
     var recommendationDetail: String?
     var recommendation: WatchPreparedWorkoutTransfer?
     var updatedAt: Date
+    var dailyForm: WatchDailyFormTransfer? = nil
 
     func isCurrent(for owner: UUID?, now: Date = Date()) -> Bool {
         owner == ownerID && Calendar.current.isDate(updatedAt, inSameDayAs: now)
