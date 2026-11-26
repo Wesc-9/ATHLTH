@@ -31,6 +31,7 @@ struct ATHLTHInsightsView: View {
     @State private var selectedSection: ATHLTHInsightsSection = .overview
     @StateObject private var checkInStore = RecoverySorenessStore()
     @State private var dailyFormHistory: [ATHLTHDailyFormPolicy.Day] = []
+    @State private var workoutFeedbackSummary: String?
     @State private var showingCheckIn = false
     @State private var showingReadinessExplanation = false
     @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
@@ -194,6 +195,9 @@ struct ATHLTHInsightsView: View {
                 refreshDailyFormHistory()
                 updatePersonalFindings()
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.workoutFeedbackDidUpdate"))) { _ in
+                if isActive { refreshWorkoutFeedback() }
+            }
         }
     }
 
@@ -270,6 +274,16 @@ struct ATHLTHInsightsView: View {
                 showingCheckIn = true
             }
             dailyFormHistoryCard
+            if let workoutFeedbackSummary {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(tr("Workout experience", "Opplevd treningsbelastning"), systemImage: "chart.bar")
+                        .font(.headline)
+                    Text(workoutFeedbackSummary).font(.subheadline).foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .athlthInsightsSurface()
+            }
             whatIfCard
         }
     }
@@ -291,6 +305,29 @@ struct ATHLTHInsightsView: View {
 
     private func refreshDailyFormHistory() {
         dailyFormHistory = ATHLTHDailyFormPolicy.history(checkInStore.entries, days: 7)
+        refreshWorkoutFeedback()
+    }
+
+    private func refreshWorkoutFeedback() {
+        guard session.signedIn else { workoutFeedbackSummary = nil; return }
+        let values = ATHLTHPostWorkoutFeedbackStore.entries(account: session.profile.userID)
+            .filter { $0.finishedAt >= Date().addingTimeInterval(-28 * 86_400) }
+        let exertions = values.compactMap(\.exertion)
+        guard !values.isEmpty else { workoutFeedbackSummary = nil; return }
+        var lines = [tr("\(values.count) workout ratings in the last 28 days.", "\(values.count) øktvurderinger siste 28 dager.")]
+        if !exertions.isEmpty {
+            let average = Double(exertions.reduce(0, +)) / Double(exertions.count)
+            lines.append(tr("Average reported exertion: \(String(format: "%.1f", average))/10.", "Gjennomsnittlig opplevd intensitet: \(String(format: "%.1f", average))/10."))
+        }
+        let lower = values.filter { ($0.preWorkoutEnergy ?? 6) <= 2 }.compactMap(\.exertion)
+        let higher = values.filter { ($0.preWorkoutEnergy ?? 0) >= 4 }.compactMap(\.exertion)
+        if lower.count >= 3, higher.count >= 3 {
+            let lowMean = Double(lower.reduce(0, +)) / Double(lower.count)
+            let highMean = Double(higher.reduce(0, +)) / Double(higher.count)
+            lines.append(tr("With low reported energy, average exertion was \(String(format: "%.1f", lowMean))/10 (n=\(lower.count)); with high energy, \(String(format: "%.1f", highMean))/10 (n=\(higher.count)). Observed association, not proof of cause.",
+                            "Ved lav opplevd energi var snittintensiteten \(String(format: "%.1f", lowMean))/10 (n=\(lower.count)); ved høy energi \(String(format: "%.1f", highMean))/10 (n=\(higher.count)). Observert sammenheng, ikke bevis for årsak."))
+        }
+        workoutFeedbackSummary = lines.joined(separator: "\n\n")
     }
 
     private var dailyFormAdviceCard: some View {
