@@ -251,7 +251,6 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
-            dailyFormAdviceCard
             ATHLTHInsightsDailyRhythmCard()
             ATHLTHInsightsMuscleCard(summary: muscleSummary)
             ATHLTHInsightsSleepStagesCard()
@@ -334,48 +333,6 @@ struct ATHLTHInsightsView: View {
     private var dailyFormAssessment: ATHLTHDailyFormPolicy.Assessment {
         ATHLTHDailyFormPolicy.assess(
             entry: checkInStore.todayEntry, measuredScore: health.recovery.score)
-    }
-
-    private var dailyFormAdviceCard: some View {
-        let assessment = dailyFormAssessment
-        return VStack(alignment: .leading, spacing: 9) {
-            HStack {
-                Label(tr("Your own assessment", "Din egen vurdering"), systemImage: "heart.text.square")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Button(tr("Check in", "Sjekk inn")) { showingCheckIn = true }
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-            }
-            Text(assessment.recommendation.title)
-                .font(.title3.weight(.semibold))
-            Text(assessment.explanation)
-                .font(.caption)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-            if let subjective = assessment.subjectiveScore {
-                HStack {
-                    Text(tr("Reported form", "Opplevd form"))
-                    Spacer()
-                    Text("\(subjective)/100").monospacedDigit().fontWeight(.semibold)
-                }
-                .font(.subheadline)
-            }
-            if let contextual = assessment.contextualScore {
-                HStack {
-                    Text(tr("Overall daily form", "Samlet dagsform"))
-                    Spacer()
-                    Text("\(contextual)/100").monospacedDigit().fontWeight(.semibold)
-                }
-                .font(.subheadline)
-            }
-            Text(tr("Daily form includes your check-in when enough answers are available. Measured recovery remains separate.",
-                    "Dagsformen inkluderer innsjekken når nok svar er tilgjengelige. Målt restitusjon holdes separat."))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-        }
-        .padding(16)
-        .athlthInsightsSurface()
     }
 
     private var dailyFormHistoryCard: some View {
@@ -552,21 +509,38 @@ struct ATHLTHInsightsView: View {
                 }
             }
 
-            if let measured = assessment.measuredScore, let reported = assessment.subjectiveScore,
-               assessment.contextualScore != nil {
-                Text(tr("Measured recovery: \(measured) · Check-in: \(reported)",
-                        "Målt restitusjon: \(measured) · Innsjekk: \(reported)"))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-            }
-
-            HStack(spacing: 7) {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6),
+                               count: dynamicTypeSize > .large ? 2 : 4),
+                spacing: 6
+            ) {
                 readinessMetric(tr("Sleep", "Søvn"), sleepValue, "moon.stars.fill",
                                 garmin: garminReading(.sleep))
                 readinessMetric(tr("Resting HR", "Hvilepuls"), restingHRValue, "heart.fill",
                                 garmin: garminReading(.restingHeartRate))
                 readinessMetric("HRV", hrvValue, "waveform.path.ecg",
                                 garmin: garminReading(.hrv))
+                Button {
+                    showingCheckIn = true
+                } label: {
+                    readinessMetric(
+                        tr("Check-in", "Innsjekk"),
+                        assessment.subjectiveScore.map { "\($0)/100" }
+                            ?? (checkInStore.hasTodayCheckIn
+                                ? tr("Update", "Oppdater")
+                                : tr("Check in", "Sjekk inn")),
+                        "checklist"
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Daily check-in", "Daglig innsjekk"))
+                .accessibilityValue(assessment.subjectiveScore.map { "\($0)/100" }
+                    ?? (checkInStore.hasTodayCheckIn
+                        ? tr("Registered", "Registrert")
+                        : tr("Not registered", "Ikke registrert")))
+                .accessibilityHint(tr("Opens your check-in to enter or edit answers",
+                                      "Åpner innsjekken for å registrere eller endre svar"))
+                .accessibilityIdentifier("athlth-readiness-check-in")
             }
             if garminReading(.sleep) != nil || garminReading(.restingHeartRate) != nil || garminReading(.hrv) != nil {
                 Text(tr("Garmin measurements are displayed here. Measured recovery still uses the Apple Health baseline.",
@@ -623,8 +597,9 @@ struct ATHLTHInsightsView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
         .background(ATHLTHTrainDesign.canvas.opacity(0.88),
                     in: RoundedRectangle(cornerRadius: 14))
     }
