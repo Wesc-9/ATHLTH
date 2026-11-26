@@ -72,6 +72,9 @@ struct ATHLTHTrainTodayPremiumView: View {
     @State private var reportedEnergy: Int?
     @State private var reportedStress: Int?
     @State private var reportedSoreness: Int?
+    @State private var reportedMotivation: Int?
+    @State private var reportedSleep: Int?
+    @State private var reportedIllness: Bool?
     @State private var reportedMuscles: [String: RecoverySorenessLevel] = [:]
     @State private var pendingSwap: PendingSwap?
     @State private var customDelayWorkout: PlannedSession?
@@ -85,11 +88,15 @@ struct ATHLTHTrainTodayPremiumView: View {
     private var selfReportedSignals: ATHLTHDailyWorkoutAlternativeAdvisor.Signals {
         .init(energy: reportedEnergy, stress: reportedStress,
               overallSoreness: reportedSoreness,
-              muscleRatings: reportedMuscles, readiness: todaysReadiness)
+              muscleRatings: reportedMuscles, readiness: todaysReadiness,
+              motivation: reportedMotivation, sleepQuality: reportedSleep, feelsUnwell: reportedIllness)
     }
 
     private func reloadCheckIn() {
-        let current = RecoverySorenessStore()
+        let current = RecoverySorenessStore(accountID: session.profile.userID)
+        if reportedMotivation != current.todayMotivation { reportedMotivation = current.todayMotivation }
+        if reportedSleep != current.todayEntry?.sleepQuality { reportedSleep = current.todayEntry?.sleepQuality }
+        if reportedIllness != current.todayEntry?.feelsUnwell { reportedIllness = current.todayEntry?.feelsUnwell }
         if reportedEnergy != current.todayEnergy { reportedEnergy = current.todayEnergy }
         if reportedStress != current.todayStress { reportedStress = current.todayStress }
         if reportedSoreness != current.todayOverallSoreness {
