@@ -1102,6 +1102,7 @@ struct PostWorkoutReviewView: View {
     @State private var nameDraft = ""
     @State private var editingReviewName = false
     @State private var sportsZoneSeconds: [Double] = []
+    @State private var selectedSportCategory: ATHLTHSportCategory?
     @State private var effort = 5.0
     @State private var showingFeedPrivacyConfirmation = false
     @State private var feedPrivacyError: String?
@@ -1128,6 +1129,18 @@ struct PostWorkoutReviewView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     summaryCard
+                    if workout.isSports {
+                        ATHLTHUnifiedCard {
+                            Picker(ATHLTHLocalization.choose(english: "Sport", norwegian: "Idrett"), selection: $selectedSportCategory) {
+                                Text(ATHLTHLocalization.choose(english: "General sports", norwegian: "Generell idrett")).tag(Optional<ATHLTHSportCategory>.none)
+                                ForEach(ATHLTHSportCategory.allCases) { category in
+                                    Text(category.title).tag(Optional(category))
+                                }
+                            }
+                            .tint(ATHLTHTheme.accentDeep)
+                            .accessibilityIdentifier("athlth-review-sport-category")
+                        }
+                    }
                     if workout.activity == .running &&
                        ATHLTHThreeMinuteAllOut.isTestTitle(workout.title) {
                         ATHLTHThreeMinuteAllOutMeasurementsView(
@@ -1842,7 +1855,7 @@ struct PostWorkoutReviewView: View {
     }
 
     private var completionActivityTitle: String {
-        if workout.isSports { return workout.sportsActivityTitle }
+        if workout.isSports { return selectedSportCategory?.title ?? workout.sportsActivityTitle }
         switch workout.activity {
         case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
         case .walking: return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåtur")
@@ -1861,7 +1874,7 @@ struct PostWorkoutReviewView: View {
     }
 
     private var completionWorkoutTitle: String {
-        if workout.isSports { return workout.sportName ?? ATHLTHLocalization.choose(english: "Sports session", norwegian: "Idrettsøkt") }
+        if workout.isSports { return selectedSportCategory?.title ?? workout.sportsActivityTitle }
         let original = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
         if original.isEmpty || original == "Økt completed" { return completionActivityTitle }
         let genericEnglish = [
@@ -4671,6 +4684,9 @@ struct PostWorkoutReviewView: View {
     }
 
     private func loadExistingReview() async {
+        if workout.isSports {
+            selectedSportCategory = ATHLTHSportCategory.load(userID: session.profile.userID)[workout.id.uuidString] ?? workout.sportCategory
+        }
         if reviewName == nil { reviewName = ATHLTHCompletedWorkoutNames.name(for: workout.id, userID: session.profile.userID) }
         visibility = initialVisibilityOverride ?? (
             settings.workoutSharingChoiceCompleted
@@ -4693,6 +4709,9 @@ struct PostWorkoutReviewView: View {
 
         if let activity = await social.workoutActivity(for: workout.id) {
             alreadyPublished = true
+            if workout.isSports, let raw = activity.metadata?["sport_category"], let category = ATHLTHSportCategory(rawValue: raw) {
+                selectedSportCategory = selectedSportCategory ?? category
+            }
             if reviewName == nil, let stored = activity.metadata?["custom_workout_title"],
                let clean = ATHLTHCompletedWorkoutNames.clean(stored) {
                 reviewName = clean
@@ -4759,7 +4778,8 @@ struct PostWorkoutReviewView: View {
         let petsSaved = await pets.savePetUsage(
             for: workout, petIDs: selectedPetIDs)
 
-        var reviewWorkout = reviewName.map { workout.renamed($0) } ?? workout
+        let categorized = selectedSportCategory.map { workout.categorizedSport($0) } ?? workout
+        var reviewWorkout = reviewName.map { categorized.renamed($0) } ?? categorized
         if reviewName == nil { reviewWorkout.title = completionWorkoutTitle }
         let reviewSaved = await social.saveWorkoutReview(
             reviewWorkout,
@@ -4782,6 +4802,9 @@ struct PostWorkoutReviewView: View {
             reviewSaved &&
             mediaSaved {
             if let reviewName { ATHLTHCompletedWorkoutNames.save(reviewName, for: workout.id, userID: session.profile.userID) }
+            if workout.isSports, let selectedSportCategory {
+                ATHLTHSportCategory.save(selectedSportCategory, workoutID: workout.id, userID: session.profile.userID)
+            }
             dismiss()
         }
     }

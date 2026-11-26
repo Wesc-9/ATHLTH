@@ -1487,16 +1487,76 @@ enum ATHLTHSharedPulseSeries {
     }
 }
 
+/// Presentation-only sport subtype; does not change the recorded HealthKit
+/// activity, duration or evidence. Stable identifiers travel with feed posts.
+enum ATHLTHSportCategory: String, CaseIterable, Identifiable, Codable {
+    case football, cageball, futsal, handball, basketball, volleyball, tennis, padel, badminton, squash, floorball, hockey, golf, climbing, martialArts, other
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .football: return tr("Football", "Fotball")
+        case .cageball: return "Cageball"
+        case .futsal: return "Futsal"
+        case .handball: return tr("Handball", "Håndball")
+        case .basketball: return "Basketball"
+        case .volleyball: return "Volleyball"
+        case .tennis: return "Tennis"
+        case .padel: return "Padel"
+        case .badminton: return "Badminton"
+        case .squash: return "Squash"
+        case .floorball: return tr("Floorball", "Innebandy")
+        case .hockey: return tr("Hockey", "Hockey")
+        case .golf: return "Golf"
+        case .climbing: return tr("Climbing", "Klatring")
+        case .martialArts: return tr("Martial arts", "Kampsport")
+        case .other: return tr("Other sports", "Annen idrett")
+        }
+    }
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    static func title(from metadata: [String: String]?) -> String {
+        metadata?["sport_category"].flatMap(Self.init(rawValue:))?.title ??
+            metadata?["sport_name"] ??
+            ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
+    }
+
+    static func load(userID: UUID) -> [String: Self] {
+        AccountLocalStorage.read([String: Self].self, name: "completedSportCategories", userID: userID, defaults: .standard) ?? [:]
+    }
+
+    static func save(_ category: Self, workoutID: UUID, userID: UUID) {
+        var values = load(userID: userID)
+        values[workoutID.uuidString] = category
+        do {
+            try AccountLocalStorage.writeChecked(values, name: "completedSportCategories", userID: userID, defaults: .standard)
+            ATHLTHTrainingDataChangeSignal.post(userID: userID)
+        } catch { return }
+    }
+}
+
 struct SocialPublishableWorkout: Identifiable, Hashable {
     let id: UUID
     var title: String
     var isSports = false
     var sportName: String? = nil
+    var sportCategory: ATHLTHSportCategory? = nil
     var reviewTitleOverride: String? = nil
     var recordedAverageHeartRate: Double? = nil
     var recordedMaximumHeartRate: Double? = nil
 
-    var sportsActivityTitle: String { sportName ?? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") }
+    var sportsActivityTitle: String { sportCategory?.title ?? sportName ?? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") }
+
+    func categorizedSport(_ category: ATHLTHSportCategory) -> Self {
+        guard isSports else { return self }
+        var copy = self
+        copy.sportCategory = category
+        copy.sportName = category.title
+        if copy.reviewTitleOverride == nil { copy.title = category.title }
+        return copy
+    }
     var presentationIcon: String { isSports ? "sportscourt.fill" : activity.icon }
 
     func renamed(_ name: String) -> Self {

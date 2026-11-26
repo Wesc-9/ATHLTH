@@ -3862,7 +3862,11 @@ final class SocialStore: ObservableObject {
         workout: SocialPublishableWorkout,
         includeHealthData: Bool
     ) {
-        if workout.isSports { metadata["activity_subtype"] = "sports" }
+        if workout.isSports {
+            metadata["activity_subtype"] = "sports"
+            if let category = workout.sportCategory { metadata["sport_category"] = category.rawValue }
+            if let name = workout.sportName { metadata["sport_name"] = name }
+        }
         if let title = workout.reviewTitleOverride { metadata["custom_workout_title"] = title }
         metadata["duration_seconds"] =
             String(

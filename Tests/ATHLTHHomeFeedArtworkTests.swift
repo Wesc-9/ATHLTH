@@ -36,4 +36,11 @@ final class ATHLTHHomeFeedArtworkTests: XCTestCase {
         XCTAssertNil(ATHLTHHomeFeedFallbackPolicy.imageName(for: .walking))
         XCTAssertNil(ATHLTHHomeFeedFallbackPolicy.imageName(for: .cycling))
     }
+
+    func testSportsFeedUsesBundledArtworkAndStableCategory() {
+        XCTAssertNotNil(UIImage(named: ATHLTHHomeSportsFeedPhoto.assetName))
+        XCTAssertEqual(ATHLTHSportCategory.title(from: ["sport_category": "cageball"]), "Cageball")
+        XCTAssertEqual(ATHLTHSportCategory.title(from: ["sport_name": "Padel"]), "Padel")
+        XCTAssertTrue(ATHLTHSportCategory.allCases.contains(.football))
+    }
 }

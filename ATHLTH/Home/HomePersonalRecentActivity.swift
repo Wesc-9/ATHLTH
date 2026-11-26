@@ -1539,6 +1539,7 @@ struct HomePersonalRecentActivitySection:
     }
 
     private func rebuildRecentWorkouts() {
+        let sportCategories = ATHLTHSportCategory.load(userID: session.profile.userID)
         let refreshed =
             HomePersonalWorkoutCatalog
                 .mergeRecent(
@@ -1557,6 +1558,10 @@ struct HomePersonalRecentActivitySection:
                                     social.currentUserID
                             )
                 )
+
+        .map { workout in
+            sportCategories[workout.id.uuidString].map { workout.categorizedSport($0) } ?? workout
+        }
 
         if refreshed != myWorkouts {
             let recentStrengthHistory = Array(strength.workoutHistory.prefix(32))
@@ -2716,6 +2721,26 @@ enum ATHLTHHomeFeedFallbackPolicy {
     }
 }
 
+struct ATHLTHHomeSportsFeedPhoto: View {
+    static let assetName = "ConversationStadiumHero"
+    let height: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            Image(Self.assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+                .overlay {
+                    LinearGradient(colors: [.black.opacity(0.24), .clear, .black.opacity(0.38)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}
+
 struct ATHLTHHomeRunningFeedPhoto: View {
     let height: CGFloat
 
@@ -2848,7 +2873,7 @@ private struct ATHLTHProfilePublishedWorkoutCard: View {
     private var activity: WorkoutActivity { HomeFollowingWorkoutPresentation.activity(for: item) }
     private var activityTitle: String {
         if item.activity.metadata?["activity_subtype"] == "sports" {
-            return ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
+            return ATHLTHSportCategory.title(from: item.activity.metadata)
         }
         return HomeRecentCardFormat.activity(activity)
     }
@@ -2961,7 +2986,7 @@ private struct HomeFollowingWorkoutArtwork:
         Group {
             if embeddedInFeedCard {
                 ATHLTHFeedArtworkOverlay(
-                    title: item.activity.metadata?["activity_subtype"] == "sports" ? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") : HomeRecentCardFormat.activity(activity), icon: item.activity.metadata?["activity_subtype"] == "sports" ? "sportscourt.fill" : activity.icon, height: height,
+                    title: item.activity.metadata?["activity_subtype"] == "sports" ? ATHLTHSportCategory.title(from: item.activity.metadata) : HomeRecentCardFormat.activity(activity), icon: item.activity.metadata?["activity_subtype"] == "sports" ? "sportscourt.fill" : activity.icon, height: height,
                     metrics: .init(
                         duration: HomeRecentCardFormat.number(item, key: "duration_seconds"),
                         distanceMeters: HomeRecentCardFormat.number(item, key: "distance_meters"),
@@ -2995,7 +3020,9 @@ private struct HomeFollowingWorkoutArtwork:
     }
 
     @ViewBuilder private var backgroundArtwork: some View {
-        if activity == .strength {
+        if item.activity.metadata?["activity_subtype"] == "sports" {
+            ATHLTHHomeSportsFeedPhoto(height: height)
+        } else if activity == .strength {
             ATHLTHStrengthCompletedHeroCard(
                 profile: strengthMuscleProfile,
                 duration: HomeRecentCardFormat.number(item, key: "duration_seconds") ?? 0,
@@ -5267,7 +5294,9 @@ private struct HomePersonalWorkoutVisual:
     @ViewBuilder
     private var background:
         some View {
-        if workout.activity == .running,
+        if workout.isSports {
+            ATHLTHHomeSportsFeedPhoto(height: height)
+        } else if workout.activity == .running,
            workout.isIndoor == true {
             HomeTreadmillRecentArtwork(
                 workout: workout,

@@ -5046,6 +5046,7 @@ struct WorkoutPublishView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     @State private var selectedWorkoutID: UUID?
+    @State private var selectedSportCategory: ATHLTHSportCategory?
     @State private var visibility: ProfileVisibility = .publicProfile
     @State private var caption = ""
     @State private var publishing = false
@@ -5163,6 +5164,16 @@ struct WorkoutPublishView: View {
                 }
 
                 if let workout = selectedWorkout {
+                    if workout.isSports {
+                        Section(ATHLTHLocalization.choose(english: "Sport", norwegian: "Idrett")) {
+                            Picker(ATHLTHLocalization.choose(english: "Category", norwegian: "Underkategori"), selection: $selectedSportCategory) {
+                                Text(ATHLTHLocalization.choose(english: "General sports", norwegian: "Generell idrett")).tag(Optional<ATHLTHSportCategory>.none)
+                                ForEach(ATHLTHSportCategory.allCases) { category in
+                                    Text(category.title).tag(Optional(category))
+                                }
+                            }
+                        }
+                    }
                     let partners = social.acceptedTrainingPartnerNames(
                         for: workout.id
                     )
@@ -5328,6 +5339,9 @@ struct WorkoutPublishView: View {
                 }
             }
             .task(id: selectedWorkoutID) {
+                selectedSportCategory = selectedWorkoutID.flatMap {
+                    ATHLTHSportCategory.load(userID: session.profile.userID)[$0.uuidString]
+                }
                 includeRoute = false
                 sharingRoute = []
                 loadingRoute = false
@@ -5347,6 +5361,9 @@ struct WorkoutPublishView: View {
                     for: selectedWorkoutID
                 ) {
                     selectedAlreadyPublished = true
+                    if let raw = activity.metadata?["sport_category"], let category = ATHLTHSportCategory(rawValue: raw) {
+                        selectedSportCategory = selectedSportCategory ?? category
+                    }
                     caption = activity.metadata?["caption"] ?? ""
                     visibility =
                         ProfileVisibility(
@@ -5406,8 +5423,9 @@ struct WorkoutPublishView: View {
         publishing = true
         defer { publishing = false }
 
+        let categorized = selectedSportCategory.map { workout.categorizedSport($0) } ?? workout
         let success = await social.publishWorkout(
-            workout,
+            categorized,
             visibility: visibility,
             caption: caption,
             routePreview: includeRoute ? WorkoutRouteSharing.preview(sharingRoute, hideStartAndEnd: hideRouteStartAndEnd) : [],
@@ -5416,6 +5434,9 @@ struct WorkoutPublishView: View {
         )
 
         if success {
+            if workout.isSports, let selectedSportCategory {
+                ATHLTHSportCategory.save(selectedSportCategory, workoutID: workout.id, userID: session.profile.userID)
+            }
             selectedAlreadyPublished = true
             successMessage =
                 wasPublished
