@@ -42,6 +42,64 @@ enum ATHLTHSoloGhostTemplateStore {
     }
 }
 
+/// References an existing library route; does not duplicate its GPS track.
+struct ATHLTHRouteGhostTemplate: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let routeID: UUID
+    let reversed: Bool
+    let durationSeconds: Double
+    let strategy: GhostTargetPacingStrategy
+
+    var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            durationSeconds.isFinite && (60...86_400).contains(durationSeconds)
+    }
+
+    func resolve(in routes: [TrainingRoute]) -> TrainingRoute? {
+        guard isValid, let route = routes.first(where: { $0.id == routeID }),
+              GhostTargetRouteEligibility.isUsable(route) else { return nil }
+        return reversed ? ATHLTHExploreRoutePolicy.reversedForWorkout(route) : route
+    }
+
+    static func matchingLibraryRoute(_ selected: TrainingRoute, in routes: [TrainingRoute])
+        -> (id: UUID, reversed: Bool)? {
+        func matches(_ a: TrainingRoute, _ b: TrainingRoute) -> Bool {
+            let lhs = a.coordinates.sorted { $0.sequence < $1.sequence }
+            let rhs = b.coordinates.sorted { $0.sequence < $1.sequence }
+            return lhs.count == rhs.count && zip(lhs, rhs).allSatisfy {
+                $0.0.latitude == $0.1.latitude && $0.0.longitude == $0.1.longitude
+            }
+        }
+        for route in routes where route.id == selected.id {
+            if matches(route, selected) { return (route.id, false) }
+            if matches(ATHLTHExploreRoutePolicy.reversedForWorkout(route), selected) {
+                return (route.id, true)
+            }
+        }
+        return nil
+    }
+}
+
+enum ATHLTHRouteGhostTemplateStore {
+    private static let name = "routeGhostTemplates"
+    static func load(userID: UUID) -> [ATHLTHRouteGhostTemplate] {
+        (AccountLocalStorage.read([ATHLTHRouteGhostTemplate].self, name: name, userID: userID) ?? [])
+            .filter(\.isValid)
+    }
+    static func save(_ template: ATHLTHRouteGhostTemplate, userID: UUID) {
+        guard template.isValid else { return }
+        var items = load(userID: userID)
+        items.removeAll { $0.id == template.id || ($0.routeID == template.routeID &&
+            $0.reversed == template.reversed && $0.name == template.name) }
+        items.insert(template, at: 0)
+        AccountLocalStorage.write(Array(items.prefix(50)), name: name, userID: userID)
+    }
+    static func remove(_ id: UUID, userID: UUID) {
+        AccountLocalStorage.write(load(userID: userID).filter { $0.id != id }, name: name, userID: userID)
+    }
+}
+
 enum ATHLTHSoloGhostPacePolicy {
     struct Preset {
         let title: String

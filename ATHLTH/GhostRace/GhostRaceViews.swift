@@ -3992,6 +3992,7 @@ struct ATHLTHSoloGhostSetupView: View {
     var onStarted: () -> Void
     @EnvironmentObject private var session: AppSessionStore
     @State private var templates: [ATHLTHSoloGhostTemplate] = []
+    @State private var routeTemplates: [ATHLTHRouteGhostTemplate] = []
     @Environment(\.dismiss) private var dismiss
     @State private var showingBuilder = false
     @State private var createdRoute: TrainingRoute?
@@ -4022,8 +4023,29 @@ struct ATHLTHSoloGhostSetupView: View {
                 } label: {
                     choice("Fri løping", detail: "Velg ghostens tempo. Ingen rute eller målstrek.", icon: "figure.run")
                 }.buttonStyle(.plain)
-                if !templates.isEmpty {
+                if !templates.isEmpty || !routeTemplates.isEmpty {
                     Text("Mine Ghost Race-maler").font(.headline)
+                    ForEach(routeTemplates) { template in
+                        HStack(spacing: 8) {
+                            if let route = template.resolve(in: session.savedRoutes) {
+                                NavigationLink {
+                                    TargetGhostSetupView(route: route, suggestedDurationSeconds: template.durationSeconds,
+                                                         preferredStrategy: template.strategy)
+                                } label: {
+                                    choice(template.name, detail: route.title + " · " +
+                                           GhostTargetTimeFormatter.string(template.durationSeconds), icon: "map.fill")
+                                }.buttonStyle(.plain)
+                            } else {
+                                choice(template.name, detail: "Ruten er ikke lenger i biblioteket.", icon: "map")
+                                    .opacity(0.6)
+                            }
+                            Button(role: .destructive) {
+                                ATHLTHRouteGhostTemplateStore.remove(template.id, userID: session.profile.userID)
+                                reloadTemplates()
+                            } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
+                                .buttonStyle(.plain).accessibilityLabel("Slett rutemal")
+                        }
+                    }
                     ForEach(templates) { template in
                         HStack(spacing: 8) {
                             NavigationLink {
@@ -4072,6 +4094,7 @@ struct ATHLTHSoloGhostSetupView: View {
 
     private func reloadTemplates() {
         templates = session.signedIn ? ATHLTHSoloGhostTemplateStore.load(userID: session.profile.userID) : []
+        routeTemplates = session.signedIn ? ATHLTHRouteGhostTemplateStore.load(userID: session.profile.userID) : []
     }
 
     private func choice(_ title: String, detail: String, icon: String) -> some View {

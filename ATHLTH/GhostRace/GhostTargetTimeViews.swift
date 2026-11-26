@@ -364,6 +364,10 @@ struct TargetGhostSetupView: View {
     @AppStorage("athlth.ghostRace.target.advancedMode")
     private var advancedMode = false
     @State private var confirmingStart = false
+    @State private var templateName = ""
+    @State private var namingRouteTemplate = false
+    @State private var routeTemplateSaved = false
+    private let preferredStrategy: GhostTargetPacingStrategy?
     @State private var starting = false
     @State private var loadingHistory = false
     @State private var errorMessage: String?
@@ -373,8 +377,10 @@ struct TargetGhostSetupView: View {
     init(
         route: TrainingRoute,
         challengeTitle: String? = nil,
-        suggestedDurationSeconds: TimeInterval? = nil
+        suggestedDurationSeconds: TimeInterval? = nil,
+        preferredStrategy: GhostTargetPacingStrategy? = nil
     ) {
+        self.preferredStrategy = preferredStrategy
         self.route = route
         self.challengeTitle = challengeTitle
         let routeGeometryKilometers =
@@ -680,6 +686,23 @@ struct TargetGhostSetupView: View {
                 } else {
                     basicTargetCard
                 }
+                if session.signedIn {
+                    Button {
+                        templateName = route.title
+                        namingRouteTemplate = true
+                    } label: {
+                        Label(routeTemplateSaved ? "Mal lagret" : "Lagre som rutemal",
+                              systemImage: routeTemplateSaved ? "checkmark" : "bookmark")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!routeReady || targetDuration == nil ||
+                        ATHLTHRouteGhostTemplate.matchingLibraryRoute(route, in: session.savedRoutes) == nil)
+                    if ATHLTHRouteGhostTemplate.matchingLibraryRoute(route, in: session.savedRoutes) == nil {
+                        Text("Lagre ruten i biblioteket før du kan opprette en rutemal.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
             .padding()
             .padding(.bottom, 12)
@@ -713,6 +736,17 @@ struct TargetGhostSetupView: View {
                 Task { await loadAttemptHistory() }
             }
         }
+        .onAppear {
+            if let preferredStrategy {
+                if preferredStrategy != .even { advancedMode = true }
+                pacingStrategy = preferredStrategy
+            }
+        }
+        .alert("Lagre rutemal", isPresented: $namingRouteTemplate) {
+            TextField("Navn på mal", text: $templateName)
+            Button("Lagre") { saveRouteTemplate() }
+            Button("Avbryt", role: .cancel) {}
+        } message: { Text("Lagrer rute, retning, sluttid og fartstrategi.") }
         .task(id: route.id) {
             // Personal route history is an advanced insight; Basic should
             // not wait for HealthKit queries to display its starting goal.
@@ -1945,6 +1979,19 @@ struct TargetGhostSetupView: View {
                 routeID: route.id
             )
         }
+    }
+
+    private func saveRouteTemplate() {
+        guard session.signedIn, let duration = targetDuration,
+              (60...86_400).contains(duration),
+              let link = ATHLTHRouteGhostTemplate.matchingLibraryRoute(route, in: session.savedRoutes) else { return }
+        let name = String(templateName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        guard !name.isEmpty else { return }
+        ATHLTHRouteGhostTemplateStore.save(
+            .init(id: UUID(), name: name, routeID: link.id, reversed: link.reversed,
+                  durationSeconds: duration, strategy: pacingStrategy),
+            userID: session.profile.userID)
+        routeTemplateSaved = true
     }
 
     @MainActor
