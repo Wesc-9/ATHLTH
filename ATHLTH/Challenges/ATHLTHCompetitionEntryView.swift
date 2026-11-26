@@ -32,40 +32,21 @@ struct ATHLTHCompetitionEntryView: View {
                     Text("Velg hvordan dere vil konkurrere.")
                         .font(ATHLTHTrainDesign.pageSubtitle)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    ForEach(ATHLTHCompetitionFormat.allCases) { format in
-                        Button { selectedFormat = format } label: {
-                            HStack(spacing: 15) {
-                                Image(systemName: format.symbol)
-                                    .font(.system(size: 29, weight: .light))
-                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                    .frame(width: 61, height: 61)
-                                    .background(ATHLTHTrainDesign.paleGold.opacity(0.55),
-                                        in: RoundedRectangle(cornerRadius: 18))
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text(format.title).font(ATHLTHTrainDesign.cardTitle)
-                                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                                    Text(format.subtitle).font(.subheadline)
-                                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                    Text(format == .duel ? "2 deltakere" :
-                                        "Minst \(ATHLTHCompetitionCreationPolicy.minOpponents(format) + 1) deltakere")
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                }
-                                Spacer(minLength: 3)
-                                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 14)], spacing: 14) {
+                        ForEach(ATHLTHCompetitionFormat.allCases) { format in
+                            Button { selectedFormat = format } label: {
+                                competitionHero(format)
                             }
-                            .padding(16).frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
-                            .athlthTrainEditorialCard()
-                            .contentShape(Rectangle())
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(format.title + ", " + format.subtitle))
+                            .accessibilityValue(Text(participantLabel(format)))
+                            .accessibilityIdentifier("athlth-competition-entry-\(format.rawValue)")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("athlth-competition-entry-\(format.rawValue)")
                     }
                     }
                 }
-                .padding(18).frame(maxWidth: 650)
+                .padding(18).frame(maxWidth: 820)
                 .frame(maxWidth: .infinity)
             }
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
@@ -115,6 +96,69 @@ struct ATHLTHCompetitionEntryView: View {
                 }?.0
             }
         }
+    }
+
+    private func participantLabel(_ format: ATHLTHCompetitionFormat) -> String {
+        format == .duel ? "2 deltakere" :
+            "Minst \(ATHLTHCompetitionCreationPolicy.minOpponents(format) + 1) deltakere"
+    }
+
+    private func competitionHero(_ format: ATHLTHCompetitionFormat) -> some View {
+        let artwork: String = {
+            switch format.title {
+            case "Duell": return "StrengthQuickHero"
+            case "Enkeltkonkurranse": return "TrainHero"
+            case "Liga": return "GoalRunning"
+            case "Cup": return "GoalAdventure"
+            default: return "TrainHero"
+            }
+        }()
+        return ZStack(alignment: .bottomLeading) {
+            GeometryReader { geometry in
+                Image(artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }
+            LinearGradient(
+                stops: [.init(color: .black.opacity(0.84), location: 0),
+                        .init(color: .black.opacity(0.65), location: 0.55),
+                        .init(color: .black.opacity(0.18), location: 1)],
+                startPoint: .leading, endPoint: .trailing
+            )
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(participantLabel(format), systemImage: format.symbol)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color(red: 0.97, green: 0.88, blue: 0.68))
+                    Text(format.title)
+                        .font(.system(.title2, design: .serif).weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text(format.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.92))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(.black.opacity(0.28), in: Circle())
+                    .accessibilityHidden(true)
+            }
+            .padding(16)
+        }
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.15), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var filtered: [ATHLTHTournamentRemote] {
