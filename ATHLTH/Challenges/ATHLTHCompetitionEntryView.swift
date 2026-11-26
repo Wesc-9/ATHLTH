@@ -176,34 +176,38 @@ struct ATHLTHCompetitionEntryView: View {
 
     private var hubContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Button { showingFormats = true } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "trophy.fill").font(.title2)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Ny konkurranse").font(ATHLTHTrainDesign.cardTitle)
-                        Text("Duell, enkeltkonkurranse, liga eller cup").font(.caption)
-                    }
-                    Spacer()
-                    Image(systemName: "plus.circle").font(.title2)
-                }
-                .foregroundStyle(.white)
-                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                .background(ATHLTHTrainDesign.bronze, in: RoundedRectangle(cornerRadius: 23))
-            }.buttonStyle(.plain)
-            Picker("Konkurranser", selection: $hubTab) {
+            competitionDashboard
+            HStack(spacing: 6) {
                 ForEach(HubTab.allCases) { tab in
-                    Text(tab == .invitations && !invitedIDs.isEmpty ? "Invitasjoner (\(invitedIDs.count))" : tab.rawValue).tag(tab)
+                    Button {
+                        hubTab = tab
+                    } label: {
+                        VStack(spacing: 5) {
+                            Text(tab.rawValue).font(.subheadline.weight(.semibold))
+                            Text(String(tabCount(tab))).font(.caption.monospacedDigit())
+                        }
+                        .foregroundStyle(hubTab == tab ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background {
+                            if hubTab == tab {
+                                RoundedRectangle(cornerRadius: 14).fill(Color.white)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(hubTab == tab ? .isSelected : [])
                 }
-            }.pickerStyle(.segmented)
+            }
+            .padding(4)
+            .background(ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 18))
             if loading && tournaments.isEmpty { ProgressView("Henter konkurranser…") }
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
                 Button("Prøv igjen") { Task { await reloadHub() } }.font(.subheadline)
             }
             if filtered.isEmpty && !loading && errorMessage == nil {
-                Text(hubTab == .invitations ? "Ingen nye invitasjoner." : hubTab == .history ? "Ingen avsluttede konkurranser." : "Ingen pågående konkurranser.")
-                    .font(.subheadline).foregroundStyle(ATHLTHTrainDesign.secondary)
-                    .padding(18).frame(maxWidth: .infinity, alignment: .leading).athlthTrainEditorialCard()
+                emptyCompetitionState
             }
             if hubTab == .history && !filtered.isEmpty {
                 LazyVStack(spacing: 0) {
@@ -240,6 +244,91 @@ struct ATHLTHCompetitionEntryView: View {
             }
             }
         }
+    }
+
+    private func tabCount(_ tab: HubTab) -> Int {
+        tournaments.filter { item in
+            switch tab {
+            case .mine: return !invitedIDs.contains(item.id) && ["active", "inviting"].contains(item.status)
+            case .invitations: return invitedIDs.contains(item.id) && item.status == "inviting"
+            case .history: return ["completed", "cancelled"].contains(item.status)
+            }
+        }.count
+    }
+
+    private var competitionDashboard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("DIN KONKURRANSEARENA")
+                        .font(.caption2.weight(.semibold)).tracking(1.6)
+                    Text("Utfordre deg selv.\nKonkurrer sammen.")
+                        .font(.system(size: 27, design: .serif))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "trophy")
+                    .font(.system(size: 34, weight: .light))
+                    .frame(width: 62, height: 62)
+                    .background(.white.opacity(0.12), in: Circle())
+                    .accessibilityHidden(true)
+            }
+            HStack(spacing: 16) {
+                dashboardMetric("Pågår", tournaments.filter { $0.status == "active" }.count)
+                dashboardMetric("Fullført", tournaments.filter { $0.status == "completed" }.count)
+            }
+            Button { showingFormats = true } label: {
+                HStack {
+                    Text("Ny konkurranse").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "plus.circle")
+                }
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .padding(14)
+                .background(.white, in: RoundedRectangle(cornerRadius: 14))
+            }.buttonStyle(.plain)
+        }
+        .foregroundStyle(.white)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.ink],
+                           startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 24)
+        )
+    }
+
+    private func dashboardMetric(_ label: String, _ count: Int) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(String(count)).font(.system(size: 25, design: .serif)).monospacedDigit()
+            Text(label).font(.caption).foregroundStyle(.white.opacity(0.8))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var emptyCompetitionState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: hubTab == .invitations ? "envelope" : hubTab == .history ? "clock.arrow.circlepath" : "flag.checkered")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 54, height: 54)
+                .background(ATHLTHTrainDesign.paleGold, in: Circle())
+            Text(hubTab == .invitations ? "Ingen nye invitasjoner" : hubTab == .history ? "Ingen avsluttede konkurranser" : "Klar for en utfordring?")
+                .font(ATHLTHTrainDesign.cardTitle)
+            Text(hubTab == .invitations ? "Invitasjoner fra andre vises her." : hubTab == .history ? "Fullførte og avlyste konkurranser samles her." : "Opprett en konkurranse og utfordre en venn eller en gruppe.")
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .multilineTextAlignment(.center)
+            if hubTab == .mine {
+                Button("Velg konkurranseform") { showingFormats = true }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .padding(.top, 5)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+        .athlthTrainEditorialCard()
     }
 
     private func historyDate(_ item: ATHLTHTournamentRemote) -> Date {
