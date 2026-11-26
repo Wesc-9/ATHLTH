@@ -108,6 +108,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var deviceRelay = WorkoutDeviceRelayStore.shared
 
     @State private var didInstallBackgroundRefreshHandlers = false
+    @State private var lastAppliedResourcePolicy: ATHLTHSystemResourcePolicy?
     @State private var profileRecordPublishTask: Task<Void, Never>?
 
     var body: some View {
@@ -279,6 +280,8 @@ private struct ATHLTHSceneRootView: View {
             .frame(width: 0, height: 0)
         }
         .onAppear {
+            ATHLTHMetricDeliveryObserver.install()
+            applyResourcePolicyIfNeeded()
             installBackgroundRefreshHandlersIfNeeded()
             watchConnection.setCurrentAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
@@ -313,7 +316,17 @@ private struct ATHLTHSceneRootView: View {
                 isForeground: scenePhase == .active && appSession.signedIn
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification).receive(on: RunLoop.main)) { _ in
+            applyResourcePolicyIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange).receive(on: RunLoop.main)) { _ in
+            applyResourcePolicyIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification).receive(on: RunLoop.main)) { _ in
+            releaseTransientCaches()
+        }
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active { applyResourcePolicyIfNeeded() }
             scheduleAutomaticOfflinePreparation()
             ATHLTHAliveController.reconcile(
                 isForeground: newPhase == .active && appSession.signedIn
@@ -520,13 +533,36 @@ private struct ATHLTHSceneRootView: View {
         }
     }
 
+    private func applyResourcePolicyIfNeeded() {
+        let policy = ATHLTHSystemResourcePolicy.current
+        guard policy != lastAppliedResourcePolicy else { return }
+        lastAppliedResourcePolicy = policy
+        ATHLTHSizedStorageImageCache.shared.applyResourcePolicy(policy)
+        Task { await ATHLTHLocalExerciseThumbnailLoader.shared.applyResourcePolicy(policy) }
+        if policy == .critical {
+            releaseTransientCaches()
+        }
+        scheduleAutomaticOfflinePreparation()
+    }
+
+    private func releaseTransientCaches() {
+        ATHLTHArtworkImage.clearRemoteCache()
+        health.releaseTransientCachesForMemoryPressure()
+        HomeActivityRouteSnapshotRendererV2.shared.clearCache()
+        RouteMapSnapshotCache.clearCache()
+        ATHLTHSizedStorageImageCache.shared.clear()
+        Task { await ATHLTHLocalExerciseThumbnailLoader.shared.clearCache() }
+        ATHLTHPerformance.event("TransientCachesReleased")
+    }
+
     private func scheduleAutomaticOfflinePreparation() {
         automaticOfflineLibrary.update(
             userID: appSession.signedIn ? appSession.profile.userID : nil,
             plans: appSession.signedIn ? appSession.trainingPlans : [],
             routes: appSession.signedIn ? appSession.savedRoutes : [],
             isForeground: scenePhase == .active &&
-                !appSession.previewModeEnabled
+                !appSession.previewModeEnabled &&
+                ATHLTHSystemResourcePolicy.current.allowsOptionalPreparation
         )
     }
 
@@ -1870,24 +1906,6 @@ struct AppRootView: View {
             value:
                 deviceRelay.lastStatusText
         )
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for:
-                    UIApplication
-                        .didReceiveMemoryWarningNotification
-            )
-        ) { _ in
-            ATHLTHArtworkImage
-                .clearRemoteCache()
-            health
-                .releaseTransientCachesForMemoryPressure()
-            HomeActivityRouteSnapshotRendererV2
-                .shared
-                .clearCache()
-            RouteMapSnapshotCache.clearCache()
-            ATHLTHSizedStorageImageCache.shared.clear()
-            Task { await ATHLTHLocalExerciseThumbnailLoader.shared.clearCache() }
-        }
         )
     }
 
