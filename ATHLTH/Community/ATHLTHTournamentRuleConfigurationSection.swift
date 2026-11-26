@@ -28,7 +28,7 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                 ForEach(ATHLTHTournamentActivity.allCases) { activity in
                     let available = activity.isAvailableForCreation
                     Button {
-                        guard available else { return }
+                        guard available || activities.contains(activity) else { return }
                         if activities.contains(activity) {
                             activities.remove(activity)
                         } else {
@@ -57,10 +57,10 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                         .background(ATHLTHArenaV3Style.panel())
                     }
                     .buttonStyle(.plain)
-                    .disabled(!available)
+                    .disabled(!available && !activities.contains(activity))
                     .opacity(available ? 1 : 0.42)
                     .accessibilityValue(
-                        !available ? "Kommer senere" : activities.contains(activity) ? "Valgt" : "Ikke valgt"
+                        !available ? (activities.contains(activity) ? "Ikke tilgjengelig – trykk for å fjerne" : "Kommer senere") : activities.contains(activity) ? "Valgt" : "Ikke valgt"
                     )
                 }
             }
