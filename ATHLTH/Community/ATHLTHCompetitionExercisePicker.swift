@@ -85,7 +85,7 @@ struct ATHLTHCompetitionExercisePicker: View {
     private func row(_ item: ATHLTHTournamentExerciseSearchResult) -> some View {
         let alreadySelected = selected.contains(item.id) || added.contains(item.id)
         return Button {
-            guard !alreadySelected, selected.count + added.count < 12 else { return }
+            guard !alreadySelected, selected.union(added).count < 12 else { return }
             added.insert(item.id)
             onSelect(item)
         } label: {
@@ -108,6 +108,6 @@ struct ATHLTHCompetitionExercisePicker: View {
             .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
-        .disabled(alreadySelected || selected.count + added.count >= 12)
+        .disabled(alreadySelected || selected.union(added).count >= 12)
     }
 }
