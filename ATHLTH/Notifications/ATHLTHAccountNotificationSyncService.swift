@@ -62,6 +62,22 @@ struct ATHLTHAccountNotificationSnapshot: Codable {
         )
     }
 
+    /// A check-in prompt is actionable only on its own day. Record its
+    /// removal as a tombstone, otherwise account sync restores stale alerts.
+    @discardableResult
+    mutating func expireDailyCheckIns(keeping eventKey: String?, now: Date) -> Bool {
+        let expired = items.filter {
+            $0.kind == .dailyCheckIn && $0.eventKey != eventKey
+        }
+        guard !expired.isEmpty else { return false }
+        var deletedKeys = Set(tombstones.map { $0.item.eventKey })
+        for item in expired where deletedKeys.insert(item.eventKey).inserted {
+            tombstones.append(.init(item: item, deletedAt: now))
+        }
+        items.removeAll { $0.kind == .dailyCheckIn && $0.eventKey != eventKey }
+        return true
+    }
+
     private static func latest(_ a: Date?, _ b: Date?) -> Date? {
         switch (a, b) {
         case let (a?, b?): max(a, b)

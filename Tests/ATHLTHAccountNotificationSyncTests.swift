@@ -6,10 +6,11 @@ final class ATHLTHAccountNotificationSyncTests: XCTestCase {
     private func item(
         key: String,
         readAt: Date? = nil,
-        id: UUID = UUID()
+        id: UUID = UUID(),
+        kind: ATHLTHNotificationKind = .social
     ) -> ATHLTHNotificationItem {
         ATHLTHNotificationItem(
-            id: id, eventKey: key, kind: .social,
+            id: id, eventKey: key, kind: kind,
             title: "Invitation", message: "Training tomorrow",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             readAt: readAt
@@ -59,6 +60,29 @@ final class ATHLTHAccountNotificationSyncTests: XCTestCase {
             ATHLTHAccountNotificationSnapshot.merged(deleted, stale)
                 .tombstones.count, 1
         )
+    }
+
+    func testCompletedCheckInCannotReturnFromCloud() {
+        let today = item(key: "insights.daily-check-in.today", kind: .dailyCheckIn)
+        let invite = item(key: "invite")
+        let stale = ATHLTHAccountNotificationSnapshot(items: [today, invite], tombstones: [])
+        var local = stale
+        XCTAssertTrue(local.expireDailyCheckIns(keeping: nil, now: .now))
+        XCTAssertEqual(local.items.map(\.eventKey), ["invite"])
+        XCTAssertEqual(local.tombstones.map { $0.item.eventKey }, [today.eventKey])
+        XCTAssertFalse(local.expireDailyCheckIns(keeping: nil, now: .now))
+        XCTAssertEqual(ATHLTHAccountNotificationSnapshot.merged(local, stale).items.map(\.eventKey), ["invite"])
+    }
+
+    func testExpiredCheckInsDoNotRemoveTodaysUnansweredReminderOrOtherAlerts() {
+        let today = item(key: "today", kind: .dailyCheckIn)
+        let yesterday = item(key: "yesterday", kind: .dailyCheckIn)
+        let invite = item(key: "invite")
+        var snapshot = ATHLTHAccountNotificationSnapshot(
+            items: [today, yesterday, invite], tombstones: [])
+        XCTAssertTrue(snapshot.expireDailyCheckIns(keeping: today.eventKey, now: .now))
+        XCTAssertEqual(Set(snapshot.items.map(\.eventKey)), Set(["today", "invite"]))
+        XCTAssertEqual(snapshot.tombstones.map { $0.item.eventKey }, ["yesterday"])
     }
 
     func testTwoDevicesDoNotDuplicateSameEventKey() {

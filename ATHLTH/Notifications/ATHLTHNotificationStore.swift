@@ -155,7 +155,29 @@ final class ATHLTHNotificationStore: ObservableObject {
             items = []
             tombstones = []
         }
+        // A cached reminder may already have been completed on this device.
+        if expireCurrentDailyCheckIns(accountID: userID) {
+            persist(scheduleRemote: false)
+        }
         scheduleAccountSync()
+    }
+
+    private func expireCurrentDailyCheckIns(accountID: UUID, now: Date = Date()) -> Bool {
+        let completed = RecoverySorenessStore(accountID: accountID).hasTodayCheckIn
+        let enabled = preferenceEnabled("settings.dailyCheckInReminders")
+        let key = enabled && !completed
+            ? ATHLTHDailyCheckInReminderScheduler.eventKey(accountID: accountID, date: now)
+            : nil
+        return expireDailyCheckIns(keeping: key, now: now)
+    }
+
+    @discardableResult
+    private func expireDailyCheckIns(keeping eventKey: String?, now: Date) -> Bool {
+        var snapshot = ATHLTHAccountNotificationSnapshot(items: items, tombstones: tombstones)
+        guard snapshot.expireDailyCheckIns(keeping: eventKey, now: now) else { return false }
+        items = snapshot.items
+        tombstones = snapshot.tombstones
+        return true
     }
 
     func scheduleAccountSync() {
@@ -193,9 +215,13 @@ final class ATHLTHNotificationStore: ObservableObject {
             let merged = ATHLTHAccountNotificationSnapshot.merged(
                 .init(items: items, tombstones: tombstones), cloud
             )
-            items = Array(merged.items.prefix(250))
+            // Recheck local completion after the network await. A stale
+            // cloud row must never restore today's completed reminder.
+            items = merged.items
             tombstones = merged.tombstones
-            persist(scheduleRemote: false)
+            let expired = expireCurrentDailyCheckIns(accountID: userID)
+            trimIfNeeded()
+            persist(scheduleRemote: expired)
             lastAccountSyncAt = Date()
             lastAccountSyncError = nil
         } catch is CancellationError {
@@ -448,12 +474,9 @@ final class ATHLTHNotificationStore: ObservableObject {
         let eventKey = prefix + accountID.uuidString + "." + dateKey
         // All old reminders are stale. Switching accounts or opting out also
         // clears their unread badge, but leaves other notification types alone.
-        let previousCount = items.count
-        items.removeAll {
-            $0.kind == .dailyCheckIn &&
-                (!enabled || completed || $0.eventKey != eventKey)
+        if expireDailyCheckIns(keeping: enabled && !completed ? eventKey : nil, now: now) {
+            persist()
         }
-        if items.count != previousCount { persist() }
 
         // In-app Activity and the system notification share the same
         // account/day key. Future alerts remain queued even when ATHLTH
