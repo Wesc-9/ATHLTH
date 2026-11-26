@@ -1678,6 +1678,9 @@ struct IPhoneWorkoutView: View {
                                         time: .shortened
                                     )
                                 )
+                                if workout.id == recorder.lastCompletedWorkout?.id, let finishedAt = workout.end {
+                                    ATHLTHPostWorkoutFeedbackCard(workoutID: workout.id, finishedAt: finishedAt)
+                                }
                                 let result = ATHLTHPhoneWorkoutResultBreakdown(
                                     workout: workout
                                 )
