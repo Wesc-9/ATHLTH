@@ -61,6 +61,7 @@ on:
       - release/v3.0.3
       - release/v3.0.4
       - release/v3.0.5
+      - release/v3.0.6
     paths:
       - ATHLTH/**/*.swift
       - ATHLTHWidgets/**/*.swift
