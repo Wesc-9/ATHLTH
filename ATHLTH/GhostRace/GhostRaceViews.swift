@@ -210,6 +210,9 @@ struct GhostRaceHubView: View {
         ScrollView {
             LazyVStack(spacing: 14) {
                 hero
+                if personalCompetitionOnly {
+                    personalRouteEntry
+                }
                 modeOverview
                 ghostExperiencePicker
 
@@ -549,6 +552,41 @@ struct GhostRaceHubView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityAddTraits(advancedMode == isAdvanced ? .isSelected : [])
+    }
+
+    private var personalRouteEntry: some View {
+        ATHLTHUnifiedCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Velg rute").font(.headline)
+                Text("Velg en løype først, og konkurrer mot din beste tid, siste forsøk eller en digital fartsholder.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                ForEach(Array(availableTargetGhostRoutes.prefix(3))) { route in
+                    NavigationLink {
+                        RouteDetailView(route: route)
+                    } label: {
+                        HStack(spacing: 12) {
+                            RouteMapSnapshotThumbnail(route: route, height: 64)
+                                .frame(width: 84, height: 64)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(route.title).font(.subheadline.weight(.semibold))
+                                Text(String(format: "%.1f km", route.distanceKilometers))
+                                    .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption)
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    }.buttonStyle(.plain)
+                }
+                NavigationLink {
+                    RouteLibraryListView(source: .database)
+                } label: {
+                    Label("Finn flere ruter", systemImage: "map")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }.buttonStyle(.bordered)
+            }
+        }
     }
 
     private var modeOverview: some View {
