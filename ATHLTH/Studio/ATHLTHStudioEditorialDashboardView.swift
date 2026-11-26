@@ -198,6 +198,15 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// a different week; reopening must not silently jump back to today.
     @SceneStorage("athlth.studio.homeFollowsToday") private var followsToday = true
     @State private var showingReadinessExplanation = false
+    @State private var dailyFormEntry: RecoverySorenessEntry?
+
+    private var dailyFormAssessment: ATHLTHDailyFormPolicy.Assessment {
+        ATHLTHDailyFormPolicy.assess(entry: dailyFormEntry, measuredScore: hasHealth ? health.recovery.score : nil)
+    }
+
+    private func reloadDailyForm() {
+        dailyFormEntry = session.signedIn ? RecoverySorenessStore(accountID: session.profile.userID).todayEntry : nil
+    }
     @State private var recordingProjection = ATHLTHRecordedWorkoutProjection()
     @State private var homeProjection: ATHLTHStudioHomeProjection?
     @State private var pendingProjectionTask: Task<Void, Never>?
@@ -429,6 +438,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             if followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
             }
+            reloadDailyForm()
             // The 7/28/90-day chart is relative to today even when the
             // selected calendar week is historical.
             scheduleProjectionRefresh()
@@ -439,10 +449,15 @@ struct ATHLTHStudioEditorialDashboardView: View {
             if followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
             }
+            reloadDailyForm()
             scheduleProjectionRefresh()
         }
         .task(id: session.profile.userID) {
+            reloadDailyForm()
             scheduleProjectionRefresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
+            reloadDailyForm()
         }
         #if ATHLTH_GARMIN_PERSONAL && DEBUG
         .task(id: "\(session.profile.userID)|\(scenePhase)|\(garminStore.connected)") {
@@ -491,6 +506,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
         .onChange(of: session.signedIn) { _, _ in
             homeProjection = nil
+            reloadDailyForm()
             scheduleProjectionRefresh()
         }
         .onDisappear {
@@ -500,7 +516,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
             ATHLTHReadinessExplanationSheet(
                 recovery: health.recovery,
                 sleep: health.sleep,
-                heart: health.heart
+                heart: health.heart,
+                assessment: dailyFormAssessment
             )
         }
     }
@@ -1563,7 +1580,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 .accessibilityLabel(tr("Open Insights", "Åpne Innsikt"))
             }
 
-            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
+            if hasHealth, health.isRefreshing && !health.hasCompletedHealthReadThisLaunch && dailyFormAssessment.displayScore == nil && !dailyFormAssessment.hasCheckIn {
                 HStack(spacing: 12) {
                     ProgressView().tint(bronze)
                     Text(tr("Updating signals", "Oppdaterer treningssignaler"))
@@ -1571,7 +1588,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 98, alignment: .leading)
-            } else if hasHealth, let score = health.recovery.score {
+            } else if let score = dailyFormAssessment.displayScore {
                 HStack(alignment: .center, spacing: 12) {
                     ZStack {
                         Circle()
@@ -1606,16 +1623,31 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ink)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text(tr(
-                            "Your recovery, sleep and cardiovascular signals.",
-                            "Restitusjon, søvn og kroppens signaler."
-                        ))
+                        Text(dailyFormAssessment.hasCheckInWarning
+                            ? dailyFormAssessment.recommendation.title
+                            : dailyFormAssessment.contextualScore != nil
+                                ? tr("Includes your check-in and measured recovery.", "Inkluderer innsjekken din og målt restitusjon.")
+                                : dailyFormAssessment.hasCheckIn
+                                    ? tr("Measured score; check-in informs advice.", "Målt score; innsjekken påvirker rådet.")
+                                    : tr("Recovery, sleep and cardiovascular signals.", "Restitusjon, søvn og kroppens signaler."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            } else if dailyFormAssessment.hasCheckIn {
+                VStack(alignment: .leading, spacing: 7) {
+                    if let subjective = dailyFormAssessment.subjectiveScore {
+                        Text("\(subjective)/100").font(.title.weight(.semibold)).monospacedDigit()
+                        Text(tr("Reported form · measured score pending", "Opplevd form · målt score mangler"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text(dailyFormAssessment.recommendation.title)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(ink)
+                    Text(dailyFormAssessment.explanation)
+                        .font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, minHeight: 98, alignment: .leading)
             } else if hasHealth, let diagnostics = health.recovery.diagnostics {
                 VStack(alignment: .leading, spacing: 7) {
                     Label(tr("Building your baseline", "Kartlegger dagsformen"),
@@ -1634,7 +1666,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     Image(systemName: "waveform.path.ecg")
                         .font(.title2)
                         .foregroundStyle(bronze)
-                    Text(tr("Connect health data", "Koble til helsedata"))
+                    Text(hasHealth
+                         ? tr("Waiting for health data", "Venter på helsedata")
+                         : tr("Connect health data", "Koble til helsedata"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
                     Text(tr(
@@ -1673,7 +1707,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
 
             Button {
-                if hasHealth {
+                if hasHealth || dailyFormAssessment.hasCheckIn {
                     showingReadinessExplanation = true
                 } else {
                     onOpenSettings()
@@ -1740,7 +1774,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private var readinessTitle: String {
-        switch health.recovery.state {
+        switch dailyFormAssessment.displayState(measuredState: health.recovery.state) {
         case .ready:
             tr("Strong recovery", "God restitusjon")
         case .balanced:

@@ -1115,16 +1115,20 @@ final class HealthKitManager: ObservableObject {
     func refreshIfStale(
         maxAge: TimeInterval = 60
     ) async {
-        if let lastSuccessfulRefreshAt,
-           Date().timeIntervalSince(lastSuccessfulRefreshAt) < maxAge,
-           hasCompletedHealthReadThisLaunch,
-           hasReadableHealthData,
-           !hasPendingHealthRead,
-           authorizationError == nil {
-            return
+        func isFresh() -> Bool {
+            guard let lastSuccessfulRefreshAt else { return false }
+            return Date().timeIntervalSince(lastSuccessfulRefreshAt) < maxAge &&
+                hasCompletedHealthReadThisLaunch && hasTrainingHealthData &&
+                !hasPendingHealthRead && authorizationError == nil
         }
-
-        await refreshAll()
+        guard integrationEnabled, healthDataAvailable, hasRequestedAuthorization,
+              !shouldDeferAutomaticHealthWork, !isFresh() else { return }
+        let before = lastSuccessfulRefreshAt
+        guard await waitForHealthRefreshSlot(), !Task.isCancelled else { return }
+        // Another consumer may have completed a read while we waited.
+        if isFresh() || (lastSuccessfulRefreshAt != before &&
+            hasCompletedHealthReadThisLaunch && hasTrainingHealthData && !hasPendingHealthRead) { return }
+        await performFullRefresh(recordBackgroundSync: false)
     }
 
     private func coalescedBackgroundRefresh(

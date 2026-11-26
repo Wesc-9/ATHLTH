@@ -1423,9 +1423,11 @@ struct AppRootView: View {
             return
         }
 
-        await health.configureBackgroundSync(
-            allowed: settings.backgroundHealthSyncEnabled
-        )
+        // Registration of all background data types may take longer than
+        // the foreground read. It must not block the first health snapshot.
+        Task { @MainActor in
+            await health.configureBackgroundSync(allowed: settings.backgroundHealthSyncEnabled)
+        }
 
         // Opening ATHLTH while the Watch owns an active workout should
         // prioritize the mirroring session. A full Health refresh can
@@ -2160,6 +2162,9 @@ struct AppRootView: View {
     private var lifecycleHealthSyncContent: AnyView {
         AnyView(
             lifecycleSessionContent
+        .task(id: "health-foreground-\(signedInUserID?.uuidString ?? "none")-\(startupAuthenticationResolved)-\(scenePhase == .active)-\(settings.appleHealthIntegrationEnabled)-\(workoutMirroring.hasActiveMirroredWorkout)") {
+            await refreshForegroundHealthAutomatically()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
             guard scenePhase == .active, settings.appleHealthIntegrationEnabled,
                   health.hasRequestedAuthorization,
@@ -3244,6 +3249,47 @@ struct AppRootView: View {
                 .performFailsafeBackup(
                     userID: userID
                 )
+        }
+    }
+
+    @MainActor
+    private func refreshForegroundHealthAutomatically() async {
+        guard startupAuthenticationResolved, appSession.signedIn,
+              !appSession.previewModeEnabled, scenePhase == .active,
+              settings.appleHealthIntegrationEnabled else { return }
+        let owner = appSession.profile.userID
+        func mayRead() -> Bool {
+            !Task.isCancelled && scenePhase == .active &&
+            appSession.signedIn && appSession.profile.userID == owner &&
+            settings.appleHealthIntegrationEnabled &&
+            !workoutMirroring.hasActiveMirroredWorkout &&
+            !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+        }
+        // Independent from network initialization. No permission prompt, and
+        // no heavy HealthKit reads while Watch mirroring is active.
+        await allowWatchMirroringToAttachIfNeeded()
+        guard mayRead(), await health.restoreAuthorizationStateFromSystem() else { return }
+        if health.needsHealthRefreshRecovery {
+            do { try await Task.sleep(for: .milliseconds(1500)) } catch { return }
+            guard mayRead() else { return }
+            _ = health.resumeDeferredHealthWorkAfterStableLaunch()
+        }
+        // A previous interrupted full read retains the existing crash-loop
+        // guard. A later clean launch automatically resumes normal reads.
+        for delay in [0, 4, 15] {
+            if delay > 0 {
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            }
+            guard mayRead(), !health.shouldDeferAutomaticHealthWork else { return }
+            guard UIApplication.shared.isProtectedDataAvailable else { continue }
+            if delay == 0 || !health.hasTrainingHealthData || health.hasPendingHealthRead ||
+                !health.hasCompletedHealthReadThisLaunch {
+                await health.refreshIfStale(maxAge: delay == 0 ? 90 : 0)
+            }
+            guard mayRead() else { return }
+            if health.hasCompletedHealthReadThisLaunch && health.hasTrainingHealthData && !health.hasPendingHealthRead {
+                break
+            }
         }
     }
 
