@@ -30,6 +30,7 @@ struct ATHLTHInsightsView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedSection: ATHLTHInsightsSection = .overview
     @StateObject private var checkInStore = RecoverySorenessStore()
+    @State private var dailyFormHistory: [ATHLTHDailyFormPolicy.Day] = []
     @State private var showingCheckIn = false
     @State private var showingReadinessExplanation = false
     @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
@@ -131,6 +132,8 @@ struct ATHLTHInsightsView: View {
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
+                checkInStore.reloadFromStorage()
+                refreshDailyFormHistory()
                 updateWorkoutProjection(health.workouts)
                 updateMuscleProjection(strength.workoutHistory)
                 // Keep the already-rendered insight snapshots on quick tab
@@ -170,12 +173,17 @@ struct ATHLTHInsightsView: View {
                 muscleSummary = .empty
                 sessionBaselines = .empty
                 cachedPersonalFindings = []
+                dailyFormHistory = []
+                checkInStore.reloadFromStorage()
+                refreshDailyFormHistory()
                 recoverySnapshot = .empty
                 trendSnapshot = nil
                 lastInsightsRefreshAt = nil
             }
             .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
                 guard isActive else { return }
+                checkInStore.reloadFromStorage()
+                refreshDailyFormHistory()
                 updateWorkoutProjection(health.workouts)
                 updateMuscleProjection(strength.workoutHistory)
             }
@@ -183,6 +191,7 @@ struct ATHLTHInsightsView: View {
                 for: Notification.Name("athlth.dailyCheckInDidUpdate")
             )) { _ in
                 checkInStore.reloadFromStorage()
+                refreshDailyFormHistory()
                 updatePersonalFindings()
             }
         }
@@ -237,6 +246,7 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
+            dailyFormAdviceCard
             ATHLTHInsightsDailyRhythmCard()
             ATHLTHInsightsMuscleCard(summary: muscleSummary)
             ATHLTHInsightsSleepStagesCard()
@@ -259,6 +269,7 @@ struct ATHLTHInsightsView: View {
             ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
                 showingCheckIn = true
             }
+            dailyFormHistoryCard
             whatIfCard
         }
     }
@@ -276,6 +287,90 @@ struct ATHLTHInsightsView: View {
             trainingChangePercent: trendSnapshot?.trainingDurationChangePercent,
             averageDailySteps: trendSnapshot?.averageDailySteps
         )
+    }
+
+    private func refreshDailyFormHistory() {
+        dailyFormHistory = ATHLTHDailyFormPolicy.history(checkInStore.entries, days: 7)
+    }
+
+    private var dailyFormAdviceCard: some View {
+        let assessment = ATHLTHDailyFormPolicy.assess(
+            entry: checkInStore.todayEntry, measuredScore: health.recovery.score)
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(tr("Your own assessment", "Din egen vurdering"), systemImage: "heart.text.square")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button(tr("Check in", "Sjekk inn")) { showingCheckIn = true }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+            }
+            Text(assessment.recommendation.title)
+                .font(.title3.weight(.semibold))
+            Text(assessment.explanation)
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            if let subjective = assessment.subjectiveScore {
+                HStack {
+                    Text(tr("Reported form", "Opplevd form"))
+                    Spacer()
+                    Text("\(subjective)/100").monospacedDigit().fontWeight(.semibold)
+                }
+                .font(.subheadline)
+            }
+            if let contextual = assessment.contextualScore {
+                HStack {
+                    Text(tr("Combined guidance score", "Veiledende samlet score"))
+                    Spacer()
+                    Text("\(contextual)/100").monospacedDigit().fontWeight(.semibold)
+                }
+                .font(.subheadline)
+            }
+            Text(tr("Guidance only. Measured readiness remains unchanged.",
+                    "Veiledende. Målt restitusjonsscore er uendret."))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+        }
+        .padding(16)
+        .athlthInsightsSurface()
+    }
+
+    private var dailyFormHistoryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(tr("Daily form · last 7 days", "Dagsform · siste 7 dager"))
+                .font(.headline)
+            ForEach(dailyFormHistory) { day in
+                HStack(spacing: 5) {
+                    Text(day.date.formatted(.dateTime.weekday(.abbreviated)))
+                        .frame(minWidth: 38, alignment: .leading)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    Spacer(minLength: 1)
+                    historyValue(day.energy, symbol: "bolt")
+                    historyValue(day.stress, symbol: "waveform.path.ecg")
+                    historyValue(day.soreness, symbol: "figure.cooldown")
+                    historyValue(day.motivation, symbol: "flame")
+                    historyValue(day.sleep, symbol: "moon")
+                }
+                .font(.caption)
+            }
+            Text(tr("Energy · stress · soreness · motivation · sleep. Dash means unanswered.",
+                    "Energi · stress · ømhet · motivasjon · søvn. Strek betyr ubesvart."))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+        }
+        .padding(16)
+        .athlthInsightsSurface()
+    }
+
+    private func historyValue(_ value: Int?, symbol: String) -> some View {
+        VStack(spacing: 2) {
+            Image(systemName: symbol)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .accessibilityHidden(true)
+            Text(value.map(String.init) ?? "—").monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var personalInsightsHighlights: some View {
