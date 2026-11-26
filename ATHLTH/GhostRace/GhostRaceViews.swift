@@ -120,6 +120,7 @@ private enum GhostReplaySort: String, CaseIterable, Identifiable {
 }
 
 struct GhostRaceHubView: View {
+    var personalCompetitionOnly = false
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -552,7 +553,7 @@ struct GhostRaceHubView: View {
 
     private var modeOverview: some View {
         HStack(spacing: 4) {
-            ForEach(GhostRaceHubMode.allCases) { mode in
+            ForEach(GhostRaceHubMode.allCases.filter { !personalCompetitionOnly || $0 != .live }) { mode in
                 Button {
                     withAnimation(.easeInOut(duration: 0.20)) {
                         selectedMode = mode
