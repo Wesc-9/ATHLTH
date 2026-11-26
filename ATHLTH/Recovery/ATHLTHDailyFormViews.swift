@@ -8,6 +8,7 @@ struct ATHLTHPostWorkoutFeedback: Codable, Hashable, Identifiable {
     let finishedAt: Date
     var feeling: Int?
     var exertion: Int?
+    var preWorkoutEnergy: Int? = nil
     var id: UUID { workoutID }
 }
 
@@ -37,6 +38,7 @@ enum ATHLTHPostWorkoutFeedbackStore {
             var updated = stored[existing]
             if let feeling = item.feeling { updated.feeling = feeling }
             if let exertion = item.exertion { updated.exertion = exertion }
+            if updated.preWorkoutEnergy == nil { updated.preWorkoutEnergy = item.preWorkoutEnergy }
             stored[existing] = updated
         } else {
             stored.insert(item, at: 0)
@@ -86,6 +88,7 @@ struct ATHLTHPostWorkoutFeedbackCard: View {
     @EnvironmentObject private var session: AppSessionStore
     let workoutID: UUID
     let finishedAt: Date
+    var startedAt: Date? = nil
     @State private var feeling: Int?
     @State private var exertion: Int?
     @State private var saved = false
@@ -140,8 +143,15 @@ struct ATHLTHPostWorkoutFeedbackCard: View {
             }
             Button {
                 guard let owner, session.signedIn, owner == session.profile.userID else { return }
+                // Old check-ins have no timestamp; never assume they preceded training.
+                let before = startedAt.flatMap { start in
+                    RecoverySorenessStore(accountID: owner).entries.first {
+                        Calendar.current.isDate($0.date, inSameDayAs: start) &&
+                        ($0.updatedAt.map { $0 <= start } ?? false)
+                    }?.energy
+                }
                 saved = ATHLTHPostWorkoutFeedbackStore.save(.init(workoutID: workoutID, finishedAt: finishedAt,
-                    feeling: feeling, exertion: exertion), account: owner)
+                    feeling: feeling, exertion: exertion, preWorkoutEnergy: before), account: owner)
             } label: {
                 Label(saved ? ATHLTHLocalization.choose(english: "Saved", norwegian: "Lagret") : ATHLTHLocalization.choose(english: "Save feedback", norwegian: "Lagre vurdering"),
                       systemImage: saved ? "checkmark.circle.fill" : "checkmark.circle")
