@@ -168,7 +168,10 @@ struct ATHLTHCompetitionEntryView: View {
             case .invitations: return invitedIDs.contains(item.id) && item.status == "inviting"
             case .history: return ["completed", "cancelled"].contains(item.status)
             }
-        }.sorted { $0.createdAt > $1.createdAt }
+        }.sorted {
+            if hubTab == .history { return historyDate($0) > historyDate($1) }
+            return $0.createdAt > $1.createdAt
+        }
     }
 
     private var hubContent: some View {
@@ -202,6 +205,17 @@ struct ATHLTHCompetitionEntryView: View {
                     .font(.subheadline).foregroundStyle(ATHLTHTrainDesign.secondary)
                     .padding(18).frame(maxWidth: .infinity, alignment: .leading).athlthTrainEditorialCard()
             }
+            if hubTab == .history && !filtered.isEmpty {
+                LazyVStack(spacing: 0) {
+                    ForEach(filtered) { item in
+                        Button { selectedTournament = item } label: { historyRow(item) }
+                            .buttonStyle(.plain)
+                        if item.id != filtered.last?.id { Divider().padding(.leading, 54) }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .athlthTrainEditorialCard()
+            } else {
             ForEach(filtered) { item in
                 Button { selectedTournament = item } label: {
                     VStack(alignment: .leading, spacing: 9) {
@@ -224,8 +238,49 @@ struct ATHLTHCompetitionEntryView: View {
                     }.foregroundStyle(ATHLTHTrainDesign.ink).padding(15).athlthTrainEditorialCard()
                 }.buttonStyle(.plain)
             }
+            }
         }
     }
+
+    private func historyDate(_ item: ATHLTHTournamentRemote) -> Date {
+        item.completedAt ?? item.startedAt ?? item.createdAt
+    }
+
+    private func historyRow(_ item: ATHLTHTournamentRemote) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.displayFormatSymbol)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 42, height: 42)
+                .background(ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(item.displayFormatTitle + (item.seasonLabel.map { " · " + $0 } ?? ""))
+                    .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(historyDate(item).formatted(.dateTime.day().month(.abbreviated).year()))
+                    .font(.caption2).foregroundStyle(ATHLTHTrainDesign.secondary)
+                Text(status(item))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(item.status == "cancelled" ? Color.red : ATHLTHTrainDesign.bronze)
+                if item.completedAt == nil {
+                    Text(item.startedAt == nil ? "Opprettet" : "Startet")
+                        .font(.caption2).foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            Image(systemName: "chevron.right").font(.caption2)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+        }
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+    }
+
     private func status(_ item: ATHLTHTournamentRemote) -> String {
         if invitedIDs.contains(item.id) && item.status == "inviting" { return "Svar på invitasjon" }
         switch item.status {
