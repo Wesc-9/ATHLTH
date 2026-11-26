@@ -65,18 +65,31 @@ final class HomeCalendarRecommendationDisplayPolicyTests: XCTestCase {
         XCTAssertNil(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: false))
     }
 
-    func testHomeQuickDevicePickerUsesOneSelectionForBothFavorites() {
+    func testHomeQuickDevicePickerUsesConfigurationNotReachability() {
         let automatic = ATHLTHHomeQuickCaptureChoice.automatic
-        XCTAssertEqual(automatic.displayedChoice(watchAvailable: true), .appleWatch)
-        XCTAssertEqual(automatic.displayedChoice(watchAvailable: false), .iPhone)
-        let phone = automatic.toggled(watchAvailable: true)
+        XCTAssertEqual(automatic.displayedChoice(watchConfigured: true), .appleWatch)
+        XCTAssertEqual(automatic.displayedChoice(watchConfigured: false), .iPhone)
+        let phone = automatic.toggled(watchConfigured: true)
         XCTAssertEqual(phone, .iPhone)
-        XCTAssertEqual(phone.displayedChoice(watchAvailable: true), .iPhone)
-        let watch = phone.toggled(watchAvailable: true)
+        XCTAssertEqual(phone.displayedChoice(watchConfigured: true), .iPhone)
+        let watch = phone.toggled(watchConfigured: true)
         XCTAssertEqual(watch, .appleWatch)
-        XCTAssertEqual(watch.displayedChoice(watchAvailable: false), .iPhone)
-        XCTAssertEqual(watch.displayedChoice(watchAvailable: true), .appleWatch)
-        XCTAssertEqual(phone.toggled(watchAvailable: false), .iPhone)
+        XCTAssertEqual(watch.displayedChoice(watchConfigured: false), .iPhone)
+        XCTAssertEqual(watch.displayedChoice(watchConfigured: true), .appleWatch)
+        XCTAssertEqual(phone.toggled(watchConfigured: false), .iPhone)
         XCTAssertNil(ATHLTHHomeQuickCaptureChoice.appleWatch.resolve(watchAvailable: false))
+    }
+
+    func testTemporaryUnknownPairingDoesNotSwitchTheSelectedDevice() {
+        XCTAssertTrue(ATHLTHHomeQuickCaptureChoice.configuredWatch(paired: nil, installed: nil, previous: true))
+        XCTAssertFalse(ATHLTHHomeQuickCaptureChoice.configuredWatch(paired: nil, installed: nil, previous: false))
+        XCTAssertTrue(ATHLTHHomeQuickCaptureChoice.configuredWatch(paired: true, installed: true, previous: false))
+        XCTAssertFalse(ATHLTHHomeQuickCaptureChoice.configuredWatch(paired: false, installed: nil, previous: true))
+        XCTAssertFalse(ATHLTHHomeQuickCaptureChoice.configuredWatch(paired: true, installed: false, previous: true))
+    }
+
+    func testGarminSyncDoesNotBecomeAnUnsupportedLiveLaunch() {
+        XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.automatic.displayedChoice(watchConfigured: true, preferredWatch: .garmin), .iPhone)
+        XCTAssertEqual(ATHLTHHomeQuickCaptureChoice.appleWatch.displayedChoice(watchConfigured: true, preferredWatch: .garmin), .appleWatch)
     }
 }

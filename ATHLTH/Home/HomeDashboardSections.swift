@@ -5944,16 +5944,23 @@ private struct PlannedWorkoutInvitationLobby: View {
 enum ATHLTHHomeQuickCaptureChoice: String {
     case automatic, iPhone, appleWatch
 
-    /// The icon and the normal tap use the same explicit, currently
-    /// available device. Losing connectivity before tapping shows iPhone.
-    func displayedChoice(watchAvailable: Bool) -> Self {
-        guard watchAvailable, self != .iPhone else { return .iPhone }
+    /// Pairing/installation, not reachability, determines the choices.
+    func displayedChoice(watchConfigured: Bool, preferredWatch: ATHLTHPreferredWatch = .automatic) -> Self {
+        guard watchConfigured, self != .iPhone else { return .iPhone }
+        if self == .automatic && preferredWatch == .garmin { return .iPhone }
         return .appleWatch
     }
 
-    func toggled(watchAvailable: Bool) -> Self {
-        guard watchAvailable else { return self }
-        return displayedChoice(watchAvailable: true) == .appleWatch ? .iPhone : .appleWatch
+    func toggled(watchConfigured: Bool, preferredWatch: ATHLTHPreferredWatch = .automatic) -> Self {
+        guard watchConfigured else { return self }
+        return displayedChoice(watchConfigured: true, preferredWatch: preferredWatch) == .appleWatch ? .iPhone : .appleWatch
+    }
+
+    static func configuredWatch(paired: Bool?, installed: Bool?, previous: Bool) -> Bool {
+        if paired == false || installed == false { return false }
+        if paired == true && installed == true { return true }
+        // Transient WCSession activation is not a device disconnection.
+        return previous
     }
 
     func resolve(watchAvailable: Bool) -> WorkoutCaptureDevice? {
@@ -5971,17 +5978,31 @@ struct ATHLTHHomeQuickStartCard: View {
     let accountID: UUID
     let isActive: Bool
     let occupied: Bool
-    let watchAvailable: Bool
+    let watchPaired: Bool?
+    let watchInstalled: Bool?
     let onSelect: (Category, ATHLTHHomeQuickCaptureChoice) -> Void
     let onAll: () -> Void
 
     @State private var loadedOwner: UUID?
     @State private var counts: [String: Int] = [:]
     @State private var capturePreference: ATHLTHHomeQuickCaptureChoice = .automatic
+    @AppStorage("settings.preferredLiveWatch") private var preferredWatchRaw = ATHLTHPreferredWatch.automatic.rawValue
+    @AppStorage("athlth.home.quickStart.watchConfigured") private var lastKnownWatchConfigured = false
+
+    private var preferredWatch: ATHLTHPreferredWatch {
+        ATHLTHPreferredWatch(rawValue: preferredWatchRaw) ?? .automatic
+    }
+
+    private var watchConfigured: Bool {
+        ATHLTHHomeQuickCaptureChoice.configuredWatch(
+            paired: watchPaired, installed: watchInstalled,
+            previous: lastKnownWatchConfigured
+        )
+    }
 
     private var selectedDevice: ATHLTHHomeQuickCaptureChoice {
         let preference = loadedOwner == accountID ? capturePreference : .automatic
-        return preference.displayedChoice(watchAvailable: watchAvailable)
+        return preference.displayedChoice(watchConfigured: watchConfigured, preferredWatch: preferredWatch)
     }
 
     private var selectedDeviceName: String {
@@ -6021,7 +6042,7 @@ struct ATHLTHHomeQuickStartCard: View {
                     } label: {
                         Label(ATHLTHLocalization.choose(english: "Start on Apple Watch", norwegian: "Start på Apple Watch"), systemImage: "applewatch")
                     }
-                    .disabled(occupied || !watchAvailable)
+                    .disabled(occupied || !watchConfigured)
                 }
                 .accessibilityHint(ATHLTHLocalization.choose(
                     english: "Starts a simple workout. Hold to choose a device.",
@@ -6048,6 +6069,12 @@ struct ATHLTHHomeQuickStartCard: View {
                 .allowsHitTesting(false)
         }
         .opacity(occupied ? 0.65 : 1)
+        .onChange(of: watchConfigured, initial: true) { _, configured in
+            if lastKnownWatchConfigured != configured { lastKnownWatchConfigured = configured }
+        }
+        .onChange(of: preferredWatchRaw) { _, _ in
+            capturePreference = .automatic
+        }
         .task(id: "\(accountID.uuidString)|\(isActive)") {
             guard isActive else { return }
             if loadedOwner != accountID { capturePreference = .automatic }
@@ -6064,7 +6091,7 @@ struct ATHLTHHomeQuickStartCard: View {
                 counts = ATHLTHQuickActivityUsage.counts(for: accountID)
                 loadedOwner = accountID
             }
-            capturePreference = capturePreference.toggled(watchAvailable: watchAvailable)
+            capturePreference = capturePreference.toggled(watchConfigured: watchConfigured, preferredWatch: preferredWatch)
         } label: {
             Image(systemName: selectedDevice == .appleWatch ? "applewatch" : "iphone")
                 .font(.system(size: 14, weight: .semibold))
@@ -6074,17 +6101,18 @@ struct ATHLTHHomeQuickStartCard: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(occupied || !watchAvailable)
+        .disabled(occupied || !watchConfigured)
         .accessibilityLabel(ATHLTHLocalization.choose(english: "Workout device", norwegian: "Treningsenhet"))
         .accessibilityValue(selectedDeviceName)
-        .accessibilityHint(watchAvailable
+        .accessibilityHint(watchConfigured
             ? ATHLTHLocalization.choose(english: "Switch between Apple Watch and iPhone", norwegian: "Bytt mellom Apple Watch og iPhone")
-            : ATHLTHLocalization.choose(english: "Apple Watch is unavailable", norwegian: "Apple Watch er ikke tilgjengelig"))
+            : ATHLTHLocalization.choose(english: "No Apple Watch configured for recording", norwegian: "Ingen Apple Watch satt opp for treningsopptak"))
         .accessibilityIdentifier("athlth-home-quick-start-device")
     }
 
     private func launch(_ category: Category, choice: ATHLTHHomeQuickCaptureChoice) {
-        guard !occupied, category.isAvailable, choice.resolve(watchAvailable: watchAvailable) != nil else { return }
+        guard !occupied, category.isAvailable,
+              choice != .appleWatch || watchConfigured else { return }
         if loadedOwner != accountID { capturePreference = .automatic }
         counts = ATHLTHQuickActivityUsage.record(category, for: accountID)
         loadedOwner = accountID

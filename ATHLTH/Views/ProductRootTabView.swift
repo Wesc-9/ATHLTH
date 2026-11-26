@@ -2760,7 +2760,8 @@ struct ATHLTHHomeView: View {
                 accountID: session.profile.userID,
                 isActive: isActive,
                 occupied: universalRecordingOccupied,
-                watchAvailable: watchConnection.isVerifiedForLiveLaunch,
+                watchPaired: watchConnection.paired,
+                watchInstalled: watchConnection.watchAppInstalled,
                 onSelect: { category, choice in
                     onOpenTrain(.homeBasicQuick(category, choice, owner: session.profile.userID))
                 },
@@ -5630,6 +5631,12 @@ struct ATHLTHTrainView: View {
     }
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
+    private struct HomeBasicWatchRequest {
+        let category: ATHLTHTrainAllWorkoutCategoriesSheet.Category
+        let owner: UUID
+    }
+    @State private var homeBasicWatchFallback: HomeBasicWatchRequest?
+    @State private var homeBasicPreflightInProgress = false
     @State private var delayedPlanStart: DelayedTrainPlanStart?
     @State private var isRecheckingWatchActivity = false
     @State private var watchActivityCheckMessage: String?
@@ -6512,6 +6519,7 @@ struct ATHLTHTrainView: View {
         .onChange(of: session.profile.userID) { _, userID in
             // Never reuse another athlete's selected Train subsection or timers.
             delayedPlanStart = nil
+            homeBasicWatchFallback = nil
             restoreTrainSection(for: userID)
             restoreDelayedPlanStartIfNeeded()
         }
@@ -6649,6 +6657,31 @@ struct ATHLTHTrainView: View {
             // Preserve the viewport when leaving Train. Resetting three
             // ScrollPositions during a tab transition can force layout
             // work on the main thread and cause a visible hitch.
+        }
+        .alert(
+            ATHLTHLocalization.choose(english: "Apple Watch is not available", norwegian: "Apple Watch er ikke tilgjengelig"),
+            isPresented: Binding(
+                get: { homeBasicWatchFallback != nil },
+                set: { if !$0 { homeBasicWatchFallback = nil } }
+            ),
+            presenting: homeBasicWatchFallback
+        ) { request in
+            Button(ATHLTHLocalization.choose(english: "Start on iPhone", norwegian: "Start på iPhone")) {
+                homeBasicWatchFallback = nil
+                startHomeBasicQuick(request.category, choice: .iPhone, owner: request.owner)
+            }
+            Button(ATHLTHLocalization.choose(english: "Try again", norwegian: "Prøv igjen")) {
+                homeBasicWatchFallback = nil
+                startHomeBasicQuick(request.category, choice: .appleWatch, owner: request.owner)
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {
+                homeBasicWatchFallback = nil
+            }
+        } message: { _ in
+            Text(ATHLTHLocalization.choose(
+                english: "We could not confirm the connection to your watch. No new workout has been started. Start on iPhone instead, or check your watch and try again.",
+                norwegian: "Vi får ikke bekreftet forbindelsen til klokken. Ingen ny økt er startet. Start på iPhone i stedet, eller sjekk klokken og prøv igjen."
+            ))
         }
         .alert("ATHLTH", isPresented: Binding(
             get: {
@@ -9097,14 +9130,46 @@ struct ATHLTHTrainView: View {
         owner: UUID
     ) {
         guard session.profile.userID == owner, category.isAvailable,
-              !hasOngoingTrainWorkout else { return }
-        guard let device = choice.resolve(watchAvailable: watchConnection.isVerifiedForLiveLaunch) else {
-            watchTransferError = ATHLTHLocalization.choose(
-                english: "Apple Watch is not currently available. Choose iPhone or reconnect Watch.",
-                norwegian: "Apple Watch er ikke tilgjengelig akkurat nå. Velg iPhone eller koble til klokken."
-            )
-            return
+              !homeBasicPreflightInProgress, !hasOngoingTrainWorkout else { return }
+
+        // Refresh/check the live link only when an athlete requests a Watch recording.
+        if choice != .iPhone {
+            homeBasicPreflightInProgress = true
+            Task { @MainActor in
+                defer { homeBasicPreflightInProgress = false }
+                guard session.profile.userID == owner else { return }
+                watchConnection.refreshStatus()
+                guard watchConnection.isVerifiedForLiveLaunch else {
+                    homeBasicWatchFallback = HomeBasicWatchRequest(category: category, owner: owner)
+                    return
+                }
+
+                // Query before any HealthKit launch. A missing acknowledgement
+                // after dispatch must never trigger a second recording.
+                let status = await watchConnection.checkWatchWorkoutActivity()
+                guard session.profile.userID == owner else { return }
+                if status == .active || watchConnection.hasActiveWatchWorkout {
+                    watchTransferError = watchConnection.blockedWatchWorkoutLaunchError.localizedDescription
+                    return
+                }
+                guard status == .clear, watchConnection.isVerifiedForLiveLaunch else {
+                    homeBasicWatchFallback = HomeBasicWatchRequest(category: category, owner: owner)
+                    return
+                }
+                guard !hasOngoingTrainWorkout else { return }
+                launchHomeBasicQuick(category, device: .appleWatch, owner: owner)
+            }
+        } else {
+            launchHomeBasicQuick(category, device: .iPhone, owner: owner)
         }
+    }
+
+    private func launchHomeBasicQuick(
+        _ category: ATHLTHTrainAllWorkoutCategoriesSheet.Category,
+        device: WorkoutCaptureDevice,
+        owner: UUID
+    ) {
+        guard session.profile.userID == owner, !hasOngoingTrainWorkout else { return }
 
         // A solo shortcut must not inherit an old shared workout setup.
         social.quickTrainFriendIDs.removeAll()
