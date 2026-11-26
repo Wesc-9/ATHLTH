@@ -19,6 +19,7 @@ private enum ATHLTHTournamentDetailTab: String, CaseIterable, Identifiable {
 struct ATHLTHTournamentLiveDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var library: ExerciseLibraryStore
+    @EnvironmentObject private var social: SocialStore
     @Environment(\.scenePhase) private var scenePhase
 
     let tournament: ATHLTHTournamentRemote
@@ -98,7 +99,7 @@ struct ATHLTHTournamentLiveDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 18) {
                 heading
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -282,7 +283,9 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
             if current.isDuel { duelParticipants } else { competitionSummary }
             HStack(spacing: 13) {
-                Label("\(confirmedEntries.count)/\(confirmedEntries.count + pendingCount) bekreftet", systemImage: "person.2")
+                if current.isDuel {
+                    Label("\(confirmedEntries.count)/\(confirmedEntries.count + pendingCount) bekreftet", systemImage: "person.2")
+                }
                 if !current.singleEventMode {
                     Label("\(verifiedMatches.filter { !$0.isWarmup }.count) godkjent",
                           systemImage: "checkmark.shield")
@@ -447,11 +450,15 @@ struct ATHLTHTournamentLiveDetailView: View {
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
                 VStack(spacing: 7) {
-                    Text(String(name(entry.userID).prefix(2)).uppercased())
-                        .font(.headline)
-                        .foregroundStyle(ATHLTHArenaV3Style.gold)
-                        .frame(width: 56, height: 56)
-                        .background(ATHLTHArenaV3Style.cream, in: Circle())
+                    if let profile = social.profile(for: entry.userID) {
+                        SocialAvatar(profile: profile, size: 56)
+                    } else {
+                        Text(String(name(entry.userID).prefix(2)).uppercased())
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            .frame(width: 56, height: 56)
+                            .background(ATHLTHArenaV3Style.cream, in: Circle())
+                    }
                     Text(name(entry.userID)).font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     Text(entry.response == "invited" ? "Invitert" : entry.isReady ? "Klar" : "Ikke klar")
