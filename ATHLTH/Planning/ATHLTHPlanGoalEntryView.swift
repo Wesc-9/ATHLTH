@@ -44,7 +44,7 @@ enum ATHLTHPlanGoalArea: String, CaseIterable, Identifiable {
     var imageName: String {
         switch self {
         case .running: return "GoalRunning"
-        case .strength: return "GoalStrength"
+        case .strength: return "ATHLTHStrengthTeam"
         case .general: return "GoalRecovery"
         case .specific: return "GoalAdventure"
         }
@@ -226,8 +226,10 @@ struct ATHLTHPlanGoalEntryView: View {
     private let bronze = ATHLTHTrainDesign.bronze
     private let divider = ATHLTHTrainDesign.rule
 
+    private var wide: Bool { widthClass == .regular }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: wide ? 18 : 15) {
             referenceHero
             Button(action: onChooseNoGoal) {
                 HStack(spacing: 14) {
@@ -270,7 +272,7 @@ struct ATHLTHPlanGoalEntryView: View {
     private var referenceHero: some View {
         ZStack(alignment: .leading) {
             GeometryReader { geometry in
-                Image("PlanGoalHero")
+                Image("ATHLTHTrackTeam")
                     .resizable()
                     .scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height)
@@ -304,7 +306,7 @@ struct ATHLTHPlanGoalEntryView: View {
                     norwegian: "Hva er målet ditt?"
                 ))
                 .font(.system(
-                    size: dynamicTypeSize.isAccessibilitySize ? 32 : 36,
+                    size: dynamicTypeSize.isAccessibilitySize ? 32 : (wide ? 42 : 36),
                     weight: .regular, design: .serif
                 ))
                 .foregroundStyle(ink)
@@ -324,7 +326,7 @@ struct ATHLTHPlanGoalEntryView: View {
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: dynamicTypeSize.isAccessibilitySize ? 205 : 129)
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? 220 : (wide ? 184 : 148))
         .clipped()
         .padding(.horizontal, -18)
         .accessibilityElement(children: .contain)
@@ -341,10 +343,10 @@ struct ATHLTHPlanGoalEntryView: View {
         } else {
             LazyVGrid(
                 columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
+                    GridItem(.flexible(), spacing: wide ? 14 : 10),
+                    GridItem(.flexible(), spacing: wide ? 14 : 10)
                 ],
-                spacing: 10
+                spacing: wide ? 14 : 10
             ) {
                 ForEach(ATHLTHPlanGoalArea.allCases) { item in
                     categoryCard(item)
@@ -379,11 +381,11 @@ struct ATHLTHPlanGoalEntryView: View {
                     endPoint: .trailing
                 )
 
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: wide ? 8 : 6) {
                     Image(systemName: item.icon)
-                        .font(.system(size: 19, weight: .medium))
+                        .font(.system(size: wide ? 23 : 20, weight: .medium))
                         .foregroundStyle(isSelected ? .white : bronze)
-                        .frame(width: 37, height: 37)
+                        .frame(width: wide ? 44 : 39, height: wide ? 44 : 39)
                         .background(
                             isSelected ? gold : ATHLTHTrainDesign.paleGold.opacity(0.72),
                             in: Circle()
@@ -393,21 +395,21 @@ struct ATHLTHPlanGoalEntryView: View {
                     Spacer(minLength: 4)
 
                     Text(item.title)
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                        .font(.system(size: wide ? 26 : 22, weight: .semibold, design: .serif))
                         .foregroundStyle(ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
 
                     Text(item.subtitle)
-                        .font(.system(size: 10.5))
+                        .font(.system(size: wide ? 14 : 12))
                         .foregroundStyle(muted)
                         .multilineTextAlignment(.leading)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 3)
-                        .frame(maxWidth: .infinity, minHeight: 27, alignment: .topLeading)
+                        .frame(maxWidth: wide ? 270 : .infinity, minHeight: wide ? 34 : 32, alignment: .topLeading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .padding(10)
+                .padding(wide ? 17 : 12)
 
                 if isSelected {
                     Image(systemName: "checkmark")
@@ -421,7 +423,7 @@ struct ATHLTHPlanGoalEntryView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 170 : 118)
+            .frame(height: dynamicTypeSize.isAccessibilitySize ? 205 : (wide ? 172 : 142))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
