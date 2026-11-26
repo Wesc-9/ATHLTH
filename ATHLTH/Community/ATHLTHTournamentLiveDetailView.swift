@@ -34,6 +34,8 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var busy = false
     @State private var publishingFeed = false
     @State private var loading = true
+    @State private var reloading = false
+    @State private var hasLoaded = false
     @State private var errorMessage: String?
     @State private var visibleMatchLimit = 80
     @State private var selectedGroup = 0
@@ -111,7 +113,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 if loading {
-                    ProgressView("Laster turnering…")
+                    ProgressView("Laster konkurranse…")
                         .frame(maxWidth: .infinity, minHeight: 180)
                 } else {
                     switch selection {
@@ -1106,8 +1108,11 @@ struct ATHLTHTournamentLiveDetailView: View {
     }
 
     @MainActor private func reload() async {
-        loading = true
-        defer { loading = false }
+        guard !reloading else { return }
+        reloading = true
+        loading = !hasLoaded
+        defer { loading = false; reloading = false }
+        for attempt in 0...1 {
         do {
             async let allTournaments = cloud.visibleTournaments()
             async let participants = cloud.entries(for: current.id)
@@ -1121,6 +1126,7 @@ struct ATHLTHTournamentLiveDetailView: View {
             // Nonparticipants may view public results but not private athlete
             // presence. That must never prevent the public detail from loading.
             let statuses = (try? await progress) ?? []
+            try Task.checkCancellation()
             latest = all.first { $0.id == current.id } ?? latest
             seasonHistory = ATHLTHTournamentSeasonContinuation.history(current: current, visible: all)
             continuationExists = all.contains {
@@ -1130,13 +1136,25 @@ struct ATHLTHTournamentLiveDetailView: View {
             matches = newMatches
             confirmedStandings = updatedRankings
             athleteProgress = statuses
-            names = try await cloud.athleteNames(
-                for: Set(newEntries.map(\.userID))
-            )
+            hasLoaded = true
+            if let updatedNames = try? await cloud.athleteNames(for: Set(newEntries.map(\.userID))) {
+                names.merge(updatedNames) { _, new in new }
+            }
             errorMessage = nil
+            return
         } catch {
-            errorMessage = "Kunne ikke hente konkurransen: " +
-                error.localizedDescription
+            if Task.isCancelled { return }
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                if attempt == 0 { continue }
+                return
+            }
+            if attempt == 0, let networkError = error as? URLError,
+               [.timedOut, .networkConnectionLost, .notConnectedToInternet].contains(networkError.code) {
+                do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
+                continue
+            }
+            errorMessage = "Kunne ikke hente konkurransen: " + error.localizedDescription
+        }
         }
     }
 
