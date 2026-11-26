@@ -4,11 +4,11 @@ import UIKit
 
 /// Clubs is a standalone sidebar destination, not a Community tab.
 final class ATHLTHCommunityV5NavigationTests: XCTestCase {
-    func testCommunityHasThreeDestinationsWithoutClubs() {
+    func testCommunityHasOnlyOverview() {
         XCTAssertEqual(ATHLTHCommunityMainTab.allCases,
-                       [.overview, .arena, .events])
+                       [.overview])
         XCTAssertEqual(
-            Set(ATHLTHCommunityMainTab.allCases.map(\.id)).count, 3)
+            Set(ATHLTHCommunityMainTab.allCases.map(\.id)).count, 1)
     }
 
     func testCommunityTabLabelsAreNotBlank() {
@@ -42,11 +42,9 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
         XCTAssertFalse(CommunityInterest.strength.matchesClub(club))
     }
 
-    func testOnlyThreeNewCommunityHeroAssets() throws {
+    func testCommunityOverviewHeroAsset() throws {
         let mapping: [ATHLTHCommunityMainTab: String] = [
-            .overview: "CommunityHero",
-            .arena: "CommunityArenaHero",
-            .events: "CommunityEventsHero"
+            .overview: "CommunityHero"
         ]
         XCTAssertEqual(mapping.count, ATHLTHCommunityMainTab.allCases.count)
         for tab in ATHLTHCommunityMainTab.allCases {

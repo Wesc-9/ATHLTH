@@ -179,6 +179,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onOpenSettings: () -> Void
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
     var onOpenClubs: () -> Void = {}
+    var onOpenCompetition: () -> Void = {}
     let onOpenTrainTogether: () -> Void
     let onOpenWorkoutLibrary: () -> Void
     let onOpenCoach: () -> Void
@@ -399,6 +400,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             ATHLTHStudioHomeCommunitySummary(
                                 onOpenCommunity: onOpenCommunity,
                                 onOpenClubs: onOpenClubs,
+                                onOpenCompetition: onOpenCompetition,
                                 onOpenTrainTogether: onOpenTrainTogether,
                                 onOpenNotifications: onOpenNotifications
                             )

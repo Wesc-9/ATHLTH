@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHStudioHomeCommunitySummary: View {
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
     var onOpenClubs: () -> Void = {}
+    var onOpenCompetition: () -> Void = {}
     let onOpenTrainTogether: () -> Void
     let onOpenNotifications: () -> Void
 
@@ -227,7 +228,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 tr("Events", "Arrangementer"),
                 detail: tr("Coming up in your clubs", "Kommende i klubbene dine"),
                 symbol: "calendar",
-                action: { onOpenCommunity(.events) }
+                action: { onOpenClubs() }
             )
 
             if groups.homeUpcomingEventsLoadFailed {
@@ -248,8 +249,8 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ink)
                         Text(tr(
-                            "See other public events in Community.",
-                            "Oppdag flere åpne arrangementer i Fellesskap."
+                            "See upcoming events in your clubs.",
+                            "Se kommende arrangementer i klubbene dine."
                         ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -259,7 +260,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 .padding(.vertical, 5)
             } else {
                 ForEach(nextEvents) { event in
-                    Button { onOpenCommunity(.events) } label: {
+                    Button { onOpenClubs() } label: {
                         HStack(alignment: .top, spacing: 10) {
                             symbolTile("calendar")
                             VStack(alignment: .leading, spacing: 4) {
@@ -370,7 +371,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                     .buttonStyle(.plain)
                 }
                 ForEach(Array(challengeInvites.prefix(2))) { challenge in
-                    Button { onOpenCommunity(.arena) } label: {
+                    Button { onOpenCompetition() } label: {
                         inviteRow(
                             tr("Challenge invitation", "Utfordringsinvitasjon"),
                             subtitle: challenge.title,
@@ -385,7 +386,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 HStack(spacing: 12) {
                     actionLink(tr("Explore challenges", "Utforsk utfordringer"),
                                symbol: "trophy") {
-                        onOpenCommunity(.arena)
+                        onOpenCompetition()
                     }
                     actionLink(tr("All invitations", "Alle invitasjoner"),
                                symbol: "arrow.up.right") {
@@ -395,7 +396,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 VStack(spacing: 8) {
                     actionLink(tr("Explore challenges", "Utforsk utfordringer"),
                                symbol: "trophy") {
-                        onOpenCommunity(.arena)
+                        onOpenCompetition()
                     }
                     actionLink(tr("All invitations", "Alle invitasjoner"),
                                symbol: "arrow.up.right") {
