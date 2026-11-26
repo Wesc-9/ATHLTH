@@ -178,6 +178,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onOpenInsights: () -> Void
     let onOpenSettings: () -> Void
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
+    var onOpenClubs: () -> Void = {}
     let onOpenTrainTogether: () -> Void
     let onOpenWorkoutLibrary: () -> Void
     let onOpenCoach: () -> Void
@@ -397,6 +398,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             progressCard(wide: split, data: home.analytics, week: week)
                             ATHLTHStudioHomeCommunitySummary(
                                 onOpenCommunity: onOpenCommunity,
+                                onOpenClubs: onOpenClubs,
                                 onOpenTrainTogether: onOpenTrainTogether,
                                 onOpenNotifications: onOpenNotifications
                             )

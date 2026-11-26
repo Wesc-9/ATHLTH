@@ -59,6 +59,36 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
         }
     }
 
+    func testStandaloneClubHubFiltersLocationVisibilityAndMembership() {
+        func club(_ name: String, place: String, visibility: String = "public") -> CommunityGroupRecord {
+            CommunityGroupRecord(id: UUID(), creatorID: UUID(), name: name,
+                summary: "Løping", locationName: place, visibility: visibility,
+                imageURL: nil, headerImageURL: nil, featuredChallengeID: nil,
+                joinMode: "open", membersCanCreateContent: true,
+                createdAt: Date(), updatedAt: Date())
+        }
+        let local = club("Trondheim Løpeklubb", place: "Trondheim")
+        let privateClub = club("Privat", place: "Trondheim", visibility: "private")
+        let distant = club("Oslo", place: "Oslo")
+        let joined = club("Medlem", place: "Trondheim")
+        XCTAssertEqual(ATHLTHClubHubPolicy.discovery(
+            [local, privateClub, distant, joined, local], excluded: [joined.id],
+            query: "lop", place: "trondheim", interest: .running).map(\.id), [local.id])
+    }
+
+    func testClubHubManagementRequiresCurrentAccountsRole() {
+        let account = UUID()
+        let club = CommunityGroupRecord(id: UUID(), creatorID: UUID(), name: "Club",
+            summary: "", locationName: "", visibility: "public", imageURL: nil,
+            headerImageURL: nil, featuredChallengeID: nil, joinMode: "open",
+            membersCanCreateContent: true, createdAt: Date(), updatedAt: Date())
+        let otherAdmin = CommunityGroupMemberRecord(groupID: club.id, userID: UUID(), role: "admin", joinedAt: Date())
+        let ownAdmin = CommunityGroupMemberRecord(groupID: club.id, userID: account, role: "admin", joinedAt: Date())
+        XCTAssertFalse(ATHLTHClubHubPolicy.manages(club, memberships: [otherAdmin], account: account))
+        XCTAssertTrue(ATHLTHClubHubPolicy.manages(club, memberships: [ownAdmin], account: account))
+        XCTAssertTrue(ATHLTHClubHubPolicy.manages(club, memberships: [], account: club.creatorID))
+    }
+
     func testClubDiscoveryNormalizesNorwegianNames() {
         XCTAssertTrue(ATHLTHCommunityDiscoveryPolicy.matches(
             "loPE", in: ["Løpeklubb", "Trondheim"]))

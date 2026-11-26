@@ -4,6 +4,7 @@ import SwiftUI
 /// All actions open the full iPad detail column; this view never owns a sheet.
 struct ATHLTHStudioHomeCommunitySummary: View {
     let onOpenCommunity: (ATHLTHCommunityMainTab) -> Void
+    var onOpenClubs: () -> Void = {}
     let onOpenTrainTogether: () -> Void
     let onOpenNotifications: () -> Void
 
@@ -127,7 +128,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                     "\(groups.joinedGroupIDs.count) medlemskap"
                 ),
                 symbol: "person.3",
-                action: { onOpenCommunity(.clubs) }
+                action: { onOpenClubs() }
             )
 
             if myClubs.isEmpty {
@@ -141,7 +142,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 .padding(.vertical, 6)
             } else {
                 ForEach(myClubs) { club in
-                    Button { onOpenCommunity(.clubs) } label: {
+                    Button { onOpenClubs() } label: {
                         HStack(spacing: 10) {
                             symbolTile("person.3.fill")
                             VStack(alignment: .leading, spacing: 3) {
@@ -186,7 +187,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 .fixedSize(horizontal: false, vertical: true)
             } else {
                 ForEach(suggestedClubs) { club in
-                    Button { onOpenCommunity(.clubs) } label: {
+                    Button { onOpenClubs() } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus.circle")
                                 .foregroundStyle(gold)
@@ -207,7 +208,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
             }
 
             actionLink(tr("See all clubs", "Se alle klubber"), symbol: "arrow.up.right") {
-                onOpenCommunity(.clubs)
+                onOpenClubs()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -358,7 +359,7 @@ struct ATHLTHStudioHomeCommunitySummary: View {
                 .foregroundStyle(.secondary)
             } else {
                 ForEach(Array(clubInvites.prefix(2)), id: \.groupID) { invite in
-                    Button { onOpenCommunity(.clubs) } label: {
+                    Button { onOpenClubs() } label: {
                         inviteRow(
                             tr("Club invitation", "Klubbinvitasjon"),
                             subtitle: groups.groups.first(where: { $0.id == invite.groupID })?.name

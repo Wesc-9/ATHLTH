@@ -1182,6 +1182,7 @@ struct ATHLTHiPadStudioRootView: View {
                 onOpenCommunity: { tab in
                     openCommunity(tab)
                 },
+                onOpenClubs: { openSidebarPage(.clubs) },
                 onOpenTrainTogether: {
                     openSidebarPage(.trainTogether)
                 },

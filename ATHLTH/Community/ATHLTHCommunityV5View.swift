@@ -1722,6 +1722,15 @@ struct ATHLTHClubsHubView: View {
         }
     }
 
+    private var upcomingEvents: [CommunityGroupEventRecord] {
+        guard groups.homeUpcomingEventsAccountID == session.profile.userID else { return [] }
+        let ids = Set(memberships.map(\.id))
+        return Array(groups.homeUpcomingEvents.filter {
+            ids.contains($0.groupID) && $0.startsAt >= Date() &&
+            $0.status != "draft" && $0.status != "cancelled"
+        }.sorted { $0.startsAt < $1.startsAt }.prefix(3))
+    }
+
     private var searchTerm: String {
         let local = place.trimmingCharacters(in: .whitespacesAndNewlines)
         return local.isEmpty ? query.trimmingCharacters(in: .whitespacesAndNewlines) : local
@@ -1775,11 +1784,13 @@ struct ATHLTHClubsHubView: View {
         .task(id: session.profile.userID) {
             await groups.refresh(force: false)
             await groups.refreshRecentChatActivity()
+            await groups.refreshHomeUpcomingEvents()
         }
         .refreshable {
             await groups.refresh(force: true)
             if discovery && searchTerm.count >= 2 { await groups.search(searchTerm) }
-            await groups.refreshRecentChatActivity()
+            await groups.refreshRecentChatActivity(force: true)
+            await groups.refreshHomeUpcomingEvents(force: true)
         }
         .task(id: "\(session.profile.userID)-\(discovery)-\(searchTerm)") {
             guard discovery, searchTerm.count >= 2 else {
@@ -1882,6 +1893,23 @@ struct ATHLTHClubsHubView: View {
                       tr("Discover a club that suits you.", "Utforsk klubber som passer deg."))
             } else {
                 clubGrid(joined, isManagement: false)
+            }
+            if !upcomingEvents.isEmpty {
+                heading(tr("Upcoming club events", "Kommende klubbarrangementer"), "calendar")
+                ForEach(upcomingEvents) { event in
+                    if let club = groups.group(for: event.groupID) {
+                        NavigationLink {
+                            CommunityGroupEventDetailView(group: club, event: event)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(event.title).font(.headline).foregroundStyle(CommunityReferenceStyle.ink)
+                                Text(club.name).font(.caption).foregroundStyle(CommunityReferenceStyle.muted)
+                                Text(event.startsAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption).foregroundStyle(CommunityReferenceStyle.darkGold)
+                            }.padding(12).communityReferenceCard()
+                        }.buttonStyle(.plain)
+                    }
+                }
             }
             Button { discovery = true } label: {
                 actionLabel(tr("Find clubs", "Finn klubber"), "magnifyingglass")
