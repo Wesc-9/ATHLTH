@@ -69,6 +69,8 @@ targets:
         NSCalendarsUsageDescription: "ATHLTH uses calendar access to show your planned workouts in a dedicated ATHLTH calendar."
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        # Allow adaptive ProMotion animations above 60 Hz on supported iPhones.
+        CADisableMinimumFrameDurationOnPhone: true
         ATHLTHLegalOperatorName: "$(ATHLTH_LEGAL_OPERATOR_NAME)"
         ATHLTHPrivacyContactEmail: "$(ATHLTH_PRIVACY_CONTACT_EMAIL)"
         ATHLTHSupportURL: "$(ATHLTH_SUPPORT_URL)"
