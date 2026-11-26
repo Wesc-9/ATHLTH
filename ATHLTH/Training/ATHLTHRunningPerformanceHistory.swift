@@ -63,7 +63,8 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
                   phase.activeSeconds > 0 else { return nil }
             return ATHLTHSoloGhostComparison.result(
                 elapsed: phase.activeSeconds, meters: phase.distanceMeters, pace: pace,
-                targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds)
+                targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds,
+                samples: phone.recordedRunningMinutes ?? [])
         }()
         guard full || solo != nil else { return nil }
         id = phone.id

@@ -9059,7 +9059,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             result.soloGhostResult = ATHLTHSoloGhostComparison.result(
                 elapsed: phase?.activeSeconds ?? max(0, elapsedTime - structuredStepStartElapsedTime),
                 meters: phase?.distanceMeters ?? max(0, distanceMeters - structuredStepStartDistanceMeters),
-                pace: pace, targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds)
+                pace: pace, targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds,
+                samples: recordedStructuredRunMinutes)
         }
 
         if structuredWorkoutComplete,

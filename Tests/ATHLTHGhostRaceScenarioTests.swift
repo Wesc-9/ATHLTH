@@ -652,3 +652,11 @@ final class ATHLTHSoloGhostCoachTests: XCTestCase {
         XCTAssertNil(ATHLTHSoloGhostComparison.coachPhrase(leadMeters: .nan, pace: 300, norwegian: true))
     }
 }
+
+final class ATHLTHSoloGhostSampledStatsTests: XCTestCase {
+    func testNoSamplesDoesNotInventRaceStatistics() {
+        XCTAssertNil(ATHLTHSoloGhostComparison.sampledStats(samples: [], pace: 300, finishElapsed: 600))
+        XCTAssertNil(ATHLTHSoloGhostComparison.result(elapsed: 300, meters: 1000, pace: 300,
+            targetMeters: nil, targetSeconds: nil)?.sampledStats)
+    }
+}

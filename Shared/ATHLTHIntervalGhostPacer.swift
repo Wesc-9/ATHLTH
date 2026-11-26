@@ -289,16 +289,56 @@ enum ATHLTHIntervalGhostPacer {
 /// the ghost's speed, not a prediction of future finish time.
 enum ATHLTHSoloGhostComparison {
     enum Outcome: String, Codable, Hashable { case ahead, behind, tied, incomplete }
+    struct SampledStats: Codable, Hashable {
+        let largestLeadMeters: Double
+        let largestDeficitMeters: Double
+        let observedLeadChanges: Int
+    }
     struct Result: Codable, Hashable {
         let leadMeters: Double
         let timeGapSeconds: Double
         let outcome: Outcome
+        var sampledStats: SampledStats? = nil
+    }
+
+    /// The existing measured minute checkpoints are intentionally used
+    /// rather than inventing second-by-second race history. Missing or
+    /// inconsistent samples make these optional statistics unavailable.
+    static func sampledStats(samples: [ATHLTHRecordedRunningMinute], pace: Double,
+                             finishElapsed: Double) -> SampledStats? {
+        guard finishElapsed.isFinite, finishElapsed > 0 else { return nil }
+        let phase = samples.filter {
+            $0.stepIndex == 0 && $0.stepElapsedAtEndSeconds <= finishElapsed + 0.5
+        }.sorted { $0.stepElapsedAtEndSeconds < $1.stepElapsedAtEndSeconds }
+        guard phase.count >= 2 else { return nil }
+        var elapsed = 0.0, distance = 0.0, best = 0.0, worst = 0.0
+        var sign = 0, changes = 0
+        for sample in phase {
+            let end = sample.stepElapsedAtEndSeconds
+            let duration = sample.activeSeconds
+            let meters = sample.recordedDistanceMeters
+            guard end.isFinite, duration.isFinite, meters.isFinite,
+                  duration > 0, meters >= 0, end > elapsed,
+                  abs(end - elapsed - duration) <= 2 else { return nil }
+            distance += meters
+            elapsed = end
+            guard let gap = lead(elapsed: elapsed, meters: distance, pace: pace) else { return nil }
+            best = max(best, gap)
+            worst = max(worst, -gap)
+            let direction = gap >= 8 ? 1 : gap <= -8 ? -1 : 0
+            if direction != 0 {
+                if sign != 0 && sign != direction { changes += 1 }
+                sign = direction
+            }
+        }
+        return SampledStats(largestLeadMeters: best, largestDeficitMeters: worst, observedLeadChanges: changes)
     }
 
     /// Use the recorded race phase rather than the enclosing workout,
     /// which can include additional running after a completed goal.
     static func result(elapsed: Double, meters: Double, pace: Double,
-                       targetMeters: Double?, targetSeconds: Double?) -> Result? {
+                       targetMeters: Double?, targetSeconds: Double?,
+                       samples: [ATHLTHRecordedRunningMinute] = []) -> Result? {
         guard let lead = lead(elapsed: elapsed, meters: meters, pace: pace),
               let gap = timeGap(leadMeters: lead, pace: pace),
               targetMeters == nil || targetSeconds == nil else { return nil }
@@ -316,7 +356,8 @@ enum ATHLTHSoloGhostComparison {
         guard finishGap.isFinite else { return nil }
         let outcome: Outcome = incomplete ? .incomplete
             : abs(finishGap) < 0.5 ? .tied : finishGap > 0 ? .ahead : .behind
-        return Result(leadMeters: lead, timeGapSeconds: finishGap, outcome: outcome)
+        return Result(leadMeters: lead, timeGapSeconds: finishGap, outcome: outcome,
+                      sampledStats: sampledStats(samples: samples, pace: pace, finishElapsed: elapsed))
     }
 
     static func coachPhrase(leadMeters: Double, pace: Double, norwegian: Bool) -> String? {

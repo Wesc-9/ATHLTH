@@ -4930,6 +4930,14 @@ private struct ATHLTHSoloGhostHistoryCard: View {
                         english: result.timeGapSeconds >= 0 ? "sec ahead" : "sec behind",
                         norwegian: result.timeGapSeconds >= 0 ? "sek foran" : "sek bak"))
                     .font(.headline.monospacedDigit())
+                if let stats = result.sampledStats {
+                    Divider()
+                    LabeledContent("Største målte ledelse", value: String(format: "%.0f m", stats.largestLeadMeters))
+                    LabeledContent("Største målte etterslep", value: String(format: "%.0f m", stats.largestDeficitMeters))
+                    LabeledContent("Observerte lederskifter", value: "\(stats.observedLeadChanges)")
+                    Text("Basert på registrerte minuttpunkter. Korte endringer mellom målingene kan mangle.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
