@@ -31,6 +31,12 @@ actor ATHLTHLocalExerciseThumbnailLoader {
         thumbnails.removeAllObjects()
     }
 
+    func applyResourcePolicy(_ policy: ATHLTHSystemResourcePolicy) {
+        thumbnails.countLimit = policy == .normal ? 240 : 100
+        thumbnails.totalCostLimit = policy.exerciseThumbnailBudget
+        if policy == .critical { clearCache() }
+    }
+
     func thumbnail(for url: URL, maxPixels: Int) -> ATHLTHPreparedExerciseThumbnail? {
         guard url.isFileURL, !Task.isCancelled else { return nil }
         let pixels = max(64, min(maxPixels, 640))
