@@ -614,6 +614,10 @@ struct TrainTogetherLiveDraftRoomView: View {
                          icon: draft.isPhysical ? "person.2.fill" : "network")
                 infoPill(draft.isCollaborative ? tr("Both edit", "Begge redigerer") : tr("Owner edits", "Arrangør redigerer"),
                          icon: draft.isCollaborative ? "square.and.pencil" : "lock")
+                if let indoor = workout.trainTogetherIndoor {
+                    infoPill(indoor ? tr("Indoors", "Innendørs") : tr("Outdoors", "Utendørs"),
+                             icon: indoor ? "house" : "sun.max")
+                }
             }
         }
     }
