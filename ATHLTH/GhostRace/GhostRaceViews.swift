@@ -44,8 +44,8 @@ private enum GhostRaceHubMode:
         switch self {
         case .live:
             return ATHLTHLocalization.choose(
-                english: "Race live against visible runners or invite a friend.",
-                norwegian: "Konkurrer live mot andre løpere eller inviter en venn."
+                english: "Compare with visible runners. Organised duels use Competition.",
+                norwegian: "Sammenlign deg med synlige løpere. Organiserte dueller opprettes i Konkurranse."
             )
         case .past:
             return ATHLTHLocalization.choose(
@@ -182,6 +182,7 @@ struct GhostRaceHubView: View {
     @State private var replayFavoriteIDs: Set<UUID> = []
     @State private var pendingReplayRun: WorkoutSummary?
     @State private var pendingLiveRace: ATHLTHLiveWorkoutSession?
+    @State private var showingRunningDuel = false
     @State private var errorMessage: String?
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
@@ -247,6 +248,9 @@ struct GhostRaceHubView: View {
             )
             .ignoresSafeArea()
         )
+        .sheet(isPresented: $showingRunningDuel) {
+            ATHLTHCompetitionEntryView(initialFormat: .duel, locksRunningActivity: true)
+        }
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: session.profile.userID) {
@@ -674,20 +678,20 @@ struct GhostRaceHubView: View {
                         norwegian: "Oppdater tilgjengelige delte løp nedenfor"
                     ))
 
-                    NavigationLink {
-                        GhostFriendRaceHubView(openInvitationOnAppear: true)
+                    Button {
+                        showingRunningDuel = true
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Label(ATHLTHLocalization.choose(
-                                english: "Friends", norwegian: "Venner"
+                                english: "Duel", norwegian: "Duell"
                             ), systemImage: "person.2.fill")
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
 
                             HStack(spacing: 5) {
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Send invitation",
-                                    norwegian: "Send invitasjon"
+                                    english: "Open Competition",
+                                    norwegian: "Åpne Konkurranse"
                                 ))
                                 Image(systemName: "arrow.up.right")
                             }
