@@ -536,9 +536,6 @@ struct ATHLTHSettingsView: View {
         }
         .background(settingsBackground)
         .navigationTitle(category.title)
-        .navigationDestination(for: ConnectionItem.self) { item in
-            connectionDestination(item)
-        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
     }
@@ -1074,7 +1071,9 @@ settingsSection(ATHLTHLocalization.choose(
     private func connectionRow(_ item: ConnectionItem) -> some View {
         switch item {
         case .health:
-            NavigationLink(value: ConnectionItem.health) {
+            NavigationLink {
+                connectionDestination(.health)
+            } label: {
                 PremiumSettingsRow(
                     icon: "heart.fill",
                     iconTint: .pink,
@@ -1098,7 +1097,9 @@ settingsSection(ATHLTHLocalization.choose(
             .buttonStyle(.plain)
         case .calendar:
             if session.subscriptionAccess.hasPaidAccess {
-                NavigationLink(value: ConnectionItem.calendar) {
+                NavigationLink {
+                connectionDestination(.calendar)
+            } label: {
                     PremiumSettingsRow(
                         icon: "calendar",
                         iconTint: .red,
@@ -1181,7 +1182,9 @@ settingsSection(ATHLTHLocalization.choose(
                     )
                 }
             } else {
-                NavigationLink(value: ConnectionItem.watch) {
+                NavigationLink {
+                connectionDestination(.watch)
+            } label: {
                     PremiumSettingsRow(
                         icon: "applewatch",
                         iconTint: ATHLTHTheme.primaryText,
@@ -1197,7 +1200,9 @@ settingsSection(ATHLTHLocalization.choose(
                 .buttonStyle(.plain)
             }
         case .garmin:
-            NavigationLink(value: ConnectionItem.garmin) {
+            NavigationLink {
+                connectionDestination(.garmin)
+            } label: {
                 PremiumSettingsRow(
                     icon: "watch.analog",
                     iconTint: ATHLTHTheme.accentDeep,
@@ -1217,7 +1222,9 @@ settingsSection(ATHLTHLocalization.choose(
             }
             .buttonStyle(.plain)
         case .spotify:
-            NavigationLink(value: ConnectionItem.spotify) {
+            NavigationLink {
+                connectionDestination(.spotify)
+            } label: {
                 PremiumSettingsRow(
                     icon: "music.note",
                     iconTint: spotifyGreen,
@@ -1235,7 +1242,9 @@ settingsSection(ATHLTHLocalization.choose(
             }
             .buttonStyle(.plain)
         case .homeAssistant:
-            NavigationLink(value: ConnectionItem.homeAssistant) {
+            NavigationLink {
+                connectionDestination(.homeAssistant)
+            } label: {
                 PremiumSettingsRow(
                     icon: "house.fill",
                     iconTint: Color(red: 0.12, green: 0.58, blue: 0.86),
