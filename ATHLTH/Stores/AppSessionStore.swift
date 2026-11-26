@@ -4877,6 +4877,11 @@ final class AppSessionStore: ObservableObject {
               let sourceDay = plan.weeks.flatMap(\.days).first(where: {
                   $0.sessions.contains(where: { $0.id == workoutID })
               }),
+              let workout = sourceDay.sessions.first(where: { $0.id == workoutID }),
+              !workout.isExplicitRestDay, workout.cancelledAt == nil, workout.trainTogetherMode == nil,
+              recordedTimes(for: workoutID) == nil,
+              linkedHealthWorkoutID(planID: planID, sessionID: workoutID) == nil,
+              !isPlanSessionManuallyCompleted(planID: planID, sessionID: workoutID),
               let source = planStudioDayLocation(in: plan, dayID: sourceDay.id),
               source.date >= Calendar.current.startOfDay(for: Date()),
               Calendar.current.startOfDay(for: targetDate) >=
@@ -4890,11 +4895,11 @@ final class AppSessionStore: ObservableObject {
                   healthWorkouts: healthWorkouts,
                   strengthHistory: strengthHistory
               ) else { return false }
-        return movePlanSession(
-            planID: planID,
-            sessionID: workoutID,
-            to: targetDate
-        )
+        guard movePlanSession(planID: planID, sessionID: workoutID, to: targetDate) else { return false }
+        if let moved = trainingPlan(withID: planID)?.weeks.flatMap(\.days).flatMap(\.sessions).first(where: { $0.id == workoutID }) {
+            PlannedWorkoutReminderScheduler.sync(moved)
+        }
+        return true
     }
 
     /// Atomically move/copy several planned workouts from the iPad editor.

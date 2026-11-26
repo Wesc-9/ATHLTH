@@ -27,6 +27,8 @@ struct PlannedWorkoutDetailView: View {
     @State private var showingHealthLinkPicker = false
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
+    @State private var showingMovePlannedWorkout = false
+    @State private var showingCancelPlannedWorkout = false
     @State private var showingRemovePlannedWorkoutConfirmation = false
     @State private var removalError: String?
 
@@ -115,6 +117,27 @@ struct PlannedWorkoutDetailView: View {
                 planID: planID, sessionID: currentWorkout.id
             )
         )
+    }
+
+    private var canRescheduleOrCancel: Bool {
+        guard !currentWorkout.isExplicitRestDay, !isCompleted, !isSkipped,
+              currentWorkout.cancelledAt == nil, currentWorkout.trainTogetherMode == nil,
+              session.recordedTimes(for: currentWorkout.id) == nil,
+              storedLinkedHealthID == nil, !isManuallyCompleted, !hasRecordedStrengthWorkout,
+              let plan = session.trainingPlan(withID: planID),
+              plan.weeks.flatMap(\.days).flatMap(\.sessions).contains(where: { $0.id == currentWorkout.id })
+        else { return false }
+        return true
+    }
+
+    private var canMoveScheduledWorkout: Bool {
+        guard canRescheduleOrCancel,
+              let plan = session.trainingPlan(withID: planID),
+              let original = ATHLTHTrainWorkoutMovePolicy.originalDate(for: currentWorkout.id, in: plan),
+              original >= Calendar.current.startOfDay(for: .now),
+              let bounds = ATHLTHTrainWorkoutMovePolicy.allowedDates(startDate: plan.startDate, weekCount: plan.weeks.count)
+        else { return false }
+        return bounds.lowerBound != bounds.upperBound || !Calendar.current.isDate(original, inSameDayAs: bounds.lowerBound)
     }
 
     var body: some View {
@@ -275,15 +298,33 @@ struct PlannedWorkoutDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if !isCompleted && !isSkipped &&
                         session.recordedTimes(for: currentWorkout.id) == nil {
-                        Button(role: .destructive) {
-                            showingRemovePlannedWorkoutConfirmation = true
+                        Menu {
+                            if canMoveScheduledWorkout {
+                                Button {
+                                    showingMovePlannedWorkout = true
+                                } label: {
+                                    Label(ATHLTHLocalization.choose(english: "Move workout", norwegian: "Flytt økt"), systemImage: "calendar.badge.clock")
+                                }
+                            }
+                            if canRescheduleOrCancel {
+                                Button(role: .destructive) {
+                                    showingCancelPlannedWorkout = true
+                                } label: {
+                                    Label(ATHLTHLocalization.choose(english: "Cancel workout", norwegian: "Avlys økt"), systemImage: "calendar.badge.minus")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                showingRemovePlannedWorkoutConfirmation = true
+                            } label: {
+                                Label(ATHLTHLocalization.choose(english: "Remove workout", norwegian: "Slett økt"), systemImage: "trash")
+                            }
                         } label: {
-                            Image(systemName: "trash")
+                            Image(systemName: "ellipsis.circle")
                         }
                         .accessibilityLabel(
                             ATHLTHLocalization.choose(
-                                english: "Remove planned workout",
-                                norwegian: "Fjern planlagt økt"
+                                english: "Workout actions",
+                                norwegian: "Økthandlinger"
                             )
                         )
                     }
@@ -297,6 +338,26 @@ struct PlannedWorkoutDetailView: View {
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showingMovePlannedWorkout) {
+                ATHLTHScheduledPlanWorkoutMoveSheet(planID: planID, workoutID: currentWorkout.id)
+                    .presentationDetents([.medium, .large])
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(english: "Cancel this workout?", norwegian: "Avlyse denne økten?"),
+                isPresented: $showingCancelPlannedWorkout,
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(english: "Cancel workout", norwegian: "Avlys økten"), role: .destructive) {
+                    guard canRescheduleOrCancel,
+                          session.cancelPlannedWorkout(currentWorkout.id, healthWorkouts: health.workouts, strengthHistory: strength.workoutHistory) else {
+                        removalError = ATHLTHLocalization.choose(english: "The workout has changed or started.", norwegian: "Økten er endret eller påbegynt.")
+                        return
+                    }
+                }
+                Button(ATHLTHLocalization.choose(english: "Keep workout", norwegian: "Behold økten"), role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(english: "It stays in the calendar as cancelled.", norwegian: "Økten blir stående som avlyst i kalenderen."))
             }
             .confirmationDialog(
                 ATHLTHLocalization.choose(
@@ -1755,5 +1816,85 @@ struct PlannedWorkoutDetailView: View {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%d:%02d /km", minutes, seconds)
+    }
+}
+
+
+/// Shared date picker for the calendar and the plan's workout details.
+struct ATHLTHScheduledPlanWorkoutMoveSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+    let planID: UUID
+    let workoutID: UUID
+    @State private var targetDate = Calendar.current.startOfDay(for: .now)
+    @State private var originalDate: Date?
+    @State private var expectedVersion: Int?
+    @State private var failed = false
+
+    private var plan: TrainingPlan? { session.trainingPlan(withID: planID) }
+    private var bounds: ClosedRange<Date>? {
+        guard let plan else { return nil }
+        return ATHLTHTrainWorkoutMovePolicy.allowedDates(startDate: plan.startDate, weekCount: plan.weeks.count)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                if let bounds {
+                    Text(ATHLTHLocalization.choose(english: "Choose a new day in your training plan. The workout and its start time are kept.", norwegian: "Velg en ny dag i treningsplanen. Økten og klokkeslettet beholdes."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    DatePicker(
+                        ATHLTHLocalization.choose(english: "New date", norwegian: "Ny dato"),
+                        selection: $targetDate,
+                        in: bounds,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.compact)
+                    Button {
+                        guard let expectedVersion,
+                              ATHLTHTrainWorkoutMovePolicy.canMove(to: targetDate, from: originalDate, within: bounds),
+                              session.movePlanStudioWorkout(planID: planID, workoutID: workoutID, targetDate: targetDate,
+                                  expectedVersion: expectedVersion, healthWorkouts: health.workouts,
+                                  strengthHistory: strength.workoutHistory) else {
+                            failed = true
+                            return
+                        }
+                        dismiss()
+                    } label: {
+                        Text(ATHLTHLocalization.choose(english: "Move workout", norwegian: "Flytt økten"))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .disabled(expectedVersion == nil || !ATHLTHTrainWorkoutMovePolicy.canMove(to: targetDate, from: originalDate, within: bounds))
+                } else {
+                    Text(ATHLTHLocalization.choose(english: "No available dates in this plan.", norwegian: "Ingen tilgjengelige datoer i denne planen."))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(22)
+            .navigationTitle(ATHLTHLocalization.choose(english: "Move workout", norwegian: "Flytt økt"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) { dismiss() }
+                }
+            }
+            .onAppear {
+                guard expectedVersion == nil, let plan, let bounds else { return }
+                expectedVersion = plan.version
+                originalDate = ATHLTHTrainWorkoutMovePolicy.originalDate(for: workoutID, in: plan)
+                targetDate = min(max(originalDate ?? bounds.lowerBound, bounds.lowerBound), bounds.upperBound)
+            }
+            .alert(ATHLTHLocalization.choose(english: "Could not move workout", norwegian: "Kunne ikke flytte økten"), isPresented: $failed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(ATHLTHLocalization.choose(english: "Check the date and whether the workout has started or changed.", norwegian: "Kontroller datoen og om økten er påbegynt eller endret."))
+            }
+        }
     }
 }

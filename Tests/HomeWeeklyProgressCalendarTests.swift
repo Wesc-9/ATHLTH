@@ -359,4 +359,12 @@ final class HomeTodayRecordedWorkoutPolicyTests: XCTestCase {
             today: today
         ))
     }
+
+    func testDeliberateWeeklySwipeMovesExactlyOneWeek() {
+        XCTAssertEqual(HomeWeeklyProgressSwipePolicy.weekDelta(horizontal: 65, vertical: 10), -1)
+        XCTAssertEqual(HomeWeeklyProgressSwipePolicy.weekDelta(horizontal: -180, vertical: 20), 1)
+        XCTAssertEqual(HomeWeeklyProgressSwipePolicy.weekDelta(horizontal: 64, vertical: 0), 0)
+        XCTAssertEqual(HomeWeeklyProgressSwipePolicy.weekDelta(horizontal: 100, vertical: 60), 0)
+        XCTAssertEqual(HomeWeeklyProgressSwipePolicy.weekDelta(horizontal: 10, vertical: 120), 0)
+    }
 }

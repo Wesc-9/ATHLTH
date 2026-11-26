@@ -1805,6 +1805,15 @@ struct HomeScheduledCommunityEvent:
     let detail: String
 }
 
+enum HomeWeeklyProgressSwipePolicy {
+    static func weekDelta(horizontal: CGFloat, vertical: CGFloat) -> Int {
+        guard horizontal.isFinite, vertical.isFinite,
+              abs(horizontal) >= 65,
+              abs(horizontal) >= 2 * abs(vertical) else { return 0 }
+        return horizontal < 0 ? 1 : -1
+    }
+}
+
 struct HomeWeeklyProgressStrip:
     View {
     @EnvironmentObject private var session:
@@ -1888,6 +1897,20 @@ struct HomeWeeklyProgressStrip:
                     dayButton(date)
                 }
             }
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 28, coordinateSpace: .local)
+                    .onEnded { value in
+                        let delta = HomeWeeklyProgressSwipePolicy.weekDelta(
+                            horizontal: value.translation.width,
+                            vertical: value.translation.height
+                        )
+                        guard delta != 0 else { return }
+                        withAnimation(.snappy(duration: 0.22)) {
+                            weekOffset += delta
+                        }
+                    }
+            )
             .accessibilityIdentifier("athlth-home-weekly-progress-days")
 
             Divider()
@@ -2307,12 +2330,9 @@ struct HomeWeeklyProgressStrip:
             .overlay {
                 if isToday {
                     Circle()
-                        .stroke(
-                            ATHLTHTheme
-                                .accentDeep,
-                            lineWidth: 1.1
-                        )
-                        .padding(-2)
+                        .strokeBorder(ATHLTHTheme.premiumGold, lineWidth: 2)
+                        .padding(-3)
+                        .allowsHitTesting(false)
                 }
             }
 
@@ -3264,6 +3284,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     @State private var selectedPlanTracking: PlannedSession?
     @State private var pendingStandaloneTracking: PlannedSession?
     @State private var selectedStandaloneTracking: PlannedSession?
+    @State private var movingPlanWorkout: PlannedSession?
     @State private var editingWorkoutTime: PlannedSession?
     @State private var editedWorkoutClock = Date()
     @State private var showingTimeEditFailure = false
@@ -3721,6 +3742,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     onStartWorkout: onStartStandaloneWorkout
                 )
                 .presentationDetents([.fraction(0.85), .large])
+            }
+            .sheet(item: $movingPlanWorkout) { workout in
+                if let planID = HomeWeeklyProgressCalendar.containingPlanID(for: workout, in: plan) {
+                    ATHLTHScheduledPlanWorkoutMoveSheet(planID: planID, workoutID: workout.id)
+                        .presentationDetents([.medium, .large])
+                }
             }
             .sheet(item: $editingWorkoutTime) { workout in
                 timeOnlyEditor(for: workout)
@@ -4973,6 +5000,17 @@ private struct HomeWeeklyProgressDaySheet: View {
                                 english: "Change time",
                                 norwegian: "Endre klokkeslett"
                             ), systemImage: "clock")
+                        }
+                        if let planID = HomeWeeklyProgressCalendar.containingPlanID(for: workout, in: plan),
+                           let livePlan = session.trainingPlan(withID: planID),
+                           let original = ATHLTHTrainWorkoutMovePolicy.originalDate(for: workout.id, in: livePlan),
+                           original >= Calendar.current.startOfDay(for: .now),
+                           ATHLTHTrainWorkoutMovePolicy.allowedDates(startDate: livePlan.startDate, weekCount: livePlan.weeks.count) != nil {
+                            Button {
+                                movingPlanWorkout = workout
+                            } label: {
+                                Label(ATHLTHLocalization.choose(english: "Move workout", norwegian: "Flytt økt"), systemImage: "calendar.badge.clock")
+                            }
                         }
                         Button {
                             workoutPendingCancellation = workout
