@@ -29,6 +29,15 @@ struct ATHLTHStudioDashboardView: View {
     @State private var periodDays = 28
     @State private var selectedWeekDate = Date.now
     @State private var showingReadinessExplanation = false
+    @State private var dailyFormEntry: RecoverySorenessEntry?
+
+    private var dailyFormAssessment: ATHLTHDailyFormPolicy.Assessment {
+        ATHLTHDailyFormPolicy.assess(entry: dailyFormEntry, measuredScore: health.recovery.score)
+    }
+
+    private func reloadDailyForm() {
+        dailyFormEntry = RecoverySorenessStore(accountID: session.profile.userID).todayEntry
+    }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -204,11 +213,19 @@ struct ATHLTHStudioDashboardView: View {
                 selectedWeekDate = .now
             }
         }
+        .task(id: session.profile.userID) { reloadDailyForm() }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
+            reloadDailyForm()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            reloadDailyForm()
+        }
         .sheet(isPresented: $showingReadinessExplanation) {
             ATHLTHReadinessExplanationSheet(
                 recovery: health.recovery,
                 sleep: health.sleep,
-                heart: health.heart
+                heart: health.heart,
+                assessment: dailyFormAssessment
             )
         }
     }
@@ -537,7 +554,7 @@ struct ATHLTHStudioDashboardView: View {
                 ))
                 .frame(maxWidth: .infinity, minHeight: 140)
                 Spacer(minLength: 0)
-            } else if healthHasDataAccess, let score = health.recovery.score {
+            } else if healthHasDataAccess, let score = dailyFormAssessment.displayScore {
                 HStack(alignment: .center, spacing: 19) {
                     ZStack {
                         Circle()
@@ -587,10 +604,12 @@ struct ATHLTHStudioDashboardView: View {
                     }
                 }
 
-                Text(tr(
-                    "A locally calculated signal from sleep, HRV and resting heart rate. Not a medical assessment.",
-                    "Beregnet lokalt fra søvn, HRV og hvilepuls. Ikke en medisinsk vurdering."
-                ))
+                Text(dailyFormAssessment.hasCheckInWarning
+                     ? dailyFormAssessment.recommendation.title + ". " + dailyFormAssessment.explanation
+                     : dailyFormAssessment.contextualScore != nil
+                       ? tr("Includes your check-in and measured recovery.", "Inkluderer innsjekken din og målt restitusjon.")
+                       : tr("A locally calculated signal from sleep, HRV and resting heart rate. Not a medical assessment.",
+                            "Beregnet lokalt fra søvn, HRV og hvilepuls. Ikke en medisinsk vurdering."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -668,7 +687,7 @@ struct ATHLTHStudioDashboardView: View {
     }
 
     private var readinessTitle: String {
-        switch health.recovery.state {
+        switch dailyFormAssessment.displayState(measuredState: health.recovery.state) {
         case .ready:
             tr("Strong recovery signal", "Gode restitusjonssignaler")
         case .balanced:

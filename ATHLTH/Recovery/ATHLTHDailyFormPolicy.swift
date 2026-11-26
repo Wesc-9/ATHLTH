@@ -25,6 +25,25 @@ enum ATHLTHDailyFormPolicy {
         let illnessReported: Bool
         let answeredCount: Int
 
+        /// Overall daily form uses the existing combined score, while the
+        /// measured recovery result stays intact for diagnostics and history.
+        var displayScore: Int? { contextualScore ?? measuredScore }
+
+        var hasCheckIn: Bool { answeredCount > 0 || illnessReported }
+
+        var hasCheckInWarning: Bool {
+            hasCheckIn && (recommendation == .lighter || recommendation == .rest)
+        }
+
+        func displayState(measuredState: RecoveryReadinessState) -> RecoveryReadinessState {
+            guard let score = displayScore else { return measuredState }
+            if illnessReported { return .recover }
+            if score < 50 || measuredState == .recover { return .recover }
+            if score < 65 || hasCheckInWarning || measuredState == .takeItEasy { return .takeItEasy }
+            if score < 80 || measuredState == .balanced { return .balanced }
+            return measuredState
+        }
+
         var explanation: String {
             reasons.isEmpty
                 ? ATHLTHLocalization.choose(english: "Answer a daily check-in to personalize your advice.", norwegian: "Registrer dagsformen for å tilpasse treningsrådene.")

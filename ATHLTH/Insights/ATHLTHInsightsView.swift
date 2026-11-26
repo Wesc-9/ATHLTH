@@ -120,7 +120,8 @@ struct ATHLTHInsightsView: View {
                 ATHLTHReadinessExplanationSheet(
                     recovery: health.recovery,
                     sleep: health.sleep,
-                    heart: health.heart
+                    heart: health.heart,
+                    assessment: dailyFormAssessment
                 )
             }
             .refreshable {
@@ -330,9 +331,13 @@ struct ATHLTHInsightsView: View {
         workoutFeedbackSummary = lines.joined(separator: "\n\n")
     }
 
-    private var dailyFormAdviceCard: some View {
-        let assessment = ATHLTHDailyFormPolicy.assess(
+    private var dailyFormAssessment: ATHLTHDailyFormPolicy.Assessment {
+        ATHLTHDailyFormPolicy.assess(
             entry: checkInStore.todayEntry, measuredScore: health.recovery.score)
+    }
+
+    private var dailyFormAdviceCard: some View {
+        let assessment = dailyFormAssessment
         return VStack(alignment: .leading, spacing: 9) {
             HStack {
                 Label(tr("Your own assessment", "Din egen vurdering"), systemImage: "heart.text.square")
@@ -358,14 +363,14 @@ struct ATHLTHInsightsView: View {
             }
             if let contextual = assessment.contextualScore {
                 HStack {
-                    Text(tr("Combined guidance score", "Veiledende samlet score"))
+                    Text(tr("Overall daily form", "Samlet dagsform"))
                     Spacer()
                     Text("\(contextual)/100").monospacedDigit().fontWeight(.semibold)
                 }
                 .font(.subheadline)
             }
-            Text(tr("Guidance only. Measured readiness remains unchanged.",
-                    "Veiledende. Målt restitusjonsscore er uendret."))
+            Text(tr("Daily form includes your check-in when enough answers are available. Measured recovery remains separate.",
+                    "Dagsformen inkluderer innsjekken når nok svar er tilgjengelige. Målt restitusjon holdes separat."))
                 .font(.caption2)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
         }
@@ -474,7 +479,8 @@ struct ATHLTHInsightsView: View {
     }
 
     private var readinessOverviewCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let assessment = dailyFormAssessment
+        return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 9) {
                 Image(systemName: pulseIcon)
                     .foregroundStyle(ATHLTHTrainDesign.gold)
@@ -496,7 +502,7 @@ struct ATHLTHInsightsView: View {
                         .rotationEffect(.degrees(90))
                     Circle()
                         .trim(from: 0.10,
-                              to: 0.10 + 0.80 * CGFloat(health.recovery.score ?? 0) / 100)
+                              to: 0.10 + 0.80 * CGFloat(assessment.displayScore ?? 0) / 100)
                         .stroke(
                             AngularGradient(
                                 colors: [Color(red: 0.89, green: 0.84, blue: 0.76),
@@ -507,7 +513,7 @@ struct ATHLTHInsightsView: View {
                         )
                         .rotationEffect(.degrees(90))
                     VStack(spacing: 2) {
-                        Text(health.recovery.score.map(String.init) ?? "—")
+                        Text(assessment.displayScore.map(String.init) ?? "—")
                             .font(.system(size: 37, weight: .regular, design: .serif))
                             .monospacedDigit()
                             .foregroundStyle(ATHLTHTrainDesign.ink)
@@ -520,7 +526,7 @@ struct ATHLTHInsightsView: View {
                 }
                 .frame(width: 135, height: 135)
                 .accessibilityLabel(tr("Readiness score", "Dagsformscore") +
-                    ": " + (health.recovery.score.map(String.init) ?? tr("Unavailable", "Ikke tilgjengelig")))
+                    ": " + (assessment.displayScore.map(String.init) ?? tr("Unavailable", "Ikke tilgjengelig")))
 
                 VStack(alignment: .leading, spacing: 9) {
                     Text(pulseTitle.capitalized)
@@ -546,6 +552,14 @@ struct ATHLTHInsightsView: View {
                 }
             }
 
+            if let measured = assessment.measuredScore, let reported = assessment.subjectiveScore,
+               assessment.contextualScore != nil {
+                Text(tr("Measured recovery: \(measured) · Check-in: \(reported)",
+                        "Målt restitusjon: \(measured) · Innsjekk: \(reported)"))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+
             HStack(spacing: 7) {
                 readinessMetric(tr("Sleep", "Søvn"), sleepValue, "moon.stars.fill",
                                 garmin: garminReading(.sleep))
@@ -555,8 +569,8 @@ struct ATHLTHInsightsView: View {
                                 garmin: garminReading(.hrv))
             }
             if garminReading(.sleep) != nil || garminReading(.restingHeartRate) != nil || garminReading(.hrv) != nil {
-                Text(tr("Garmin measurements are displayed here. The readiness score still uses the Apple Health baseline.",
-                        "Garmin-målinger vises her. Dagsformscoren bruker fortsatt grunnlinjen fra Apple Helse."))
+                Text(tr("Garmin measurements are displayed here. Measured recovery still uses the Apple Health baseline.",
+                        "Garmin-målinger vises her. Målt restitusjon bruker fortsatt grunnlinjen fra Apple Helse."))
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
@@ -732,7 +746,7 @@ struct ATHLTHInsightsView: View {
 
 
     private var readinessRingCaption: String {
-        if health.recovery.score != nil { return pulseTitle.capitalized }
+        if dailyFormAssessment.displayScore != nil { return pulseTitle.capitalized }
         guard let diagnostic = health.recovery.diagnostics else {
             return tr("Loading", "Henter data")
         }
@@ -747,12 +761,14 @@ struct ATHLTHInsightsView: View {
     }
 
     private var pulseTitle: String {
-        switch health.recovery.state {
+        switch dailyFormAssessment.displayState(measuredState: health.recovery.state) {
         case .ready:
             return ATHLTHLocalization.choose(english: "STRONG", norwegian: "STERK")
         case .balanced:
             return ATHLTHLocalization.choose(english: "BALANCED", norwegian: "BALANSERT")
-        case .takeItEasy, .recover:
+        case .takeItEasy:
+            return tr("TAKE IT EASY", "TA DET ROLIG")
+        case .recover:
             return ATHLTHLocalization.choose(english: "RECOVER", norwegian: "RESTITUSJON")
         case .buildingBaseline:
             if let diagnostic = health.recovery.diagnostics {
@@ -768,7 +784,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var pulseIcon: String {
-        switch health.recovery.state {
+        switch dailyFormAssessment.displayState(measuredState: health.recovery.state) {
         case .ready:
             return "bolt.heart.fill"
         case .balanced:
@@ -783,7 +799,11 @@ struct ATHLTHInsightsView: View {
     }
 
     private var pulseDetail: String {
-        switch health.recovery.state {
+        let assessment = dailyFormAssessment
+        if assessment.hasCheckInWarning {
+            return assessment.recommendation.title + ". " + assessment.explanation
+        }
+        switch dailyFormAssessment.displayState(measuredState: health.recovery.state) {
         case .ready:
             return tr("Your recovery signals support a normal training day.",
                       "Restitusjonssignalene støtter en normal treningsdag.")

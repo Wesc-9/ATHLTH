@@ -40,6 +40,31 @@ final class ATHLTHDailyFormPolicyTests: XCTestCase {
         XCTAssertEqual(advice.suggestedWorkout, .restDay)
     }
 
+    func testDisplayedDailyFormUsesCombinedScoreAndCheckInWarning() {
+        let result = ATHLTHDailyFormPolicy.assess(
+            entry: entry(energy: 3, stress: 4, motivation: 4, sleep: 2), measuredScore: 88)
+        XCTAssertEqual(result.subjectiveScore, 44)
+        XCTAssertEqual(result.displayScore, 75)
+        XCTAssertEqual(result.measuredScore, 88)
+        XCTAssertEqual(result.displayState(measuredState: .ready), .takeItEasy)
+    }
+
+    func testDisplayKeepsMeasuredScoreForPartialCheckInButRespectsWarning() {
+        let result = ATHLTHDailyFormPolicy.assess(entry: entry(energy: 1), measuredScore: 90)
+        XCTAssertEqual(result.displayScore, 90)
+        XCTAssertEqual(result.displayState(measuredState: .ready), .takeItEasy)
+        let illness = ATHLTHDailyFormPolicy.assess(entry: entry(unwell: true), measuredScore: 90)
+        XCTAssertEqual(illness.displayState(measuredState: .ready), .recover)
+        let missing = ATHLTHDailyFormPolicy.assess(entry: entry(energy: 1), measuredScore: nil)
+        XCTAssertNil(missing.displayScore)
+    }
+
+    func testDisplayWithoutCheckInRetainsMeasuredReadiness() {
+        let result = ATHLTHDailyFormPolicy.assess(entry: nil, measuredScore: 88)
+        XCTAssertEqual(result.displayScore, 88)
+        XCTAssertEqual(result.displayState(measuredState: .ready), .ready)
+    }
+
     func testAccountScopedCheckInsDoNotLeakOrOverwrite() {
         let defaults = UserDefaults(suiteName: "athlth.dailyform.tests.\(UUID())")!
         let first = UUID(), second = UUID()

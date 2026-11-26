@@ -1,12 +1,15 @@
 import SwiftUI
 
 /// Read-only explanation of exactly the score displayed in Insights.
-/// Mirrors RecoveryReadinessEngine's 45/35/20 calculations; all values
-/// stay on device, with no AI call, new permissions or additional score.
+/// Explains both the measured 45/35/20 recovery and the existing
+/// check-in-adjusted daily form. All calculations stay on device.
 struct ATHLTHReadinessExplanationSheet: View {
     let recovery: RecoveryReadinessSummary
     let sleep: SleepSummary
     let heart: HeartSummary
+    var assessment: ATHLTHDailyFormPolicy.Assessment? = nil
+
+    private var displayScore: Int? { assessment?.displayScore ?? recovery.score }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -40,12 +43,40 @@ struct ATHLTHReadinessExplanationSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     hero
+                    if let assessment, assessment.hasCheckIn {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text(tr("Your check-in", "Din innsjekk"))
+                                .font(.system(size: 22, design: .serif))
+                            if let measured = assessment.measuredScore {
+                                Text(tr("Measured recovery: \(measured)/100", "Målt restitusjon: \(measured)/100"))
+                            }
+                            if let reported = assessment.subjectiveScore {
+                                Text(tr("Reported form: \(reported)/100", "Opplevd form: \(reported)/100"))
+                            }
+                            if let combined = assessment.contextualScore {
+                                Text(tr("Overall daily form: \(combined)/100", "Samlet dagsform: \(combined)/100"))
+                                    .fontWeight(.semibold)
+                                Text(tr("70% measured recovery + 30% check-in. Check-in can lower, but never raise, measured recovery.",
+                                        "70 % målt restitusjon + 30 % innsjekk. Innsjekken kan redusere, men aldri øke, målt restitusjon."))
+                            } else {
+                                Text(tr("No combined score without measured recovery and at least three valid answers.",
+                                        "Ingen samlet score uten målt restitusjon og minst tre gyldige svar."))
+                            }
+                            Text(assessment.recommendation.title).fontWeight(.semibold)
+                            Text(assessment.explanation)
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHInsightsStyle.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(17)
+                        .athlthInsightsSurface()
+                    }
                     if let diagnostics = recovery.diagnostics {
                         coverageCard(diagnostics)
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(tr("What makes up your score",
-                                "Slik beregnes scoren"))
+                        Text(tr("How measured recovery is calculated",
+                                "Slik beregnes målt restitusjon"))
                             .font(.system(size: 22, weight: .regular, design: .serif))
                             .foregroundStyle(ATHLTHInsightsStyle.ink)
                         Text(tr(
@@ -146,11 +177,11 @@ struct ATHLTHReadinessExplanationSheet: View {
                         .stroke(ATHLTHInsightsStyle.track, lineWidth: 9)
                     Circle()
                         .trim(from: 0,
-                              to: CGFloat(recovery.score ?? 0) / 100)
+                              to: CGFloat(displayScore ?? 0) / 100)
                         .stroke(ATHLTHInsightsStyle.accent,
                                 style: StrokeStyle(lineWidth: 9, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    Text(recovery.score.map(String.init) ?? "—")
+                    Text(displayScore.map(String.init) ?? "—")
                         .font(.system(size: 38, weight: .regular, design: .serif))
                         .foregroundStyle(ATHLTHInsightsStyle.ink)
                         .monospacedDigit()
@@ -170,8 +201,11 @@ struct ATHLTHReadinessExplanationSheet: View {
                         .foregroundStyle(ATHLTHInsightsStyle.muted)
                 }
             }
-            Text(tr("Calculated locally from Apple Health data",
-                    "Beregnet lokalt fra Apple Health-data"))
+            Text(assessment?.contextualScore != nil
+                 ? tr("Calculated locally from health data and your check-in",
+                      "Beregnet lokalt fra helsedata og innsjekken din")
+                 : tr("Calculated locally from Apple Health data",
+                      "Beregnet lokalt fra Apple Health-data"))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(ATHLTHInsightsStyle.muted)
         }
@@ -340,7 +374,7 @@ struct ATHLTHReadinessExplanationSheet: View {
     }
 
     private var readinessTitle: String {
-        switch recovery.state {
+        switch assessment?.displayState(measuredState: recovery.state) ?? recovery.state {
         case .ready: return tr("Strong", "Sterk")
         case .balanced: return tr("Balanced", "Balansert")
         case .takeItEasy: return tr("Take it easy", "Ta det rolig")
