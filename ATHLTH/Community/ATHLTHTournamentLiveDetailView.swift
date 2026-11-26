@@ -28,6 +28,9 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var confirmedStandings: [ATHLTHTournamentStandingRemote] = []
     @State private var athleteProgress: [ATHLTHTournamentAthleteProgress] = []
     @State private var names: [UUID: String] = [:]
+    @State private var exerciseCandidates: [ATHLTHTournamentExerciseCandidateRemote] = []
+    @State private var exerciseNames: [UUID: String] = [:]
+    @State private var exerciseLoadFailed = false
     @State private var selection: ATHLTHTournamentDetailTab = .overview
     @State private var showingMatchReport: ATHLTHTournamentRemoteMatch?
     @State private var editingExerciseDeadlines: ATHLTHTournamentRemoteMatch?
@@ -173,32 +176,28 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
             }
         }
-        .confirmationDialog(
-            "Avlyse turneringen?",
-            isPresented: $showingCancelConfirmation
-        ) {
-            Button("Avlys turneringen", role: .destructive) {
-                Task { await cancel() }
-            }
-            Button("Behold turneringen", role: .cancel) {}
-        } message: {
-            Text("Invitasjonene avsluttes. Oppsettet blir stående i historikken.")
-        }
-        .confirmationDialog(
-            "Trekk invitasjonen?",
-            isPresented: Binding(
-                get: { pendingWithdrawal != nil },
-                set: { if !$0 { pendingWithdrawal = nil } }
+        .sheet(isPresented: $showingCancelConfirmation) {
+            ATHLTHCompetitionConfirmationCard(
+                title: "Avlyse konkurransen?",
+                message: "Invitasjonene avsluttes. Oppsettet blir stående i historikken.",
+                actionTitle: "Avlys konkurransen",
+                onConfirm: { Task { await cancel() } }
             )
-        ) {
-            Button("Trekk invitasjonen", role: .destructive) {
-                guard let selected = pendingWithdrawal else { return }
-                pendingWithdrawal = nil
-                Task { await withdraw(selected) }
-            }
-            Button("Avbryt", role: .cancel) { pendingWithdrawal = nil }
-        } message: {
-            Text("Deltakeren tas ut av invitasjonslisten. Andre svar beholdes.")
+        }
+        .sheet(isPresented: Binding(
+            get: { pendingWithdrawal != nil },
+            set: { if !$0 { pendingWithdrawal = nil } }
+        )) {
+            ATHLTHCompetitionConfirmationCard(
+                title: "Trekke invitasjonen?",
+                message: "Deltakeren tas ut av invitasjonslisten. Andre svar beholdes.",
+                actionTitle: "Trekk invitasjonen",
+                onConfirm: {
+                    guard let selected = pendingWithdrawal else { return }
+                    pendingWithdrawal = nil
+                    Task { await withdraw(selected) }
+                }
+            )
         }
         .refreshable { await reload() }
         .task(id: current.id) { await reload() }
@@ -264,7 +263,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 13) {
-                Label("\(confirmedEntries.count) deltakere", systemImage: "person.2")
+                Label("\(confirmedEntries.count)/\(confirmedEntries.count + pendingCount) bekreftet", systemImage: "person.2")
                 if !current.singleEventMode {
                     Label("\(verifiedMatches.filter { !$0.isWarmup }.count) godkjent",
                           systemImage: "checkmark.shield")
@@ -555,6 +554,7 @@ struct ATHLTHTournamentLiveDetailView: View {
 
     private var overview: some View {
         VStack(alignment: .leading, spacing: 17) {
+            competitionExercises
             eventInformation
             if !current.singleEventMode && !current.isDuel { seasonHistorySection }
             athleteProgressSection
@@ -699,6 +699,63 @@ struct ATHLTHTournamentLiveDetailView: View {
         ) {
             await reload()
         }
+    }
+
+    private var competitionExercises: some View {
+        let selected = exerciseCandidates.filter { $0.selectedPosition != nil }
+            .sorted { ($0.selectedPosition ?? 0) < ($1.selectedPosition ?? 0) }
+        let visible = selected.isEmpty && current.exerciseSelectionFinalizedAt == nil
+            ? exerciseCandidates : selected
+        return VStack(alignment: .leading, spacing: 14) {
+            sectionTitle("Konkurranseøvelser")
+            Text("\(current.exerciseCount) øvelser · " + (current.exerciseSelectionFinalizedAt == nil ? "Utvalg ikke endelig" : "Bekreftet oppsett"))
+                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if exerciseLoadFailed {
+                Text("Kunne ikke hente alle øvelsesdetaljene. Dra ned for å oppdatere.")
+                    .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            if visible.isEmpty {
+                Text("Ingen øvelser tilgjengelig ennå.")
+                    .font(.subheadline).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            ForEach(visible) { candidate in
+                NavigationLink {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(exerciseNames[candidate.lookupID] ?? "Øvelse")
+                            .font(.system(size: 30, design: .serif))
+                        Label("Frist per øvelse: \(current.completionHours) timer", systemImage: "clock")
+                        Text("Detaljert øvelsesinstruksjon er ikke tilgjengelig her ennå.")
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        Spacer()
+                    }
+                    .padding(22)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
+                    .navigationTitle("Øvelsesdetaljer")
+                    .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: candidate.activityTemplateID == nil ? "dumbbell" : "figure.run")
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            .frame(width: 44, height: 44)
+                            .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(exerciseNames[candidate.lookupID] ?? "Øvelse")
+                                .font(.subheadline.weight(.semibold))
+                            Text(candidate.selectedPosition == nil ? "Foreslått" : "Valgt øvelse")
+                                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHArenaV3Style.panel())
     }
 
     private var eventInformation: some View {
@@ -1140,6 +1197,15 @@ struct ATHLTHTournamentLiveDetailView: View {
             if let updatedNames = try? await cloud.athleteNames(for: Set(newEntries.map(\.userID))) {
                 names.merge(updatedNames) { _, new in new }
             }
+            let lobby = ATHLTHTournamentLobbyCloudService()
+            do {
+                let candidates = try await lobby.candidates(tournamentID: current.id)
+                exerciseCandidates = candidates
+                exerciseNames = try await lobby.candidateNames(candidates)
+                exerciseLoadFailed = false
+            } catch {
+                if !Task.isCancelled { exerciseLoadFailed = true }
+            }
             errorMessage = nil
             return
         } catch {
@@ -1424,5 +1490,48 @@ struct ATHLTHTournamentMatchReportView: View {
             try await onSubmit(home, away, evidence)
             dismiss()
         } catch { errorMessage = error.localizedDescription }
+    }
+}
+
+
+/// Shared destructive-action presentation for competition surfaces.
+struct ATHLTHCompetitionConfirmationCard: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let message: String
+    let actionTitle: String
+    let onConfirm: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(.red)
+                .frame(width: 60, height: 60)
+                .background(Color.red.opacity(0.08), in: Circle())
+            Text(title).font(.system(size: 27, design: .serif))
+                .multilineTextAlignment(.center)
+            Text(message).font(.subheadline)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                onConfirm()
+                dismiss()
+            } label: {
+                Text(actionTitle).font(.headline).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(Color.red, in: Capsule())
+            }.buttonStyle(.plain)
+            Button("Behold / gå tilbake") { dismiss() }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHArenaV3Style.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .padding(24)
+        .frame(maxWidth: 480)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
