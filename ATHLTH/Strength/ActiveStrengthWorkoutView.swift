@@ -42,6 +42,8 @@ struct ActiveStrengthWorkoutView: View {
     @State private var finishInProgress = false
     @State private var presentedCompletedWorkoutID: UUID?
     @State private var finishRequestedAt: Date?
+    @State private var confirmingTemplateUpdate = false
+    @State private var templateUpdated = false
 
     private var presentedCompletedWorkout: StrengthWorkoutLog? {
         guard appSession.signedIn, strength.isLoaded(for: appSession.profile.userID),
@@ -2089,6 +2091,51 @@ struct ActiveStrengthWorkoutView: View {
             .accessibilityIdentifier("athlth-watch-finish-pending-summary")
     }
 
+    private func editableSourceTemplate(for workout: StrengthWorkoutLog) -> PlannedSession? {
+        guard let id = workout.sourceWorkoutTemplateID ?? workout.plannedSessionID,
+              let source = appSession.savedWorkoutTemplates.first(where: { $0.id == id }),
+              source.kind == .strength, source.workoutBlocks?.isEmpty != false,
+              workout.exercises.allSatisfy({ $0.groupID == nil && $0.isEmbeddedRunningInterval != true })
+        else { return nil }
+        return source
+    }
+
+    private func updateSourceTemplate(from workout: StrengthWorkoutLog) -> Bool {
+        guard var source = editableSourceTemplate(for: workout) else { return false }
+        let original = source.exercises
+        source.exercises = workout.exercises.compactMap { exercise in
+            let sets = exercise.sets.filter { $0.skippedAt == nil }
+            guard let first = sets.first else { return nil }
+            var planned = original.first(where: { $0.id == exercise.plannedExerciseID }) ??
+                PlannedExercise(id: UUID(), exerciseID: exercise.exercise.libraryExerciseID,
+                    embeddedExercise: exercise.exercise, sets: sets.count, reps: first.plannedReps,
+                    targetWeightKilograms: first.plannedWeightKilograms, targetRPE: first.plannedRPE,
+                    restSeconds: first.restSeconds, notes: nil)
+            planned.exerciseID = exercise.exercise.libraryExerciseID
+            planned.embeddedExercise = exercise.exercise
+            planned.sets = sets.count
+            planned.reps = first.plannedReps
+            planned.targetWeightKilograms = first.plannedWeightKilograms
+            planned.targetRPE = first.plannedRPE
+            planned.targetRIR = first.plannedRIR
+            planned.restSeconds = exercise.restSecondsOverride ?? first.restSeconds
+            planned.targetKind = first.resolvedTargetKind
+            planned.targetDurationSeconds = first.plannedDurationSeconds
+            planned.loadKind = first.resolvedLoadKind
+            planned.targetResistanceLevel = first.plannedResistanceLevel
+            planned.setTargets = sets.map { set in
+                PlannedExerciseSetTarget(reps: set.plannedReps, durationSeconds: set.plannedDurationSeconds,
+                    weightKilograms: set.plannedWeightKilograms, resistanceLevel: set.plannedResistanceLevel,
+                    restSeconds: exercise.restSecondsOverride ?? set.restSeconds, targetRPE: set.plannedRPE,
+                    targetRIR: set.plannedRIR, isWarmUp: set.isWarmUp, setType: set.plannedSetType,
+                    tempo: set.plannedTempo, notes: set.plannedNote)
+            }
+            return planned
+        }
+        guard !source.exercises.isEmpty else { return false }
+        return appSession.updateSavedWorkoutTemplate(source, id: source.id)
+    }
+
     private func strengthResultCard(
         _ workout: StrengthWorkoutLog, awaitingWatch: Bool
     ) -> some View {
@@ -2157,6 +2204,19 @@ struct ActiveStrengthWorkoutView: View {
                 focusedWorkoutExerciseReview(workout, readOnly: true)
 
                 if !awaitingWatch {
+                    if editableSourceTemplate(for: workout) != nil {
+                        Button {
+                            confirmingTemplateUpdate = true
+                        } label: {
+                            Label(templateUpdated
+                                  ? ATHLTHLocalization.choose(english: "Workout updated", norwegian: "Treningsøkt oppdatert")
+                                  : ATHLTHLocalization.choose(english: "Update original workout", norwegian: "Oppdater opprinnelig treningsøkt"),
+                                  systemImage: templateUpdated ? "checkmark.circle" : "square.and.arrow.down")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(templateUpdated)
+                    }
                     Button {
                         dismiss()
                     } label: {
@@ -2176,6 +2236,17 @@ struct ActiveStrengthWorkoutView: View {
         }
         .scrollIndicators(.hidden)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .confirmationDialog(ATHLTHLocalization.choose(english: "Update the saved workout?", norwegian: "Oppdatere lagret treningsøkt?"),
+                            isPresented: $confirmingTemplateUpdate, titleVisibility: .visible) {
+            Button(ATHLTHLocalization.choose(english: "Update workout", norwegian: "Oppdater treningsøkt")) {
+                templateUpdated = updateSourceTemplate(from: workout)
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only the saved template's planned targets and exercise order are updated. Recorded history is unchanged.",
+                norwegian: "Kun planlagte mål og øvelsesrekkefølge i den lagrede økten oppdateres. Registrert historikk endres ikke."
+            ))
+        }
     }
 
     @ViewBuilder
