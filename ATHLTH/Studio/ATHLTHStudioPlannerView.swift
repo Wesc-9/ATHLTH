@@ -8,6 +8,7 @@ struct ATHLTHStudioPlannerView: View {
     var onSendToWatch: ((UUID, UUID) -> Void)? = nil
     var onStartAfter: ((UUID, UUID, TimeInterval) -> Void)? = nil
     var onOpenCoach: (() -> Void)? = nil
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -24,6 +25,8 @@ struct ATHLTHStudioPlannerView: View {
     @State private var showingScenarioPreview = false
     @State private var showingCoachAdaptation = false
     @State private var showingNewPlanBuilder = false
+    @State private var showingCoachPlanBuilder = false
+    @State private var coachCreatedPlanID: UUID?
     @State private var openedPlanID: UUID?
     @State private var screen: PlanStudioScreen = .home
 
@@ -145,6 +148,20 @@ struct ATHLTHStudioPlannerView: View {
             )
             .environment(\.athlthStudioFullscreenEditing, true)
         }
+        .sheet(
+            isPresented: $showingCoachPlanBuilder.keepingPresentedWhenInactive(scenePhase),
+            onDismiss: finishCoachPlanCreation
+        ) {
+            // The same standalone Coach journey as the shared workout/plan
+            // builder. No seed and no singleWorkoutDate means a full plan.
+            AIProgramBuilderView(
+                mode: .generate,
+                onProgramCreatedPlanID: { id in
+                    coachCreatedPlanID = id
+                }
+            )
+            .presentationDetents([.large])
+        }
         .sheet(isPresented: $showingCoachAdaptation) {
             CoachPlanAdaptationView(planID: openedPlanID ?? session.activePlan?.id)
                 .presentationDetents([.large])
@@ -174,6 +191,21 @@ struct ATHLTHStudioPlannerView: View {
         .background(.white.opacity(0.82))
     }
 
+    private func openCoachPlanBuilder() {
+        coachCreatedPlanID = nil
+        showingCoachPlanBuilder = true
+    }
+
+    private func finishCoachPlanCreation() {
+        guard let id = coachCreatedPlanID else { return }
+        coachCreatedPlanID = nil
+        // Let Coach complete its own confirmation screen before opening
+        // the canonical editor. Cancelling the builder stays on Home.
+        openedPlanID = id
+        selectedWeekIndex = 0
+        screen = .editor
+    }
+
     private var planStudioHome: some View {
         ATHLTHStudioPlannerHomeView(
             onOpenActivePlan: {
@@ -185,7 +217,7 @@ struct ATHLTHStudioPlannerView: View {
                 }
             },
             onCreatePlan: { showingNewPlanBuilder = true },
-            onOpenCoach: { onOpenCoach?() },
+            onOpenCoach: openCoachPlanBuilder,
             onOpenMyPlans: { screen = .myPlans },
             onExplorePlans: { screen = .explorePlans },
             onFavoritePlans: { screen = .favoritePlans }
