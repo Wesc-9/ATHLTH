@@ -18,6 +18,7 @@ private enum ATHLTHTournamentDetailTab: String, CaseIterable, Identifiable {
 /// Never render a provisional match report as an official winner.
 struct ATHLTHTournamentLiveDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var library: ExerciseLibraryStore
     @Environment(\.scenePhase) private var scenePhase
 
     let tournament: ATHLTHTournamentRemote
@@ -720,11 +721,19 @@ struct ATHLTHTournamentLiveDetailView: View {
             }
             ForEach(visible) { candidate in
                 NavigationLink {
+                    if let id = candidate.exerciseID, let entry = library.allExercises.first(where: { $0.id == id }) {
+                        ExerciseDetailView(entry: entry, selectionTitle: nil, onSelect: nil)
+                    } else {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(exerciseNames[candidate.lookupID] ?? "Øvelse")
                             .font(.system(size: 30, design: .serif))
                         Label("Frist per øvelse: \(current.completionHours) timer", systemImage: "clock")
-                        Text("Detaljert øvelsesinstruksjon er ikke tilgjengelig her ennå.")
+                        Text(current.raceRules.effectiveScoringMode.detail)
+                        Text(current.raceRules.scoringSummary)
+                        if let goal = current.raceRules.goal(for: candidate.lookupID) {
+                            Text("Mål: " + goal.formatted())
+                        }
+                        Text("Øvelsesinstruksjon er ikke tilgjengelig i ditt bibliotek.")
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
                         Spacer()
                     }
@@ -733,6 +742,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
                     .navigationTitle("Øvelsesdetaljer")
                     .navigationBarTitleDisplayMode(.inline)
+                    }
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: candidate.activityTemplateID == nil ? "dumbbell" : "figure.run")
@@ -785,11 +795,24 @@ struct ATHLTHTournamentLiveDetailView: View {
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
             }
-            Text(current.releaseMode == "everyone_finished"
+            Text(current.releaseMode == "all_at_start"
+                ? "Alle øvelser er tilgjengelige fra start."
+                : current.releaseMode == "everyone_finished"
                 ? "Neste øvelse åpnes når alle er ferdige."
                 : "Neste øvelse åpnes etter avtalt tidsintervall.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            Label(current.raceRules.scoringSummary, systemImage: "trophy")
+                .font(.subheadline.weight(.medium))
+            Text(current.raceRules.effectiveScoringMode.detail)
+                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if current.raceRules.recordingDevice != .any {
+                Label(current.raceRules.recordingDevice.title, systemImage: "applewatch")
+                    .font(.subheadline)
+            }
+            if !current.raceRules.equipmentRules.isEmpty {
+                Text("Utstyr: " + current.raceRules.equipmentRules).font(.subheadline)
+            }
             Text("Frist per øvelse: \(current.completionHours) timer")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
@@ -805,7 +828,7 @@ struct ATHLTHTournamentLiveDetailView: View {
             Text("Status er synlig uten at skjulte resultater eller privat trening deles.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
-            ForEach(confirmedEntries) { entry in
+            ForEach(entries.filter { $0.response == "accepted" || $0.response == "invited" }) { entry in
                 let progress = athleteProgress.first { $0.userID == entry.userID }
                 HStack(spacing: 10) {
                     Image(systemName: progress?.symbol ?? "clock")
@@ -814,7 +837,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                     Text(name(entry.userID))
                         .font(.subheadline.weight(.medium))
                     Spacer()
-                    Text(progress?.label ?? (entry.isReady ? "Venter start" : "Ikke klar"))
+                    Text(entry.response == "invited" ? "Invitert" : (progress?.label ?? (entry.isReady ? "Venter start" : "Ikke klar")))
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
