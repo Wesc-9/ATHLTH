@@ -1819,6 +1819,9 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var effortMetricRaw: String? = nil
     var exerciseQueue:
         [WatchStrengthExerciseSummary]? = nil
+    // Only compact ordering metadata; no extra polling or duplicated log.
+    var requiresCompanionExecutionOrder: Bool? = nil
+    var nextExecutionLabel: String? = nil
 
     var currentCoachLoadBasisRaw: String? {
         exerciseQueue?.first(where: { $0.index == exerciseIndex })?
