@@ -3990,6 +3990,8 @@ struct ATHLTHGhostRuntimeObserver: View {
 
 struct ATHLTHSoloGhostSetupView: View {
     var onStarted: () -> Void
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var templates: [ATHLTHSoloGhostTemplate] = []
     @Environment(\.dismiss) private var dismiss
     @State private var showingBuilder = false
     @State private var createdRoute: TrainingRoute?
@@ -4020,6 +4022,27 @@ struct ATHLTHSoloGhostSetupView: View {
                 } label: {
                     choice("Fri løping", detail: "Velg ghostens tempo. Ingen rute eller målstrek.", icon: "figure.run")
                 }.buttonStyle(.plain)
+                if !templates.isEmpty {
+                    Text("Mine Ghost Race-maler").font(.headline)
+                    ForEach(templates) { template in
+                        HStack(spacing: 8) {
+                            NavigationLink {
+                                ATHLTHSoloGhostPaceSetupView(
+                                    fixedDistance: template.distanceMeters != nil,
+                                    onStarted: onStarted, initialTemplate: template)
+                            } label: {
+                                choice(template.name,
+                                       detail: GhostTargetPaceFormatter.text(secondsPerKilometer: template.paceSeconds) + " /km",
+                                       icon: "bookmark.fill")
+                            }.buttonStyle(.plain)
+                            Button(role: .destructive) {
+                                ATHLTHSoloGhostTemplateStore.remove(template.id, userID: session.profile.userID)
+                                reloadTemplates()
+                            } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
+                                .buttonStyle(.plain).accessibilityLabel("Slett mal")
+                        }
+                    }
+                }
                 NavigationLink {
                     GhostRaceHubView(personalCompetitionOnly: true, replayOnly: true)
                 } label: {
@@ -4030,6 +4053,8 @@ struct ATHLTHSoloGhostSetupView: View {
         }
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { reloadTemplates() }
+        .onChange(of: session.profile.userID) { _, _ in reloadTemplates() }
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Lukk") { dismiss() } } }
         .sheet(isPresented: $showingBuilder, onDismiss: {
             if createdRoute != nil { openCreatedRoute = true }
@@ -4043,6 +4068,10 @@ struct ATHLTHSoloGhostSetupView: View {
                 RouteDetailView(route: createdRoute, ghostCompetitionSetup: true)
             }
         }
+    }
+
+    private func reloadTemplates() {
+        templates = session.signedIn ? ATHLTHSoloGhostTemplateStore.load(userID: session.profile.userID) : []
     }
 
     private func choice(_ title: String, detail: String, icon: String) -> some View {
@@ -4164,6 +4193,7 @@ private struct ATHLTHSoloGhostSavedRoutesView: View {
 private struct ATHLTHSoloGhostPaceSetupView: View {
     let fixedDistance: Bool
     let onStarted: () -> Void
+    var initialTemplate: ATHLTHSoloGhostTemplate? = nil
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
@@ -4180,6 +4210,10 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
     @State private var reviewing = false
     @State private var startedSuccessfully = false
     @State private var errorMessage: String?
+    @State private var templateName = ""
+    @State private var namingTemplate = false
+    @State private var savedTemplate = false
+    @State private var appliedTemplate = false
 
     private var meters: Double? {
         guard fixedDistance else { return nil }
@@ -4221,17 +4255,57 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }.buttonStyle(.borderedProminent).tint(ATHLTHTrainDesign.ink)
                     .disabled(!valid || starting)
+                if session.signedIn {
+                    Button {
+                        templateName = title + " · " + pace + "/km"
+                        namingTemplate = true
+                    } label: {
+                        Label(savedTemplate ? "Mal lagret" : "Lagre som mal", systemImage: savedTemplate ? "checkmark" : "bookmark")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }.buttonStyle(.bordered).disabled(!valid || starting)
+                }
             }
             .padding(18).frame(maxWidth: 760).frame(maxWidth: .infinity)
         }
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            guard !appliedTemplate, let template = initialTemplate else { return }
+            appliedTemplate = true
+            pace = GhostTargetPaceFormatter.text(secondsPerKilometer: template.paceSeconds)
+            if let distance = template.distanceMeters {
+                if ATHLTHSoloGhostPacePolicy.presets.contains(where: { $0.meters == distance }) {
+                    selectedMeters = distance
+                } else {
+                    selectedMeters = 0
+                    customDistance = String(distance / 1_000)
+                }
+            }
+            durationMinutes = Int((template.durationSeconds ?? 0) / 60)
+        }
+        .alert("Lagre Ghost Race-mal", isPresented: $namingTemplate) {
+            TextField("Navn på mal", text: $templateName)
+            Button("Lagre") { saveTemplate() }
+            Button("Avbryt", role: .cancel) {}
+        } message: { Text("Lagre distanse, målfart og eventuell varighet.") }
         .sheet(isPresented: $reviewing, onDismiss: {
             if startedSuccessfully { onStarted() }
         }) { review }
         .alert("Ghost Race", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
+    }
+
+    private func saveTemplate() {
+        guard session.signedIn, valid, let paceSeconds else { return }
+        let name = String(templateName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+        guard !name.isEmpty else { return }
+        ATHLTHSoloGhostTemplateStore.save(
+            .init(id: UUID(), name: name, paceSeconds: paceSeconds,
+                  distanceMeters: meters, durationSeconds: duration),
+            userID: session.profile.userID)
+        savedTemplate = true
     }
 
     private var distanceCard: some View {

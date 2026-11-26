@@ -334,3 +334,20 @@ final class ATHLTHCompletedRunningPerformanceTests: XCTestCase {
         XCTAssertNil(ATHLTHCompletedRunningPerformance(watch: watch))
     }
 }
+
+final class ATHLTHSoloGhostHistoryTests: XCTestCase {
+    func testSoloResultSurvivesTransferWithoutFullIntervalRecording() throws {
+        let now = Date()
+        var watch = WatchWorkoutResult(id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: now.addingTimeInterval(-300), endedAt: now,
+            duration: 300, activeCalories: 10, distanceMeters: 1000,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 0)
+        watch.soloGhostResult = ATHLTHSoloGhostComparison.result(
+            elapsed: 300, meters: 1000, pace: 330, targetMeters: nil, targetSeconds: nil)
+        let decoded = try JSONDecoder().decode(WatchWorkoutResult.self, from: JSONEncoder().encode(watch))
+        let record = try XCTUnwrap(ATHLTHCompletedRunningPerformance(watch: decoded))
+        XCTAssertEqual(record.soloGhostResult?.outcome, .ahead)
+        XCTAssertTrue(record.steps.isEmpty)
+        XCTAssertEqual(record.title, "Ghost Race")
+    }
+}

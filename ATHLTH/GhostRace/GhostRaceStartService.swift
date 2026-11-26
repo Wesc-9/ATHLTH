@@ -3,6 +3,45 @@ import Foundation
 
 /// A route-free Ghost uses the normal structured run transfer and shared
 /// virtual pacer. No fabricated map, route ID, or second workout clock.
+struct ATHLTHSoloGhostTemplate: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let paceSeconds: Double
+    let distanceMeters: Double?
+    let durationSeconds: Double?
+
+    var isValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            ATHLTHSoloGhostPacePolicy.transfer(paceSeconds: paceSeconds,
+                distanceMeters: distanceMeters, durationSeconds: durationSeconds) != nil
+    }
+}
+
+enum ATHLTHSoloGhostTemplateStore {
+    private static let name = "soloGhostTemplates"
+
+    static func load(userID: UUID) -> [ATHLTHSoloGhostTemplate] {
+        (AccountLocalStorage.read([ATHLTHSoloGhostTemplate].self, name: name, userID: userID) ?? [])
+            .filter(\.isValid)
+    }
+
+    static func save(_ template: ATHLTHSoloGhostTemplate, userID: UUID) {
+        guard template.isValid else { return }
+        var values = load(userID: userID)
+        values.removeAll {
+            $0.id == template.id || ($0.paceSeconds == template.paceSeconds &&
+                $0.distanceMeters == template.distanceMeters && $0.durationSeconds == template.durationSeconds &&
+                $0.name == template.name)
+        }
+        values.insert(template, at: 0)
+        AccountLocalStorage.write(Array(values.prefix(50)), name: name, userID: userID)
+    }
+
+    static func remove(_ id: UUID, userID: UUID) {
+        AccountLocalStorage.write(load(userID: userID).filter { $0.id != id }, name: name, userID: userID)
+    }
+}
+
 enum ATHLTHSoloGhostPacePolicy {
     struct Preset {
         let title: String

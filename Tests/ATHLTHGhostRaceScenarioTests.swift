@@ -629,3 +629,14 @@ final class ATHLTHSoloGhostFinishPolicyTests: XCTestCase {
             paceSeconds: 330, distanceMeters: 5_000, durationSeconds: 600))
     }
 }
+
+final class ATHLTHSoloGhostTemplateTests: XCTestCase {
+    func testTemplateValidationRejectsConflictingGoals() {
+        XCTAssertTrue(ATHLTHSoloGhostTemplate(id: UUID(), name: "5 km", paceSeconds: 300,
+            distanceMeters: 5000, durationSeconds: nil).isValid)
+        XCTAssertFalse(ATHLTHSoloGhostTemplate(id: UUID(), name: "Invalid", paceSeconds: 300,
+            distanceMeters: 5000, durationSeconds: 600).isValid)
+        XCTAssertFalse(ATHLTHSoloGhostTemplate(id: UUID(), name: " ", paceSeconds: 300,
+            distanceMeters: nil, durationSeconds: nil).isValid)
+    }
+}
