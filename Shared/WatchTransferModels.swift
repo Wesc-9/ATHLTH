@@ -1617,12 +1617,35 @@ enum ATHLTHWatchPreparedRecipeAdmissionPolicy {
     }
 }
 
+/// A presentation-only snapshot of the existing library and daily advice.
+struct WatchHomeFavoriteWorkout: Codable, Hashable, Identifiable {
+    var id: String
+    var title: String
+    var subtitle: String?
+    var recipe: WatchPreparedWorkoutTransfer?
+}
+
+struct WatchHomeDashboardTransfer: Codable, Hashable {
+    var ownerID: UUID
+    var favorites: [WatchHomeFavoriteWorkout]
+    var favoriteRouteIDs: [UUID]
+    var recommendationTitle: String?
+    var recommendationDetail: String?
+    var recommendation: WatchPreparedWorkoutTransfer?
+    var updatedAt: Date
+
+    func isCurrent(for owner: UUID?, now: Date = Date()) -> Bool {
+        owner == ownerID && Calendar.current.isDate(updatedAt, inSameDayAs: now)
+    }
+}
+
 struct WatchTodaySnapshot: Codable, Hashable {
     var workout: WatchTodayWorkoutTransfer?
     var updatedAt: Date
     // Optional for backwards compatibility with existing Watch snapshots.
     // The iPhone can send all sessions for a day, not only the first one.
     var workouts: [WatchTodayWorkoutTransfer]? = nil
+    var dashboard: WatchHomeDashboardTransfer? = nil
 
     var scheduledWorkouts: [WatchTodayWorkoutTransfer] {
         let candidates = workouts ?? workout.map { [$0] } ?? []

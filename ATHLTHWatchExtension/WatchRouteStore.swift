@@ -72,13 +72,15 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var companionLinked = false
     @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
     @Published private(set) var todayWorkouts: [WatchTodayWorkoutTransfer] = []
+    @Published private(set) var homeDashboard: WatchHomeDashboardTransfer?
+    private let homeDashboardDefaultsKey = "athlth.watch.homeDashboard.v1"
     @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
     // One transient preflight at a time, before any card can mutate the
     // shared manager's route, coach or interval configuration.
     private var pendingPreparedLaunchID: UUID?
     @Published private(set) var petCatalog: [WatchPetIdentity] = []
     @Published private(set) var selectedPetIDs: Set<UUID> = []
-    private(set) var companionAccountID: UUID?
+    @Published private(set) var companionAccountID: UUID?
     private var latestCompanionAccountUpdatedAt = Date.distantPast
     private let accountIdentityDefaultsKey =
         "athlth.watch.accountIdentity.v1"
@@ -110,6 +112,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
         loadRoutes()
         loadTodayWorkout()
         loadTodayWorkouts()
+        if let bytes = UserDefaults.standard.data(forKey: homeDashboardDefaultsKey),
+           let saved = try? JSONDecoder().decode(WatchHomeDashboardTransfer.self, from: bytes),
+           saved.ownerID == companionAccountID { homeDashboard = saved }
         loadPreparedWorkout()
         restorePetCatalog()
         activateConnectivity()
@@ -122,6 +127,15 @@ final class WatchRouteStore: NSObject, ObservableObject {
         let transfer = try? JSONDecoder().decode(
             WatchAccountIdentityTransfer.self, from: data
         ) else { return }
+        if companionAccountID != transfer.ownerID {
+            homeDashboard = nil
+            todayWorkouts = []
+            todayWorkout = nil
+            UserDefaults.standard.removeObject(forKey: homeDashboardDefaultsKey)
+            UserDefaults.standard.removeObject(forKey: todayWorkoutDefaultsKey)
+            UserDefaults.standard.removeObject(forKey: todayWorkoutsDefaultsKey)
+            if let preparedWorkout { consumePreparedWorkout(preparedWorkout.id) }
+        }
         companionAccountID = transfer.ownerID
         latestCompanionAccountUpdatedAt = transfer.updatedAt
     }
@@ -865,8 +879,15 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 forKey:
                     "athlth.watch.todayWorkoutSnapshotDate.v1"
             )
+            if let dashboard = snapshot.dashboard, dashboard.ownerID != companionAccountID { return }
             storeTodayWorkout(snapshot.workout)
             storeTodayWorkouts(snapshot.scheduledWorkouts)
+            if let dashboard = snapshot.dashboard {
+                homeDashboard = dashboard
+                if let data = try? JSONEncoder().encode(dashboard) {
+                    UserDefaults.standard.set(data, forKey: homeDashboardDefaultsKey)
+                }
+            }
 
         case .strengthSnapshot:
             guard let snapshot = try? JSONDecoder().decode(

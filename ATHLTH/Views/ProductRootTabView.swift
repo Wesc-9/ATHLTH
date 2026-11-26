@@ -1248,6 +1248,9 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var watchHomeFavorites: LibraryFavoritesStore
+    @EnvironmentObject private var watchHomeRunningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var watchHomePets: ATHLTHPetStore
 
     #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
     @ObservedObject private var garminStore = GarminPersonalLocalStore.shared
@@ -2062,7 +2065,19 @@ struct ATHLTHHomeView: View {
                 scheduleHomeStreakRefresh()
             }
             .onChange(of: session.activePlan) {
-                // Editing sessions in the same plan must also refresh Watch.
+                syncHomeTodayWorkoutToWatch()
+            }
+            .onChange(of: watchHomeFavorites.favorites) { syncHomeTodayWorkoutToWatch() }
+            .onChange(of: session.standalonePlannedSessions) { syncHomeTodayWorkoutToWatch() }
+            .onChange(of: session.recordedPlannedWorkoutTimes) { syncHomeTodayWorkoutToWatch() }
+            .onChange(of: watchConnection.isReady) { if watchConnection.isReady { syncHomeTodayWorkoutToWatch() } }
+            .task(id: session.profile.userID) {
+                guard isActive, session.signedIn, !session.previewModeEnabled else { return }
+                await watchHomeFavorites.refresh()
+                if watchHomeFavorites.favorites.contains(where: { $0.itemType == .workout }) {
+                    await WorkoutTemplateCatalogStore.shared.refresh()
+                }
+                guard !Task.isCancelled else { return }
                 syncHomeTodayWorkoutToWatch()
             }
         }
@@ -4053,116 +4068,105 @@ struct ATHLTHHomeView: View {
     }
 
     private func syncHomeTodayWorkoutToWatch() {
-        guard let plan = session.activePlan else {
-            watchConnection.sendTodayWorkouts([])
-            return
-        }
-
-        let today = session.plannedSessions(on: Date(), in: plan)
-            .filter { !$0.isExplicitRestDay
-                && ATHLTHWorkoutCaptureAdmission.watchKind(for: $0) != nil
-                && ATHLTHPlannedWorkoutCaptureRoute.resolve(
-                    $0, device: .appleWatch
-                ).canUsePreparedWatchTransfer }
-        let workouts: [PlannedSession] = {
-            if !today.isEmpty { return today }
-            // On rest days show the next planned workout on Watch home,
-            // without changing the athlete's actual weekly plan.
-            for offset in 1...7 {
-                guard let date = Calendar.current.date(
-                    byAdding: .day, value: offset, to: Date()
-                ) else { continue }
-                let next = session.plannedSessions(on: date, in: plan)
-                    .filter { !$0.isExplicitRestDay
-                        && ATHLTHWorkoutCaptureAdmission.watchKind(for: $0) != nil
-                        && ATHLTHPlannedWorkoutCaptureRoute.resolve(
-                            $0, device: .appleWatch
-                        ).canUsePreparedWatchTransfer }
-                if !next.isEmpty { return next }
-            }
-            return []
-        }()
+        guard session.signedIn, !session.previewModeEnabled else { return }
+        let owner = session.profile.userID
         var transfers: [WatchTodayWorkoutTransfer] = []
-        for workout in workouts {
-            guard let watchKind = ATHLTHWorkoutCaptureAdmission.watchKind(
-                for: workout
-            ), ATHLTHPlannedWorkoutCaptureRoute.resolve(
-                workout, device: .appleWatch
-            ).canUsePreparedWatchTransfer else { continue }
-        let selectedRoute =
-            PlannedWorkoutWatchBuilder.route(
-                for: workout,
-                routes: session.savedRoutes
-            )
-
-        if let selectedRoute {
-            try? watchConnection.sendRoute(
-                selectedRoute
-            )
+        if let plan = session.activePlan {
+            for offset in 0...7 {
+                guard let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) else { continue }
+                for workout in session.plannedSessions(on: date, in: plan) {
+                    guard !workout.isExplicitRestDay,
+                          session.recordedTimes(for: workout.id)?.endedAt == nil,
+                          !session.isPlanSessionSkipped(planID: plan.id, sessionID: workout.id),
+                          !homeIsPlanSessionCompleted(planID: plan.id, workout: workout),
+                          let recipe = watchHomeRecipe(workout) else { continue }
+                    transfers.append(WatchTodayWorkoutTransfer(
+                        planID: plan.id, workoutID: workout.id, title: workout.title,
+                        summary: recipe.summary, kind: recipe.kind,
+                        scheduledStart: workout.scheduledStart ?? Calendar.current.startOfDay(for: date),
+                        durationMinutes: workout.durationMinutes,
+                        distanceKilometers: workout.targetDistanceKilometers,
+                        routeID: recipe.routeID, runningWorkout: recipe.runningWorkout,
+                        audioCoach: recipe.audioCoach, strengthWorkout: recipe.strengthWorkout,
+                        indoor: recipe.indoor, updatedAt: Date()
+                    ))
+                }
+            }
         }
-
-        let runningWorkout:
-            WatchRunningWorkoutTransfer?
-
-        if watchKind == .running ||
-            watchKind == .walking {
-            runningWorkout =
-                PlannedWorkoutWatchBuilder
-                    .runningTransfer(
-                        from: workout,
-                        routeAlerts: .standard,
-                        autoPauseEnabled:
-                            workout.autoPauseEnabled ??
-                            settings.autoPauseOutdoorWorkouts
-                    )
-        } else {
-            runningWorkout = nil
+        let favoriteRecords = watchHomeFavorites.favorites.filter { $0.userID == owner }
+        let favorites = favoriteRecords.filter { $0.itemType == .workout }.prefix(24).map { favorite in
+            let id = UUID(uuidString: favorite.itemID)
+            let workout: PlannedSession? = id.flatMap { id in
+                if let running = watchHomeRunningLibrary.allTemplates.first(where: { $0.id == id }) {
+                    return running.plannedSession()
+                }
+                if let entry = WorkoutTemplateCatalogStore.shared.entries.first(where: { $0.id == id }) {
+                    return entry.plannedSession(useOriginalID: true)
+                }
+                return session.personalWorkoutTemplates.first(where: { $0.id == id })
+            }
+            return WatchHomeFavoriteWorkout(id: favorite.id, title: favorite.title,
+                subtitle: favorite.subtitle, recipe: workout.flatMap { watchHomeRecipe($0) })
         }
-
-        let audioCoach =
-            PlannedWorkoutWatchBuilder
-                .audioCoachConfiguration(
-                    for: workout,
-                    selectedRoute:
-                        selectedRoute,
-                    defaultConfiguration:
-                        .disabled
-                )
-
-        transfers.append(
-            WatchTodayWorkoutTransfer(
-                planID: plan.id,
-                workoutID: workout.id,
-                title: workout.title,
-                summary:
-                    homeSessionSummary(
-                        workout
-                    ),
-                kind: watchKind,
-                scheduledStart:
-                    workout.scheduledStart,
-                durationMinutes:
-                    workout.durationMinutes,
-                distanceKilometers:
-                    workout
-                        .targetDistanceKilometers,
-                routeID:
-                    workout.routeID,
-                runningWorkout:
-                    runningWorkout,
-                audioCoach:
-                    audioCoach,
-                strengthWorkout:
-                    watchKind == .strength
-                        ? homeStrengthWatchSnapshot(
-                            workout
-                        )
-                        : nil,
-                updatedAt: Date()
-            )
+        let routeIDs = favoriteRecords.filter { $0.itemType == .route }
+            .compactMap { UUID(uuidString: $0.itemID) }
+        for route in session.savedRoutes where routeIDs.contains(route.id) {
+            try? watchConnection.sendRoute(route)
+        }
+        let history = HomeTrainingPatternAdvisor.snapshot(
+            workouts: health.workouts, strengthHistory: strengthWorkout.workoutHistory,
+            phoneHistory: phoneWorkout.history, dogs: watchHomePets.pets.filter { $0.userID == owner }
         )
+        let checkIn = RecoverySorenessStore(accountID: owner)
+        let personal = ATHLTHDailyFormPolicy.assess(entry: checkIn.todayEntry, measuredScore: nil)
+        let measured: HomeDailyRecommendationPolicy.Readiness
+        if health.recovery.score == nil { measured = .unavailable }
+        else {
+            switch health.recovery.state {
+            case .ready: measured = .ready
+            case .balanced: measured = .balanced
+            case .takeItEasy: measured = .takeItEasy
+            case .recover: measured = .recover
+            case .buildingBaseline: measured = .unavailable
+            }
         }
-        watchConnection.sendTodayWorkouts(transfers)
+        var advice: HomeDailyRecommendationPolicy.Advice?
+        if history.supportsPersonalization || personal.recommendation == .rest || personal.recommendation == .lighter {
+            advice = HomeDailyRecommendationPolicy.recommendation(
+                readiness: ATHLTHDailyFormPolicy.recommendationReadiness(measured, entry: checkIn.todayEntry),
+                hasWorkoutToday: false, trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio,
+                trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(workouts: homeRecordedWorkouts),
+                personalizedHistory: history, checkIn: personal
+            )
+        }
+        let recommended = advice.flatMap { HomeDailyRecommendationSessionFactory.make(advice: $0) }
+            .flatMap { watchHomeRecipe($0) }
+        let dashboard = WatchHomeDashboardTransfer(ownerID: owner, favorites: Array(favorites),
+            favoriteRouteIDs: routeIDs, recommendationTitle: advice?.suggestedTitle,
+            recommendationDetail: advice?.suggestedDetail, recommendation: recommended, updatedAt: Date())
+        watchConnection.sendTodayWorkouts(transfers, dashboard: dashboard)
+    }
+
+    private func watchHomeRecipe(_ workout: PlannedSession) -> WatchPreparedWorkoutTransfer? {
+        guard let kind = ATHLTHWorkoutCaptureAdmission.watchKind(for: workout),
+              ATHLTHPlannedWorkoutCaptureRoute.resolve(workout, device: .appleWatch).canUsePreparedWatchTransfer,
+              !ATHLTHHybridWorkoutLaunchPlan.isCandidate(workout),
+              !workout.isExplicitRestDay else { return nil }
+        let route = PlannedWorkoutWatchBuilder.route(for: workout, routes: session.savedRoutes)
+        if workout.routeID != nil && route == nil { return nil }
+        if let route { try? watchConnection.sendRoute(route) }
+        let running = (kind == .running || kind == .walking)
+            ? PlannedWorkoutWatchBuilder.runningTransfer(from: workout, routeAlerts: .standard,
+                autoPauseEnabled: workout.autoPauseEnabled ?? settings.autoPauseOutdoorWorkouts) : nil
+        let strength = kind == .strength ? PlannedWorkoutWatchBuilder.strengthSnapshot(workout) : nil
+        guard ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(kind: kind,
+            hasRunningRecipe: running != nil, hasStrengthRecipe: strength != nil, hasRoute: route != nil)
+        else { return nil }
+        return WatchPreparedWorkoutTransfer(id: workout.id, title: workout.title,
+            summary: homeSessionSummary(workout), kind: kind, routeID: route?.id,
+            runningWorkout: running, audioCoach: PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+                for: workout, selectedRoute: route, defaultConfiguration: .disabled),
+            indoor: nil, startMode: .onWatch, strengthWorkout: strength, updatedAt: Date())
     }
 
     private func homeStrengthWatchSnapshot(

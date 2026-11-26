@@ -4312,7 +4312,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func start(
         kind: WatchWorkoutKind,
-        route: WatchRouteTransfer? = nil
+        route: WatchRouteTransfer? = nil,
+        isSports: Bool = false
     ) async {
         guard ATHLTHWatchStartPreflightAdmissionPolicy.canReserve(
             pendingID: pendingWorkoutStartAdmissionID
@@ -4362,7 +4363,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         let configuration = HKWorkoutConfiguration()
-        configuration.activityType = activityType(for: kind)
+        configuration.activityType = isSports && kind == .other ? .play : activityType(for: kind)
         configuration.locationType = kind.usesOutdoorLocation ? .outdoor : .indoor
 
         await start(

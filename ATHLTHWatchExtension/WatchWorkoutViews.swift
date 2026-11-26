@@ -6,6 +6,7 @@ struct WatchWorkoutStartView: View {
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
 
     let route: WatchRouteTransfer?
+    var otherActivitiesOnly = false
     @State private var showingMoreActivities = false
 
     var body: some View {
@@ -24,11 +25,22 @@ struct WatchWorkoutStartView: View {
                     .watchSurface()
                 }
 
-                WatchPetSelectionButton()
-                workoutButton(.running)
-                workoutButton(.walking)
+                if !otherActivitiesOnly {
+                    WatchPetSelectionButton()
+                    workoutButton(.running)
+                    workoutButton(.walking)
+                }
 
-                if route == nil {
+                if otherActivitiesOnly {
+                    workoutButton(.other, sports: true)
+                    workoutButton(.other)
+                    workoutButton(.cycling)
+                    workoutButton(.hiit)
+                    workoutButton(.functional)
+                    workoutButton(.rowing)
+                    workoutButton(.stairClimbing)
+                    workoutButton(.yoga)
+                } else if route == nil {
                     workoutButton(.strength)
 
                     Button {
@@ -96,12 +108,13 @@ struct WatchWorkoutStartView: View {
     }
 
     @ViewBuilder
-    private func workoutButton(_ kind: WatchWorkoutKind) -> some View {
+    private func workoutButton(_ kind: WatchWorkoutKind, sports: Bool = false) -> some View {
         Button {
             Task {
                 await workoutManager.start(
                     kind: kind,
-                    route: route
+                    route: route,
+                    isSports: sports
                 )
             }
         } label: {
@@ -111,13 +124,13 @@ struct WatchWorkoutStartView: View {
                         .fill(WatchTheme.green.opacity(0.11))
                         .frame(width: 36, height: 36)
 
-                    Image(systemName: kind.systemImage)
+                    Image(systemName: sports ? "sportscourt.fill" : kind.systemImage)
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(WatchTheme.green)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(kind.title)
+                    Text(sports ? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett") : kind == .other ? ATHLTHLocalization.choose(english: "Free workout", norwegian: "Fri trening") : kind.title)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(WatchTheme.textPrimary)
 

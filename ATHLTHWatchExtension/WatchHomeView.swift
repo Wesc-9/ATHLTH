@@ -1,867 +1,361 @@
 import SwiftUI
 
 private enum WatchShortcutDestination: Hashable {
-    case routes
-    case ghostRace
+    case routes, ghostRace, favorites, favoriteWorkouts, favoriteRoutes, sent, planned, recommendation, menu, other
 }
 
 struct WatchHomeView: View {
     @EnvironmentObject private var routeStore: WatchRouteStore
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
     @State private var shortcutPath: [WatchShortcutDestination] = []
+    @State private var launchError: String?
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private var dashboard: WatchHomeDashboardTransfer? {
+        guard let value = routeStore.homeDashboard,
+              value.ownerID == routeStore.companionAccountID else { return nil }
+        return value
+    }
+
+    private var recommendation: WatchHomeDashboardTransfer? {
+        guard let dashboard, dashboard.isCurrent(for: routeStore.companionAccountID) else { return nil }
+        return dashboard
+    }
+
+    private var upcoming: [WatchTodayWorkoutTransfer] {
+        let start = Calendar.current.startOfDay(for: Date())
+        var seen = Set<UUID>()
+        return routeStore.todayWorkouts.filter {
+            ($0.scheduledStart ?? Date()) >= start &&
+            routeStore.canLaunchTodayWorkout($0.workoutID) &&
+            seen.insert($0.workoutID).inserted
+        }.sorted { ($0.scheduledStart ?? start) < ($1.scheduledStart ?? start) }
+    }
+
+    private var sent: WatchPreparedWorkoutTransfer? {
+        guard let workout = routeStore.preparedWorkout,
+              Date().timeIntervalSince(workout.updatedAt) < 24 * 3600,
+              workout.plannedSessionID.map({ routeStore.canLaunchTodayWorkout($0) }) ?? true else { return nil }
+        return workout
+    }
 
     var body: some View {
         NavigationStack(path: $shortcutPath) {
-            GeometryReader { geometry in
-                let compact = geometry.size.height < 205
-                let hasAdditionalContent =
-                    routeStore.preparedWorkout != nil ||
-                    !routeStore.todayWorkouts.isEmpty ||
-                    !routeStore.petCatalog.isEmpty ||
-                    workoutManager.errorMessage != nil
-
-                Group {
-                    if hasAdditionalContent {
-                        // Keep important transferred workouts and errors
-                        // available; only this expanded state may scroll.
-                        ScrollView {
-                            VStack(spacing: 7) {
-                                header
-                                if let prepared = routeStore.preparedWorkout {
-                                    preparedWorkoutCard(prepared)
-                                }
-                                ForEach(routeStore.todayWorkouts, id: \.workoutID) { today in
-                                    todayWorkoutCard(today)
-                                }
-                                quickStartTiles(compact: compact)
-                                WatchPetSelectionButton()
-                                otherWorkoutsCard
-                                if let message = workoutManager.errorMessage {
-                                    Label(
-                                        message,
-                                        systemImage: "exclamationmark.triangle.fill"
-                                    )
-                                    .font(.caption2)
-                                    .foregroundStyle(WatchTheme.warning)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(9)
-                                    .watchSurface(radius: 13)
-                                }
-                            }
-                            .padding(.horizontal, 7)
-                            .padding(.bottom, 6)
-                        }
-                    } else {
-                        // Default state fits on a single Watch screen,
-                        // including the smallest supported displays.
-                        VStack(spacing: compact ? 5 : 8) {
-                            header
-                            Spacer(minLength: 0)
-                            quickStartTiles(compact: compact)
-                            otherWorkoutsCard
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, compact ? 2 : 5)
-                    }
+            GeometryReader { proxy in
+                let compact = proxy.size.width < 180
+                let spacing: CGFloat = compact ? 4 : 5
+                let headerHeight: CGFloat = 30
+                let quickHeight: CGFloat = 52
+                let cardHeight = max(72, proxy.size.height - headerHeight - quickHeight - spacing * 2 - 4)
+                VStack(spacing: spacing) {
+                    header.frame(height: headerHeight)
+                    HStack(spacing: spacing) {
+                        nextCard.frame(maxWidth: .infinity)
+                        shortcuts.frame(width: max(70, (proxy.size.width - 14) * 0.45))
+                    }.frame(height: cardHeight)
+                    quickActions(height: quickHeight)
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .top
-                )
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(WatchTheme.planCanvas.ignoresSafeArea())
                 .foregroundStyle(WatchTheme.planInk)
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: WatchShortcutDestination.self) { target in
                 switch target {
-                case .routes:
-                    WatchRoutesListView()
-                case .ghostRace:
-                    WatchGhostRaceShortcutView()
+                case .routes: WatchRoutesListView()
+                case .ghostRace: WatchGhostRaceShortcutView()
+                case .other: WatchWorkoutStartView(route: nil, otherActivitiesOnly: true)
+                case .favorites: favoritesPage
+                case .favoriteWorkouts: favoriteWorkoutsPage
+                case .favoriteRoutes: favoriteRoutesPage
+                case .sent: sentPage
+                case .planned: plannedPage
+                case .recommendation: recommendationPage
+                case .menu: menuPage
                 }
             }
         }
-        .onAppear {
-            // Ask iPhone for the latest planned session when the Watch opens.
-            // The cached snapshot remains available without a connection.
-            routeStore.requestTodayWorkoutSnapshot()
-        }
+        .onAppear { routeStore.requestTodayWorkoutSnapshot() }
         .onOpenURL { url in
-            guard url.scheme ==
-                    "athlth-watch"
-            else {
-                return
-            }
-
+            guard url.scheme == "athlth-watch" else { return }
             switch url.host {
-            case "home":
-                // A Watch-face tap opens the first ATHLTH screen. Never
-                // auto-start a workout or discard an active recording.
-                shortcutPath.removeAll()
-                routeStore.requestTodayWorkoutSnapshot()
-
-            case "today":
-                if let today = routeStore.todayWorkouts.first {
-                    startTodayWorkout(today)
-                }
-
-            case "quick-run":
-                Task { await workoutManager.start(kind: .running) }
-
-            case "quick-strength":
-                Task { await workoutManager.start(kind: .strength) }
-
-            case "quick-walk":
-                Task { await workoutManager.start(kind: .walking) }
-
-            case "routes":
-                shortcutPath = [.routes]
-
-            case "ghost-race":
-                // A plain run is not a Ghost Race. Navigate to the prepared
-                // Ghost state rather than starting an unconfigured session.
-                shortcutPath = [.ghostRace]
-
-            default:
-                break
+            case "home": shortcutPath.removeAll(); routeStore.requestTodayWorkoutSnapshot()
+            case "today": shortcutPath = [.planned]
+            case "quick-run": quickStart(.running)
+            case "quick-strength": quickStart(.strength)
+            case "quick-walk": quickStart(.walking)
+            case "routes": shortcutPath = [.routes]
+            case "ghost-race": shortcutPath = [.ghostRace]
+            default: break
             }
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: {
-                    workoutManager
-                        .isWorkoutPresented
-                },
-                set: { presented in
-                    if !presented,
-                       workoutManager.state ==
-                        .completed {
-                        workoutManager.reset()
-                    }
-                }
-            )
-        ) {
+        .alert(tr("Workout", "Trening"), isPresented: Binding(
+            get: { launchError != nil },
+            set: { if !$0 { launchError = nil } }
+        )) { Button("OK", role: .cancel) {} } message: { Text(launchError ?? "") }
+        .fullScreenCover(isPresented: Binding(
+            get: { workoutManager.isWorkoutPresented },
+            set: { presented in
+                if !presented, workoutManager.state == .completed { workoutManager.reset() }
+            }
+        )) {
             WatchActiveWorkoutView()
-                .environmentObject(
-                    workoutManager
-                )
-                .environmentObject(
-                    routeStore
-                )
+                .environmentObject(workoutManager)
+                .environmentObject(routeStore)
         }
     }
 
     private var header: some View {
-        HStack(spacing: 7) {
-            ATHLTHWatchLogomark()
-                .frame(width: 29, height: 29)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("ATHLTH")
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .tracking(1.1)
-                    .foregroundStyle(WatchTheme.planInk)
-                    .minimumScaleFactor(0.8)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "READY TO MOVE",
-                    norwegian: "KLAR FOR ØKT"
-                ))
-                .font(.system(size: 8, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(WatchTheme.planSecondary)
-            }
-
-            Spacer(minLength: 2)
-
-            NavigationLink {
-                WatchRoutesListView()
-            } label: {
-                Image(systemName: "map")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(WatchTheme.planInk)
-                    .frame(width: 31, height: 31)
+        HStack(spacing: 5) {
+            Button { shortcutPath.append(.menu) } label: {
+                Image(systemName: workoutManager.errorMessage == nil ? "line.3.horizontal" : "exclamationmark.circle")
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 30, height: 30)
                     .background(.white, in: Circle())
-                    .overlay {
-                        Circle().strokeBorder(
-                            WatchTheme.planBorder, lineWidth: 0.6
-                        )
-                    }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Routes", norwegian: "Ruter"
-            ))
-
-            Circle()
-                .fill(
-                    routeStore.companionLinked
-                        ? WatchTheme.planConnected
-                        : WatchTheme.planSecondary
-                )
-                .frame(width: 7, height: 7)
-                .accessibilityLabel(
-                    routeStore.companionLinked
-                        ? ATHLTHLocalization.choose(
-                            english: "iPhone connected",
-                            norwegian: "iPhone tilkoblet"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Watch ready for standalone workouts",
-                            norwegian: "Klokken kan registrere økter alene"
-                        )
-                )
+            }.buttonStyle(.plain).accessibilityLabel(tr("Menu", "Meny"))
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+                ATHLTHMarkShape(strokeScale: 0.72)
+                    .fill(Color.black).frame(width: 26, height: 21)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ATHLTH").font(.system(size: 11, weight: .medium)).tracking(2)
+                    Text(tr("READY TO MOVE", "KLAR FOR ØKT"))
+                        .font(.system(size: 6, weight: .medium)).tracking(0.7)
+                        .foregroundStyle(WatchTheme.planSecondary)
+                }.lineLimit(1).minimumScaleFactor(0.75)
+            }.foregroundStyle(.black)
+            Spacer(minLength: 0)
+            Circle().fill(routeStore.companionLinked ? WatchTheme.planConnected : WatchTheme.planSecondary)
+                .frame(width: 5, height: 5)
+                .accessibilityLabel(routeStore.companionLinked ? tr("Connected", "Tilkoblet") : tr("Offline", "Frakoblet"))
         }
-        .padding(.horizontal, 1)
-        .frame(height: 36)
     }
 
-    private var otherWorkoutsCard: some View {
-        NavigationLink {
-            WatchWorkoutStartView(route: nil)
-        } label: {
-            HStack(spacing: 9) {
-                Image(systemName: "figure.mixed.cardio")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(WatchTheme.planAccent)
-                    .frame(width: 34, height: 34)
-                    .background(
-                        WatchTheme.planSelected,
-                        in: RoundedRectangle(cornerRadius: 11)
-                    )
+    private var nextCard: some View {
+        Button { shortcutPath.append(.planned) } label: {
+            GeometryReader { proxy in
+                let next = upcoming.first
+                ZStack(alignment: .bottomLeading) {
+                    RoundedRectangle(cornerRadius: 14).fill(Color(red: 0.24, green: 0.19, blue: 0.15))
+                    Image(next?.kind == .strength ? "WatchHomeStrength" : next?.kind == .walking ? "WatchHomeWalking" : "WatchHomeRunning")
+                        .resizable().scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height).clipped()
+                    LinearGradient(colors: [.black.opacity(0.03), .black.opacity(0.24), .black.opacity(0.88)], startPoint: .top, endPoint: .bottom)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "calendar").font(.system(size: 8))
+                            Text(tr("NEXT WORKOUT", "NESTE ØKT")).font(.system(size: 7, weight: .semibold)).tracking(0.5)
+                        }.foregroundStyle(Color(red: 0.99, green: 0.88, blue: 0.68))
+                        Text(next?.title ?? tr("No planned workout", "Ingen planlagt økt"))
+                            .font(.system(size: 12, weight: .semibold)).lineLimit(2).minimumScaleFactor(0.8)
+                        if let next {
+                            if let date = next.scheduledStart {
+                                Text(date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.system(size: 8)).lineLimit(1).minimumScaleFactor(0.75)
+                            }
+                            HStack(spacing: 3) {
+                                Text(next.durationMinutes.map { "\($0) min" } ?? next.kind.title)
+                                    .font(.system(size: 8)).lineLimit(1)
+                                Spacer(minLength: 0)
+                                Image(systemName: "play.circle.fill").font(.system(size: 19))
+                            }
+                        } else {
+                            Text(tr("Open schedule", "Se kalender")).font(.system(size: 8))
+                        }
+                    }.padding(6).foregroundStyle(.white)
+                }.clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        }.buttonStyle(.plain).accessibilityLabel(tr("Next planned workout", "Neste planlagte økt"))
+    }
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Other workouts",
-                        norwegian: "Andre økter"
-                    ))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(WatchTheme.planInk)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Walk and more",
-                        norwegian: "Gåtur og mer"
-                    ))
-                    .font(.system(size: 10))
-                    .foregroundStyle(WatchTheme.planSecondary)
+    private var shortcuts: some View {
+        GeometryReader { proxy in
+            let rowHeight = max(20, (proxy.size.height - 3) / 4)
+            VStack(spacing: 1) {
+                shortcut(.favoriteWorkouts, icon: "star", title: tr("Favorite workouts", "Favorittøkter"), detail: nil)
+                shortcut(.favoriteRoutes, icon: "map", title: tr("Favorite routes", "Favorittruter"), detail: nil)
+                shortcut(.sent, icon: "applewatch.and.arrow.forward", title: tr("Sent to Watch", "Sendt til klokken"), detail: sent == nil ? nil : "1")
+                shortcut(.recommendation, icon: "bolt.fill", title: tr("Recommended", "Anbefalt økt"), detail: nil)
+            }
+            .environment(\.defaultMinListRowHeight, rowHeight)
+            .frame(height: proxy.size.height)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 13))
+            .overlay { RoundedRectangle(cornerRadius: 13).strokeBorder(WatchTheme.planBorder, lineWidth: 0.6) }
+        }
+    }
+
+    private func shortcut(_ destination: WatchShortcutDestination, icon: String, title: String, detail: String?) -> some View {
+        Button { shortcutPath.append(destination) } label: {
+            HStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(red: 0.52, green: 0.37, blue: 0.19))
+                    .frame(width: 13)
+                Text(title).font(.system(size: 9, weight: .semibold))
+                    .lineLimit(2).minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
+                if let detail { Text(detail).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchTheme.planAccent) }
+            }.padding(.horizontal, 4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+
+    private func quickActions(height: CGFloat) -> some View {
+        HStack(spacing: 4) {
+            quickTile(tr("Walk", "Gå"), "figure.walk") { quickStart(.walking) }
+            quickTile(tr("Run", "Løping"), "figure.run") { quickStart(.running) }
+            quickTile(tr("Strength", "Styrke"), "dumbbell.fill") { quickStart(.strength) }
+            quickTile(tr("Other", "Andre økter"), "square.grid.2x2") { shortcutPath.append(.other) }
+        }.frame(height: height)
+    }
+
+    private func quickTile(_ title: String, _ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 18, weight: .semibold))
+                Text(title).font(.system(size: 10, weight: .semibold)).lineLimit(2)
+                    .minimumScaleFactor(0.78).multilineTextAlignment(.center)
+            }.foregroundStyle(.black)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(WatchTheme.planBorder, lineWidth: 0.7) }
+        }.buttonStyle(.plain)
+    }
+
+    private func quickStart(_ kind: WatchWorkoutKind) {
+        Task { await workoutManager.start(kind: kind) }
+    }
+
+    private func launch(_ recipe: WatchPreparedWorkoutTransfer) {
+        Task {
+            if await routeStore.launchPreparedWorkout(recipe, manager: workoutManager) {
+                shortcutPath.removeAll()
+            } else {
+                launchError = tr("The workout is not ready. Check the route and active workout.", "Økten er ikke klar. Kontroller ruten og eventuell aktiv økt.")
+            }
+        }
+    }
+
+    private func recipeRow(_ recipe: WatchPreparedWorkoutTransfer) -> some View {
+        let ready = (recipe.routeID == nil || recipe.routeID.flatMap { routeStore.route(with: $0) } != nil)
+            && routeStore.automaticStartCountdownSeconds == nil && workoutManager.canAcceptPreparedWorkout()
+        return Button { launch(recipe) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: recipe.kind.systemImage).foregroundStyle(WatchTheme.planAccent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(recipe.title).font(.headline).lineLimit(2)
+                    Text(recipe.summary).font(.caption2).foregroundStyle(WatchTheme.planSecondary)
                 }
                 Spacer(minLength: 2)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(WatchTheme.planSecondary)
-            }
-            .padding(.horizontal, 9)
-            .frame(height: 51)
-            .background(.white, in: RoundedRectangle(cornerRadius: 15))
-            .overlay {
-                RoundedRectangle(cornerRadius: 15)
-                    .strokeBorder(WatchTheme.planBorder, lineWidth: 0.75)
-            }
-        }
-        .buttonStyle(.plain)
+                Image(systemName: ready ? "play.circle.fill" : "arrow.triangle.2.circlepath")
+            }.padding(9).watchSurface(radius: 12)
+        }.buttonStyle(.plain).disabled(!ready).opacity(ready ? 1 : 0.6)
     }
 
-    private func preparedWorkoutCard(
-        _ workout:
-            WatchPreparedWorkoutTransfer
-    ) -> some View {
-        let routeReady =
-            workout.routeID == nil ||
-            workout.routeID.flatMap {
-                routeStore.route(with: $0)
-            } != nil
-        let canStart =
-            routeReady &&
-            routeStore.automaticStartCountdownSeconds == nil &&
-            workoutManager.canAcceptPreparedWorkout() &&
-            ATHLTHWatchPreparedRecipeAdmissionPolicy.permits(
-                kind: workout.kind,
-                hasRunningRecipe: workout.runningWorkout != nil,
-                hasStrengthRecipe: workout.strengthWorkout != nil,
-                hasRoute: workout.routeID != nil
-            ) &&
-            (workout.plannedSessionID.map {
-                routeStore.canLaunchTodayWorkout($0)
-            } ?? true)
+    private func page<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        ScrollView { VStack(spacing: 7) { content() }.padding(6) }
+            .background(WatchTheme.planCanvas.ignoresSafeArea())
+            .foregroundStyle(WatchTheme.planInk).navigationTitle(title)
+    }
 
-        return Button {
-            startPreparedWorkout(workout)
-        } label: {
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
-                HStack {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "READY",
-                            norwegian: "KLAR"
-                        ),
-                        systemImage:
-                            "applewatch"
-                    )
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
-                    .tracking(1)
-                    .foregroundStyle(
-                        WatchTheme.accent
-                    )
+    private func empty(_ message: String) -> some View {
+        Text(message).font(.caption).multilineTextAlignment(.center).padding(12)
+            .frame(maxWidth: .infinity).watchSurface()
+    }
 
-                    Spacer()
-
-                    Text(
-                        routeStore.automaticStartCountdownSeconds.map {
-                            "\($0)s"
-                        } ??
-                        (routeReady
-                            ? "START"
-                            : ATHLTHLocalization.choose(
-                                english: "SYNCING",
-                                norwegian: "SYNKER"
-                            ))
-                    )
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .black
-                        )
-                    )
-                    .tracking(0.8)
-                    .foregroundStyle(
-                        routeReady
-                            ? WatchTheme.accent
-                            : WatchTheme.muted
-                    )
-                }
-
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(
-                            cornerRadius: 13,
-                            style: .continuous
-                        )
-                        .fill(
-                            WatchTheme
-                                .accent
-                                .opacity(0.16)
-                        )
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-
-                        Image(
-                            systemName:
-                                workout
-                                    .kind
-                                    .systemImage
-                        )
-                        .font(
-                            .system(
-                                size: 20,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            WatchTheme.accent
-                        )
+    private var plannedPage: some View {
+        page(tr("Upcoming", "Planlagte økter")) {
+            if upcoming.isEmpty { empty(tr("No upcoming Watch-ready workouts.", "Ingen kommende økter klare for Watch.")) }
+            ForEach(upcoming, id: \.workoutID) { workout in
+                if let recipe = ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) {
+                    if let date = workout.scheduledStart {
+                        Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption2)
                     }
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(workout.title)
-                            .font(
-                                .system(
-                                    size: 15,
-                                    weight: .bold
-                                )
-                            )
-                            .lineLimit(1)
-
-                        Text(
-                            routeReady
-                                ? workout.summary
-                                : ATHLTHLocalization.choose(
-                                    english:
-                                        "Receiving route from iPhone…",
-                                    norwegian:
-                                        "Mottar rute fra iPhone…"
-                                )
-                        )
-                        .font(
-                            .system(
-                                size: 9
-                            )
-                        )
-                        .foregroundStyle(
-                            WatchTheme
-                                .textSecondary
-                        )
-                        .lineLimit(2)
-                    }
-
-                    Spacer(
-                        minLength: 2
-                    )
-
-                    Image(
-                        systemName:
-                            routeReady
-                                ? "play.circle.fill"
-                                : "arrow.triangle.2.circlepath"
-                    )
-                    .font(
-                        .system(
-                            size: 17,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        routeReady
-                            ? WatchTheme.accent
-                            : WatchTheme.muted
-                    )
+                    recipeRow(recipe)
                 }
             }
-            .padding(11)
-            .frame(
-                maxWidth: .infinity
-            )
-            .watchSurface(
-                radius: 19
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(!canStart)
-        .opacity(
-            canStart
-                ? 1
-                : 0.62
-        )
-    }
-
-    private func startPreparedWorkout(
-        _ workout: WatchPreparedWorkoutTransfer
-    ) {
-        // RouteStore first validates the original complete plan link,
-        // then applies plannedSessionID; prepared.id is only the card ID.
-        Task {
-            await routeStore.launchPreparedWorkout(
-                workout,
-                manager: workoutManager
-            )
         }
     }
 
-    private func todayWorkoutCard(
-        _ workout:
-            WatchTodayWorkoutTransfer
-    ) -> some View {
-        Button {
-            startTodayWorkout(workout)
-        } label: {
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
-                HStack {
-                    Label(
-                        workout.scheduledStart.map {
-                            Calendar.current.isDateInToday($0)
-                        } ?? true
-                        ? ATHLTHLocalization.choose(
-                            english: "TODAY", norwegian: "I DAG")
-                        : ATHLTHLocalization.choose(
-                            english: "UPCOMING", norwegian: "KOMMENDE"),
-                        systemImage:
-                            "calendar.badge.clock"
-                    )
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
-                    .tracking(1)
-                    .foregroundStyle(
-                        WatchTheme.accent
-                    )
+    private var sentPage: some View {
+        page(tr("Sent to Watch", "Sendt til klokken")) {
+            if let sent {
+                recipeRow(sent)
+                if let countdown = routeStore.automaticStartCountdownSeconds { Text("\(countdown)s").font(.headline) }
+            } else {
+                empty(tr("Send a workout from ATHLTH on your iPhone.", "Send en treningsøkt fra ATHLTH på iPhone."))
+            }
+        }
+    }
 
-                    Spacer()
+    private var favoritesPage: some View {
+        page(tr("Favorites", "Favoritter")) {
+            link(.favoriteWorkouts, tr("Favorite workouts", "Favorittøkter"), "star")
+            link(.favoriteRoutes, tr("Favorite routes", "Favorittruter"), "map")
+            link(.sent, tr("Sent to Watch", "Sendt til klokken"), "applewatch")
+        }
+    }
 
-                    if let start =
-                            workout
-                                .scheduledStart {
-                        Text(
-                            start.formatted(
-                                date: Calendar.current.isDateInToday(start)
-                                    ? .omitted : .abbreviated,
-                                time: .shortened
-                            )
-                        )
-                        .font(
-                            .system(
-                                size: 9,
-                                weight:
-                                    .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            WatchTheme.muted
-                        )
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(
-                            cornerRadius: 13,
-                            style: .continuous
-                        )
-                        .fill(
-                            WatchTheme
-                                .accent
-                                .opacity(0.14)
-                        )
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-
-                        Image(
-                            systemName:
-                                workout
-                                    .kind
-                                    .systemImage
-                        )
-                        .font(
-                            .system(
-                                size: 20,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            WatchTheme.accent
-                        )
-                    }
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(
-                            workout.title
-                        )
-                        .font(
-                            .system(
-                                size: 15,
-                                weight: .bold
-                            )
-                        )
-                        .lineLimit(1)
-
-                        Text(
-                            workout.summary
-                        )
-                        .font(
-                            .system(
-                                size: 9
-                            )
-                        )
-                        .foregroundStyle(
-                            WatchTheme
-                                .textSecondary
-                        )
-                        .lineLimit(2)
-                    }
-
-                    Spacer(
-                        minLength: 2
-                    )
-
-                    Image(
-                        systemName:
-                            "play.fill"
-                    )
-                    .font(
-                        .system(
-                            size: 12,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        WatchTheme.accent
-                    )
+    private var favoriteWorkoutsPage: some View {
+        page(tr("Favorite workouts", "Favorittøkter")) {
+            let favorites = dashboard?.favorites ?? []
+            if favorites.isEmpty { empty(tr("No favorite workouts synced.", "Ingen synkroniserte favorittøkter.")) }
+            ForEach(favorites) { favorite in
+                if let recipe = favorite.recipe { recipeRow(recipe) }
+                else {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(favorite.title).font(.headline)
+                        Text(tr("Open on iPhone", "Åpne på iPhone")).font(.caption2)
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(9).watchSurface()
                 }
             }
-            .padding(11)
-            .frame(
-                maxWidth: .infinity
-            )
-            .watchSurface(
-                radius: 19
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(
-            !workoutManager.canAcceptPreparedWorkout() ||
-            (workout.routeID != nil &&
-             workout.routeID.flatMap { routeStore.route(with: $0) } == nil) ||
-            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) == nil ||
-            !routeStore.canLaunchTodayWorkout(workout.workoutID)
-        )
-        .opacity(
-            workoutManager.canAcceptPreparedWorkout() &&
-            (workout.routeID == nil ||
-             workout.routeID.flatMap { routeStore.route(with: $0) } != nil) &&
-            ATHLTHWatchTodayLaunchAdapter.prepared(from: workout) != nil &&
-            routeStore.canLaunchTodayWorkout(workout.workoutID)
-                ? 1 : 0.55
-        )
-    }
-
-    private func startTodayWorkout(
-        _ workout: WatchTodayWorkoutTransfer
-    ) {
-        // Today follows exactly the same one-recorder HealthKit admission,
-        // route validation, Audio Coach staging and start acknowledgement as
-        // an explicitly prepared Watch card. No legacy side-door start.
-        guard workoutManager.canAcceptPreparedWorkout(),
-              let card = ATHLTHWatchTodayLaunchAdapter.prepared(
-                  from: workout
-              )
-        else { return }
-        Task {
-            _ = await routeStore.launchPreparedWorkout(
-                card, manager: workoutManager
-            )
         }
     }
 
-    private func quickStartTiles(compact: Bool) -> some View {
-        HStack(spacing: 7) {
-            quickStartTile(
-                kind: .running,
-                title: ATHLTHLocalization.choose(
-                    english: "Run", norwegian: "Løp"
-                ),
-                icon: "figure.run",
-                tint: WatchTheme.planAccent,
-                fill: .white,
-                compact: compact
-            )
-            quickStartTile(
-                kind: .strength,
-                title: ATHLTHLocalization.choose(
-                    english: "Strength", norwegian: "Styrke"
-                ),
-                icon: "dumbbell.fill",
-                tint: WatchTheme.planInk,
-                fill: WatchTheme.planSelected,
-                compact: compact
-            )
-        }
-    }
-
-    private func quickStartTile(
-        kind: WatchWorkoutKind,
-        title: String,
-        icon: String,
-        tint: Color,
-        fill: Color,
-        compact: Bool
-    ) -> some View {
-        Button {
-            Task { await workoutManager.start(kind: kind) }
-        } label: {
-            VStack(spacing: compact ? 2 : 4) {
-                Image(systemName: icon)
-                    .font(.system(
-                        size: compact ? 18 : 21,
-                        weight: .semibold
-                    ))
-                    .foregroundStyle(tint)
-
-                Text(title)
-                    .font(.system(
-                        size: compact ? 12 : 13,
-                        weight: .bold
-                    ))
-                    .foregroundStyle(WatchTheme.planInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Start workout", norwegian: "Start økt"
-                ))
-                .font(.system(size: 8))
-                .foregroundStyle(WatchTheme.planSecondary)
-                .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: compact ? 69 : 77)
-            .background(
-                fill,
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .strokeBorder(
-                        WatchTheme.planBorder, lineWidth: 0.8
-                    )
+    private var favoriteRoutesPage: some View {
+        page(tr("Favorite routes", "Favorittruter")) {
+            let ids = Set(dashboard?.favoriteRouteIDs ?? [])
+            let routes = routeStore.routes.filter { ids.contains($0.id) }
+            if routes.isEmpty { empty(tr("No favorite routes synced.", "Ingen synkroniserte favorittruter.")) }
+            ForEach(routes) { route in
+                NavigationLink { WatchRouteDetailView(route: route) } label: {
+                    Label(route.title, systemImage: "map").font(.subheadline).padding(8).watchSurface()
+                }.buttonStyle(.plain)
             }
         }
-        .buttonStyle(.plain)
-        .disabled(workoutManager.state == .preparing)
-        .opacity(workoutManager.state == .preparing ? 0.55 : 1)
     }
 
-    private func menuCard(
-        title: LocalizedStringKey,
-        subtitle: Text,
-        icon: String,
-        accent: Bool
-    ) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(
-                    cornerRadius: 12,
-                    style: .continuous
-                )
-                .fill(
-                    WatchTheme
-                        .cardRaised
-                )
-                .frame(
-                    width: 38,
-                    height: 38
-                )
-
-                Image(
-                    systemName: icon
-                )
-                .font(
-                    .system(
-                        size: 16,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    accent
-                        ? WatchTheme.accent
-                        : WatchTheme
-                            .textPrimary
-                )
-            }
-
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(title)
-                    .font(
-                        .system(
-                            size: 13,
-                            weight: .semibold
-                        )
-                    )
-
-                subtitle
-                    .font(
-                        .system(size: 9)
-                    )
-                    .foregroundStyle(
-                        WatchTheme.muted
-                    )
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            Image(
-                systemName:
-                    "chevron.right"
-            )
-            .font(
-                .system(
-                    size: 9,
-                    weight: .bold
-                )
-            )
-            .foregroundStyle(
-                WatchTheme.muted
-            )
+    private var recommendationPage: some View {
+        page(tr("Recommended", "Anbefalt økt")) {
+            if let recipe = recommendation?.recommendation { recipeRow(recipe) }
+            else if let title = recommendation?.recommendationTitle {
+                empty(title + "\n" + (recommendation?.recommendationDetail ?? ""))
+            } else { empty(tr("No current recommendation.", "Ingen aktuell anbefaling.")) }
         }
-        .padding(10)
-        .watchSurface(
-            radius: 17
-        )
     }
 
-    private var connectionRow: some View {
-        HStack(spacing: 6) {
-            Image(
-                systemName:
-                    routeStore
-                        .companionLinked
-                    ? "iphone.radiowaves.left.and.right"
-                    : "applewatch"
-            )
-            .font(
-                .system(size: 10)
-            )
-
-            Group {
-                if routeStore
-                    .companionLinked {
-                    Text(
-                        "iPhone connected"
-                    )
-                } else {
-                    Text(
-                        "Watch ready for standalone workouts"
-                    )
-                }
-            }
-            .font(
-                .system(
-                    size: 9,
-                    weight: .medium
-                )
-            )
-            .lineLimit(1)
-        }
-        .foregroundStyle(
-            WatchTheme.muted
-        )
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-        .padding(.horizontal, 4)
-        .padding(.top, 2)
+    private func link(_ destination: WatchShortcutDestination, _ title: String, _ icon: String) -> some View {
+        Button { shortcutPath.append(destination) } label: {
+            HStack { Label(title, systemImage: icon); Spacer(); Image(systemName: "chevron.right").font(.caption2) }
+                .font(.caption.weight(.semibold)).padding(9).watchSurface()
+        }.buttonStyle(.plain)
     }
-}
 
-/// Reuses ATHLTH's actual vector logo from Shared/ATHLTHBrandMark.swift.
-/// No watch-only brand redesign and no extra image decode/memory cost.
-private struct ATHLTHWatchLogomark: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(WatchTheme.planSelected)
-            ATHLTHMarkShape()
-                .fill(WatchTheme.planAccent)
-                .frame(width: 24, height: 20)
+    private var menuPage: some View {
+        page(tr("Menu", "Meny")) {
+            link(.favorites, tr("Favorites", "Favoritter"), "star")
+            link(.planned, tr("Planned workouts", "Planlagte økter"), "calendar")
+            link(.routes, tr("All routes", "Alle ruter"), "map")
+            link(.ghostRace, "Ghost Race", "figure.run")
+            WatchPetSelectionButton()
+            if let message = workoutManager.errorMessage { empty(message) }
+            Text(routeStore.connectionText).font(.caption2)
         }
-        .accessibilityHidden(true)
     }
 }
 

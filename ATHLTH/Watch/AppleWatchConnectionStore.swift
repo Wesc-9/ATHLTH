@@ -977,6 +977,9 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     func sendAccountIdentity(_ ownerID: UUID?) {
+        if latestTodaySnapshot.dashboard?.ownerID != ownerID || ownerID == nil {
+            latestTodaySnapshot = WatchTodaySnapshot(workout: nil, updatedAt: Date(), workouts: [])
+        }
         // User identity is sent even if this account has no pets, planned
         // workouts or routes. A logout sends nil to clear future ownership.
         sendWatchPayload(
@@ -1022,7 +1025,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
 
     /// Send the full day in one atomic snapshot. The legacy single-workout
     /// field remains populated for older Watch app versions.
-    func sendTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer]) {
+    func sendTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer], dashboard: WatchHomeDashboardTransfer? = nil) {
         let ordered = workouts.sorted {
             ($0.scheduledStart ?? .distantFuture) <
                 ($1.scheduledStart ?? .distantFuture)
@@ -1030,7 +1033,8 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         let snapshot = WatchTodaySnapshot(
             workout: ordered.first,
             updatedAt: Date(),
-            workouts: ordered
+            workouts: ordered,
+            dashboard: dashboard
         )
         latestTodaySnapshot = snapshot
         sendWatchPayload(snapshot, kind: .todayWorkout)
