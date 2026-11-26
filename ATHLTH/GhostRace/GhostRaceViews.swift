@@ -4188,7 +4188,11 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
               km.isFinite, (0.2...100).contains(km) else { return nil }
         return km * 1_000
     }
-    private var paceSeconds: Double? { GhostTargetPaceFormatter.secondsPerKilometer(from: pace) }
+    private var paceSeconds: Double? {
+        guard let seconds = GhostTargetPaceFormatter.secondsPerKilometer(from: pace),
+              seconds.isFinite, (120...1_800).contains(seconds) else { return nil }
+        return seconds
+    }
     private var valid: Bool { paceSeconds != nil && (!fixedDistance || meters != nil) }
     private var title: String { fixedDistance ? "Fast distanse" : "Fri løping" }
     private var duration: Double? { !fixedDistance && durationMinutes > 0 ? Double(durationMinutes * 60) : nil }
@@ -4270,6 +4274,10 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
                         .font(.system(.largeTitle, design: .monospaced).weight(.semibold))
                     Text("min/km").foregroundStyle(.secondary)
                 }.padding(12).background(ATHLTHTheme.surfaceStone, in: RoundedRectangle(cornerRadius: 12))
+                if paceSeconds == nil {
+                    Text("Velg en fart mellom 2:00 og 30:00 min/km.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
                     ForEach(["7:00", "6:30", "6:00", "5:30", "5:00", "4:30", "4:00"], id: \.self) { option in
                         Button { pace = option } label: {

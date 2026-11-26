@@ -1699,19 +1699,24 @@ struct IPhoneWorkoutView: View {
                                 )
                                 if let plan = workout.structuredRunningWorkout, plan.soloGhostRace == true,
                                    let step = plan.steps.first, let pace = step.ghostPaceSecondsPerKilometer,
-                                   let lead = ATHLTHSoloGhostComparison.lead(
-                                       elapsed: result.activeSeconds, meters: result.distanceMeters, pace: pace),
-                                   let gap = ATHLTHSoloGhostComparison.timeGap(leadMeters: lead, pace: pace) {
-                                    VStack(alignment: .leading, spacing: 4) {
+                                   let race = result.segments.first(where: { $0.index == 0 }),
+                                   let comparison = ATHLTHSoloGhostComparison.result(
+                                       elapsed: race.activeSeconds, meters: race.distanceMeters, pace: pace,
+                                       targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds) {
+                                    VStack(alignment: .leading, spacing: 5) {
                                         Text("Ghost Race · resultat").font(.subheadline.weight(.semibold))
-                                        Text("\(Int(abs(lead).rounded())) m \(lead >= 0 ? "foran" : "bak") · \(Int(abs(gap).rounded())) sek")
+                                        Text(soloGhostOutcome(comparison.outcome))
+                                            .font(.headline)
+                                        Text("\(Int(abs(comparison.timeGapSeconds).rounded())) sek \(comparison.timeGapSeconds >= 0 ? "foran" : "bak")")
                                             .font(.caption.monospacedDigit())
+                                        if step.distanceMeters == nil || comparison.outcome == .incomplete {
+                                            Text("\(Int(abs(comparison.leadMeters).rounded())) m \(comparison.leadMeters >= 0 ? "foran" : "bak")")
+                                                .font(.caption.monospacedDigit())
+                                        }
                                         Text("Ghost \(GhostTargetPaceFormatter.text(secondsPerKilometer: pace))/km")
                                             .font(.caption).foregroundStyle(.secondary)
-                                        if step.measure == .distance,
-                                           let target = step.distanceMeters, result.distanceMeters < target {
-                                            Text("Distansemålet ble ikke fullført.").font(.caption).foregroundStyle(.secondary)
-                                        }
+                                        Text("Løpsdel: " + ATHLTHRunStepCountdown.display(race.activeSeconds))
+                                            .font(.caption).foregroundStyle(.secondary)
                                     }
                                 }
                                 if result.pausedSeconds > 0.5 {
@@ -4493,5 +4498,14 @@ final class ATHLTHLiveRouteDisplayProjection {
             let offset = Int((Double(index) * Double(points.count - 1) / Double(limit - 1)).rounded())
             return coordinate(points[offset])
         }
+    }
+}
+
+private func soloGhostOutcome(_ outcome: ATHLTHSoloGhostComparison.Outcome) -> String {
+    switch outcome {
+    case .ahead: return "Du slo ghosten"
+    case .behind: return "Ghosten vant"
+    case .tied: return "Uavgjort"
+    case .incomplete: return "Målet ble ikke fullført"
     }
 }

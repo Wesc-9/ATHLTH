@@ -589,3 +589,43 @@ final class ATHLTHIntervalGhostPacerPolicyTests: XCTestCase {
         ))
     }
 }
+
+final class ATHLTHSoloGhostFinishPolicyTests: XCTestCase {
+    func testDistanceFinishUsesTargetTimeRatherThanOvershoot() throws {
+        let result = try XCTUnwrap(ATHLTHSoloGhostComparison.result(
+            elapsed: 301, meters: 1_020, pace: 300,
+            targetMeters: 1_000, targetSeconds: nil))
+        XCTAssertEqual(result.outcome, .behind)
+        XCTAssertEqual(result.timeGapSeconds, -1, accuracy: 0.001)
+    }
+
+    func testStoppedBeforeDistanceIsNotAWin() throws {
+        let result = try XCTUnwrap(ATHLTHSoloGhostComparison.result(
+            elapsed: 120, meters: 500, pace: 300,
+            targetMeters: 1_000, targetSeconds: nil))
+        XCTAssertEqual(result.outcome, .incomplete)
+        XCTAssertGreaterThan(result.leadMeters, 0)
+    }
+
+    func testOpenAndTimedResults() throws {
+        let open = try XCTUnwrap(ATHLTHSoloGhostComparison.result(
+            elapsed: 300, meters: 1_100, pace: 300, targetMeters: nil, targetSeconds: nil))
+        XCTAssertEqual(open.outcome, .ahead)
+        XCTAssertEqual(open.timeGapSeconds, 30, accuracy: 0.001)
+        XCTAssertEqual(ATHLTHSoloGhostComparison.result(
+            elapsed: 300, meters: 1_100, pace: 300, targetMeters: nil, targetSeconds: 600)?.outcome, .incomplete)
+        XCTAssertEqual(ATHLTHSoloGhostComparison.result(
+            elapsed: 600, meters: 2_000, pace: 300, targetMeters: nil, targetSeconds: 600)?.outcome, .tied)
+    }
+
+    func testDistancePresetsAndOpenTransfer() throws {
+        XCTAssertEqual(ATHLTHSoloGhostPacePolicy.presets.map(\.meters),
+                       [1_000, 2_000, 5_000, 10_000, 21_097.5, 42_195])
+        let transfer = try XCTUnwrap(ATHLTHSoloGhostPacePolicy.transfer(
+            paceSeconds: 330, distanceMeters: nil, durationSeconds: nil))
+        XCTAssertEqual(transfer.soloGhostRace, true)
+        XCTAssertEqual(transfer.steps.first?.measure, .open)
+        XCTAssertNil(ATHLTHSoloGhostPacePolicy.transfer(
+            paceSeconds: 330, distanceMeters: 5_000, durationSeconds: 600))
+    }
+}

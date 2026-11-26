@@ -288,6 +288,33 @@ enum ATHLTHIntervalGhostPacer {
 /// Shared constant-pace comparison; seconds are an equivalent time gap at
 /// the ghost's speed, not a prediction of future finish time.
 enum ATHLTHSoloGhostComparison {
+    enum Outcome: Equatable { case ahead, behind, tied, incomplete }
+    struct Result: Equatable {
+        let leadMeters: Double
+        let timeGapSeconds: Double
+        let outcome: Outcome
+    }
+
+    /// Use the recorded race phase rather than the enclosing workout,
+    /// which can include additional running after a completed goal.
+    static func result(elapsed: Double, meters: Double, pace: Double,
+                       targetMeters: Double?, targetSeconds: Double?) -> Result? {
+        guard let lead = lead(elapsed: elapsed, meters: meters, pace: pace),
+              let gap = timeGap(leadMeters: lead, pace: pace),
+              targetMeters == nil || targetSeconds == nil else { return nil }
+        if let targetMeters, !targetMeters.isFinite || targetMeters <= 0 { return nil }
+        if let targetSeconds, !targetSeconds.isFinite || targetSeconds <= 0 { return nil }
+        let incomplete = targetMeters.map { meters < $0 } ?? targetSeconds.map { elapsed < $0 } ?? false
+        // For a distance race compare against ghost's target finish time,
+        // not the distance overshoot recorded on the last GPS sample.
+        let finishGap = !incomplete && targetMeters != nil
+            ? targetMeters! * pace / 1_000 - elapsed : gap
+        guard finishGap.isFinite else { return nil }
+        let outcome: Outcome = incomplete ? .incomplete
+            : abs(finishGap) < 0.5 ? .tied : finishGap > 0 ? .ahead : .behind
+        return Result(leadMeters: lead, timeGapSeconds: finishGap, outcome: outcome)
+    }
+
     static func timeGap(leadMeters: Double, pace: Double) -> Double? {
         guard leadMeters.isFinite, pace.isFinite, (120...1_800).contains(pace) else { return nil }
         let gap = leadMeters * pace / 1_000
