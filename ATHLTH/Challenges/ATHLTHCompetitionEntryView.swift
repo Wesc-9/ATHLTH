@@ -4,6 +4,7 @@ import SwiftUI
 struct ATHLTHCompetitionEntryView: View {
     var preselectedFriend: SocialProfileCard? = nil
     var initialFormat: ATHLTHCompetitionFormat? = nil
+    var locksRunningActivity = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
@@ -65,7 +66,7 @@ struct ATHLTHCompetitionEntryView: View {
             AnyView(ATHLTHCompetitionCreationView(
                 initialActivity: .running, advanced: true,
                 initialFormat: format, preselectedFriend: preselectedFriend,
-                choosesActivityInRules: true
+                choosesActivityInRules: !locksRunningActivity
             ))
         }
         .fullScreenCover(item: $selectedTournament, onDismiss: { Task { await reloadHub() } }) { item in
