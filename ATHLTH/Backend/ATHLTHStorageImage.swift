@@ -108,6 +108,12 @@ final class ATHLTHSizedStorageImageCache {
             20 * 1_024 * 1_024
     }
 
+    func applyResourcePolicy(_ policy: ATHLTHSystemResourcePolicy) {
+        images.countLimit = policy == .normal ? 24 : 12
+        images.totalCostLimit = policy.storageImageBudget
+        if policy == .critical { clear() }
+    }
+
     func image(
         for key: String
     ) -> UIImage? {
