@@ -12165,7 +12165,7 @@ private struct StrengthActiveExerciseQueueView: View {
 private struct StrengthQueueSetEdit: Identifiable {
     let exerciseID: UUID
     let set: StrengthSetLog
-    var id: UUID { set.id }
+    var id: UUID { self.set.id }
 }
 
 private struct StrengthQueueBatchPicker: View {
