@@ -9045,6 +9045,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             result.recordedRunningMinutes = recordedStructuredRunMinutes
         }
 
+        if let plan = structuredRunningWorkout, plan.soloGhostRace == true,
+           let step = plan.steps.first, let pace = step.ghostPaceSecondsPerKilometer {
+            let phase = recordedStructuredRunSteps.first(where: { $0.index == 0 })
+            result.soloGhostResult = ATHLTHSoloGhostComparison.result(
+                elapsed: phase?.activeSeconds ?? max(0, elapsedTime - structuredStepStartElapsedTime),
+                meters: phase?.distanceMeters ?? max(0, distanceMeters - structuredStepStartDistanceMeters),
+                pace: pace, targetMeters: step.distanceMeters, targetSeconds: step.durationSeconds)
+        }
+
         if structuredWorkoutComplete,
            let structured = structuredRunningWorkout,
            !structured.steps.isEmpty,

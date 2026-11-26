@@ -2102,6 +2102,8 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var structuredWorkoutTitle: String? = nil
     var recordedRunningSteps: [ATHLTHRecordedRunningStep]? = nil
     var recordedRunningMinutes: [ATHLTHRecordedRunningMinute]? = nil
+    // Optional local solo race outcome, backward-compatible with older builds.
+    var soloGhostResult: ATHLTHSoloGhostComparison.Result? = nil
 
     // Strength work performed while iPhone is unavailable is shipped together
     // with the final HealthKit result. This makes offline completion atomic

@@ -288,8 +288,8 @@ enum ATHLTHIntervalGhostPacer {
 /// Shared constant-pace comparison; seconds are an equivalent time gap at
 /// the ghost's speed, not a prediction of future finish time.
 enum ATHLTHSoloGhostComparison {
-    enum Outcome: Equatable { case ahead, behind, tied, incomplete }
-    struct Result: Equatable {
+    enum Outcome: String, Codable, Hashable { case ahead, behind, tied, incomplete }
+    struct Result: Codable, Hashable {
         let leadMeters: Double
         let timeGapSeconds: Double
         let outcome: Outcome
@@ -307,8 +307,12 @@ enum ATHLTHSoloGhostComparison {
         let incomplete = targetMeters.map { meters < $0 } ?? targetSeconds.map { elapsed < $0 } ?? false
         // For a distance race compare against ghost's target finish time,
         // not the distance overshoot recorded on the last GPS sample.
-        let finishGap = !incomplete && targetMeters != nil
-            ? targetMeters! * pace / 1_000 - elapsed : gap
+        let finishGap: Double
+        if !incomplete, let targetMeters {
+            finishGap = targetMeters * pace / 1_000 - elapsed
+        } else {
+            finishGap = gap
+        }
         guard finishGap.isFinite else { return nil }
         let outcome: Outcome = incomplete ? .incomplete
             : abs(finishGap) < 0.5 ? .tied : finishGap > 0 ? .ahead : .behind

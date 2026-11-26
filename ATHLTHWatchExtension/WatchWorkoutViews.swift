@@ -2410,6 +2410,24 @@ struct WatchActiveWorkoutView: View {
             }
 
             if let result = workoutManager.completedResult {
+                if let ghost = result.soloGhostResult {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("Ghost Race", systemImage: "flag.checkered")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(WatchTheme.accentDeep)
+                        Text(soloGhostResultTitle(ghost.outcome))
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("\(Int(abs(ghost.timeGapSeconds).rounded())) " +
+                             ATHLTHLocalization.choose(
+                                english: ghost.timeGapSeconds >= 0 ? "sec ahead" : "sec behind",
+                                norwegian: ghost.timeGapSeconds >= 0 ? "sek foran" : "sek bak"))
+                            .font(.system(size: 11, weight: .medium))
+                            .monospacedDigit()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(9)
+                    .watchSurface(radius: 14)
+                }
                 Text(durationText(result.duration))
                     .font(.system(size: 24, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -5056,5 +5074,14 @@ struct WatchAudioCoachLiveSettingsView: View {
             )
 
         return "\(minutes) min"
+    }
+}
+
+private func soloGhostResultTitle(_ outcome: ATHLTHSoloGhostComparison.Outcome) -> String {
+    switch outcome {
+    case .ahead: return ATHLTHLocalization.choose(english: "You beat the ghost", norwegian: "Du slo ghosten")
+    case .behind: return ATHLTHLocalization.choose(english: "The ghost won", norwegian: "Ghosten vant")
+    case .tied: return ATHLTHLocalization.choose(english: "Tie", norwegian: "Uavgjort")
+    case .incomplete: return ATHLTHLocalization.choose(english: "Goal not completed", norwegian: "Målet ble ikke fullført")
     }
 }
