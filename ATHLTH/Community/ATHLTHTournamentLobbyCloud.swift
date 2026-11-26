@@ -363,30 +363,48 @@ struct ATHLTHTournamentLobbyCloudService {
 
     func searchCompetitionExercises(
         _ query: String,
-        allowed: [ATHLTHTournamentActivity]
+        allowed: [ATHLTHTournamentActivity],
+        browse: Bool = false
     ) async throws -> [ATHLTHTournamentExerciseSearchResult] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard clean.count >= 2, !allowed.isEmpty else { return [] }
-
-        let presets: [ATHLTHTournamentActivityTemplateRemote] = try await client
-            .from("athlth_tournament_activity_templates")
+        guard !allowed.isEmpty, clean.count >= 2 || (browse && clean.isEmpty) else { return [] }
+        // Browsing is explicit and bounded. The existing lobby's search-only
+        // callers retain their previous minimum query length.
+        let base = client.from("athlth_tournament_activity_templates")
             .select("id,title,activity_type,metric")
             .eq("is_active", value: true)
             .in("activity_type", values: allowed.map(\.rawValue))
-            .ilike("title", pattern: "%\(clean)%")
-            .order("title")
-            .limit(40).execute().value
+        let presets: [ATHLTHTournamentActivityTemplateRemote]
+        if clean.isEmpty {
+            presets = try await base.order("title").limit(40).execute().value
+        } else {
+            presets = try await base.ilike("title", pattern: "%\(clean)%")
+                .order("title").limit(40).execute().value
+        }
         var result = presets.map {
             ATHLTHTournamentExerciseSearchResult(
-                id: $0.id,name: $0.title,isActivityTemplate: true,metric: $0.metric ?? "repetitions",activity: $0.activityType
+                id: $0.id, name: $0.title, isActivityTemplate: true,
+                metric: $0.metric ?? "repetitions", activity: $0.activityType
             )
         }
         if allowed.contains(.strength) {
-            let exercises = try await searchExercises(clean)
+            let exercises: [ATHLTHTournamentLibraryExerciseRemote]
+            if clean.isEmpty {
+                exercises = try await client.from("exercise_catalog").select("id,name")
+                    .eq("is_published", value: true).order("name").limit(30).execute().value
+            } else {
+                var matches = try await searchExercises(clean)
+                // The catalog includes English exercise titles.
+                let aliases = ["roing": "row", "romaskin": "row", "knebøy": "squat",
+                               "benkpress": "bench press", "markløft": "deadlift",
+                               "armheving": "push up", "utfall": "lunge"]
+                if matches.isEmpty, let alias = aliases[clean.lowercased()] {
+                    matches = try await searchExercises(alias)
+                }
+                exercises = matches
+            }
             result += exercises.map {
-                ATHLTHTournamentExerciseSearchResult(
-                    id: $0.id,name: $0.name,isActivityTemplate: false
-                )
+                ATHLTHTournamentExerciseSearchResult(id: $0.id, name: $0.name, isActivityTemplate: false)
             }
         }
         return result
