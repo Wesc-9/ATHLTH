@@ -88,3 +88,28 @@ final class WorkoutFeedSafetyTests: XCTestCase {
 
 
 }
+
+
+final class ATHLTHProfilePublishedFeedPolicyTests: XCTestCase {
+    func testOnlyOwnSharedWorkoutRecordsAreIncluded() {
+        let owner = UUID()
+        func row(_ actor: UUID, _ kind: String, _ visibility: String) -> SocialActivityRecord {
+            .init(id: UUID(), actorID: actor, kind: kind, title: "Workout", subtitle: nil,
+                metadata: nil, visibility: visibility, eventKey: nil, workoutSessionID: nil, createdAt: Date())
+        }
+        XCTAssertTrue(ATHLTHProfilePublishedFeedPolicy.includes(row(owner, "workout", "friends"), owner: owner))
+        XCTAssertTrue(ATHLTHProfilePublishedFeedPolicy.includes(row(owner, "workout", "public"), owner: owner))
+        XCTAssertFalse(ATHLTHProfilePublishedFeedPolicy.includes(row(owner, "workout", "private"), owner: owner))
+        XCTAssertFalse(ATHLTHProfilePublishedFeedPolicy.includes(row(UUID(), "workout", "public"), owner: owner))
+        XCTAssertFalse(ATHLTHProfilePublishedFeedPolicy.includes(row(owner, "trophy", "public"), owner: owner))
+        XCTAssertFalse(ATHLTHProfilePublishedFeedPolicy.includes(row(owner, "workout", "public"), owner: nil))
+    }
+
+    func testSportsAndCustomWorkoutNameSurviveSafeSummaryFiltering() {
+        let safe = WorkoutFeedSafety.sanitizedMetadata(["activity_subtype": "sports",
+            "custom_workout_title": "Cageball", "average_heart_rate_bpm": "155"])
+        XCTAssertEqual(safe["activity_subtype"], "sports")
+        XCTAssertEqual(safe["custom_workout_title"], "Cageball")
+        XCTAssertNil(safe["average_heart_rate_bpm"])
+    }
+}

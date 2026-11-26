@@ -657,6 +657,31 @@ final class SupabaseSocialService: Sendable {
             .execute()
             .value
 
+        return try await projectFeed(activities)
+    }
+
+    /// Query the owner's published workouts before limiting rows. Never use
+    /// the friends feed, local Health history or private review entries.
+    func loadOwnPublishedWorkoutFeed(limit: Int = 60, offset: Int = 0) async throws -> [SocialFeedItem] {
+        guard let owner = currentUserID else { throw SocialServiceError.notAuthenticated }
+        let count = min(max(limit, 1), 60)
+        let start = max(0, offset)
+        let activities: [SocialActivityRecord] = try await client
+            .from("social_activities")
+            .select()
+            .eq("actor_id", value: owner)
+            .eq("kind", value: "workout")
+            .in("visibility", values: ["friends", "public"])
+            .order("created_at", ascending: false)
+            .order("id", ascending: false)
+            .range(from: start, to: start + count - 1)
+            .execute()
+            .value
+        guard currentUserID == owner, !Task.isCancelled else { throw CancellationError() }
+        return try await projectFeed(activities)
+    }
+
+    private func projectFeed(_ activities: [SocialActivityRecord]) async throws -> [SocialFeedItem] {
         guard !activities.isEmpty else {
             return []
         }

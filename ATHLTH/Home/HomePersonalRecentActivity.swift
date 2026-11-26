@@ -2088,9 +2088,8 @@ private struct HomeCompactActivityEngagementRow:
             return nil
         }
 
-        return social.feed.first {
-            $0.id == item.id
-        } ?? item
+        return social.ownPublishedWorkouts.first { $0.id == item.id } ??
+            social.feed.first { $0.id == item.id } ?? item
     }
 
     private var isLiked: Bool {
@@ -2598,6 +2597,162 @@ struct ATHLTHHomeRunningFeedPhoto: View {
         }
         .frame(height: height)
         .accessibilityHidden(true)
+    }
+}
+
+/// The 1.9.7 horizontal feed layout, now driven exclusively by published
+/// activity records and the current shared feed artwork/engagement views.
+struct ATHLTHProfilePublishedWorkoutFeed: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var items: [SocialFeedItem] {
+        guard session.signedIn else { return [] }
+        return ATHLTHProfilePublishedFeedPolicy.items(social.ownPublishedWorkouts, owner: session.profile.userID)
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(tr("Published workouts", "Publiserte økter"))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Spacer()
+                if !items.isEmpty {
+                    NavigationLink {
+                        ATHLTHProfilePublishedWorkoutHistory()
+                    } label: {
+                        Label(tr("See all", "Se alle"), systemImage: "chevron.right")
+                            .labelStyle(.titleAndIcon)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(ATHLTHTheme.accentSoft, in: Capsule())
+                    }.buttonStyle(.plain)
+                }
+            }
+            if items.isEmpty {
+                if social.ownPublishedWorkoutsLoading {
+                    ProgressView().frame(maxWidth: .infinity, minHeight: 64)
+                } else if social.ownPublishedWorkoutsError {
+                    Button {
+                        Task { await social.refreshOwnPublishedWorkouts() }
+                    } label: {
+                        Label(tr("Could not load. Retry", "Kunne ikke laste. Prøv igjen"), systemImage: "arrow.clockwise")
+                            .font(.caption.weight(.medium))
+                    }.frame(maxWidth: .infinity, minHeight: 54)
+                } else {
+                    Text(tr("Only workouts you share appear here.", "Her vises bare økter du har publisert."))
+                        .font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                }
+            } else {
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 10) {
+                        ForEach(Array(items.prefix(12))) { item in
+                            ATHLTHProfilePublishedWorkoutCard(item: item)
+                                .frame(width: 224)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollIndicators(.hidden)
+                .scrollTargetBehavior(.viewAligned)
+            }
+        }
+        .task(id: "\(session.profile.userID)-\(session.signedIn)-\(scenePhase == .active)") {
+            guard session.signedIn, scenePhase == .active, !session.previewModeEnabled else { return }
+            await social.refreshOwnPublishedWorkouts()
+        }
+        .accessibilityIdentifier("athlth-profile-published-workouts")
+    }
+}
+
+private struct ATHLTHProfilePublishedWorkoutHistory: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 12) {
+                ForEach(ATHLTHProfilePublishedFeedPolicy.items(social.ownPublishedWorkouts, owner: session.signedIn ? session.profile.userID : nil)) { item in
+                    ATHLTHProfilePublishedWorkoutCard(item: item)
+                }
+                if social.ownPublishedWorkoutsHasMore {
+                    Button {
+                        Task { await social.refreshOwnPublishedWorkouts(loadMore: true) }
+                    } label: {
+                        Text(ATHLTHLocalization.choose(english: "Load more", norwegian: "Vis flere"))
+                            .font(.subheadline.weight(.semibold)).padding(14)
+                    }.disabled(social.ownPublishedWorkoutsLoading)
+                }
+            }.padding(14)
+            if social.ownPublishedWorkoutsError {
+                Button(ATHLTHLocalization.choose(english: "Retry", norwegian: "Prøv igjen")) {
+                    Task { await social.refreshOwnPublishedWorkouts() }
+                }
+            }
+        }
+        .refreshable { await social.refreshOwnPublishedWorkouts() }
+        .navigationTitle(ATHLTHLocalization.choose(english: "Published workouts", norwegian: "Publiserte økter"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ATHLTHProfilePublishedWorkoutCard: View {
+    let item: SocialFeedItem
+    private var activity: WorkoutActivity { HomeFollowingWorkoutPresentation.activity(for: item) }
+    private var activityTitle: String {
+        if item.activity.metadata?["activity_subtype"] == "sports" {
+            return ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
+        }
+        return HomeRecentCardFormat.activity(activity)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            NavigationLink {
+                HomeFollowingWorkoutDetailView(item: item)
+            } label: {
+                HomeFollowingWorkoutArtwork(item: item, activity: activity, height: 122, embeddedInFeedCard: true)
+            }.buttonStyle(.plain)
+
+            NavigationLink {
+                HomeFollowingWorkoutDetailView(item: item)
+            } label: {
+                HStack(spacing: 8) {
+                    SocialAvatar(profile: item.actor, size: 30)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.activity.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+                        Text(activityTitle + " · " + HomeRecentCardFormat.date(item.activity.createdAt))
+                            .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            HomeCompactActivityEngagementRow(item: item)
+                .padding(.horizontal, 10).padding(.bottom, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.white.opacity(0.98), in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
     }
 }
 
@@ -4156,8 +4311,8 @@ private struct HomeActivityCommentsSheet: View {
     @State private var text = ""
 
     private var currentItem: SocialFeedItem {
-        social.feed.first(where: { $0.id == item.id }) ??
-        item
+        social.ownPublishedWorkouts.first(where: { $0.id == item.id }) ??
+        social.feed.first(where: { $0.id == item.id }) ?? item
     }
 
     var body: some View {

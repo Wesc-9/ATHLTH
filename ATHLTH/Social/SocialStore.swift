@@ -10,6 +10,13 @@ final class SocialStore: ObservableObject {
     @Published private(set) var challengeSearchResults: [ATHLTHChallenge] = []
     @Published private(set) var visibleProfiles: [SocialProfileCard] = []
     @Published private(set) var feed: [SocialFeedItem] = []
+    @Published private(set) var ownPublishedWorkouts: [SocialFeedItem] = []
+    @Published private(set) var ownPublishedWorkoutsLoading = false
+    @Published private(set) var ownPublishedWorkoutsError = false
+    @Published private(set) var ownPublishedWorkoutsHasMore = false
+    private var ownPublishedWorkoutsOwner: UUID?
+    private var ownPublishedWorkoutsOffset = 0
+    private var ownPublishedWorkoutsGeneration = UUID()
     @Published private(set) var blockedUsers: [SocialBlockedUser] = []
     @Published private(set) var mutedUserIDs: Set<UUID> = []
     @Published private(set) var inboxEvents: [SocialInboxEvent] = []
@@ -761,6 +768,41 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    func refreshOwnPublishedWorkouts(loadMore: Bool = false) async {
+        guard let owner = currentUserID else { return }
+        if ownPublishedWorkoutsOwner != owner {
+            ownPublishedWorkouts = []
+            ownPublishedWorkoutsOffset = 0
+            ownPublishedWorkoutsOwner = owner
+            ownPublishedWorkoutsHasMore = false
+            ownPublishedWorkoutsLoading = false
+            ownPublishedWorkoutsGeneration = UUID()
+        }
+        if loadMore && (!ownPublishedWorkoutsHasMore || ownPublishedWorkoutsLoading) { return }
+        let generation = UUID()
+        ownPublishedWorkoutsGeneration = generation
+        ownPublishedWorkoutsLoading = true
+        ownPublishedWorkoutsError = false
+        let offset = loadMore ? ownPublishedWorkoutsOffset : 0
+        // Keep previously loaded history on refresh; query in bounded pages.
+        let limit = 60
+        defer {
+            if ownPublishedWorkoutsGeneration == generation { ownPublishedWorkoutsLoading = false }
+        }
+        do {
+            let rows = try await service.loadOwnPublishedWorkoutFeed(limit: limit, offset: offset)
+            guard !Task.isCancelled, currentUserID == owner,
+                  ownPublishedWorkoutsGeneration == generation else { return }
+            let previous = loadMore ? ownPublishedWorkouts : []
+            ownPublishedWorkouts = ATHLTHProfilePublishedFeedPolicy.items(previous + rows, owner: owner)
+            ownPublishedWorkoutsOffset = offset + rows.count
+            ownPublishedWorkoutsHasMore = rows.count == limit
+        } catch {
+            guard !Task.isCancelled, currentUserID == owner, ownPublishedWorkoutsGeneration == generation else { return }
+            ownPublishedWorkoutsError = true
+        }
+    }
+
     func refreshActivityHistoryFeed(
         limit: Int = 100
     ) async {
@@ -1095,13 +1137,14 @@ final class SocialStore: ObservableObject {
         errorMessage = nil
         pendingReactionIDs.insert(activityID)
 
-        let previous = feed.first { $0.id == activityID }
+        let previous = feed.first { $0.id == activityID } ?? ownPublishedWorkouts.first { $0.id == activityID }
         if let currentUserID, let previous {
             let updated = previous.replacingReaction(
                 from: currentUserID,
                 with: reaction
             )
             feed = feed.map { $0.id == activityID ? updated : $0 }
+            ownPublishedWorkouts = ownPublishedWorkouts.map { $0.id == activityID ? updated : $0 }
         }
 
         do {
@@ -1118,6 +1161,7 @@ final class SocialStore: ObservableObject {
         } catch {
             if let previous {
                 feed = feed.map { $0.id == activityID ? previous : $0 }
+                ownPublishedWorkouts = ownPublishedWorkouts.map { $0.id == activityID ? previous : $0 }
             }
             pendingReactionIDs.remove(activityID)
             errorMessage = error.localizedDescription
@@ -1135,6 +1179,9 @@ final class SocialStore: ObservableObject {
                 activityID: activityID,
                 body: body
             )
+            if ownPublishedWorkouts.contains(where: { $0.id == activityID }) {
+                await refreshOwnPublishedWorkouts()
+            }
             feed = scopedFeed(
                 try await service.loadFeed()
             )
@@ -2327,6 +2374,7 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: resolvedSession?.id
             )
 
+            if ownPublishedWorkoutsOwner == currentUserID { await refreshOwnPublishedWorkouts() }
             feed = scopedFeed(try await service.loadFeed())
             return true
         } catch {
@@ -2403,6 +2451,7 @@ final class SocialStore: ObservableObject {
                 workoutSessionID: linkedSession?.id
             )
 
+            if ownPublishedWorkoutsOwner == currentUserID { await refreshOwnPublishedWorkouts() }
             feed = scopedFeed(try await service.loadFeed())
             return true
         } catch {
@@ -2434,7 +2483,7 @@ final class SocialStore: ObservableObject {
             )
 
         let ownedMatches =
-            feed.filter { item in
+            Dictionary((feed + ownPublishedWorkouts).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }).values.filter { item in
                 guard item.activity.actorID == currentUserID,
                       item.activity.kind == "workout"
                 else {
@@ -2481,6 +2530,7 @@ final class SocialStore: ObservableObject {
                     $0.id == item.id
                 }
             }
+            ownPublishedWorkouts.removeAll { item in ownedMatches.contains { $0.id == item.id } }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -3766,6 +3816,13 @@ final class SocialStore: ObservableObject {
         isHomeSocialStatusRefreshing = false
         isHomeFriendsRefreshing = false
         feed = []
+        ownPublishedWorkouts = []
+        ownPublishedWorkoutsOwner = nil
+        ownPublishedWorkoutsOffset = 0
+        ownPublishedWorkoutsGeneration = UUID()
+        ownPublishedWorkoutsLoading = false
+        ownPublishedWorkoutsError = false
+        ownPublishedWorkoutsHasMore = false
         blockedUsers = []
         mutedUserIDs = []
         inboxEvents = []

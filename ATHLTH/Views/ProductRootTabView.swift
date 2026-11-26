@@ -9841,6 +9841,7 @@ struct ATHLTHProfileView: View {
                 personalRecordsSection
                 gearSection
                 ATHLTHPetProfileSection()
+                ATHLTHProfilePublishedWorkoutFeed()
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
