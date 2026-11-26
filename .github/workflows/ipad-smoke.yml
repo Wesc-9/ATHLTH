@@ -97,7 +97,7 @@ jobs:
         run: python3 -m unittest discover -s scripts -p 'test_resolve_ipad_smoke_artifact.py' -v
       - name: Locate exact-commit universal simulator artifact
         id: resolve
-        if: github.ref == 'refs/heads/release/v3.0.3'
+        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4"]'), github.ref)
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
