@@ -111,7 +111,9 @@ private struct ATHLTHSceneRootView: View {
     @State private var lastAppliedResourcePolicy: ATHLTHSystemResourcePolicy?
     @State private var profileRecordPublishTask: Task<Void, Never>?
 
-    var body: some View {
+    var body: some View { sceneConnectivity }
+
+    private var sceneContent: some View {
         Group {
             if !appSession.signedIn &&
                 !appSession.previewModeEnabled {
@@ -270,6 +272,10 @@ private struct ATHLTHSceneRootView: View {
                 }
             }
         }
+    }
+
+    private var sceneLifecycle: some View {
+        sceneContent
         .background {
             ATHLTHAppLockBridge(
                 owner: appSession.signedIn && !appSession.previewModeEnabled ? appSession.profile.userID : nil,
@@ -346,6 +352,10 @@ private struct ATHLTHSceneRootView: View {
                 Task { await messaging.refreshPreferences() }
             }
         }
+    }
+
+    private var scenePreferences: some View {
+        sceneLifecycle
         .onChange(of: settings.audioCoachGroups) { _, _ in
             audioCoachAccountSync.scheduleSync(session: appSession, settings: settings)
         }
@@ -374,6 +384,10 @@ private struct ATHLTHSceneRootView: View {
                 }
             }
         }
+    }
+
+    private var sceneAccount: some View {
+        scenePreferences
         .onChange(of: appSession.signedIn) { _, signedIn in
             RecoverySorenessStore.configureAccount(signedIn ? appSession.profile.userID : nil)
             scheduleAutomaticOfflinePreparation()
@@ -427,6 +441,10 @@ private struct ATHLTHSceneRootView: View {
                 }
             }
         }
+    }
+
+    private var sceneSync: some View {
+        sceneAccount
         .task(id: "\(appSession.profile.userID)-\(appSession.signedIn)-\(scenePhase == .active)") {
             guard appSession.signedIn, scenePhase == .active else { return }
             while !Task.isCancelled {
@@ -457,6 +475,10 @@ private struct ATHLTHSceneRootView: View {
             )
             scheduleProfileRecordSummaryPublish()
         }
+    }
+
+    private var sceneConnectivity: some View {
+        sceneSync
         .onChange(of: appSession.profile.userID) { _, _ in
             RecoverySorenessStore.configureAccount(appSession.signedIn ? appSession.profile.userID : nil)
             notifications.switchAccount(
