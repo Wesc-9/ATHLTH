@@ -587,7 +587,7 @@ private struct ATHLTHTournamentRuleProposalEditor: View {
                             .frame(maxWidth: .infinity,minHeight: 54)
                             .background(ATHLTHArenaV3Style.ink,in: Capsule())
                     }
-                    .disabled(activities.isEmpty || busy)
+                    .disabled(!ATHLTHTournamentActivity.canCreate(with: activities) || busy)
                 }
                 .padding(18)
             }
