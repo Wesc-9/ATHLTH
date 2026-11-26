@@ -1,3 +1,4 @@
+import CoreGraphics
 import XCTest
 @testable import ATHLTH
 
@@ -345,5 +346,24 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
             XCTAssertNotNil(restored.updatedAt)
             ATHLTHCompetitionCreationCheckpoint.clear(owner: owner, entry: key, defaults: defaults)
         }
+    }
+
+    func testStudioCompetitionLayoutUsesActualDetailWidth() {
+        XCTAssertFalse(ATHLTHCompetitionStudioLayout.usesColumns(width: 799, accessibilityText: false))
+        XCTAssertTrue(ATHLTHCompetitionStudioLayout.usesColumns(width: 800, accessibilityText: false))
+        XCTAssertFalse(ATHLTHCompetitionStudioLayout.usesColumns(width: 1200, accessibilityText: true))
+        for width: CGFloat in [800, 850, 1000, 1350] {
+            let content = width - 2 * ATHLTHCompetitionStudioLayout.padding
+            let overview = ATHLTHCompetitionStudioLayout.overviewWidth(contentWidth: content)
+            let remaining = content - overview - ATHLTHCompetitionStudioLayout.spacing
+            XCTAssertGreaterThanOrEqual(overview, 285)
+            XCTAssertGreaterThan(remaining, overview)
+        }
+    }
+
+    func testStudioCompetitionFormatsAdaptToAvailableColumnWidth() {
+        XCTAssertEqual(ATHLTHCompetitionStudioLayout.formatColumnCount(width: 469, accessibilityText: false), 1)
+        XCTAssertEqual(ATHLTHCompetitionStudioLayout.formatColumnCount(width: 470, accessibilityText: false), 2)
+        XCTAssertEqual(ATHLTHCompetitionStudioLayout.formatColumnCount(width: 800, accessibilityText: true), 1)
     }
 }

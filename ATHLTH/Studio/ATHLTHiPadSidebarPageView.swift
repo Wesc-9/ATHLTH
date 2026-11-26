@@ -118,7 +118,7 @@ struct ATHLTHiPadSidebarPageView: View {
         case .trainTogether:
             TrainTogetherMarketplaceView()
         case .arena:
-            ATHLTHCompetitionEntryView()
+            ATHLTHCompetitionEntryView(usesStudioHubLayout: true)
         case .ghostRace:
             ATHLTHCompetitionEntryView(openGhostInitially: true)
         case .profile:

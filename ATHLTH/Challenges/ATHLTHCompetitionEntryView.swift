@@ -1,11 +1,31 @@
 import SwiftUI
 
+/// Width is the Studio detail column, not the entire device display.
+enum ATHLTHCompetitionStudioLayout {
+    static let padding: CGFloat = 20
+    static let spacing: CGFloat = 18
+
+    static func usesColumns(width: CGFloat, accessibilityText: Bool) -> Bool {
+        width >= 800 && !accessibilityText
+    }
+
+    static func overviewWidth(contentWidth: CGFloat) -> CGFloat {
+        max(0, min(contentWidth - spacing, max(285, (contentWidth - spacing) * 0.37)))
+    }
+
+    static func formatColumnCount(width: CGFloat, accessibilityText: Bool) -> Int {
+        width >= 470 && !accessibilityText ? 2 : 1
+    }
+}
+
 /// Competition form is the first choice; sports are configured in the rules.
 struct ATHLTHCompetitionEntryView: View {
     var preselectedFriend: SocialProfileCard? = nil
     var initialFormat: ATHLTHCompetitionFormat? = nil
     var locksRunningActivity = false
     var openGhostInitially = false
+    var usesStudioHubLayout = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
@@ -24,54 +44,48 @@ struct ATHLTHCompetitionEntryView: View {
         var id: String { rawValue }
     }
     private var isDirectEntry: Bool { preselectedFriend != nil || initialFormat != nil }
+    private var isStudioHub: Bool { usesStudioHubLayout && !isDirectEntry }
+    private var isChoosingFormats: Bool { showingFormats && !isDirectEntry && !isStudioHub }
     @State private var selectedFormat: ATHLTHCompetitionFormat?
     @State private var initialized = false
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    ATHLTHTrainPageTitle(title: "Konkurranse")
-                    if !isDirectEntry && !showingFormats { hubContent } else {
-                    Text("Velg hvordan du vil konkurrere.")
-                        .font(ATHLTHTrainDesign.pageSubtitle)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 14)], spacing: 14) {
-                        ForEach(ATHLTHCompetitionFormat.allCases) { format in
-                            Button { selectedFormat = format } label: {
-                                competitionHero(format)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(Text(format.title + ", " + format.subtitle))
-                            .accessibilityValue(Text(participantLabel(format)))
-                            .accessibilityIdentifier("athlth-competition-entry-\(format.rawValue)")
-                        }
-                        if !isDirectEntry {
-                            Button { showingPersonalGhost = true } label: {
-                                competitionArtworkCard(
-                                    artwork: "GoalRunning",
-                                    participants: "1 deltaker · Alene",
-                                    symbol: "figure.run",
-                                    title: "Ghost Race",
-                                    subtitle: "Løp alene mot en tidligere økt eller en digital fartsholder."
-                                )
-                            }.buttonStyle(.plain)
-                            .accessibilityIdentifier("athlth-competition-entry-ghost")
+            Group {
+                if isStudioHub {
+                    GeometryReader { geometry in
+                        ScrollView {
+                            studioHub(width: geometry.size.width)
                         }
                     }
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 15) {
+                            ATHLTHTrainPageTitle(title: "Konkurranse")
+                            if !isDirectEntry && !showingFormats {
+                                hubContent
+                            } else {
+                                Text("Velg hvordan du vil konkurrere.")
+                                    .font(ATHLTHTrainDesign.pageSubtitle)
+                                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 14)], spacing: 14) {
+                                    formatButtons
+                                    if !isDirectEntry { ghostButton }
+                                }
+                            }
+                        }
+                        .padding(18).frame(maxWidth: 820)
+                        .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(18).frame(maxWidth: 820)
-                .frame(maxWidth: .infinity)
             }
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await reloadHub() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(showingFormats && !isDirectEntry ? "Tilbake" : "Lukk") {
-                        if showingFormats && !isDirectEntry { showingFormats = false; Task { await reloadHub() } }
+                    Button(isChoosingFormats ? "Tilbake" : "Lukk") {
+                        if isChoosingFormats { showingFormats = false; Task { await reloadHub() } }
                         else { dismiss() }
                     }
                 }
@@ -126,6 +140,86 @@ struct ATHLTHCompetitionEntryView: View {
                 }?.0
             }
         }
+    }
+
+    private func studioHub(width: CGFloat) -> some View {
+        let layout = ATHLTHCompetitionStudioLayout.self
+        let contentWidth = max(0, width - 2 * layout.padding)
+        let overviewWidth = layout.overviewWidth(contentWidth: contentWidth)
+        let formsWidth = max(0, contentWidth - overviewWidth - layout.spacing)
+        let accessibilityText = dynamicTypeSize.isAccessibilitySize
+
+        return VStack(alignment: .leading, spacing: 18) {
+            ATHLTHTrainPageTitle(title: "Konkurranse")
+            if layout.usesColumns(width: width, accessibilityText: accessibilityText) {
+                HStack(alignment: .top, spacing: layout.spacing) {
+                    hubContent
+                        .frame(width: overviewWidth, alignment: .topLeading)
+                        .accessibilityIdentifier("athlth-ipad-competition-overview")
+                    studioFormats(width: formsWidth)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            } else {
+                // Keep both sections on one page in portrait and Stage Manager.
+                hubContent
+                    .accessibilityIdentifier("athlth-ipad-competition-overview")
+                studioFormats(width: contentWidth)
+            }
+        }
+        .padding(layout.padding)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .accessibilityIdentifier("athlth-ipad-competition-workspace")
+    }
+
+    private func studioFormats(width: CGFloat) -> some View {
+        let count = ATHLTHCompetitionStudioLayout.formatColumnCount(
+            width: width, accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
+        return VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Ny konkurranse")
+                    .font(.system(.title2, design: .serif).weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Velg hvordan du vil konkurrere.")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 14, alignment: .top), count: count), spacing: 14) {
+                formatButtons
+            }
+            // Solo competition gets the full final row, not an empty grid cell.
+            ghostButton
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("athlth-ipad-competition-formats")
+    }
+
+    private var formatButtons: some View {
+        ForEach(ATHLTHCompetitionFormat.allCases) { format in
+            Button { selectedFormat = format } label: {
+                competitionHero(format)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(format.title + ", " + format.subtitle))
+            .accessibilityValue(Text(participantLabel(format)))
+            .accessibilityIdentifier("athlth-competition-entry-\(format.rawValue)")
+        }
+    }
+
+    private var ghostButton: some View {
+        Button { showingPersonalGhost = true } label: {
+            competitionArtworkCard(
+                artwork: "GoalRunning",
+                participants: "1 deltaker · Alene",
+                symbol: "figure.run",
+                title: "Ghost Race",
+                subtitle: "Løp alene mot en tidligere økt eller en digital fartsholder."
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-competition-entry-ghost")
     }
 
     private func participantLabel(_ format: ATHLTHCompetitionFormat) -> String {
@@ -313,16 +407,18 @@ struct ATHLTHCompetitionEntryView: View {
                 dashboardMetric("Pågår", tournaments.filter { $0.status == "active" }.count)
                 dashboardMetric("Fullført", tournaments.filter { $0.status == "completed" }.count)
             }
-            Button { showingFormats = true } label: {
-                HStack {
-                    Text("Ny konkurranse").font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "plus.circle")
-                }
-                .foregroundStyle(ATHLTHTrainDesign.bronze)
-                .padding(14)
-                .background(.white, in: RoundedRectangle(cornerRadius: 14))
-            }.buttonStyle(.plain)
+            if !isStudioHub {
+                Button { showingFormats = true } label: {
+                    HStack {
+                        Text("Ny konkurranse").font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "plus.circle")
+                    }
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .padding(14)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                }.buttonStyle(.plain)
+            }
         }
         .foregroundStyle(.white)
         .padding(20)
@@ -355,7 +451,7 @@ struct ATHLTHCompetitionEntryView: View {
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
                 .multilineTextAlignment(.center)
-            if hubTab == .mine {
+            if hubTab == .mine && !isStudioHub {
                 Button("Velg konkurranseform") { showingFormats = true }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
