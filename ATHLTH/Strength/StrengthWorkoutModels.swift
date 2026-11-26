@@ -796,6 +796,8 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
     var exercises: [StrengthExerciseLog]
     var healthMetrics: LinkedHealthWorkoutMetrics
     var liveExecutionQueue: [StrengthLiveQueueEntry]? = nil
+    var sourceWorkoutTemplateID: UUID? = nil
+    var requiresCompanionExecutionOrder: Bool? = nil
     var advancedConfiguration:
         StrengthAdvancedConfiguration? = nil
     // True only when the athlete explicitly starts a no-plan strength
