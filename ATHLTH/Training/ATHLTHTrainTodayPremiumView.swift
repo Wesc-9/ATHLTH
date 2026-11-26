@@ -108,7 +108,6 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onQuickCycling: () -> Void
     let onQuickCustom: (CustomQuickWorkoutActivity) -> Void
     let onQuickFreeTraining: () -> Void
-    let onGhostRace: () -> Void
     let onCompetition: () -> Void
 
     @State private var quickActivityTapCounts: [String: Int] = [:]
