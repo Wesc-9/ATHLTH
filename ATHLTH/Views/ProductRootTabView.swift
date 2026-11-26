@@ -7110,14 +7110,14 @@ struct ATHLTHTrainView: View {
         universalRecordingOccupied
     }
 
-    @ViewBuilder
-    private var activeTrainWorkoutCard: some View {
+    @inline(never)
+    private func makeActiveTrainWorkoutCard() -> AnyView {
         if phoneWorkout.hasRecoveredActiveWorkout ||
             strengthWorkout.hasRecoveredActiveWorkout {
             // Checkpoint review is the main card, not a second banner.
-            unfinishedWorkoutRecoveryCards
+            return AnyView(unfinishedWorkoutRecoveryCards)
         } else if let workout = phoneWorkout.active {
-            liveTrainCard(
+            return AnyView(liveTrainCard(
                 title: workout.title,
                 source: "iPhone",
                 symbol: workout.walking ? "figure.walk" : "figure.run",
@@ -7127,9 +7127,9 @@ struct ATHLTHTrainView: View {
                 elapsedCaption: "Aktiv tid"
             ) {
                 phoneWorkout.presentWorkout()
-            }
+            })
         } else if let workout = strengthWorkout.activeWorkout {
-            liveTrainCard(
+            return AnyView(liveTrainCard(
                 title: workout.title,
                 source: workout.captureDevice.title,
                 symbol: "dumbbell",
@@ -7146,7 +7146,7 @@ struct ATHLTHTrainView: View {
             ) {
                 strengthWorkout.acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
-            }
+            })
         } else if let structuredID =
             ATHLTHStructuredCaptureAdmission.activeWorkoutID,
             let structured = (
@@ -7154,7 +7154,7 @@ struct ATHLTHTrainView: View {
                 ([session.activePlan].compactMap { $0 } + session.scheduledPlans)
                     .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
             ).first(where: { $0.id == structuredID }) {
-            Button {
+            return AnyView(Button {
                 selectedStructuredWorkout = ATHLTHUnifiedWorkout
                     .timedNonCardioProjection(from: structured) ?? structured
             } label: {
@@ -7167,19 +7167,19 @@ struct ATHLTHTrainView: View {
                 )
                 .frame(maxWidth: .infinity, minHeight: 50)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.borderedProminent))
         } else if ATHLTHStructuredCaptureAdmission.hasActiveCapture {
-            Text(ATHLTHLocalization.choose(
+            return AnyView(Text(ATHLTHLocalization.choose(
                 english: "A structured workout is still active. Reopen its original plan to resume or discard it.",
                 norwegian: "En strukturert økt pågår fortsatt. Åpne den opprinnelige planen for å fortsette eller forkaste."
             ))
             .font(.subheadline)
             .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+            .background(.white, in: RoundedRectangle(cornerRadius: 17)))
         } else if let timed = ATHLTHManualTimedCapture.current(
             for: session.profile.userID
         ) {
-            liveTrainCard(
+            return AnyView(liveTrainCard(
                 title: timed.recoveryConfiguration.title,
                 source: "iPhone",
                 symbol: timed.activity.systemImage,
@@ -7224,22 +7224,22 @@ struct ATHLTHTrainView: View {
                     configuration: timed.recoveryConfiguration,
                     mode: .timed
                 )
-            }
+            })
         } else if ATHLTHManualTimedCapture.hasActiveCapture {
             // An unreadable checkpoint protects the last saved bytes.
             // Never offer a new workout or erase it without user intent.
-            Text(ATHLTHLocalization.choose(
+            return AnyView(Text(ATHLTHLocalization.choose(
                 english: "A previous timed workout could not be restored. Its original checkpoint has been protected.",
                 norwegian: "En tidligere tidsmålt økt kunne ikke gjenopprettes. Originalcheckpointen er beskyttet."
             ))
             .font(.subheadline)
             .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+            .background(.white, in: RoundedRectangle(cornerRadius: 17)))
         } else if (watchConnection.hasActiveWatchWorkout ||
                    ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive),
                   phoneWorkout.active == nil,
                   strengthWorkout.activeWorkout == nil {
-            VStack(alignment: .leading, spacing: 12) {
+            return AnyView(VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Image(systemName: "applewatch")
                         .font(.system(size: 22))
@@ -7294,8 +7294,9 @@ struct ATHLTHTrainView: View {
                 }
             }
             .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+            .background(.white, in: RoundedRectangle(cornerRadius: 17)))
         }
+        return AnyView(EmptyView())
     }
 
     private func recheckActiveWatchWorkout() {
@@ -7767,7 +7768,11 @@ struct ATHLTHTrainView: View {
     @inline(never)
     private func makeTodayActiveWorkoutCard() -> AnyView? {
         guard hasOngoingTrainWorkout else { return nil }
-        return AnyView(activeTrainWorkoutCard)
+        // Avoid constructing the recorder/recovery conditional tree while the
+        // Today dashboard's already-large construction frame is on the stack.
+        return AnyView(ATHLTHTrainDeferredContent {
+            makeActiveTrainWorkoutCard()
+        })
     }
 
     // Require the actual dashboard, not just a nonblank loading frame.
