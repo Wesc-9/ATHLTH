@@ -810,13 +810,6 @@ struct ATHLTHiPadStudioRootView: View {
                     ) { openSidebarPage(.trainTogether) }
 
                     sidebarAction(
-                        "Ghost Race", symbol: "flag.checkered",
-                        selected: sidebarPage == .ghostRace
-                    ) {
-                        openSidebarPage(.ghostRace)
-                    }
-
-                    sidebarAction(
                         ATHLTHLocalization.choose(english: "Competition", norwegian: "Konkurranse"), symbol: "trophy",
                         selected: sidebarPage == .arena
                     ) {
