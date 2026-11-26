@@ -196,6 +196,9 @@ struct ATHLTHCompetitionCreationCheckpoint: Codable {
     let rules: ATHLTHTournamentDraft?
     let inRules: Bool
     let scrollID: String?
+    var updatedAt: Date? = Date()
+
+    var hasProgress: Bool { inRules || rules != nil || !opponents.isEmpty || (!customTitle.isEmpty && customTitle != ATHLTHCompetitionFormat(rawValue: format)?.title) }
 
     static func key(owner: UUID, entry: String) -> String {
         "athlth.competition.creation.v1." + owner.uuidString + "." + entry
@@ -364,7 +367,7 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .fullScreenCover(isPresented: $showingRules.keepingPresentedWhenInactive(scenePhase), onDismiss: {
             if finishAfterRules { clearCheckpoint(); dismiss() }
-            else { persistCheckpoint(inRules: false) }
+            else if scenePhase == .active { persistCheckpoint(inRules: false) }
         }) {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : format == .league ? leagueStyle : .league,
