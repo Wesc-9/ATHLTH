@@ -2204,6 +2204,9 @@ struct ActiveStrengthWorkoutView: View {
                 focusedWorkoutExerciseReview(workout, readOnly: true)
 
                 if !awaitingWatch {
+                    if let finishedAt = workout.endedAt {
+                        ATHLTHPostWorkoutFeedbackCard(workoutID: workout.id, finishedAt: finishedAt)
+                    }
                     if editableSourceTemplate(for: workout) != nil {
                         Button {
                             confirmingTemplateUpdate = true
