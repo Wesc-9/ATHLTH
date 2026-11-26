@@ -27,6 +27,19 @@ struct ATHLTHSystemDiagnosticsView: View {
                 )
             }
 
+            Section(ATHLTHLocalization.choose(english: "Performance", norwegian: "Ytelse")) {
+                diagnosticRow("ProMotion", value: booleanText(Bundle.main.object(forInfoDictionaryKey: "CADisableMinimumFrameDurationOnPhone") as? Bool), icon: "waveform.path")
+                diagnosticRow(ATHLTHLocalization.choose(english: "Resource policy", norwegian: "Ressursmodus"), value: ATHLTHSystemResourcePolicy.current.title, icon: "gauge.with.dots.needle.50percent")
+                diagnosticRow(ATHLTHLocalization.choose(english: "Low Power Mode", norwegian: "Strømsparing"), value: booleanText(ProcessInfo.processInfo.isLowPowerModeEnabled), icon: "battery.50")
+                diagnosticRow(ATHLTHLocalization.choose(english: "Last MetricKit report", norwegian: "Siste MetricKit-rapport"), value: ATHLTHMetricDeliveryObserver.lastMetricDate?.formatted(date: .abbreviated, time: .shortened) ?? "—", icon: "chart.bar")
+                diagnosticRow(ATHLTHLocalization.choose(english: "Peak memory (last report)", norwegian: "Toppminne (siste rapport)"), value: ATHLTHMetricDeliveryObserver.lastPeakMemoryMB.map { String(format: "%.0f MB", $0) } ?? "—", icon: "memorychip")
+                diagnosticRow(ATHLTHLocalization.choose(english: "CPU time (last report)", norwegian: "CPU-tid (siste rapport)"), value: ATHLTHMetricDeliveryObserver.lastCPUSeconds.map { String(format: "%.1f s", $0) } ?? "—", icon: "cpu")
+                diagnosticRow(ATHLTHLocalization.choose(english: "Last diagnostic delivery", norwegian: "Siste diagnostikk"), value: ATHLTHMetricDeliveryObserver.lastDiagnosticDate?.formatted(date: .abbreviated, time: .shortened) ?? "—", icon: "clock")
+                if ATHLTHMetricDeliveryObserver.lastDiagnosticDate != nil {
+                    diagnosticRow(ATHLTHLocalization.choose(english: "Crashes / hangs (last delivery)", norwegian: "Krasj / heng (siste levering)"), value: "\(ATHLTHMetricDeliveryObserver.lastCrashCount) / \(ATHLTHMetricDeliveryObserver.lastHangCount)", icon: "exclamationmark.triangle")
+                }
+            }
+
             Section("Account") {
                 diagnosticRow(
                     "Signed in",
