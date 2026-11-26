@@ -366,3 +366,4 @@ v3.0.2-build142-2026-11-25-phase-labels-competition-and-ipad-artifact-retry
 ATHLTH 3.0.4 build 144 — user-authorized overnight TestFlight upload, 2026-11-26. Latest source ded3f72fe6a457a8d90dea79ec600b92087cbc77. Require all five exact-commit release gates, verified signed iPhone/iPad/Watch/widget archive, dSYM preservation and successful App Store Connect delivery. Diagnose and fix failures on release/v3.0.4 and retry without weakening tests or changing frozen versions. Build bump only if confirmed collision or upload already accepted.
 
 ATHLTH 3.0.4 build 144 — authorized retry 2026-11-26 after confirmed ATHLTHApp.swift SwiftUI type-check timeout; split scene lifecycle into separately typed stages, retain all observers and exact-commit gates.
+ATHLTH 3.0.4 build 144 — authorized retry 2026-11-26: isolate strength dock callback regression test on MainActor to resolve Swift 6 region isolation compile failure; retain all assertions and five exact-commit gates.

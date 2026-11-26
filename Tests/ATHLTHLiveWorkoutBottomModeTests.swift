@@ -128,6 +128,7 @@ final class ATHLTHLiveWorkoutBottomModeTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testStrengthDockCollapseIsSeparateFromRecordingActions() {
         var primaryCalls = 0
         var secondaryCalls = 0
