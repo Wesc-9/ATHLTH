@@ -1,3 +1,4 @@
+import Foundation
 import CoreGraphics
 import XCTest
 @testable import ATHLTH
@@ -75,5 +76,29 @@ final class ATHLTHRecentActivityLayoutTests: XCTestCase {
                 availableWidth: 820, accessibilityText: true
             )
         )
+    }
+
+    func testFollowingPreviewKeepsNewestPerSharedSessionAndSkipsOwnSessions() {
+        let own = UUID()
+        let shared = UUID()
+        let candidates = [
+            HomeRecentFollowingCandidate(index: 0, date: Date(timeIntervalSince1970: 10), sessionID: shared),
+            HomeRecentFollowingCandidate(index: 1, date: Date(timeIntervalSince1970: 50), sessionID: own),
+            HomeRecentFollowingCandidate(index: 2, date: Date(timeIntervalSince1970: 40), sessionID: shared),
+            HomeRecentFollowingCandidate(index: 3, date: Date(timeIntervalSince1970: 30), sessionID: nil),
+            HomeRecentFollowingCandidate(index: 4, date: Date(timeIntervalSince1970: 20), sessionID: nil)
+        ]
+        XCTAssertEqual(HomeRecentFollowingSelection.indices(candidates, excluding: [own], limit: 2), [2, 3])
+        XCTAssertEqual(HomeRecentFollowingSelection.indices(candidates, excluding: [own], limit: 6), [2, 3, 4])
+        XCTAssertEqual(HomeRecentFollowingSelection.indices(candidates, excluding: [own], limit: 0), [])
+    }
+
+    func testFollowingPreviewPreservesFeedOrderForEqualDatesAndBoundsLargeFeeds() {
+        let date = Date(timeIntervalSince1970: 100)
+        let candidates = (0..<1000).map {
+            HomeRecentFollowingCandidate(index: $0, date: date, sessionID: nil)
+        }
+        XCTAssertEqual(HomeRecentFollowingSelection.indices(candidates, excluding: [], limit: 6), Array(0..<6))
+        XCTAssertEqual(HomeRecentFollowingSelection.indices([], excluding: [], limit: 6), [])
     }
 }
