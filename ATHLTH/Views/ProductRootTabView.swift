@@ -7748,7 +7748,6 @@ struct ATHLTHTrainView: View {
             onQuickCycling: { startCyclingQuick() },
             onQuickCustom: { activity in startCustomQuick(as: activity) },
             onQuickFreeTraining: { startFreeTrainingQuick() },
-            onGhostRace: { showingGhostHub = true },
             onCompetition: { showingCompetitionHub = true }
             )
             .onAppear {
