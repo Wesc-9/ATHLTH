@@ -5864,7 +5864,7 @@ struct ATHLTHTrainView: View {
         .navigationDestination(
             isPresented: $showingGhostHub
         ) {
-            GhostRaceHubView()
+            ATHLTHCompetitionEntryView(openGhostInitially: true)
         }
         .navigationDestination(
             isPresented: $showingTrainPlanWorkspace
