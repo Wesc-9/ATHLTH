@@ -166,6 +166,7 @@ struct RecoverySorenessEntry: Codable, Hashable {
     var motivation: Int?
     var sleepQuality: Int? = nil
     var feelsUnwell: Bool? = nil
+    var updatedAt: Date? = nil
 }
 
 final class RecoverySorenessStore: ObservableObject {
@@ -375,6 +376,7 @@ final class RecoverySorenessStore: ObservableObject {
             }
         ) {
             update(&entries[index])
+            entries[index].updatedAt = Date()
         } else {
             var entry = RecoverySorenessEntry(
                 date: today,
@@ -385,6 +387,7 @@ final class RecoverySorenessStore: ObservableObject {
                 motivation: nil
             )
             update(&entry)
+            entry.updatedAt = Date()
             entries.insert(entry, at: 0)
         }
 
