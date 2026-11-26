@@ -151,7 +151,7 @@ struct ATHLTHNotificationCenterView: View {
             notifications.reconcileDailyCheckIn(
                 enabled: settings.dailyCheckInRemindersEnabled,
                 accountID: session.profile.userID,
-                completed: RecoverySorenessStore().hasTodayCheckIn
+                completed: RecoverySorenessStore(accountID: session.profile.userID).hasTodayCheckIn
             )
             notifications.reconcileBodyGoalCheckIns(
                 goals: goals.goals,
