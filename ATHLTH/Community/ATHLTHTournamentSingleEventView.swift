@@ -380,12 +380,7 @@ private struct ATHLTHSharedEventProgressView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             VStack(alignment: .leading, spacing: 9) {
-                Text(tournament.displayFormatTitle).font(ATHLTHTrainDesign.sectionHeading)
-                Text(tournament.selectedBranchesLabel).font(.subheadline)
-                if tournament.releaseMode == "all_at_start" {
-                    Label("Alle øvelser tilgjengelig fra start", systemImage: "square.stack")
-                        .font(.caption.weight(.medium)).foregroundStyle(ATHLTHTrainDesign.bronze)
-                }
+                Text("Fremdrift").font(ATHLTHTrainDesign.sectionHeading)
                 Text("\(decided) av \(ownExercises.count) øvelser avgjort").font(.caption.weight(.medium))
                 if !ownExercises.isEmpty {
                     ProgressView(value: Double(decided), total: Double(ownExercises.count))
@@ -431,7 +426,7 @@ private struct ATHLTHSharedEventProgressView: View {
                         .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
                 }.padding(15).athlthTrainEditorialCard()
             }
-            if tournament.status == "active" || tournament.status == "completed" {
+            if tournament.status == "inviting" || tournament.status == "active" || tournament.status == "completed" {
                 ForEach(ownExercises) { exercise in exerciseCard(exercise) }
                 if tournament.status == "completed" {
                     VStack(alignment: .leading, spacing: 10) {
@@ -451,9 +446,11 @@ private struct ATHLTHSharedEventProgressView: View {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(.red)
             }
-            Button { Task { await reload() } } label: {
-                Label("Oppdater", systemImage: "arrow.clockwise").font(.subheadline)
-            }.disabled(busy)
+            if errorMessage != nil {
+                Button { Task { await reload() } } label: {
+                    Label("Prøv igjen", systemImage: "arrow.clockwise").font(.subheadline)
+                }.disabled(busy)
+            }
         }
         .task(id: tournament.id) {
             autoReporting = ATHLTHCompetitionAutoReporting.enabled(tournamentID: tournament.id, userID: userID)
@@ -514,7 +511,7 @@ private struct ATHLTHSharedEventProgressView: View {
             if let opens = exercise.opensAt, opens > Date() {
                 Label("Åpner " + opens.formatted(date: .abbreviated, time: .shortened), systemImage: "lock")
                     .font(.caption)
-            } else if exercise.opensAt == nil {
+            } else if exercise.opensAt == nil && tournament.status == "active" {
                 Label("Venter på forrige øvelse", systemImage: "lock").font(.caption)
             }
             if let deadline = exercise.deadlineAt {
@@ -576,7 +573,11 @@ private struct ATHLTHSharedEventProgressView: View {
                 await onChanged()
             }
             errorMessage = nil
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
     @MainActor private func review(_ row: ATHLTHSharedEventExerciseRow, approve: Bool) async {
         guard !busy, !reviewing else { return }
