@@ -694,7 +694,9 @@ struct HomeActiveFriendsStrip: View {
         // Never reuse them across accounts or after a completed empty refresh.
         if (social.isRefreshing || social.isHomeFriendsRefreshing) &&
            cachedForUserID == social.currentUserID {
-            return lastKnownFriends.filter { !social.isMuted($0.userID) }
+            return lastKnownFriends.filter {
+                social.isMutualFollow($0.userID) && !social.isMuted($0.userID)
+            }
         }
         return []
     }
@@ -777,12 +779,15 @@ struct HomeActiveFriendsStrip: View {
                     Spacer(minLength: 0)
                     if !showsAll {
                         NavigationLink {
-                            ScrollView {
-                                HomeActiveFriendsStrip(isActive: isActive, showsAll: true)
-                                    .padding(16)
-                            }
-                            .navigationTitle(ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner"))
-                            .navigationBarTitleDisplayMode(.inline)
+                            AnyView(
+                                ScrollView {
+                                    HomeActiveFriendsStrip(isActive: isActive, showsAll: true)
+                                        .padding(16)
+                                }
+                                .navigationTitle(ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner"))
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbar(.visible, for: .navigationBar)
+                            )
                         } label: {
                             Label(ATHLTHLocalization.choose(english: "See all", norwegian: "Se alle"), systemImage: "chevron.right")
                                 .font(.caption.weight(.semibold))
@@ -926,10 +931,16 @@ struct HomeActiveFriendsStrip: View {
                 ATHLTHSocialStatusAvatar(
                     profile: friend, size: 57
                 )
-                 .frame(width: 67, height: 67)
+                .frame(width: 67, height: 67)
+                .overlay {
+                    if !realtime.isTrainingNow(friend.userID) && !realtime.isOnline(friend.userID) {
+                        Circle().strokeBorder(ATHLTHTheme.mutedText.opacity(0.30), lineWidth: 1.5)
+                            .allowsHitTesting(false)
+                    }
+                }
 
                 statusLabel(friend)
-                    Text(friend.resolvedName
+                Text(friend.resolvedName
                     .components(separatedBy: " ")
                     .first ?? friend.resolvedName)
                     .font(.caption.weight(.medium))
@@ -961,8 +972,8 @@ struct HomeActiveFriendsStrip: View {
         ) {
             HomeFriendQuickActionsPopover(
                 friend: friend,
-                isTraining: realtime.isTrainingNow(friend.userID),
-                isOnline: realtime.isOnline(friend.userID),
+                isTraining: social.isMutualFollow(friend.userID) && realtime.isTrainingNow(friend.userID),
+                isOnline: social.isMutualFollow(friend.userID) && realtime.isOnline(friend.userID),
                 onMessage: {
                     openAction(.message(friend))
                 },

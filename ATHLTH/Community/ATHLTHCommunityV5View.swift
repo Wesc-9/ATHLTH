@@ -252,14 +252,18 @@ struct ATHLTHCommunityV5View: View {
             .font(.system(size: 17, weight: .medium))
             .foregroundStyle(CommunityReferenceStyle.ink)
             .frame(width: 44, height: 44)
-            .communityReferenceCard()
+            .background(CommunityReferenceStyle.paper, in: RoundedRectangle(cornerRadius: 13))
+            .overlay {
+                RoundedRectangle(cornerRadius: 13)
+                    .strokeBorder(CommunityReferenceStyle.edge, lineWidth: 0.7)
+            }
             .accessibilityLabel(title)
     }
 
     // MARK: - Community sections
 
     private var overview: some View {
-        LazyVStack(spacing: 15) {
+        VStack(spacing: 15) {
             weeklyChallengeSection
             HomeActiveFriendsStrip(isActive: isActive)
                 .padding(14)
@@ -425,7 +429,7 @@ struct ATHLTHCommunityV5View: View {
     private var shortcuts: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
             NavigationLink {
-                ATHLTHClubsHubView()
+                ATHLTHClubsHubView(showsNavigationBack: true)
             } label: { shortcutTile(tr("Clubs", "Klubber"), "person.3.fill") }
                 .buttonStyle(.plain)
             NavigationLink {
@@ -467,7 +471,7 @@ struct ATHLTHCommunityV5View: View {
                     .font(.headline).foregroundStyle(CommunityReferenceStyle.ink)
                 Spacer()
                 NavigationLink {
-                    ATHLTHClubsHubView()
+                    ATHLTHClubsHubView(showsNavigationBack: true)
                 } label: {
                     Label(tr("See all", "Se alle"), systemImage: "chevron.right")
                         .font(.caption.weight(.semibold)).foregroundStyle(CommunityReferenceStyle.darkGold)
@@ -475,7 +479,7 @@ struct ATHLTHCommunityV5View: View {
             }
             if groups.joinedGroups.isEmpty {
                 NavigationLink {
-                    ATHLTHClubsHubView()
+                    ATHLTHClubsHubView(showsNavigationBack: true)
                 } label: {
                     creamButton(tr("Find your club", "Finn din klubb"), symbol: "person.3")
                 }.buttonStyle(.plain)
@@ -652,6 +656,7 @@ struct ATHLTHCommunityV5View: View {
 /// One directory for both sidebar destinations. Existing club detail,
 /// membership, invitations and creation flows remain authoritative.
 struct ATHLTHClubsHubView: View {
+    var showsNavigationBack = false
     @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var session: AppSessionStore
     @State private var showCreate = false
@@ -783,7 +788,9 @@ struct ATHLTHClubsHubView: View {
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .background(CommunityReferenceStyle.canvas)
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(tr("Clubs", "Klubber"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(showsNavigationBack ? .visible : .hidden, for: .navigationBar)
         .sheet(isPresented: $showCreate, onDismiss: {
             Task { await groups.refresh(force: true) }
         }) {
