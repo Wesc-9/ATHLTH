@@ -580,7 +580,7 @@ struct GhostRaceHubView: View {
                     }.buttonStyle(.plain)
                 }
                 NavigationLink {
-                    RouteLibraryListView(source: .database)
+                    RouteLibraryListView(source: .database, ghostCompetitionSetup: true)
                 } label: {
                     Label("Finn flere ruter", systemImage: "map")
                         .frame(maxWidth: .infinity, minHeight: 44)
