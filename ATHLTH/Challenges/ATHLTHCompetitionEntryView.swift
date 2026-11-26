@@ -5,6 +5,7 @@ struct ATHLTHCompetitionEntryView: View {
     var preselectedFriend: SocialProfileCard? = nil
     var initialFormat: ATHLTHCompetitionFormat? = nil
     var locksRunningActivity = false
+    var openGhostInitially = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
@@ -109,6 +110,7 @@ struct ATHLTHCompetitionEntryView: View {
         .onAppear {
             guard !initialized else { return }
             initialized = true
+            if openGhostInitially { showingPersonalGhost = true }
             if let initialFormat { selectedFormat = initialFormat }
             else if session.signedIn {
                 let friend = preselectedFriend?.userID.uuidString ?? "none"
