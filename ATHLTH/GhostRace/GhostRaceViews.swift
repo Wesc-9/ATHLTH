@@ -219,11 +219,11 @@ struct GhostRaceHubView: View {
                     )
                 }
 
+                modeContent
                 if !ATHLTHDeviceRole.isIPad,
                    selectedMode != .live, session.signedIn {
                     ownIPadSpectatorSettings
                 }
-                modeContent
                 if selectedMode != .target && advancedMode {
                     workoutDeviceCard
                 }
@@ -369,79 +369,58 @@ struct GhostRaceHubView: View {
     }
 
     private var hero: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-            Image(selectedMode == .live ? "TrainHero" : "GoalMountain")
-                .resizable()
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: 194)
-                .clipped()
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.98),
-                            Color.white.opacity(0.92),
-                            Color.white.opacity(0.24)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("GHOST RACE").font(.caption2.weight(.semibold)).tracking(2)
+                    Text(selectedMode.headline)
+                        .font(.system(size: 28, weight: .medium, design: .serif))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(selectedMode.introduction)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-            VStack(alignment: .leading, spacing: 9) {
-                Text("GHOST RACE")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(2.0)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                Text(selectedMode.headline)
-                    .font(.system(size: 29, weight: .semibold, design: .serif))
-                    .tracking(-0.4)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(3)
-                    .frame(maxWidth: 255, alignment: .leading)
-
-                Text(selectedMode.introduction)
-                    .font(.system(size: 12))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 268, alignment: .leading)
-
-                if selectedMode == .live {
-                    let count = realtime.visibleLiveSessions.filter {
-                        $0.activity == "running" &&
-                        $0.ownerID != realtime.currentUserID
+                Spacer(minLength: 0)
+                Image(systemName: selectedMode.icon)
+                    .font(.system(size: 27, weight: .light))
+                    .frame(width: 56, height: 56)
+                    .background(.white.opacity(0.14), in: Circle())
+                    .accessibilityHidden(true)
+            }
+            switch selectedMode {
+            case .live:
+                Label(ATHLTHLocalization.format(
+                    english: "%d runners visible now",
+                    norwegian: "%d løpere synlige nå",
+                    realtime.visibleLiveSessions.filter {
+                        $0.activity == "running" && $0.ownerID != realtime.currentUserID
                     }.count
-                    Label(
-                        ATHLTHLocalization.format(
-                            english: "%d runners visible now",
-                            norwegian: "%d løpere synlige nå",
-                            count
-                        ),
-                        systemImage: "circle.fill"
-                    )
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Color.white.opacity(0.94), in: Capsule()
-                    )
-                }
+                ), systemImage: "dot.radiowaves.left.and.right")
+                .font(.subheadline.weight(.medium))
+            case .past:
+                Label(ATHLTHLocalization.format(
+                    english: "%d verified GPS runs",
+                    norwegian: "%d kontrollerte GPS-løp",
+                    recentRuns.count
+                ), systemImage: "location.circle")
+                .font(.subheadline.weight(.medium))
+            case .target:
+                Label(ATHLTHLocalization.choose(
+                    english: "Finish time or pace",
+                    norwegian: "Sluttid eller tempo"
+                ), systemImage: "timer")
+                .font(.subheadline.weight(.medium))
             }
-            .padding(19)
-            }
-            .frame(width: geometry.size.width, height: 194)
-            .clipped()
         }
-        .frame(height: 194)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 23))
-        .clipShape(RoundedRectangle(cornerRadius: 23))
-        .overlay {
-            RoundedRectangle(cornerRadius: 23)
-                .stroke(Color.white.opacity(0.86), lineWidth: 1)
-        }
+        .foregroundStyle(.white)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.ink],
+                           startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 24)
+        )
         .accessibilityElement(children: .combine)
     }
 
@@ -584,7 +563,7 @@ struct GhostRaceHubView: View {
         }
         .padding(4)
         .background(
-            ATHLTHTheme.surfaceStone,
+            ATHLTHTrainDesign.bronze.opacity(0.10),
             in: RoundedRectangle(cornerRadius: 17, style: .continuous)
         )
     }
@@ -1579,7 +1558,7 @@ struct GhostRaceHubView: View {
                         english: "Challenge your latest run",
                         norwegian: "Utfordre ditt siste løp"
                     ))
-                    .font(.title3.weight(.bold))
+                    .font(.system(.title2, design: .serif).weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(ATHLTHLocalization.choose(
@@ -2332,17 +2311,17 @@ struct GhostRaceHubView: View {
         _ mode: GhostRaceHubMode,
         selected: Bool
     ) -> some View {
-        HStack(spacing: 7) {
+        VStack(spacing: 6) {
             Image(systemName: mode.icon)
                 .font(.system(size: 14, weight: .semibold))
             Text(mode.title)
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
         }
-        .foregroundStyle(selected ? Color.white : ATHLTHTheme.primaryText)
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .foregroundStyle(selected ? ATHLTHTrainDesign.bronze : ATHLTHTheme.primaryText)
+        .frame(maxWidth: .infinity, minHeight: 60)
         .background(
-            selected ? ATHLTHTheme.accentDeep : Color.clear,
+            selected ? Color.white : Color.clear,
             in: RoundedRectangle(cornerRadius: 13, style: .continuous)
         )
         .contentShape(Rectangle())
