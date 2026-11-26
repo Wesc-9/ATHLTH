@@ -124,8 +124,8 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                     .font(.subheadline)
             }
 
-            if settings.race.discipline == .sprint &&
-               settings.race.sprintTarget == .route {
+            if runningAllowed {
+                Text("Felles løperute").font(.subheadline.weight(.semibold))
                 Button {
                     showingSavedRoutes = true
                 } label: {
@@ -135,7 +135,14 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                           systemImage: "point.topleft.down.curvedto.point.bottomright.up")
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
-                if settings.race.routeID == nil {
+                if settings.race.routeID != nil {
+                    Button("Fjern rute", role: .destructive) {
+                        settings.race.routeID = nil
+                        settings.race.routeName = ""
+                    }.font(.caption)
+                    Text("Live Ghost kan følge deltakere som frivillig deler et løp på denne ruten.")
+                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                } else if settings.race.discipline == .sprint && settings.race.sprintTarget == .route {
                     Text("Alle må bruke samme lagrede rute.")
                         .font(.caption)
                         .foregroundStyle(.orange)
@@ -241,9 +248,10 @@ struct ATHLTHCompetitionRaceRulesSection: View {
             ATHLTHCompetitionMeetingPointPicker(settings: $settings)
         }
         .onChange(of: activities) { _, current in
-            if !current.contains(.running) &&
-               settings.race.discipline == .sprint {
-                settings.race.discipline = .workout
+            if !current.contains(.running) {
+                settings.race.routeID = nil
+                settings.race.routeName = ""
+                if settings.race.discipline == .sprint { settings.race.discipline = .workout }
             }
         }
     }
