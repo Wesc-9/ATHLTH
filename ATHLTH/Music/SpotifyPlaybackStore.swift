@@ -549,6 +549,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         }
 
         guard let token = await accessTokenForRequest() else {
+            if pkceSession != nil { return }
             connectionState = .disconnected
             playlists = []
             return
@@ -783,7 +784,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
     ) async throws -> T {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await spotifyData(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw SpotifyPlaybackError.invalidResponse
         }
@@ -1301,6 +1302,11 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
                     )
                     applyPKCESession(pkceSession, connectRemote: false)
                 } catch {
+                    guard isAuthorizationError(error) else {
+                        lastErrorMessage = error.localizedDescription
+                        connectionState = .error(error.localizedDescription)
+                        return nil
+                    }
                     self.pkceSession = nil
                     deleteStoredPKCESession()
                     connectionState = .disconnected
@@ -1648,6 +1654,21 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
         ])
     }
 
+    private func spotifyData(for request: URLRequest) async throws -> (Data, URLResponse) {
+        // Only retry safe reads and explicit refresh-token 503 responses.
+        let isRead = request.httpMethod == nil || request.httpMethod == "GET"
+        let isRefresh = request.httpBody.flatMap { String(data: $0, encoding: .utf8) }?.hasPrefix("grant_type=refresh_token&") == true
+        for attempt in 0...2 {
+            let result = try await URLSession.shared.data(for: request)
+            if (isRead || isRefresh), (result.1 as? HTTPURLResponse)?.statusCode == 503, attempt < 2 {
+                try await Task.sleep(nanoseconds: UInt64(attempt + 1) * 1_000_000_000)
+                continue
+            }
+            return result
+        }
+        throw SpotifyPlaybackError.httpStatus(503)
+    }
+
     private func requestSpotifyToken(
         _ fields: [URLQueryItem]
     ) async throws -> SpotifyTokenResponse {
@@ -1670,18 +1691,24 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             form.percentEncodedQuery?.data(using: .utf8)
 
         let (data, response) =
-            try await URLSession.shared.data(for: request)
+            try await spotifyData(for: request)
 
         guard let http = response as? HTTPURLResponse else {
             throw SpotifyPlaybackError.invalidResponse
         }
 
         guard (200..<300).contains(http.statusCode) else {
+            if http.statusCode >= 500 || http.statusCode == 429 {
+                throw SpotifyPlaybackError.httpStatus(http.statusCode)
+            }
             if let apiError =
                 try? JSONDecoder().decode(
                     SpotifyTokenErrorResponse.self,
                     from: data
                 ) {
+                if apiError.error == "invalid_grant" {
+                    throw SpotifyPlaybackError.authorizationExpired
+                }
                 let message =
                     apiError.errorDescription ?? apiError.error
                 throw SpotifyPlaybackError.authorizationMessage(message)
@@ -1758,7 +1785,7 @@ final class SpotifyPlaybackStore: NSObject, ObservableObject {
             )
 
             let (data, response) =
-                try await URLSession.shared.data(for: request)
+                try await spotifyData(for: request)
 
             guard let http = response as? HTTPURLResponse else {
                 throw SpotifyPlaybackError.invalidResponse
@@ -2176,7 +2203,10 @@ private enum SpotifyPlaybackError: LocalizedError {
         case .authorizationMessage(let message):
             return message
         case .httpStatus(let status):
-            return "Spotify request failed (HTTP \(status))."
+            if status == 503 {
+                return ATHLTHLocalization.choose(english: "Spotify is temporarily unavailable. Try again shortly.", norwegian: "Spotify er midlertidig utilgjengelig. Prøv igjen om litt.")
+            }
+            return ATHLTHLocalization.choose(english: "Spotify request failed (HTTP \(status)).", norwegian: "Spotify-forespørselen mislyktes (HTTP \(status)).")
         }
     }
 }
