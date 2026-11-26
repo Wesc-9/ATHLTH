@@ -245,8 +245,23 @@ enum HomeDailyRecommendationPolicy {
         plannedActivity: PlannedActivity? = nil,
         plannedWorkoutTitle: String? = nil,
         trainingHistory: TrainingHistory = .empty,
-        personalizedHistory: HomeTrainingPatternAdvisor.Snapshot? = nil
+        personalizedHistory: HomeTrainingPatternAdvisor.Snapshot? = nil,
+        checkIn: ATHLTHDailyFormPolicy.Assessment? = nil
     ) -> Advice {
+        if let checkIn, checkIn.recommendation == .rest || checkIn.recommendation == .lighter {
+            let rest = checkIn.recommendation == .rest
+            let title = rest
+                ? ATHLTHLocalization.choose(english: "Prioritize recovery", norwegian: "Prioriter restitusjon")
+                : ATHLTHLocalization.choose(english: "Consider an easier session", norwegian: "Vurder en lettere økt")
+            return Advice(title: title, detail: checkIn.explanation,
+                          source: ATHLTHLocalization.choose(english: "Today's check-in", norwegian: "Dagens innsjekk"),
+                          symbol: rest ? "bed.double.fill" : "leaf",
+                          destination: .insights,
+                          dayDescription: checkIn.explanation,
+                          suggestedWorkout: rest ? .restDay : .easyWalk(minutes: 15),
+                          suggestedTitle: rest ? title : ATHLTHLocalization.choose(english: "15 min easy walk", norwegian: "15 min rolig gåtur"),
+                          suggestedDetail: ATHLTHLocalization.choose(english: "Optional. Keep the original plan until you approve a change.", norwegian: "Valgfritt. Behold planen til du godkjenner en endring."))
+        }
         if let personalizedHistory {
             if let tailored = HomeTrainingPatternAdvisor.recommend(
                 snapshot: personalizedHistory, readiness: readiness,
