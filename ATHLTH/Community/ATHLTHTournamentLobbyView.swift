@@ -45,6 +45,9 @@ struct ATHLTHTournamentLobbyView: View {
     @State private var announcing = false
     @State private var busy = false
     @State private var loading = true
+    @State private var reloading = false
+    @State private var hasLoaded = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var errorMessage: String?
     @State private var showAllAthletes = false
     @State private var pendingForfeit: ATHLTHTournamentReplacementSelection?
@@ -139,6 +142,8 @@ struct ATHLTHTournamentLobbyView: View {
                 return
             }
             do {
+                try await Task.sleep(for: .milliseconds(300))
+                try Task.checkCancellation()
                 let result = try await cloud.searchCompetitionExercises(
                     exerciseQuery,
                     allowed: tournament.allowedActivities
@@ -152,11 +157,13 @@ struct ATHLTHTournamentLobbyView: View {
         }
         .task(id: tab) {
             while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(15)) } catch { break }
+                guard scenePhase == .active, !busy else { continue }
                 if tab == .chat {
                     if let updated = try? await cloud.messages(
                         tournamentID: tournament.id
                     ) {
-                        messages = updated
+                        if !Task.isCancelled { messages = updated }
                     }
                 } else {
                     // Ready state and automatic ballot completion may change
@@ -165,7 +172,6 @@ struct ATHLTHTournamentLobbyView: View {
                     await onChange()
                     await reload()
                 }
-                try? await Task.sleep(for: .seconds(15))
             }
         }
         .fullScreenCover(item: $replacementSelection) { selected in
@@ -182,25 +188,21 @@ struct ATHLTHTournamentLobbyView: View {
             }
             .environmentObject(social)
         }
-        .alert("Gi walkover i gjenstående kamper?",
-               isPresented: Binding(
-                get: { pendingForfeit != nil },
-                set: { if !$0 { pendingForfeit = nil } }
-               )) {
-            Button("Gi walkover",role: .destructive) {
-                guard let selected = pendingForfeit else { return }
-                pendingForfeit = nil
-                Task {
-                    await perform {
-                        try await cloud.forfeit(
-                            tournamentID: tournament.id, playerID: selected.id
-                        )
+        .sheet(item: $pendingForfeit) { selected in
+            ATHLTHCompetitionConfirmationCard(
+                title: "Gi walkover?",
+                message: "Tidligere godkjente resultater bevares. Uavgjorte kamper registreres som tap for deltakeren som fjernes.",
+                actionTitle: "Gi walkover",
+                onConfirm: {
+                    Task {
+                        await perform {
+                            try await cloud.forfeit(
+                                tournamentID: tournament.id, playerID: selected.id
+                            )
+                        }
                     }
                 }
-            }
-            Button("Avbryt",role: .cancel) { pendingForfeit = nil }
-        } message: {
-            Text("Tidligere godkjente resultater bevares. Uavgjorte kamper registreres som tap for deltakeren som fjernes.")
+            )
         }
     }
 
@@ -972,8 +974,10 @@ struct ATHLTHTournamentLobbyView: View {
 
     @MainActor
     private func reload() async {
-        loading = candidates.isEmpty && messages.isEmpty
-        defer { loading = false }
+        guard !reloading else { return }
+        reloading = true
+        loading = !hasLoaded
+        defer { loading = false; reloading = false }
         do {
             async let allCandidates = cloud.candidates(tournamentID: tournament.id)
             async let allVotes = cloud.exerciseVotes(tournamentID: tournament.id)
@@ -985,20 +989,26 @@ struct ATHLTHTournamentLobbyView: View {
             let messageRows = try await allMessages
             let changes = try await allChanges
             let extraInvites = try await allInvites
+            async let names = cloud.candidateNames(candidateRows)
+            async let approvals = cloud.changeVotes(
+                requestIDs: changes.map(\.id)
+            )
+            let resolvedNames = try await names
+            let resolvedApprovals = try await approvals
+            try Task.checkCancellation()
             inviteRequests = extraInvites
             candidates = candidateRows
             votes = voteRows
             messages = messageRows
             replacements = changes
-            async let names = cloud.candidateNames(candidateRows)
-            async let approvals = cloud.changeVotes(
-                requestIDs: changes.map(\.id)
-            )
-            exerciseNames = try await names
-            replacementVotes = try await approvals
+            exerciseNames = resolvedNames
+            replacementVotes = resolvedApprovals
+            hasLoaded = true
             errorMessage = nil
         } catch {
-            errorMessage = "Kunne ikke oppdatere lobbyen: " + error.localizedDescription
+            if !Task.isCancelled && !(error is CancellationError) {
+                errorMessage = "Kunne ikke oppdatere lobbyen: " + error.localizedDescription
+            }
         }
     }
 }
