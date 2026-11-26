@@ -790,21 +790,73 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
 
 private struct ATHLTHLaunchGateView: View {
     var body: some View {
-        // Match the system-owned cold-launch surface exactly. No network,
-        // animation timer, progress spinner or artificial minimum duration.
-        Color("ATHLTHLaunchBackground")
+        ZStack {
+            ATHLTHLegacyLaunchCanvas()
             .ignoresSafeArea()
-            .overlay {
-                Image("ATHLTHLaunchLogo")
-                    .renderingMode(.original)
-                    .accessibilityHidden(true)
+
+            VStack(spacing: 16) {
+                ATHLTHBrandMark(
+                    size: .compact,
+                    showTagline: false
+                )
+
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(
+                        ATHLTHTheme.accent
+                    )
+
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Opening ATHLTH", norwegian: "Åpner ATHLTH"
-            ))
+            .padding(28)
+        }
+        .accessibilityElement(
+            children: .combine
+        )
+        .accessibilityLabel(
+            "Opening ATHLTH"
+        )
     }
 }
+
+/// Launch-only copy of the 1.8.8 palette and gradient. Do not change the
+/// current premium canvas used throughout the rest of the application.
+private struct ATHLTHLegacyLaunchCanvas: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.986, green: 0.978, blue: 0.962),
+                    Color(red: 0.955, green: 0.958, blue: 0.950),
+                    Color(red: 0.938, green: 0.947, blue: 0.944)
+                ],
+                startPoint: .top,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    ATHLTHTheme.premiumGold.opacity(0.55).opacity(0.085),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 420
+            )
+
+            RadialGradient(
+                colors: [
+                    ATHLTHTheme.premiumGold.opacity(0.070),
+                    Color.clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 10,
+                endRadius: 460
+            )
+        }
+        .ignoresSafeArea()
+    }
+}
+
 
 /// Shown only when an upgraded installation has an old signed-in marker
 /// but cannot identify its account from either local verified profile data
