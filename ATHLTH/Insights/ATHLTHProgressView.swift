@@ -131,7 +131,6 @@ struct ATHLTHProgressView: View {
                     )
                     personalRecordsCard
                     recentActivity(runs: selected.runs, lifts: selected.lifts)
-                    if trainingScope == .all { achievementsCard }
                     if progressLoading {
                         ProgressView().controlSize(.small)
                     } else if let progressError, trainingScope == .all {
@@ -582,9 +581,6 @@ struct ATHLTHProgressView: View {
         .buttonStyle(.plain)
     }
 
-    private var achievementsCard: some View {
-        TrophyProgressCard()
-    }
 
 
 

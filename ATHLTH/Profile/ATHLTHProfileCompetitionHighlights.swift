@@ -361,58 +361,43 @@ struct ATHLTHProfileCompetitionCard: View {
     }
 }
 
+/// The one owner-profile showcase: exactly four equally spaced positions.
 struct ATHLTHProfileCompactTrophyCard: View {
     let trophies: [TrophyProgressItem]
-    let unlockedCount: Int
-    var syncWarning: String? = nil
     private let gold = ATHLTHPlanDesign.accentInk
-    private let ink = ATHLTHPlanDesign.ink
-    private let dim = ATHLTHPlanDesign.secondaryInk
 
     var body: some View {
         NavigationLink {
             TrophyCollectionView(startInCabinet: true)
         } label: {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trophy.fill").font(.caption).foregroundStyle(gold)
-                        Text(ATHLTHLocalization.choose(english: "Trophies", norwegian: "Troféer"))
-                            .font(.system(size: 16, weight: .medium, design: .serif))
-                            .foregroundStyle(ink)
+            HStack(spacing: 0) {
+                ForEach(0..<TrophyStore.showcaseLimit, id: \.self) { index in
+                    Group {
+                        if trophies.indices.contains(index) {
+                            ATHLTHTrophyCoreView(trophy: trophies[index], size: 43)
+                                .accessibilityLabel(trophies[index].title)
+                        } else {
+                            Image(systemName: "plus")
+                                .font(.system(size: 15, weight: .light))
+                                .foregroundStyle(gold.opacity(0.65))
+                                .frame(width: 37, height: 43)
+                                .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 11))
+                                .accessibilityLabel(ATHLTHLocalization.choose(english: "Empty trophy slot", norwegian: "Ledig troféplass"))
+                        }
                     }
-                    Text(ATHLTHLocalization.choose(english: "\(unlockedCount) unlocked", norwegian: "\(unlockedCount) låst opp"))
-                        .font(.caption2).foregroundStyle(dim)
-                        .lineLimit(1)
-                }.layoutPriority(1)
-                Spacer(minLength: 3)
-                HStack(spacing: 3) {
-                    ForEach(Array(trophies.prefix(4))) { trophy in
-                        ATHLTHTrophyCoreView(trophy: trophy, size: 30)
-                            .frame(width: 33, height: 40)
-                            .accessibilityLabel(trophy.title)
-                    }
-                    if trophies.isEmpty {
-                        Image(systemName: "plus").font(.caption.weight(.medium))
-                            .foregroundStyle(gold)
-                            .frame(width: 33, height: 40)
-                            .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 9))
-                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
                 }
-                if let syncWarning {
-                    Image(systemName: "icloud.slash").font(.caption2)
-                        .foregroundStyle(dim).accessibilityLabel(syncWarning)
-                }
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                    .foregroundStyle(gold)
             }
-            .padding(.horizontal, 13).padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
             .athlthTrainPaper()
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityHint(ATHLTHLocalization.choose(english: "Open trophy collection", norwegian: "Åpne trofésamlingen"))
+        .accessibilityLabel(ATHLTHLocalization.choose(english: "Trophy cabinet", norwegian: "Troféskap"))
+        .accessibilityHint(ATHLTHLocalization.choose(english: "Choose up to four awards", norwegian: "Velg opptil fire utmerkelser"))
         .accessibilityIdentifier("athlth-profile-trophy-compact")
     }
 }

@@ -10577,9 +10577,7 @@ struct ATHLTHProfileView: View {
     /// One low, full-width trophy shelf above the paired profile cards.
     private var compactProfileTrophies: some View {
         ATHLTHProfileCompactTrophyCard(
-            trophies: profileTrophySlots,
-            unlockedCount: trophyStore.trophies.filter(\.isUnlocked).count,
-            syncWarning: trophyStore.lastCloudSyncIssue
+            trophies: profileTrophySlots
         )
     }
 

@@ -78,251 +78,6 @@ struct ATHLTHTrophyCoreView: View {
     }
 }
 
-struct TrophyCabinetSection: View {
-    @EnvironmentObject private var trophies: TrophyStore
-
-    var body: some View {
-        ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Trophy cabinet",
-                            norwegian: "Troféskap"
-                        )
-                    )
-                        .font(.title3.weight(.bold))
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Display your favourite medals and most prestigious gold cups.",
-                            norwegian: "Vis favorittmedaljene dine og de største gullpokalene."
-                        )
-                    )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                NavigationLink {
-                    TrophyCollectionView(
-                        startInCabinet: true
-                    )
-                } label: {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Open shelf",
-                            norwegian: "Åpne hylle"
-                        )
-                    )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-            }
-
-            if trophies.showcaseTrophies.isEmpty {
-                HStack(spacing: 14) {
-                    ATHLTHMarkShape()
-                        .fill(.secondary.opacity(0.25))
-                        .frame(width: 38, height: 28)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Your trophy cabinet is waiting",
-                                norwegian:
-                                    "Troféskapet ditt venter"
-                            )
-                        )
-                            .font(.subheadline.weight(.semibold))
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Earn medals or a gold prestige cup, then choose up to four for your profile.",
-                                norwegian:
-                                    "Tjen medaljer eller prestisjepokaler i gull, og velg opptil fire til profilen."
-                            )
-                        )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-                }
-                .padding(.top, 12)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 18) {
-                        ForEach(trophies.showcaseTrophies) { trophy in
-                            NavigationLink {
-                                TrophyDetailView(trophyID: trophy.id)
-                            } label: {
-                                ATHLTHTrophyCoreView(
-                                    trophy: trophy,
-                                    size:
-                                        trophy.isPrestigeTrophy
-                                            ? 106
-                                            : 86,
-                                    showLabel: true,
-                                    inscription:
-                                        trophies
-                                            .inscription(
-                                                for:
-                                                    trophy.id
-                                            )
-                                )
-                                .offset(
-                                    y:
-                                        trophy.isPrestigeTrophy
-                                            ? -6
-                                            : 4
-                                )
-                                .frame(
-                                    width:
-                                        trophy.isPrestigeTrophy
-                                            ? 126
-                                            : 108
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 12)
-                }
-            }
-        }
-    }
-}
-
-struct TrophyProgressCard: View {
-    @EnvironmentObject private var trophies: TrophyStore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Medal progress",
-                            norwegian:
-                                "Medaljefremdrift"
-                        )
-                    )
-                        .font(.headline)
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Advance from bronze through silver to gold.",
-                            norwegian:
-                                "Gå fra bronse via sølv til gull."
-                        )
-                    )
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                NavigationLink {
-                    TrophyCollectionView()
-                } label: {
-                    Text("See All")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-            }
-
-            if trophies.nextAchievements.isEmpty {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Medal progress appears here as ATHLTH reads verified activity.",
-                        norwegian:
-                            "Medaljefremdrift vises her når ATHLTH leser verifisert aktivitet."
-                    )
-                )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(Array(trophies.nextAchievements.prefix(3))) { trophy in
-                    NavigationLink {
-                        TrophyDetailView(trophyID: trophy.id)
-                    } label: {
-                        trophyProgressRow(trophy)
-                    }
-                    .buttonStyle(.plain)
-
-                    if trophy.id != trophies.nextAchievements.prefix(3).last?.id {
-                        Divider().opacity(0.5)
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .progressReferenceCard()
-    }
-
-    private func trophyProgressRow(_ trophy: TrophyProgressItem) -> some View {
-        HStack(spacing: 12) {
-            ATHLTHTrophyCoreView(trophy: trophy, size: 54)
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(trophy.title)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.primary)
-                        Text(trophy.nextStage?.title ?? trophy.stageLabel)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Text("\(Int((trophy.progress * 100).rounded()))%")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.accent)
-                }
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.black.opacity(0.055))
-                        Capsule()
-                            .fill(ATHLTHTheme.accent)
-                            .frame(width: proxy.size.width * trophy.progress)
-                    }
-                }
-                .frame(height: 5)
-
-                Text(progressDescription(trophy))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-    }
-
-    private func progressDescription(_ trophy: TrophyProgressItem) -> String {
-        if let completed = trophy.journeyMilestonesCompleted,
-           let total = trophy.journeyMilestonesTotal {
-            return "\(completed) of \(total) milestones"
-        }
-
-        guard let next = trophy.nextStage else {
-            return "Complete"
-        }
-
-        return ATHLTHLocalization.format(
-                            english: "Next · %@",
-                            norwegian: "Neste · %@",
-                            next.displayTarget
-                        )
-    }
-}
-
 struct TrophyCollectionView: View {
     @EnvironmentObject private var trophies: TrophyStore
 
@@ -330,10 +85,7 @@ struct TrophyCollectionView: View {
         TrophyHubTab
     @State private var filter:
         TrophyCollectionFilter = .all
-    @State private var showingShelfPicker: Bool
-    @State private var replacementTrophyID:
-        String?
-
+ 
     init(
         startInCabinet: Bool = false,
         replacingTrophyID: String? = nil
@@ -344,14 +96,8 @@ struct TrophyCollectionView: View {
                     ? .shelf
                     : .collection
         )
-        _showingShelfPicker = State(
-            initialValue:
-                replacingTrophyID != nil
-        )
-        _replacementTrophyID = State(
-            initialValue:
-                replacingTrophyID
-        )
+        // Existing entry points can still open the cabinet directly.
+        // All selection is now handled on the shelf itself.
     }
 
     private var filtered:
@@ -437,212 +183,7 @@ struct TrophyCollectionView: View {
         .navigationBarTitleDisplayMode(
             .inline
         )
-        .sheet(
-            isPresented:
-                $showingShelfPicker
-        ) {
-            shelfPickerSheet
-                .presentationDetents(
-                    [.medium, .large]
-                )
-                .presentationDragIndicator(
-                    .visible
-                )
-        }
-    }
-
-    private var shelfPickerCandidates:
-        [TrophyProgressItem] {
-        unlocked.filter {
-            !trophies
-                .isShowcased($0.id)
-        }
-    }
-
-    private var shelfPickerSheet:
-        some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(
-                    alignment: .leading,
-                    spacing: 14
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 4
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    replacementTrophyID == nil
-                                        ? "Choose an award"
-                                        : "Replace trophy",
-                                norwegian:
-                                    replacementTrophyID == nil
-                                        ? "Velg en utmerkelse"
-                                        : "Bytt trofé"
-                            )
-                        )
-                        .font(
-                            .title2
-                                .weight(.bold)
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    replacementTrophyID == nil
-                                        ? "Medals and gold cups are shown together, highest tier first."
-                                        : "Choose an unlocked award to replace the selected trophy in the same shelf position.",
-                                norwegian:
-                                    replacementTrophyID == nil
-                                        ? "Medaljer og gullpokaler vises samlet, fra høyeste nivå."
-                                        : "Velg en opplåst utmerkelse som skal erstatte troféet i samme plass på hyllen."
-                            )
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                    }
-
-                    if shelfPickerCandidates
-                        .isEmpty {
-                        ContentUnavailableView(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "No unlocked awards available",
-                                norwegian:
-                                    "Ingen ledige utmerkelser"
-                            ),
-                            systemImage:
-                                "trophy",
-                            description: Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Unlock another medal or gold cup to add it here.",
-                                    norwegian:
-                                        "Lås opp en ny medalje eller gullpokal for å legge den til her."
-                                )
-                            )
-                        )
-                        .padding(.top, 28)
-                    } else {
-                        ForEach(
-                            [
-                                TrophyRarity
-                                    .signature,
-                                .epic,
-                                .rare,
-                                .core
-                            ],
-                            id: \.self
-                        ) { rarity in
-                            let items =
-                                shelfPickerCandidates
-                                    .filter {
-                                        $0
-                                            .displayRarity ==
-                                        rarity
-                                    }
-
-                            if !items.isEmpty {
-                                VStack(
-                                    alignment:
-                                        .leading,
-                                    spacing: 8
-                                ) {
-                                    HStack {
-                                        Text(
-                                            rarity
-                                                .title
-                                                .uppercased()
-                                        )
-                                        .font(
-                                            .caption
-                                                .weight(
-                                                    .bold
-                                                )
-                                        )
-                                        .tracking(1.1)
-
-                                        Spacer()
-
-                                        Text(
-                                            items.count
-                                                .formatted()
-                                        )
-                                        .font(
-                                            .caption2
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .mutedText
-                                        )
-                                    }
-                                    .foregroundStyle(
-                                        rarity ==
-                                            .signature
-                                            ? ATHLTHTheme
-                                                .premiumGold
-                                            : ATHLTHTheme
-                                                .primaryText
-                                    )
-
-                                    ForEach(
-                                        items
-                                    ) {
-                                        item in
-                                        cabinetPickerRow(
-                                            item
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(16)
-            }
-            .background(
-                Color(
-                    .systemGroupedBackground
-                )
-            )
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Trophy shelf",
-                    norwegian:
-                        "Trofehylle"
-                )
-            )
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
-            .toolbar {
-                ToolbarItem(
-                    placement:
-                        .topBarTrailing
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Done",
-                            norwegian: "Ferdig"
-                        )
-                    ) {
-                        replacementTrophyID =
-                            nil
-                        showingShelfPicker =
-                            false
-                    }
-                }
-            }
-        }
+ 
     }
 
     private var heroEyebrow:
@@ -1028,665 +569,108 @@ struct TrophyCollectionView: View {
         }
     }
 
-    @ViewBuilder
-    private var shelfContent:
-        some View {
-        VStack(
-            alignment: .leading,
-            spacing: 14
-        ) {
-            HStack(
-                alignment:
-                    .firstTextBaseline
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Trophy shelf",
-                            norwegian:
-                                "Trofehylle"
-                        )
-                    )
-                    .font(
-                        .title3
-                            .weight(.bold)
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "A curated display of up to four awards you choose.",
-                            norwegian:
-                                "En kuratert hylle med opptil fire utmerkelser du velger selv."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
+    private var shelfContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ATHLTHUnifiedCard(compact: true) {
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(english: "Your profile shelf", norwegian: "Din trofélinje"))
+                            .font(.headline)
+                        Spacer()
+                        Text("\(trophies.showcaseIDs.count)/\(TrophyStore.showcaseLimit)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    HStack(spacing: 0) {
+                        ForEach(0..<TrophyStore.showcaseLimit, id: \.self) { index in
+                            Group {
+                                if trophies.showcaseTrophies.indices.contains(index) {
+                                    let trophy = trophies.showcaseTrophies[index]
+                                    Button { trophies.toggleShowcase(trophy.id) } label: {
+                                        ZStack(alignment: .topTrailing) {
+                                            ATHLTHTrophyCoreView(trophy: trophy, size: 48)
+                                            Image(systemName: "minus.circle.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        }
+                                    }.buttonStyle(.plain)
+                                    .accessibilityLabel(ATHLTHLocalization.choose(english: "Remove \(trophy.title)", norwegian: "Fjern \(trophy.title)"))
+                                } else {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 18, weight: .light))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk.opacity(0.55))
+                                        .frame(width: 44, height: 50)
+                                        .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 64)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(english: "Select up to four unlocked awards below. Changes are saved automatically.", norwegian: "Merk opptil fire opplåste utmerkelser nedenfor. Endringene lagres automatisk."))
+                        .font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    if trophies.showcaseIDs.count == TrophyStore.showcaseLimit {
+                        Text(ATHLTHLocalization.choose(english: "Remove one to select another.", norwegian: "Fjern én markering for å velge en annen."))
+                            .font(.caption2).foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
                 }
-
-                Spacer()
-
-                Text(
-                    "\(trophies.showcaseIDs.count)/\(TrophyStore.showcaseLimit)"
-                )
-                .font(
-                    .caption
-                        .weight(.bold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
             }
 
-            cabinetCase
-
-            if trophies
-                .showcaseTrophies
-                .isEmpty {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Open an unlocked award and choose “Show on trophy shelf”.",
-                        norwegian:
-                            "Åpne en opplåst utmerkelse og velg «Vis på trofehyllen»."
-                    ),
-                    systemImage:
-                        "sparkles"
+            if unlocked.isEmpty {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(english: "No unlocked awards yet", norwegian: "Ingen opplåste utmerkelser ennå"),
+                    systemImage: "trophy",
+                    description: Text(ATHLTHLocalization.choose(english: "Your earned awards will appear here.", norwegian: "Opptjente utmerkelser vises her."))
                 )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .frame(
-                    maxWidth:
-                        .infinity,
-                    alignment:
-                        .center
-                )
-                .padding(.top, 2)
-            }
-        }
-    }
-
-    private var cabinetCase:
-        some View {
-        ZStack {
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(
-                            red: 0.055,
-                            green: 0.060,
-                            blue: 0.075
-                        ),
-                        Color(
-                            red: 0.12,
-                            green: 0.105,
-                            blue: 0.085
-                        ),
-                        Color(
-                            red: 0.035,
-                            green: 0.038,
-                            blue: 0.050
-                        )
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
-                )
-            )
-
-            RadialGradient(
-                colors: [
-                    ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.22),
-                    .clear
-                ],
-                center: .top,
-                startRadius: 4,
-                endRadius: 240
-            )
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 28,
-                    style: .continuous
-                )
-            )
-
-            VStack(spacing: 4) {
-                HStack {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "TROPHY SHELF",
-                            norwegian:
-                                "TROFEHYLLE"
-                        ),
-                        systemImage:
-                            "sparkles"
-                    )
-                    .font(
-                        .system(
-                            size: 9,
-                            weight: .bold
-                        )
-                    )
-                    .tracking(1.3)
-                    .foregroundStyle(
-                        .white
-                            .opacity(0.66)
-                    )
-
-                    Spacer()
-
-                    Text(
-                        "\(trophies.showcaseTrophies.count) / \(TrophyStore.showcaseLimit)"
-                    )
-                    .font(
-                        .caption2
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .premiumGold
-                    )
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 10)], spacing: 10) {
+                    ForEach(unlocked) { trophy in
+                        cabinetSelectionTile(trophy)
+                    }
                 }
-                .padding(
-                    .horizontal,
-                    4
-                )
-                .padding(
-                    .bottom,
-                    4
-                )
-
-                cabinetShelf(
-                    startIndex: 0
-                )
-
-                cabinetShelf(
-                    startIndex: 2
-                )
             }
-            .padding(
-                .horizontal,
-                14
-            )
-            .padding(
-                .top,
-                14
-            )
-            .padding(
-                .bottom,
-                12
-            )
-        }
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 28,
-                style: .continuous
-            )
-            .stroke(
-                LinearGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.24),
-                        ATHLTHTheme
-                            .premiumGold
-                            .opacity(0.34),
-                        Color.white
-                            .opacity(0.06)
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
-                ),
-                lineWidth: 1
-            )
-        }
-        .shadow(
-            color:
-                ATHLTHTheme
-                    .premiumGold
-                    .opacity(0.10),
-            radius: 24,
-            y: 10
-        )
-        .animation(
-            .snappy(
-                duration: 0.30
-            ),
-            value:
-                trophies
-                    .showcaseIDs
-        )
-    }
-
-    private func cabinetShelf(
-        startIndex: Int
-    ) -> some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 12) {
-                cabinetSlot(
-                    index:
-                        startIndex
-                )
-
-                cabinetSlot(
-                    index:
-                        startIndex + 1
-                )
-            }
-
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            ATHLTHTheme
-                                .premiumGold
-                                .opacity(
-                                    0.48
-                                ),
-                            Color.white
-                                .opacity(
-                                    0.16
-                                ),
-                            Color.black
-                                .opacity(
-                                    0.50
-                                )
-                        ],
-                        startPoint:
-                            .leading,
-                        endPoint:
-                            .trailing
-                    )
-                )
-                .frame(height: 5)
-                .shadow(
-                    color:
-                        Color.black
-                            .opacity(0.34),
-                    radius: 5,
-                    y: 3
-                )
-        }
-        .padding(
-            .bottom,
-            10
-        )
-    }
-
-    @ViewBuilder
-    private func cabinetSlot(
-        index: Int
-    ) -> some View {
-        if trophies
-            .showcaseTrophies
-            .indices
-            .contains(index) {
-            let trophy =
-                trophies
-                    .showcaseTrophies[
-                        index
-                    ]
-
-            NavigationLink {
-                TrophyDetailView(
-                    trophyID:
-                        trophy.id
-                )
-            } label: {
-                VStack(spacing: 5) {
-                    ATHLTHTrophyCoreView(
-                        trophy:
-                            trophy,
-                        size:
-                            trophy.isPrestigeTrophy
-                                ? 104
-                                : 78,
-                        inscription:
-                            trophies
-                                .inscription(
-                                    for:
-                                        trophy.id
-                                )
-                    )
-                    .offset(
-                        y:
-                            trophy.isPrestigeTrophy
-                                ? -8
-                                : 4
-                    )
-
-                    Text(
-                        trophy.title
-                    )
-                    .font(
-                        .system(
-                            size: 10,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        .white
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(
-                        0.72
-                    )
-                }
-                .frame(
-                    maxWidth:
-                        .infinity
-                )
-                .frame(height: 128)
-                .background(
-                    Color.white
-                        .opacity(
-                            trophy.isPrestigeTrophy
-                                ? 0.055
-                                : 0.030
-                        ),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius:
-                                17,
-                            style:
-                                .continuous
-                        )
-                )
-            }
-            .buttonStyle(.plain)
-            .transition(
-                .scale(
-                    scale: 0.84
-                )
-                .combined(
-                    with: .opacity
-                )
-            )
-            .shadow(
-                color:
-                    trophy
-                        .isPrestigeTrophy
-                        ? ATHLTHTheme
-                            .premiumGold
-                            .opacity(0.34)
-                        : trophy
-                            .category
-                            .trophyAccent
-                            .opacity(0.22),
-                radius: 16,
-                y: 4
-            )
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Double tap to open this award. You can remove it from the trophy shelf in the detail view.",
-                    norwegian:
-                        "Dobbelttrykk for å åpne utmerkelsen. Du kan fjerne den fra trofehyllen i detaljvisningen."
-                )
-            )
-        } else {
-            Button {
-                showingShelfPicker =
-                    true
-            } label: {
-                VStack(spacing: 8) {
-                    Image(
-                        systemName:
-                            "plus"
-                    )
-                .font(
-                    .system(
-                        size: 18,
-                        weight: .medium
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.72)
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Empty slot",
-                        norwegian:
-                            "Tom plass"
-                    )
-                )
-                .font(
-                    .caption2
-                        .weight(
-                            .semibold
-                        )
-                )
-                .foregroundStyle(
-                    .white.opacity(0.44)
-                )
-            }
-            .frame(
-                maxWidth: .infinity
-            )
-            .frame(height: 118)
-            .background(
-                Color.black.opacity(0.24),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 17,
-                        style: .continuous
-                    )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 17,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white
-                        .opacity(0.08),
-                    style:
-                        StrokeStyle(
-                            lineWidth: 1,
-                            dash: [5, 5]
-                        )
-                )
-            }
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(
-                ATHLTHLocalization.choose(
-                    english:
-                        "Double tap to choose an unlocked achievement or trophy.",
-                    norwegian:
-                        "Dobbelttrykk for å velge en opplåst medalje eller gullpokal."
-                )
-            )
         }
     }
 
-    private func cabinetPickerRow(
-        _ trophy:
-            TrophyProgressItem
-    ) -> some View {
-        let selected =
-            trophies.isShowcased(
-                trophy.id
-            )
-        let limitReached =
-            trophies.showcaseIDs
-                .count >=
-            TrophyStore
-                .showcaseLimit
-
+    private func cabinetSelectionTile(_ trophy: TrophyProgressItem) -> some View {
+        let selected = trophies.isShowcased(trophy.id)
+        let canSelect = selected || trophies.showcaseIDs.count < TrophyStore.showcaseLimit
         return Button {
-            guard !selected
-            else {
-                return
-            }
-
-            if let replacementTrophyID {
-                withAnimation(
-                    .snappy(
-                        duration: 0.20
-                    )
-                ) {
-                    trophies
-                        .replaceShowcase(
-                            replacementTrophyID,
-                            with:
-                                trophy.id
-                        )
-                }
-                self.replacementTrophyID =
-                    nil
-                showingShelfPicker = false
-                return
-            }
-
-            guard !limitReached
-            else {
-                return
-            }
-
-            withAnimation(
-                .snappy(
-                    duration: 0.20
-                )
-            ) {
-                trophies
-                    .toggleShowcase(
-                        trophy.id
-                    )
-            }
-            showingShelfPicker = false
+            withAnimation(.snappy(duration: 0.20)) { trophies.toggleShowcase(trophy.id) }
         } label: {
-            HStack(spacing: 10) {
-                ATHLTHTrophyCoreView(
-                    trophy:
-                        trophy,
-                    size: 54,
-                    inscription:
-                        trophies
-                            .inscription(
-                                for:
-                                    trophy.id
-                            )
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 2
-                ) {
-                    Text(
-                        trophy.title
-                    )
-                    .font(
-                        .caption
-                            .weight(
-                                .bold
-                            )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .lineLimit(1)
-
-                    Text(
-                        "\(trophy.awardClass.title) · \(trophy.displayRarity.title)"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .lineLimit(1)
+            VStack(spacing: 6) {
+                HStack {
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(selected ? ATHLTHPlanDesign.accentInk : ATHLTHPlanDesign.secondaryInk.opacity(0.45))
                 }
-
-                Spacer()
-
-                Image(
-                    systemName:
-                        selected
-                            ? "checkmark.circle.fill"
-                            : "circle"
-                )
-                .font(
-                    .system(
-                        size: 20,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    selected
-                        ? ATHLTHTheme
-                            .premiumGold
-                        : Color.secondary
-                            .opacity(0.34)
-                )
+                ATHLTHTrophyCoreView(trophy: trophy, size: 58)
+                    .frame(height: 68)
+                Text(trophy.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(2).multilineTextAlignment(.center)
+                    .frame(minHeight: 30)
+                Text(trophy.stageLabel)
+                    .font(.caption2).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .lineLimit(1)
             }
             .padding(10)
-            .background(
-                selected
-                    ? ATHLTHTheme
-                        .champagneSoft
-                        .opacity(0.78)
-                    : Color.white
-                        .opacity(0.92),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 18,
-                        style:
-                            .continuous
-                    )
-            )
+            .frame(maxWidth: .infinity)
+            .background(selected ? ATHLTHPlanDesign.selectedSurface : Color.white,
+                        in: RoundedRectangle(cornerRadius: 16))
             .overlay {
-                RoundedRectangle(
-                    cornerRadius: 18,
-                    style: .continuous
-                )
-                .stroke(
-                    selected
-                        ? ATHLTHTheme
-                            .premiumGold
-                            .opacity(0.50)
-                        : Color.black
-                            .opacity(0.05),
-                    lineWidth: 1
-                )
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(ATHLTHPlanDesign.accentInk.opacity(selected ? 0.65 : 0.10), lineWidth: 1)
             }
+            .opacity(canSelect ? 1 : 0.55)
         }
         .buttonStyle(.plain)
-        .opacity(
-            !selected &&
-            limitReached
-                ? 0.52
-                : 1
-        )
-        .disabled(
-            !selected &&
-            limitReached
-        )
+        .disabled(!canSelect)
+        .accessibilityLabel(trophy.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityHint(ATHLTHLocalization.choose(english: "Toggle profile display", norwegian: "Velg eller fjern fra profilen"))
     }
 
     private var filters:
