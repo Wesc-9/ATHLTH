@@ -2205,7 +2205,7 @@ struct ActiveStrengthWorkoutView: View {
 
                 if !awaitingWatch {
                     if let finishedAt = workout.endedAt {
-                        ATHLTHPostWorkoutFeedbackCard(workoutID: workout.id, finishedAt: finishedAt)
+                        ATHLTHPostWorkoutFeedbackCard(workoutID: workout.id, finishedAt: finishedAt, startedAt: workout.startedAt)
                     }
                     if editableSourceTemplate(for: workout) != nil {
                         Button {
