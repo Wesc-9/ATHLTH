@@ -314,4 +314,36 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         ATHLTHCompetitionCreationCheckpoint.clear(owner: owner, entry: key, defaults: defaults)
         XCTAssertNil(ATHLTHCompetitionCreationCheckpoint.load(owner: owner, entry: key, defaults: defaults))
     }
+
+    func testOnlyOperationalCompetitionBranchesCanBeSelected() throws {
+        XCTAssertEqual(ATHLTHTournamentActivity.supportedForCreation, [.running, .walking, .strength])
+        for format in ATHLTHCompetitionFormat.allCases {
+            XCTAssertTrue(ATHLTHTournamentActivity.canCreate(with: [.running, .strength]), format.rawValue)
+            for unavailable in [ATHLTHTournamentActivity.swimming, .hiking, .cycling] {
+                XCTAssertFalse(unavailable.isAvailableForCreation)
+                XCTAssertFalse(ATHLTHTournamentActivity.canCreate(with: [unavailable]), format.rawValue)
+                XCTAssertFalse(ATHLTHTournamentActivity.canCreate(with: [.running, unavailable]), format.rawValue)
+                let data = try JSONEncoder().encode(unavailable)
+                XCTAssertEqual(try JSONDecoder().decode(ATHLTHTournamentActivity.self, from: data), unavailable)
+            }
+        }
+        XCTAssertFalse(ATHLTHTournamentActivity.canCreate(with: []))
+    }
+
+    func testIncompleteParticipantStepIsResumableForEveryFormat() throws {
+        let defaults = UserDefaults(suiteName: "athlth.test.competition.\(UUID())")!
+        for format in ATHLTHCompetitionFormat.allCases {
+            let key = format.rawValue + ".none.running.true"
+            let checkpoint = ATHLTHCompetitionCreationCheckpoint(owner: owner, format: format.rawValue,
+                leagueStyle: .league, customTitle: "", opponents: [rival], rules: nil,
+                inRules: false, scrollID: nil)
+            checkpoint.save(entry: key, defaults: defaults)
+            let restored = try XCTUnwrap(ATHLTHCompetitionCreationCheckpoint.load(owner: owner, entry: key, defaults: defaults))
+            XCTAssertTrue(restored.hasProgress)
+            XCTAssertFalse(restored.inRules)
+            XCTAssertEqual(restored.format, format.rawValue)
+            XCTAssertNotNil(restored.updatedAt)
+            ATHLTHCompetitionCreationCheckpoint.clear(owner: owner, entry: key, defaults: defaults)
+        }
+    }
 }
