@@ -317,10 +317,10 @@ private struct ATHLTHSceneRootView: View {
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: ProcessInfo.thermalStateDidChangeNotification).receive(on: RunLoop.main)) { _ in
-            applyResourcePolicyIfNeeded()
+            if applyResourcePolicyIfNeeded() { scheduleAutomaticOfflinePreparation() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange).receive(on: RunLoop.main)) { _ in
-            applyResourcePolicyIfNeeded()
+            if applyResourcePolicyIfNeeded() { scheduleAutomaticOfflinePreparation() }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification).receive(on: RunLoop.main)) { _ in
             releaseTransientCaches()
@@ -533,16 +533,17 @@ private struct ATHLTHSceneRootView: View {
         }
     }
 
-    private func applyResourcePolicyIfNeeded() {
+    @discardableResult
+    private func applyResourcePolicyIfNeeded() -> Bool {
         let policy = ATHLTHSystemResourcePolicy.current
-        guard policy != lastAppliedResourcePolicy else { return }
+        guard policy != lastAppliedResourcePolicy else { return false }
         lastAppliedResourcePolicy = policy
         ATHLTHSizedStorageImageCache.shared.applyResourcePolicy(policy)
         Task { await ATHLTHLocalExerciseThumbnailLoader.shared.applyResourcePolicy(policy) }
         if policy == .critical {
             releaseTransientCaches()
         }
-        scheduleAutomaticOfflinePreparation()
+        return true
     }
 
     private func releaseTransientCaches() {
