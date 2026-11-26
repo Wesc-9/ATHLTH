@@ -292,8 +292,12 @@ struct ATHLTHCompetitionCreationView: View {
     }
 
     private var participants: [ATHLTHTournamentParticipant] {
-        selectedPeople.map { ATHLTHTournamentParticipant(id: $0.userID,
-            username: $0.username ?? $0.resolvedName) }
+        chosenIDs.sorted { $0.uuidString < $1.uuidString }.compactMap { id in
+            if let person = selectedPeople.first(where: { $0.userID == id }) {
+                return ATHLTHTournamentParticipant(id: id, username: person.username ?? person.resolvedName)
+            }
+            return ruleDraft?.participants.first { $0.id == id }
+        }
     }
 
     var body: some View {
@@ -358,7 +362,7 @@ struct ATHLTHCompetitionCreationView: View {
                 .accessibilityIdentifier("athlth-competition-publish")
             }
         }
-        .fullScreenCover(isPresented: $showingRules, onDismiss: {
+        .fullScreenCover(isPresented: $showingRules.keepingPresentedWhenInactive(scenePhase), onDismiss: {
             if finishAfterRules { clearCheckpoint(); dismiss() }
             else { persistCheckpoint(inRules: false) }
         }) {
@@ -481,6 +485,7 @@ struct ATHLTHCompetitionCreationView: View {
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }.buttonStyle(.plain)
             if showingParticipantChoices {
+                LazyVStack(spacing: 8) {
                 ForEach(social.mutualFollows.filter {
                     $0.userID != session.profile.userID && !chosenIDs.contains($0.userID)
                 }, id: \.userID) { friend in
@@ -501,6 +506,7 @@ struct ATHLTHCompetitionCreationView: View {
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                         .athlthTrainEditorialCard(compact: true)
                     }.buttonStyle(.plain)
+                }
                 }
             }
             Text(format == .duel ? "Nøyaktig to deltakere, inkludert deg." :
