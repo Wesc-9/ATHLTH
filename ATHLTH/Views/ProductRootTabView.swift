@@ -5730,8 +5730,11 @@ struct ATHLTHTrainView: View {
     var body: some View {
         Group {
             if studioLanding {
-                // Studio already owns the detail NavigationStack.
-                trainLifecycleContent
+                // Studio already owns the detail NavigationStack. Do not
+                // construct its presentation graph in this root body frame.
+                ATHLTHTrainDeferredContent(makeContent: {
+                    AnyView(trainLifecycleContent)
+                })
             } else {
                 NavigationStack { trainLifecycleContent }
             }
@@ -5779,8 +5782,11 @@ struct ATHLTHTrainView: View {
                 .padding(.top, 24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else if studioLanding {
-                studioTrainLanding
-                    .athlthStablePresentationBoundary()
+                // Studio is the iPad workspace. Evaluate its dashboard in a
+                // separate SwiftUI body, after the navigation builder returns.
+                ATHLTHTrainDeferredContent(makeContent: {
+                    AnyView(studioTrainLanding)
+                })
             } else if selectedSection == .progress {
                 ATHLTHTrainProgressReferenceView(
                     onReturnToToday: { selectedSection = .today },
