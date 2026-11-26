@@ -1841,6 +1841,14 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 ATHLTHPetStore.shared.acceptCompletedWatchPetSegments(segments)
             }
             ATHLTHSurfaceCoordinator.completedWatchWorkoutDidArrive(result)
+            // Persist the solo result before any other receiver consumes
+            // the queued completion. A later HealthKit import links the
+            // history card by the same exact health workout UUID.
+            if result.soloGhostResult != nil,
+               let account = currentATHLTHAccountID {
+                ATHLTHRunningPerformanceHistory.saveWatch(
+                    result, userID: account, knownWorkoutIDs: [])
+            }
         }
 
         pendingWorkoutResults

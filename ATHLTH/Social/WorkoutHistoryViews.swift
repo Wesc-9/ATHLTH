@@ -415,6 +415,13 @@ struct WorkoutHistoryDetailView: View {
                     if let result = ATHLTHRunningPerformanceHistory.soloGhostResult(
                         userID: session.profile.userID, workoutID: workout.id) {
                         ATHLTHSoloGhostHistoryCard(result: result)
+                        NavigationLink {
+                            GhostFriendRaceHubView(openInvitationOnAppear: true, preferredWorkoutID: workout.id)
+                        } label: {
+                            Label("Utfordre en venn", systemImage: "person.2")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }.buttonStyle(.bordered)
                     }
                     ghostRaceCard
                 }

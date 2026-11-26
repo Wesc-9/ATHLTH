@@ -66,6 +66,7 @@ struct GhostFriendRaceHubView: View {
     private let arenaRoundID: UUID?
     private let agreedArenaRouteID: UUID?
     private let openInvitationOnAppear: Bool
+    private let preferredWorkoutID: UUID?
 
     /// Opening a duel from an active Arena 1v1 series can suggest its
     /// opponent; the existing mutual-follow and permission checks remain.
@@ -73,8 +74,10 @@ struct GhostFriendRaceHubView: View {
         preferredFriendID: UUID? = nil,
         preferredRoute: TrainingRoute? = nil,
         arenaRoundID: UUID? = nil,
-        openInvitationOnAppear: Bool = false
+        openInvitationOnAppear: Bool = false,
+        preferredWorkoutID: UUID? = nil
     ) {
+        self.preferredWorkoutID = preferredWorkoutID
         self.openInvitationOnAppear = openInvitationOnAppear
         self.arenaRoundID = arenaRoundID
         self.agreedArenaRouteID = arenaRoundID == nil ? nil : preferredRoute?.id
@@ -1446,8 +1449,24 @@ struct GhostFriendRaceHubView: View {
 
         runs = []
         checkedRunCount = 0
+        let desiredID = selectedWorkoutID ?? preferredWorkoutID
         selectedWorkoutID = nil
+        // A history shortcut suggests the exact run, but still requires
+        // normal GPS eligibility and the existing explicit invitation.
+        if let desiredID,
+           let index = unverifiedRuns.firstIndex(where: { $0.id == desiredID }) {
+            let preferred = unverifiedRuns.remove(at: index)
+            unverifiedRuns.insert(preferred, at: 0)
+        }
         await scanMoreFriendRuns()
+        guard !Task.isCancelled else { return }
+        if let desiredID, runs.contains(where: { $0.id == desiredID }) {
+            selectedWorkoutID = desiredID
+        } else if preferredWorkoutID != nil && desiredID == preferredWorkoutID {
+            localError = ATHLTHLocalization.choose(
+                english: "This run has no verified GPS replay. Choose another run or a planned route.",
+                norwegian: "Denne økten har ingen verifisert GPS-replay. Velg en annen økt eller en planlagt rute.")
+        }
     }
 
     @MainActor
