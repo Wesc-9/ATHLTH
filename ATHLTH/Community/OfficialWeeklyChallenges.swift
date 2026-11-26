@@ -1769,6 +1769,7 @@ struct CommunityWeeklyChallengeHero: View {
     @EnvironmentObject private var health: HealthKitManager
     let challenge: OfficialWeeklyChallenge
     let profiles: [SocialProfileCard]
+    var embeddedInTopHero = false
 
     var body: some View {
         NavigationLink {
@@ -1813,23 +1814,12 @@ struct CommunityWeeklyChallengeHero: View {
                         .accessibilityHidden(true)
                 }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 168, alignment: .leading)
+            .padding(embeddedInTopHero ? 4 : 14)
+            .padding(.bottom, embeddedInTopHero ? 10 : 0)
+            .frame(maxWidth: .infinity, minHeight: embeddedInTopHero ? 190 : 168, alignment: .leading)
             .background {
-                GeometryReader { geometry in
-                    OfficialWeeklyChallengeArtwork(challenge: challenge, preserveOriginalColors: true)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                }
-                .overlay {
-                    LinearGradient(stops: [
-                        .init(color: .black.opacity(0.86), location: 0),
-                        .init(color: .black.opacity(0.58), location: 0.53),
-                        .init(color: .black.opacity(0.13), location: 1)
-                    ], startPoint: .leading, endPoint: .trailing)
-                }
-                .overlay {
-                    LinearGradient(colors: [.clear, .black.opacity(0.42)], startPoint: .top, endPoint: .bottom)
+                if !embeddedInTopHero {
+                    CommunityWeeklyChallengeHeroBackground(challenge: challenge)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 20))
@@ -1865,6 +1855,31 @@ struct CommunityWeeklyChallengeHero: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// A shared photo treatment so Community can extend the weekly artwork
+/// behind its header without rendering a second copy of the image.
+struct CommunityWeeklyChallengeHeroBackground: View {
+    let challenge: OfficialWeeklyChallenge
+
+    var body: some View {
+        GeometryReader { geometry in
+            OfficialWeeklyChallengeArtwork(challenge: challenge, preserveOriginalColors: true)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+        }
+        .overlay {
+            LinearGradient(stops: [
+                .init(color: .black.opacity(0.86), location: 0),
+                .init(color: .black.opacity(0.58), location: 0.53),
+                .init(color: .black.opacity(0.13), location: 1)
+            ], startPoint: .leading, endPoint: .trailing)
+        }
+        .overlay {
+            LinearGradient(colors: [.black.opacity(0.40), .clear, .black.opacity(0.42)],
+                           startPoint: .top, endPoint: .bottom)
+        }
     }
 }
 

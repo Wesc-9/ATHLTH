@@ -145,6 +145,7 @@ struct ATHLTHCommunityV5View: View {
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
 
 
     /// Single overview; keep the initializer compatible with restored Studio state.
@@ -172,22 +173,35 @@ struct ATHLTHCommunityV5View: View {
     var body: some View {
         NavigationStack {
             GeometryReader { viewport in
+                let extendsToTop = weekly.activeChallenge != nil && !studioFullscreenEditing
+                let topInset = extendsToTop ? viewport.safeAreaInsets.top : 0
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        cover
+                        if let challenge = weekly.activeChallenge {
+                            weeklyTopHero(challenge, topInset: topInset)
+                                .frame(width: viewport.size.width)
+                        } else {
+                            VStack(alignment: .leading, spacing: 16) {
+                                cover(onArtwork: false)
+                                weeklyChallengeHighlight
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(width: min(viewport.size.width, 760))
+                            .frame(maxWidth: .infinity)
+                        }
 
                         overview
-                        .padding(.top, 16)
-                        .padding(.bottom, 112)
-                        .zIndex(1)
+                            .padding(.horizontal, 14)
+                            .padding(.top, 16)
+                            .padding(.bottom, 112)
+                            .frame(width: min(viewport.size.width, 760))
+                            .frame(maxWidth: .infinity)
                     }
-                    .padding(.horizontal, 14)
-                    // A vertical ScrollView does not impose a finite content
-                    // width. Propose the visible width explicitly so an
-                    // aspect-fill image cannot make every tab scroll sideways.
-                    .frame(width: min(viewport.size.width, 760))
-                    .frame(maxWidth: .infinity)
+                    // The top image fills the actual window or Studio detail
+                    // column; only the subsequent cards retain their margins.
+                    .frame(width: viewport.size.width)
                 }
+                .ignoresSafeArea(.container, edges: extendsToTop ? .top : [])
                 .scrollIndicators(.hidden)
                 .scrollDismissesKeyboard(.interactively)
                 .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
@@ -220,16 +234,54 @@ struct ATHLTHCommunityV5View: View {
 
     // MARK: - Hero images: one per Community destination.
 
-    private var cover: some View {
+    private func weeklyTopHero(_ challenge: OfficialWeeklyChallenge, topInset: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            cover(onArtwork: true)
+            CommunityWeeklyChallengeHero(
+                challenge: challenge,
+                profiles: social.mutualFollows,
+                embeddedInTopHero: true
+            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, topInset)
+        .padding(.bottom, 4)
+        .frame(maxWidth: 760)
+        .frame(maxWidth: .infinity)
+        .background {
+            CommunityWeeklyChallengeHeroBackground(challenge: challenge)
+                .overlay(alignment: .top) {
+                    // ATHLTH uses a light system appearance. Retain readable
+                    // dark status-bar glyphs over the full-bleed photograph.
+                    if topInset > 0 {
+                        LinearGradient(
+                            stops: [
+                                .init(color: CommunityReferenceStyle.canvas.opacity(0.96), location: 0),
+                                .init(color: CommunityReferenceStyle.canvas.opacity(0.90), location: 0.60),
+                                .init(color: .clear, location: 1)
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                        .frame(height: topInset + 10)
+                    }
+                }
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
+        }
+        .clipped()
+        .accessibilityIdentifier("athlth-community-weekly-full-bleed")
+    }
+
+    private func cover(onArtwork: Bool) -> some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(tr("Community", "Fellesskap"))
                     .font(.system(size: 34, weight: .medium, design: .serif))
-                    .foregroundStyle(CommunityReferenceStyle.ink)
+                    .foregroundStyle(onArtwork ? Color.white : CommunityReferenceStyle.ink)
                     .accessibilityAddTraits(.isHeader)
                 Text(tr("Friends, clubs and shared goals", "Venner, klubber og felles mål"))
                     .font(.subheadline)
-                    .foregroundStyle(CommunityReferenceStyle.muted)
+                    .foregroundStyle(onArtwork ? Color.white.opacity(0.88) : CommunityReferenceStyle.muted)
             }
             Spacer(minLength: 0)
             NavigationLink {
@@ -264,7 +316,6 @@ struct ATHLTHCommunityV5View: View {
 
     private var overview: some View {
         VStack(spacing: 15) {
-            weeklyChallengeHighlight
             if !social.mutualFollows.isEmpty {
                 CommunityFriendsVsFriendsCard(
                     currentUserID: session.profile.userID,
