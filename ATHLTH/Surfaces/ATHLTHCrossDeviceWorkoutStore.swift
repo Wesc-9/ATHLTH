@@ -846,7 +846,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
                 elapsedSeconds: display.elapsedSeconds,
                 distanceMeters: nil,
                 currentStep: activeName,
-                nextStep: nil,
+                nextStep: strength.nextExecutionLabel,
                 completedSets: log.totalCompletedSets,
                 totalSets: log.exercises.reduce(0) { $0 + $1.sets.count },
                 paused: display.paused,
