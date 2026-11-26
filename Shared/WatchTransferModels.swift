@@ -1461,6 +1461,7 @@ struct WatchPreparedWorkoutTransfer: Codable, Hashable {
     var plannedPlanID: UUID? = nil
     var plannedSessionID: UUID? = nil
     var updatedAt: Date
+    var ownerID: UUID? = nil
 }
 
 /// A planned Watch transfer must contain the complete original link;
@@ -1618,6 +1619,36 @@ enum ATHLTHWatchPreparedRecipeAdmissionPolicy {
 }
 
 /// A presentation-only snapshot of the existing library and daily advice.
+enum WatchHomeSentQueue {
+    static let lifetime: TimeInterval = 24 * 3600
+
+    static func visible(_ queue: [WatchPreparedWorkoutTransfer], owner: UUID?, now: Date = Date()) -> [WatchPreparedWorkoutTransfer] {
+        queue.filter { (0..<lifetime).contains(now.timeIntervalSince($0.updatedAt)) &&
+            ($0.ownerID == nil || $0.ownerID == owner)
+        }.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    static func inserting(_ workout: WatchPreparedWorkoutTransfer, into queue: [WatchPreparedWorkoutTransfer],
+                          consumed: Set<UUID>, owner: UUID?, now: Date = Date()) -> [WatchPreparedWorkoutTransfer] {
+        let existing = visible(queue, owner: owner, now: now)
+        guard !consumed.contains(workout.id), !visible([workout], owner: owner, now: now).isEmpty,
+              !existing.contains(where: {
+                  ($0.id == workout.id || (workout.plannedSessionID != nil && $0.plannedSessionID == workout.plannedSessionID))
+                  && $0.updatedAt >= workout.updatedAt
+              }) else { return existing }
+        let automatic = workout.startMode == .immediate || workout.startMode == .afterThirtySeconds
+        if automatic, existing.contains(where: {
+            ($0.startMode == .immediate || $0.startMode == .afterThirtySeconds) && $0.updatedAt > workout.updatedAt
+        }) { return existing }
+        let remaining = existing.filter {
+            $0.id != workout.id &&
+            (workout.plannedSessionID == nil || $0.plannedSessionID != workout.plannedSessionID) &&
+            (!automatic || ($0.startMode != .immediate && $0.startMode != .afterThirtySeconds))
+        }
+        return Array(([workout] + remaining).sorted { $0.updatedAt > $1.updatedAt }.prefix(24))
+    }
+}
+
 struct WatchHomeFavoriteWorkout: Codable, Hashable, Identifiable {
     var id: String
     var title: String

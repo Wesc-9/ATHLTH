@@ -35,11 +35,9 @@ struct WatchHomeView: View {
         }.sorted { ($0.scheduledStart ?? start) < ($1.scheduledStart ?? start) }
     }
 
-    private var sent: WatchPreparedWorkoutTransfer? {
-        guard let workout = routeStore.preparedWorkout,
-              Date().timeIntervalSince(workout.updatedAt) < 24 * 3600,
-              workout.plannedSessionID.map({ routeStore.canLaunchTodayWorkout($0) }) ?? true else { return nil }
-        return workout
+    private var sent: [WatchPreparedWorkoutTransfer] {
+        WatchHomeSentQueue.visible(routeStore.sentWorkouts, owner: routeStore.companionAccountID)
+            .filter { $0.plannedSessionID.map { routeStore.canLaunchTodayWorkout($0) } ?? true }
     }
 
     var body: some View {
@@ -49,7 +47,7 @@ struct WatchHomeView: View {
                 let spacing: CGFloat = compact ? 4 : 5
                 let headerHeight: CGFloat = 30
                 let quickHeight: CGFloat = 52
-                let cardHeight = max(72, proxy.size.height - headerHeight - quickHeight - spacing * 2 - 4)
+                let cardHeight = max(0, proxy.size.height - headerHeight - quickHeight - spacing * 2 - 4)
                 VStack(spacing: spacing) {
                     header.frame(height: headerHeight)
                     HStack(spacing: spacing) {
@@ -176,14 +174,12 @@ struct WatchHomeView: View {
 
     private var shortcuts: some View {
         GeometryReader { proxy in
-            let rowHeight = max(20, (proxy.size.height - 3) / 4)
             VStack(spacing: 1) {
-                shortcut(.favoriteWorkouts, icon: "star", title: tr("Favorite workouts", "Favorittøkter"), detail: nil)
-                shortcut(.favoriteRoutes, icon: "map", title: tr("Favorite routes", "Favorittruter"), detail: nil)
-                shortcut(.sent, icon: "applewatch.and.arrow.forward", title: tr("Sent to Watch", "Sendt til klokken"), detail: sent == nil ? nil : "1")
+                shortcut(.favoriteWorkouts, icon: "star", title: tr("Favorite workouts", "Favorittøkter"), detail: dashboard.map { String($0.favorites.count) })
+                shortcut(.favoriteRoutes, icon: "map", title: tr("Favorite routes", "Favorittruter"), detail: dashboard.map { String($0.favoriteRouteIDs.count) })
+                shortcut(.sent, icon: "applewatch.and.arrow.forward", title: tr("Sent to Watch", "Sendt til klokken"), detail: sent.isEmpty ? nil : String(sent.count))
                 shortcut(.recommendation, icon: "bolt.fill", title: tr("Recommended", "Anbefalt økt"), detail: nil)
             }
-            .environment(\.defaultMinListRowHeight, rowHeight)
             .frame(height: proxy.size.height)
             .background(Color.white, in: RoundedRectangle(cornerRadius: 13))
             .overlay { RoundedRectangle(cornerRadius: 13).strokeBorder(WatchTheme.planBorder, lineWidth: 0.6) }
@@ -284,8 +280,8 @@ struct WatchHomeView: View {
 
     private var sentPage: some View {
         page(tr("Sent to Watch", "Sendt til klokken")) {
-            if let sent {
-                recipeRow(sent)
+            if !sent.isEmpty {
+                ForEach(sent, id: \.id) { workout in recipeRow(workout) }
                 if let countdown = routeStore.automaticStartCountdownSeconds { Text("\(countdown)s").font(.headline) }
             } else {
                 empty(tr("Send a workout from ATHLTH on your iPhone.", "Send en treningsøkt fra ATHLTH på iPhone."))

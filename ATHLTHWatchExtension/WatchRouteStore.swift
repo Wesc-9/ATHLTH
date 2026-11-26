@@ -74,7 +74,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var todayWorkouts: [WatchTodayWorkoutTransfer] = []
     @Published private(set) var homeDashboard: WatchHomeDashboardTransfer?
     private let homeDashboardDefaultsKey = "athlth.watch.homeDashboard.v1"
-    @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
+    @Published private(set) var sentWorkouts: [WatchPreparedWorkoutTransfer] = []
+    var preparedWorkout: WatchPreparedWorkoutTransfer? { sentWorkouts.first }
+    private let sentWorkoutsKey = "athlth.watch.sentWorkouts.v1"
+    private let consumedSentWorkoutsKey = "athlth.watch.consumedSentWorkouts.v1"
+    private var consumedSentIDs: [UUID] = []
     // One transient preflight at a time, before any card can mutate the
     // shared manager's route, coach or interval configuration.
     private var pendingPreparedLaunchID: UUID?
@@ -127,15 +131,6 @@ final class WatchRouteStore: NSObject, ObservableObject {
         let transfer = try? JSONDecoder().decode(
             WatchAccountIdentityTransfer.self, from: data
         ) else { return }
-        if companionAccountID != transfer.ownerID {
-            homeDashboard = nil
-            todayWorkouts = []
-            todayWorkout = nil
-            UserDefaults.standard.removeObject(forKey: homeDashboardDefaultsKey)
-            UserDefaults.standard.removeObject(forKey: todayWorkoutDefaultsKey)
-            UserDefaults.standard.removeObject(forKey: todayWorkoutsDefaultsKey)
-            if let preparedWorkout { consumePreparedWorkout(preparedWorkout.id) }
-        }
         companionAccountID = transfer.ownerID
         latestCompanionAccountUpdatedAt = transfer.updatedAt
     }
@@ -147,6 +142,18 @@ final class WatchRouteStore: NSObject, ObservableObject {
             return
         }
         // Do not alter the account captured by an already-running workout.
+        if companionAccountID != transfer.ownerID {
+            homeDashboard = nil
+            todayWorkouts = []
+            todayWorkout = nil
+            sentWorkouts = []
+            consumedSentIDs = []
+            for key in [homeDashboardDefaultsKey, todayWorkoutDefaultsKey, todayWorkoutsDefaultsKey,
+                        sentWorkoutsKey, consumedSentWorkoutsKey, preparedWorkoutDefaultsKey,
+                        preparedWorkoutSnapshotDateKey, "athlth.watch.todayWorkoutSnapshotDate.v1"] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
         companionAccountID = transfer.ownerID
         latestCompanionAccountUpdatedAt = transfer.updatedAt
         if let data = try? JSONEncoder().encode(transfer) {
@@ -390,7 +397,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
 
     private func recordConfirmedTodayLaunch(_ sessionID: UUID) {
         guard todayWorkouts.contains(where: { $0.workoutID == sessionID }) ||
-              todayWorkout?.workoutID == sessionID,
+              todayWorkout?.workoutID == sessionID ||
+              sentWorkouts.contains(where: { $0.plannedSessionID == sessionID }),
               !wasTodaySessionLaunched(sessionID) else { return }
         confirmedTodayLaunches.append(ATHLTHWatchTodayLaunchReceipt(
             sessionID: sessionID, ownerID: companionAccountID,
@@ -494,65 +502,37 @@ final class WatchRouteStore: NSObject, ObservableObject {
     }
 
     private func loadPreparedWorkout() {
-        guard let data =
-                UserDefaults.standard.data(
-                    forKey: preparedWorkoutDefaultsKey
-                ),
-              let workout =
-                try? JSONDecoder().decode(
-                    WatchPreparedWorkoutTransfer.self,
-                    from: data
-                )
-        else {
-            return
-        }
-
-        guard Date().timeIntervalSince(
-                workout.updatedAt
-            ) < 24 * 60 * 60
-        else {
-            UserDefaults.standard.removeObject(
-                forKey: preparedWorkoutDefaultsKey
-            )
-            preparedWorkout = nil
-            return
-        }
-
-        preparedWorkout = workout
+        consumedSentIDs = (UserDefaults.standard.data(forKey: consumedSentWorkoutsKey)
+            .flatMap { try? JSONDecoder().decode([UUID].self, from: $0) }) ?? []
+        let queue: [WatchPreparedWorkoutTransfer]
+        if let data = UserDefaults.standard.data(forKey: sentWorkoutsKey),
+           let saved = try? JSONDecoder().decode([WatchPreparedWorkoutTransfer].self, from: data) {
+            queue = saved
+        } else if let data = UserDefaults.standard.data(forKey: preparedWorkoutDefaultsKey),
+                  let legacy = try? JSONDecoder().decode(WatchPreparedWorkoutTransfer.self, from: data) {
+            queue = [legacy]
+        } else { queue = [] }
+        sentWorkouts = WatchHomeSentQueue.visible(queue, owner: companionAccountID)
+            .filter { !consumedSentIDs.contains($0.id) }
+        persistSentWorkouts()
     }
 
-    private func storePreparedWorkout(
-        _ workout: WatchPreparedWorkoutTransfer
-    ) {
-        preparedWorkout = workout
-
-        guard let data =
-                try? JSONEncoder().encode(workout)
-        else {
-            return
+    private func persistSentWorkouts() {
+        if let data = try? JSONEncoder().encode(sentWorkouts) {
+            UserDefaults.standard.set(data, forKey: sentWorkoutsKey)
+            UserDefaults.standard.removeObject(forKey: preparedWorkoutDefaultsKey)
         }
-
-        UserDefaults.standard.set(
-            data,
-            forKey: preparedWorkoutDefaultsKey
-        )
-        UserDefaults.standard.set(
-            workout.updatedAt,
-            forKey: preparedWorkoutSnapshotDateKey
-        )
+        if let data = try? JSONEncoder().encode(consumedSentIDs) {
+            UserDefaults.standard.set(data, forKey: consumedSentWorkoutsKey)
+        }
     }
 
-    func consumePreparedWorkout(
-        _ id: UUID
-    ) {
-        guard preparedWorkout?.id == id else {
-            return
-        }
-
-        preparedWorkout = nil
-        UserDefaults.standard.removeObject(
-            forKey: preparedWorkoutDefaultsKey
-        )
+    func consumePreparedWorkout(_ id: UUID) {
+        guard sentWorkouts.contains(where: { $0.id == id }) else { return }
+        sentWorkouts.removeAll { $0.id == id }
+        consumedSentIDs.append(id)
+        consumedSentIDs = Array(consumedSentIDs.suffix(128))
+        persistSentWorkouts()
     }
 
     // Reused by both the manual START card and iPhone-triggered launch.
@@ -648,56 +628,29 @@ final class WatchRouteStore: NSObject, ObservableObject {
         // A Today card has a fresh transport UUID, but may represent the
         // same previously prepared calendar session. Hide only the older
         // matching card once the original HealthKit workout was confirmed.
-        if let sessionID = workout.plannedSessionID,
-           let existing = preparedWorkout,
-           existing.plannedSessionID == sessionID,
-           existing.updatedAt <= workout.updatedAt {
-            consumePreparedWorkout(existing.id)
+        if let sessionID = workout.plannedSessionID {
+            for existing in sentWorkouts.filter({ $0.plannedSessionID == sessionID }) {
+                consumePreparedWorkout(existing.id)
+            }
         }
         return true
     }
 
-    private func applyPreparedWorkout(
-        data: Data
-    ) {
-        guard let workout =
-                try? JSONDecoder().decode(
-                    WatchPreparedWorkoutTransfer.self,
-                    from: data
-                )
-        else {
-            return
+    private func applyPreparedWorkout(data: Data) {
+        guard let workout = try? JSONDecoder().decode(WatchPreparedWorkoutTransfer.self, from: data),
+              workout.plannedSessionID.map({ !wasTodaySessionLaunched($0) }) ?? true else { return }
+        let previous = sentWorkouts
+        let next = WatchHomeSentQueue.inserting(workout, into: previous,
+            consumed: Set(consumedSentIDs), owner: companionAccountID)
+        guard next != previous else { return }
+        let nextIDs = Set(next.map(\.id))
+        consumedSentIDs.append(contentsOf: previous.filter { !nextIDs.contains($0.id) }.map(\.id))
+        consumedSentIDs = Array(consumedSentIDs.suffix(128))
+        sentWorkouts = next
+        persistSentWorkouts()
+        if next.first?.id == workout.id {
+            applyRouteSelection(rawRouteID: workout.routeID?.uuidString ?? "")
         }
-
-        let currentUpdatedAt =
-            preparedWorkout?.updatedAt ??
-            UserDefaults.standard.object(
-                forKey:
-                    preparedWorkoutSnapshotDateKey
-            ) as? Date ??
-            .distantPast
-
-        // Immediate delivery and the durable queued delivery contain the same
-        // payload. Only a strictly newer prepared workout may replace the one
-        // already shown on Watch.
-        guard workout.updatedAt >
-                currentUpdatedAt
-        else {
-            return
-        }
-
-        storePreparedWorkout(workout)
-
-        // A prepared workout owns the route selection. This also clears any
-        // stale pending route from an older workout when the new one has no
-        // route, and waits for the correct route file when it is still in
-        // transit.
-        applyRouteSelection(
-            rawRouteID:
-                workout.routeID?
-                    .uuidString ??
-                ""
-        )
     }
 
     // Called by WatchHomeView on appear as well as by WCSession activation.
@@ -1275,24 +1228,8 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 payload[
                     WatchTransferMetadataKey.payload
                 ] as? Data {
-            let sentAt =
-                payload[
-                    WatchTransferMetadataKey.sentAt
-                ] as? TimeInterval
-
             Task { @MainActor [weak self] in
-                guard let self,
-                      self.shouldAcceptTransport(
-                        kind: rawKind,
-                        sentAt: sentAt
-                      )
-                else {
-                    return
-                }
-
-                self.applyPreparedWorkout(
-                    data: data
-                )
+                self?.applyPreparedWorkout(data: data)
             }
 
             replyHandler?([:])

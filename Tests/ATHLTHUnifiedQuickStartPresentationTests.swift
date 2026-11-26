@@ -129,3 +129,32 @@ final class ATHLTHCompletedSportsReviewTests: XCTestCase {
         XCTAssertEqual(ATHLTHCompletedWorkoutNames.clean(String(repeating: "a", count: 200))?.count, 100)
     }
 }
+
+
+final class ATHLTHWatchHomeSentQueueTests: XCTestCase {
+    private func workout(_ title: String, date: Date, owner: UUID, session: UUID? = nil,
+                         mode: WatchWorkoutStartMode = .onWatch) -> WatchPreparedWorkoutTransfer {
+        WatchPreparedWorkoutTransfer(id: UUID(), title: title, summary: "", kind: .walking,
+            routeID: nil, runningWorkout: nil, audioCoach: nil, startMode: mode,
+            plannedPlanID: session == nil ? nil : UUID(), plannedSessionID: session,
+            updatedAt: date, ownerID: owner)
+    }
+
+    func testTwoManualTransfersAndDuplicateDelivery() {
+        let owner = UUID(), now = Date()
+        let one = workout("First", date: now.addingTimeInterval(-10), owner: owner)
+        let two = workout("Second", date: now, owner: owner)
+        let queue = WatchHomeSentQueue.inserting(two, into: [one], consumed: [], owner: owner, now: now)
+        XCTAssertEqual(queue.map(\.id), [two.id, one.id])
+        XCTAssertEqual(WatchHomeSentQueue.inserting(one, into: queue, consumed: [], owner: owner, now: now), queue)
+        XCTAssertEqual(WatchHomeSentQueue.inserting(one, into: [two], consumed: [one.id], owner: owner, now: now), [two])
+    }
+
+    func testNewerSameSessionReplacesAndWrongAccountIsRejected() {
+        let owner = UUID(), session = UUID(), now = Date()
+        let old = workout("Old", date: now.addingTimeInterval(-10), owner: owner, session: session)
+        let new = workout("New", date: now, owner: owner, session: session)
+        XCTAssertEqual(WatchHomeSentQueue.inserting(new, into: [old], consumed: [], owner: owner, now: now), [new])
+        XCTAssertTrue(WatchHomeSentQueue.visible([old], owner: UUID(), now: now).isEmpty)
+    }
+}

@@ -331,6 +331,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     private var relayCompletionReceipts: [WatchRemoteLaunchCompletionReceipt] = []
     private var lastSpotifyCommandSentAt:
         Date = .distantPast
+    private var latestWatchOwnerID: UUID?
     private var latestTodaySnapshot =
         WatchTodaySnapshot(
             workout: nil,
@@ -906,8 +907,10 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     func sendPreparedWorkout(
-        _ workout: WatchPreparedWorkoutTransfer
+        _ original: WatchPreparedWorkoutTransfer
     ) {
+        var workout = original
+        workout.ownerID = latestWatchOwnerID
         guard
             let session,
             session.activationState == .activated,
@@ -977,6 +980,7 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     func sendAccountIdentity(_ ownerID: UUID?) {
+        latestWatchOwnerID = ownerID
         if latestTodaySnapshot.dashboard?.ownerID != ownerID || ownerID == nil {
             latestTodaySnapshot = WatchTodaySnapshot(workout: nil, updatedAt: Date(), workouts: [])
         }
