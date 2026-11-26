@@ -210,8 +210,6 @@ struct ATHLTHTrainTodayPremiumView: View {
             if diagnosticStage >= 4 {
                 ATHLTHTrainDeferredContent { AnyView(competitionSection) }
                     .frame(maxWidth: .infinity)
-                ATHLTHTrainDeferredContent { AnyView(ghostRaceSection) }
-                    .frame(maxWidth: .infinity)
                 ATHLTHTrainDeferredContent { AnyView(additionalWorkoutOptions) }
             }
         }
@@ -1253,57 +1251,6 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("athlth-train-competition-entry")
-    }
-
-    private var ghostRaceSection: some View {
-        Button(action: onGhostRace) {
-            ZStack(alignment: .leading) {
-                GeometryReader { imageGeometry in
-                    Image("GoalRunning")
-                        .resizable()
-                        .scaledToFill()
-                        .saturation(0.25)
-                        .frame(
-                            width: imageGeometry.size.width,
-                            height: 79
-                        )
-                        .clipped()
-                        .allowsHitTesting(false)
-                }
-                .frame(height: 79)
-                .allowsHitTesting(false)
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.69),
-                        Color.black.opacity(0.43)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .allowsHitTesting(false)
-                HStack(spacing: 13) {
-                    Image(systemName: "flag.checkered")
-                        .font(.system(size: 19, weight: .medium))
-                        .frame(width: 32)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Ghost Race")
-                            .font(.system(size: 17, weight: .medium, design: .serif))
-                        Text(tr("Race your previous results", "Tren mot dine tidligere tider"))
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                }
-                .foregroundStyle(.white)
-                .padding(15)
-            }
-            .frame(height: 79)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     @inline(never)
