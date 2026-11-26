@@ -16,7 +16,7 @@ struct ATHLTHCompetitionExercisePicker: View {
     @State private var filter: ATHLTHTournamentActivity?
 
     private var visible: [ATHLTHTournamentExerciseSearchResult] {
-        results.filter { filter == nil || $0.activity == filter }
+        results.filter { $0.activity.isAvailableForCreation && allowed.contains($0.activity) && (filter == nil || $0.activity == filter) }
     }
 
     var body: some View {
@@ -25,7 +25,7 @@ struct ATHLTHCompetitionExercisePicker: View {
                 Section {
                     Picker("Treningsform", selection: $filter) {
                         Text("Alle grener").tag(nil as ATHLTHTournamentActivity?)
-                        ForEach(ATHLTHTournamentActivity.allCases.filter { allowed.contains($0) }) {
+                        ForEach(ATHLTHTournamentActivity.allCases.filter { allowed.contains($0) && $0.isAvailableForCreation }) {
                             Text($0.title).tag(Optional($0))
                         }
                     }
@@ -67,7 +67,7 @@ struct ATHLTHCompetitionExercisePicker: View {
                 results = []
                 do {
                     if !query.isEmpty { try await Task.sleep(for: .milliseconds(300)) }
-                    let activities = filter.map { [$0] } ?? Array(allowed)
+                    let activities = (filter.map { [$0] } ?? Array(allowed)).filter(\.isAvailableForCreation)
                     let fetched = try await ATHLTHTournamentLobbyCloudService()
                         .searchCompetitionExercises(query, allowed: activities, browse: true)
                     guard !Task.isCancelled else { return }
