@@ -306,12 +306,17 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                     detailSection(ATHLTHLocalization.choose(
                         english: "When and where", norwegian: "Tid og sted"
                     )) {
-                        if let start = workout.scheduledStart {
+                        if let start = sharedDraft.workout?.scheduledStart ?? workout.scheduledStart {
                             detailRow(
                                 icon: "calendar",
                                 label: ATHLTHLocalization.choose(english: "Start", norwegian: "Start"),
                                 value: start.formatted(date: .complete, time: .shortened)
                             )
+                        }
+                        if let proposed = sharedDraft.draft?.proposedDate {
+                            detailRow(icon: "calendar.badge.clock",
+                                      label: "Nytt datoforslag",
+                                      value: proposed.formatted(date: .complete, time: .shortened))
                         }
                         if let minutes = workout.durationMinutes {
                             detailRow(
@@ -423,8 +428,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                         }
                     }
 
-                    if sharedDraft.draft != nil && state != .cancelled && state != .declined &&
-                       (isMine || state == .accepted) {
+                    if sharedDraft.draft != nil && state != .cancelled && state != .declined {
                         detailSection(ATHLTHLocalization.choose(
                             english: "Shared planning lobby",
                             norwegian: "Felles planleggingslobby"
@@ -438,7 +442,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                                 Label(
                                     ATHLTHLocalization.choose(
                                         english: "Open live workout",
-                                        norwegian: "Åpne fellesøkt i sanntid"
+                                        norwegian: "Åpne fellesøkt · avtal dato"
                                     ),
                                     systemImage: "person.2.fill"
                                 )
@@ -494,6 +498,7 @@ private struct ThreadWorkoutInvitationDetailsView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(ATHLTHTheme.accentDeep)
+                            .disabled(sharedDraft.draft?.proposedStart != nil)
                         }
                         .disabled(isResponding)
                     }
