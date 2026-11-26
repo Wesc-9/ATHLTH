@@ -166,6 +166,14 @@ struct ATHLTHTournamentLiveDetailView: View {
         .navigationTitle(current.displayFormatTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ATHLTHTournamentGroupConversationView(tournament: current)
+                } label: {
+                    Image(systemName: "bubble.left.and.bubble.right")
+                }
+                .accessibilityLabel("Konkurransesamtale")
+            }
             if isOwner && current.status == "inviting" {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -201,7 +209,16 @@ struct ATHLTHTournamentLiveDetailView: View {
             )
         }
         .refreshable { await reload() }
-        .task(id: current.id) { await reload() }
+        .task(id: current.id) {
+            if openChatInitially { selection = .lobby }
+            await reload()
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(30)) } catch { break }
+                guard scenePhase == .active, !busy, !Task.isCancelled else { continue }
+                guard current.status == "inviting" || current.status == "active" else { break }
+                await reload()
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
         }
@@ -263,7 +280,7 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .font(.system(size: 33, weight: .regular, design: .serif))
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            if current.isDuel { duelParticipants }
+            if current.isDuel { duelParticipants } else { competitionSummary }
             HStack(spacing: 13) {
                 Label("\(confirmedEntries.count)/\(confirmedEntries.count + pendingCount) bekreftet", systemImage: "person.2")
                 if !current.singleEventMode {
@@ -394,6 +411,30 @@ struct ATHLTHTournamentLiveDetailView: View {
                 .background(ATHLTHArenaV3Style.panel())
             }
         }
+    }
+
+    private var competitionSummary: some View {
+        HStack(spacing: 0) {
+            summaryMetric("Øvelser", value: String(current.exerciseCount), icon: "list.bullet")
+            Divider().frame(height: 42)
+            summaryMetric("Bekreftet", value: String(confirmedEntries.count), icon: "person.2")
+            Divider().frame(height: 42)
+            summaryMetric("Invitert", value: String(pendingCount), icon: "envelope")
+        }
+        .padding(.vertical, 16)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
+    private func summaryMetric(_ title: String, value: String, icon: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon).font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.gold)
+            Text(value).font(.system(size: 25, weight: .medium, design: .serif))
+                .monospacedDigit()
+            Text(title).font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var duelParticipants: some View {
@@ -595,16 +636,6 @@ struct ATHLTHTournamentLiveDetailView: View {
             )
             if current.singleEventMode {
                 singleEventSection
-            }
-            NavigationLink {
-                ATHLTHTournamentGroupConversationView(tournament: current)
-            } label: {
-                Label("Åpne konkurransesamtalen", systemImage: "bubble.left.and.bubble.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHArenaV3Style.gold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(ATHLTHArenaV3Style.panel())
             }
             if !current.singleEventMode {
             if let practice = matches.first(where: { $0.phase == .warmup }) {
