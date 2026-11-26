@@ -16,13 +16,16 @@ struct TrainTogetherLiveDraft: Decodable, Identifiable, Equatable {
     let ownerApprovedRevision: Int?
     let partnerApprovedRevision: Int?
     var cancelledAt: Date? = nil
+    var proposedStart: Double? = nil
+    var proposedStartBy: UUID? = nil
+    var proposedDate: Date? { proposedStart.map { Date(timeIntervalSinceReferenceDate: $0) } }
 
     var id: UUID { sourceWorkoutID }
     var isCollaborative: Bool { editMode == "collaborative" }
     var isPhysical: Bool { participationMode == "physical" }
     var ownerApproved: Bool { ownerApprovedRevision == revision }
     var partnerApproved: Bool { partnerApprovedRevision == revision }
-    var bothApproved: Bool { cancelledAt == nil && ownerApproved && partnerApproved }
+    var bothApproved: Bool { cancelledAt == nil && proposedStart == nil && ownerApproved && partnerApproved }
 
     var workout: PlannedSession? {
         guard let data = workoutSnapshot.data(using: .utf8) else { return nil }
@@ -40,6 +43,8 @@ struct TrainTogetherLiveDraft: Decodable, Identifiable, Equatable {
         case ownerApprovedRevision = "owner_approved_revision"
         case partnerApprovedRevision = "partner_approved_revision"
         case cancelledAt = "cancelled_at"
+        case proposedStart = "proposed_start"
+        case proposedStartBy = "proposed_start_by"
     }
 }
 
@@ -68,6 +73,20 @@ private struct TrainTogetherUpdateDraftParameters: Encodable {
         case sourceID = "p_source_id"
         case expectedRevision = "p_expected_revision"
         case snapshot = "p_snapshot"
+    }
+}
+
+private struct TrainTogetherNegotiateStartParameters: Encodable {
+    let sourceID: UUID
+    let expectedRevision: Int
+    let accept: Bool
+    let start: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case sourceID = "p_source_id"
+        case expectedRevision = "p_expected_revision"
+        case accept = "p_accept"
+        case start = "p_start"
     }
 }
 
@@ -280,8 +299,37 @@ final class TrainTogetherLiveDraftStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func negotiateStart(_ date: Date?, accept: Bool, basedOn revision: Int) async -> Bool {
+        guard let current = draft, !isWorking, current.revision == revision,
+              current.cancelledAt == nil else {
+            errorMessage = "Økten er endret. Oppdater før du svarer."
+            return false
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let updated: TrainTogetherLiveDraft = try await client.rpc(
+                "negotiate_social_workout_start",
+                params: TrainTogetherNegotiateStartParameters(
+                    sourceID: current.sourceWorkoutID, expectedRevision: revision,
+                    accept: accept, start: date?.timeIntervalSinceReferenceDate
+                )
+            ).execute().value
+            apply(updated)
+            guard !isWithdrawn(updated.sourceWorkoutID) else { return false }
+            errorMessage = nil
+            return true
+        } catch {
+            let failure = error.localizedDescription
+            await refresh(current.sourceWorkoutID, quiet: true)
+            errorMessage = failure
+            return false
+        }
+    }
+
     func approve() async {
-        guard let current = draft, !isWorking else { return }
+        guard let current = draft, !isWorking, current.proposedStart == nil else { return }
         isWorking = true
         defer { isWorking = false }
         do {
@@ -339,6 +387,8 @@ struct TrainTogetherLiveDraftRoomView: View {
     @State private var showingGuestLobby = false
     @State private var openingReady = false
     @State private var meetingEdit: MeetingEdit?
+    @State private var dateProposalRevision: Int?
+    @State private var dateProposal = Date().addingTimeInterval(3600)
 
     let sourceWorkoutID: UUID
     var fallbackWorkout: PlannedSession? = nil
@@ -422,6 +472,7 @@ struct TrainTogetherLiveDraftRoomView: View {
                     tabBar
                     if selectedTab == .workout {
                         workoutContent(workout, draft: draft)
+                        scheduleCard(workout, draft: draft)
                         approvalCard(draft)
                         if draft.isPhysical { meetingCard(workout) }
                     } else if selectedTab == .history {
@@ -525,14 +576,24 @@ struct TrainTogetherLiveDraftRoomView: View {
             }
         }
         .onChange(of: live.draft?.revision) { _, _ in
-            guard isOwner, var updated = live.workout,
-                  let local = session.standalonePlannedSessions.first(where: { $0.id == updated.id })
+            guard let updated = live.workout,
+                  let local = session.standalonePlannedSessions.first(where: {
+                      isOwner ? $0.id == updated.id : $0.sharedSourceSessionID == sourceWorkoutID &&
+                          $0.sharedSourceOwnerID == live.draft?.ownerID
+                  })
             else { return }
-            updated.gearIDs = local.gearIDs
-            updated.spotifyPlaylist = local.spotifyPlaylist
-            updated.spotifyAutoplayOnStart = local.spotifyAutoplayOnStart
-            updated.spotifyIntervalTrack = local.spotifyIntervalTrack
-            session.updateStandalonePlannedSession(updated)
+            if isOwner {
+                var copy = updated
+                copy.gearIDs = local.gearIDs
+                copy.spotifyPlaylist = local.spotifyPlaylist
+                copy.spotifyAutoplayOnStart = local.spotifyAutoplayOnStart
+                copy.spotifyIntervalTrack = local.spotifyIntervalTrack
+                session.updateStandalonePlannedSession(copy)
+            } else if local.scheduledStart != updated.scheduledStart {
+                var copy = local
+                copy.scheduledStart = updated.scheduledStart
+                session.updateStandalonePlannedSession(copy)
+            }
         }
     }
 
@@ -786,6 +847,77 @@ struct TrainTogetherLiveDraftRoomView: View {
         .athlthTrainTogetherCard(subtle: true)
     }
 
+    private func scheduleCard(_ workout: PlannedSession, draft: TrainTogetherLiveDraft) -> some View {
+        let mayNegotiate = matchingSession == nil && draft.cancelledAt == nil &&
+            (draft.ownerID == session.profile.userID || draft.partnerID == session.profile.userID)
+        return ATHLTHTrainTogetherSurface {
+            Label("Dato og klokkeslett", systemImage: "calendar").font(.headline)
+            if let start = workout.scheduledStart {
+                Text(start.formatted(date: .complete, time: .shortened))
+                    .font(.subheadline.weight(.semibold))
+            } else {
+                Text("Tidspunkt ikke avtalt").font(.subheadline)
+            }
+            if let proposed = draft.proposedDate, let proposer = draft.proposedStartBy {
+                Divider()
+                Label("Nytt datoforslag", systemImage: "calendar.badge.clock")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(accent)
+                Text(proposed.formatted(date: .complete, time: .shortened))
+                    .font(.headline)
+                Text(proposer == session.profile.userID
+                    ? "Venter på svar fra " + name(otherID(draft))
+                    : name(proposer) + " foreslår et nytt tidspunkt.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if mayNegotiate && proposer != session.profile.userID {
+                    Button {
+                        Task { _ = await live.negotiateStart(nil, accept: true, basedOn: draft.revision) }
+                    } label: {
+                        Label("Godta ny dato", systemImage: "checkmark.circle")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent).tint(accent)
+                    .disabled(live.isWorking || proposed <= Date())
+                }
+            }
+            if mayNegotiate {
+                if let revision = dateProposalRevision {
+                    DatePicker("Ny dato", selection: $dateProposal, in: Date()...,
+                               displayedComponents: [.date, .hourAndMinute])
+                    HStack {
+                        Button("Avbryt") { dateProposalRevision = nil }
+                            .buttonStyle(.bordered)
+                        Spacer()
+                        Button("Send forslag") {
+                            Task {
+                                if await live.negotiateStart(dateProposal, accept: false, basedOn: revision) {
+                                    dateProposalRevision = nil
+                                }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent).tint(accent)
+                        .disabled(live.isWorking || dateProposal <= Date() || revision != draft.revision)
+                    }
+                    if revision != draft.revision {
+                        Text("Økten er endret. Lukk og åpne datovalget på nytt.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Button {
+                        dateProposal = max(draft.proposedDate ?? workout.scheduledStart ?? Date(),
+                                           Date().addingTimeInterval(3600))
+                        dateProposalRevision = draft.revision
+                    } label: {
+                        Label(draft.proposedDate == nil ? "Foreslå ny dato" : "Foreslå en annen dato",
+                              systemImage: "calendar.badge.plus")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered).tint(accent)
+                    .disabled(live.isWorking)
+                }
+            }
+        }
+    }
+
     private func approvalCard(_ draft: TrainTogetherLiveDraft) -> some View {
         let mineApproved = isOwner ? draft.ownerApproved : draft.partnerApproved
         return ATHLTHTrainTogetherSurface {
@@ -798,7 +930,10 @@ struct TrainTogetherLiveDraftRoomView: View {
             approvalRow(name(draft.ownerID), approved: draft.ownerApproved)
             Divider()
             approvalRow(name(draft.partnerID), approved: draft.partnerApproved)
-            if draft.bothApproved {
+            if draft.proposedStart != nil {
+                Label("Avklar datoforslaget før dere godkjenner økten.", systemImage: "calendar.badge.clock")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } else if draft.bothApproved {
                 Label(tr("Both have approved. Ready lobby can be opened.",
                          "Begge har godkjent. Klar-lobbyen kan åpnes."),
                       systemImage: "checkmark.seal.fill")
