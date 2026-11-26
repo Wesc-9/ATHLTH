@@ -111,23 +111,55 @@ struct ATHLTHStudioPlannerHomeView: View {
                     )
                 )
 
-            // Tonal contour lines replace decorative imagery and gradients.
-            GeometryReader { geometry in
-                Path { path in
-                    for index in 0..<13 {
-                        let y = CGFloat(index) * 23 + geometry.size.height * 0.13
-                        path.move(to: CGPoint(x: geometry.size.width * 0.42, y: y))
-                        path.addCurve(
-                            to: CGPoint(x: geometry.size.width + 28, y: y + 18),
-                            control1: CGPoint(x: geometry.size.width * 0.62, y: y - 28),
-                            control2: CGPoint(x: geometry.size.width * 0.76, y: y + 40)
-                        )
-                    }
+            if session.activePlan == nil {
+                // Existing bundled artwork fills the card without affecting layout.
+                GeometryReader { geometry in
+                    Image("ATHLTHHillRun")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
                 }
-                .stroke(.white.opacity(0.055), lineWidth: 1)
+                .overlay {
+                    LinearGradient(
+                        stops: [
+                            .init(color: dark.opacity(0.97), location: 0),
+                            .init(color: dark.opacity(0.85), location: 0.29),
+                            .init(color: dark.opacity(0.49), location: 0.65),
+                            .init(color: dark.opacity(0.22), location: 1)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                }
+                .overlay {
+                    LinearGradient(
+                        colors: [dark.opacity(0.34), .clear, dark.opacity(0.48)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
+            } else {
+                // Preserve the quieter information-first active plan card.
+                GeometryReader { geometry in
+                    Path { path in
+                        for index in 0..<13 {
+                            let y = CGFloat(index) * 23 + geometry.size.height * 0.13
+                            path.move(to: CGPoint(x: geometry.size.width * 0.42, y: y))
+                            path.addCurve(
+                                to: CGPoint(x: geometry.size.width + 28, y: y + 18),
+                                control1: CGPoint(x: geometry.size.width * 0.62, y: y - 28),
+                                control2: CGPoint(x: geometry.size.width * 0.76, y: y + 40)
+                            )
+                        }
+                    }
+                    .stroke(.white.opacity(0.055), lineWidth: 1)
+                }
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
             }
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
 
             if let plan = session.activePlan {
                 activePlanContent(plan)
@@ -348,7 +380,7 @@ struct ATHLTHStudioPlannerHomeView: View {
                 norwegian: "Velg en av dine lagrede planer, eller opprett en ny."
             ))
             .font(.subheadline)
-            .foregroundStyle(muted)
+            .foregroundStyle(Color.white.opacity(0.88))
 
             Spacer()
 
