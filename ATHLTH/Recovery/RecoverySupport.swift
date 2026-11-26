@@ -3778,6 +3778,7 @@ struct RecoverySorenessLogView: View {
     @ObservedObject var store: RecoverySorenessStore
 
     @State private var draft = RecoveryPartialCheckInDraft()
+    @State private var draftOwner: UUID?
     @State private var showMuscleDetail = false
 
     var body: some View {
@@ -3962,9 +3963,10 @@ struct RecoverySorenessLogView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button {
-                    guard session.signedIn else { return }
+                    guard session.signedIn, draftOwner == session.profile.userID else { return }
+                    let scoped = RecoverySorenessStore(accountID: session.profile.userID)
+                    draft.apply(to: scoped)
                     store.reloadFromStorage()
-                    draft.apply(to: store)
                     notifications.reconcileDailyCheckIn(
                         enabled: settings.dailyCheckInRemindersEnabled,
                         accountID: session.profile.userID,
@@ -3992,8 +3994,11 @@ struct RecoverySorenessLogView: View {
             }
             .onAppear {
                 draft = RecoveryPartialCheckInDraft()
+                draftOwner = session.signedIn ? session.profile.userID : nil
                 showMuscleDetail = false
             }
+            .onChange(of: session.profile.userID) { _, _ in dismiss() }
+            .onChange(of: session.signedIn) { _, signedIn in if !signedIn { dismiss() } }
         }
     }
 
