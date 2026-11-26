@@ -113,14 +113,14 @@ private enum HomeActivityTypeFilter:
     }
 }
 
-private enum HomeActivityStreamSource {
+private enum HomeActivityStreamSource: Equatable {
     case mine(SocialPublishableWorkout)
     case following(SocialFeedItem)
     case garmin(account: UUID, activity: GarminImportedActivity)
 }
 
 private struct HomeActivityStreamItem:
-    Identifiable {
+    Identifiable, Equatable {
     let source: HomeActivityStreamSource
 
     var id: String {
@@ -488,6 +488,37 @@ enum HomePersonalWorkoutCatalog {
     }
 }
 
+// Only immutable identifiers and timestamps leave the main actor. No
+// SocialStore, HealthKit objects or private route artwork cross this boundary.
+struct HomeRecentFollowingCandidate: Sendable {
+    let index: Int
+    let date: Date
+    let sessionID: UUID?
+}
+
+enum HomeRecentFollowingSelection {
+    static func indices(
+        _ candidates: [HomeRecentFollowingCandidate],
+        excluding ownSessionIDs: Set<UUID>,
+        limit: Int
+    ) -> [Int] {
+        guard limit > 0 else { return [] }
+        var seen = ownSessionIDs
+        var selected: [Int] = []
+        // Original feed order breaks ties, as in the stable newest-first sort.
+        let ordered = candidates.sorted {
+            $0.date == $1.date ? $0.index < $1.index : $0.date > $1.date
+        }
+        for candidate in ordered {
+            if let sessionID = candidate.sessionID,
+               !seen.insert(sessionID).inserted { continue }
+            selected.append(candidate.index)
+            if selected.count == limit { break }
+        }
+        return selected
+    }
+}
+
 @MainActor
 private enum HomeActivityStreamBuilder {
     /// Group by the authoritative shared session ID, never by approximate
@@ -522,14 +553,45 @@ private enum HomeActivityStreamBuilder {
                 return seenSessions.insert(sharedID).inserted
             }
     }
-    /// Bounded newest-first insertion. Home needs only six rows (plus the
-    /// newest opposite-scope item); never sort the complete social feed just
-    /// because a like, a Health sample or a Home metric changes.
-    static func recentPreview(
+    /// Capture the authorized in-memory feed on the main actor, then sort
+    /// and deduplicate only the small, value-only projection off the UI thread.
+    static func recentFollowing(
         mine: [SocialPublishableWorkout],
         social: SocialStore,
+        feed: [SocialFeedItem],
+        limit: Int = 6
+    ) async -> [SocialFeedItem] {
+        let owner = social.currentUserID
+        let localIDs = Set(mine.map(\.id))
+        let ownSessionIDs = Set(social.workoutSessions.compactMap { session -> UUID? in
+            guard session.creatorID == owner,
+                  let sourceID = session.sourceWorkoutID,
+                  localIDs.contains(sourceID) else { return nil }
+            return session.id
+        })
+        let candidates = feed.enumerated().compactMap { index, item -> HomeRecentFollowingCandidate? in
+            guard item.activity.kind == "workout", item.actor.userID != owner else { return nil }
+            return HomeRecentFollowingCandidate(index: index, date: item.activity.createdAt,
+                                                sessionID: item.activity.workoutSessionID)
+        }
+        let worker = Task.detached(priority: .utility) {
+            HomeRecentFollowingSelection.indices(candidates, excluding: ownSessionIDs, limit: limit)
+        }
+        let indices = await withTaskCancellationHandler {
+            await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+        guard !Task.isCancelled, social.currentUserID == owner else { return [] }
+        return indices.map { feed[$0] }
+    }
+
+    /// Bounded newest-first insertion; at most six following candidates are
+    /// needed to preserve the opposite-scope rule and fill the preview.
+    static func recentPreview(
+        mine: [SocialPublishableWorkout],
+        following: [SocialFeedItem],
         maximumCount: Int = 6,
-        feed: [SocialFeedItem]? = nil,
         privateGarmin: [HomeActivityStreamItem] = []
     ) -> [HomeActivityStreamItem] {
         let limit = max(0, maximumCount)
@@ -559,7 +621,7 @@ private enum HomeActivityStreamBuilder {
             consider(HomeActivityStreamItem(source: .mine(workout)))
         }
         for item in privateGarmin { consider(item) }
-        for item in uniqueFollowingFeed(mine: mine, social: social, feed: feed) {
+        for item in following {
             consider(HomeActivityStreamItem(source: .following(item)))
         }
 
@@ -1270,6 +1332,13 @@ struct HomePersonalRecentActivitySection:
     }
     #endif
     @State private var visibleItems: [HomeActivityStreamItem] = []
+    @State private var previewTask: Task<Void, Never>?
+    @State private var previewGeneration = UUID()
+    @State private var visibleAccountScope = ""
+
+    private var accountScope: String {
+        "\(session.profile.userID)|\(session.signedIn)|\(social.currentUserID?.uuidString ?? "local")"
+    }
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var availableFeedWidth: CGFloat = 0
     @State private var showingAllActivities = false
@@ -1314,12 +1383,13 @@ struct HomePersonalRecentActivitySection:
 
     var body: some View {
         #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-        let recent = visibleGarminOwner == garminAccount &&
+        let cached = visibleGarminOwner == garminAccount &&
             garminAccount.flatMap({ garminStore.snapshot(for: $0) }) != nil &&
             !visibleGarminItems.isEmpty ? visibleGarminItems : visibleItems
         #else
-        let recent = visibleItems
+        let cached = visibleItems
         #endif
+        let recent = visibleAccountScope == accountScope ? cached : []
         return VStack(
             alignment: .leading,
             spacing: 12
@@ -1335,13 +1405,16 @@ struct HomePersonalRecentActivitySection:
                 // still retains its full, independently sorted activity feed.
                 LazyVStack(spacing: 12) {
                     ForEach(recent) { item in
-                        verticalItem(item)
+                        // Every lazy row has a single stable layout root.
+                        VStack(spacing: 0) { verticalItem(item) }
                     }
                 }
                 .onGeometryChange(for: CGFloat.self) { geometry in
                     geometry.size.width
                 } action: { width in
-                    availableFeedWidth = width
+                    if abs(availableFeedWidth - width) >= 0.5 {
+                        availableFeedWidth = width
+                    }
                 }
                 .accessibilityIdentifier("athlth-home-recent-vertical-feed")
                 .zIndex(0)
@@ -1370,13 +1443,30 @@ struct HomePersonalRecentActivitySection:
             guard newPhase == .active else { return }
             Task { await refreshRecentWorkouts() }
         }
-        .onReceive(social.$feed) { updatedFeed in
-            // Reactions and new shared workouts still update promptly;
-            // unrelated Home observations no longer re-sort this feed.
-            rebuildVisibleItems(feed: updatedFeed)
+        .onChange(of: accountScope) { _, _ in
+            previewTask?.cancel()
+            previewGeneration = UUID()
+            visibleItems = []
+            myWorkouts = []
+            recentStrengthProfiles = [:]
+            #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+            visibleGarminItems = []
+            visibleGarminOwner = nil
+            #endif
+            rebuildRecentWorkouts()
+            rebuildVisibleItems(feed: social.feed)
         }
-        .onReceive(social.$workoutSessions) { _ in
-            // Shared-session grouping can change without a new feed post.
+        .onDisappear {
+            previewTask?.cancel()
+            previewGeneration = UUID()
+        }
+        .onReceive(
+            social.$feed.removeDuplicates()
+                .combineLatest(social.$workoutSessions.removeDuplicates())
+                .receive(on: DispatchQueue.main)
+        ) { _ in
+            // @Published emits before assignment. Read both committed values
+            // after delivery so shared-session grouping cannot use stale data.
             rebuildVisibleItems(feed: social.feed)
         }
         .onReceive(health.$workouts.removeDuplicates()) { _ in
@@ -1458,21 +1548,36 @@ struct HomePersonalRecentActivitySection:
         mine: [SocialPublishableWorkout]? = nil,
         feed: [SocialFeedItem]
     ) {
-        let refreshed = HomeActivityStreamBuilder.recentPreview(
-            mine: mine ?? myWorkouts,
-            social: social,
-            feed: feed
-        )
-        // This work is now on source updates, never on each scroll frame.
-        visibleItems = refreshed
-        #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
-        let garminItems = privateGarminItems
-        visibleGarminOwner = garminAccount
-        visibleGarminItems = garminItems.isEmpty ? [] : HomeActivityStreamBuilder.recentPreview(
-            mine: mine ?? myWorkouts, social: social, feed: feed,
-            privateGarmin: Array(garminItems.prefix(6))
-        )
-        #endif
+        previewTask?.cancel()
+        let generation = UUID()
+        previewGeneration = generation
+        let scope = accountScope
+        let local = mine ?? myWorkouts
+        previewTask = Task { @MainActor in
+            // Coalesce consecutive store publications before doing the work.
+            await Task.yield()
+            guard !Task.isCancelled, previewGeneration == generation else { return }
+            let following = await HomeActivityStreamBuilder.recentFollowing(
+                mine: local, social: social, feed: feed
+            )
+            guard !Task.isCancelled, previewGeneration == generation,
+                  accountScope == scope else { return }
+            let refreshed = HomeActivityStreamBuilder.recentPreview(
+                mine: local, following: following
+            )
+            if visibleItems != refreshed { visibleItems = refreshed }
+            #if ATHLTH_GARMIN_PERSONAL && (DEBUG || ATHLTH_GARMIN_INTERNAL_TEST)
+            let garminItems = privateGarminItems
+            let owner = garminAccount
+            let garminPreview = garminItems.isEmpty ? [] : HomeActivityStreamBuilder.recentPreview(
+                mine: local, following: following,
+                privateGarmin: Array(garminItems.prefix(6))
+            )
+            if visibleGarminOwner != owner { visibleGarminOwner = owner }
+            if visibleGarminItems != garminPreview { visibleGarminItems = garminPreview }
+            #endif
+            if visibleAccountScope != scope { visibleAccountScope = scope }
+        }
     }
 
     private var header: some View {
@@ -1658,6 +1763,7 @@ struct HomePersonalRecentActivitySection:
                         height: recentArtworkHeight,
                         embeddedInFeedCard: true
                     )
+                    .equatable()
                     .frame(maxWidth: .infinity)
                     .clipped()
                     .contentShape(Rectangle())
@@ -2720,6 +2826,7 @@ private struct ATHLTHProfilePublishedWorkoutCard: View {
                 HomeFollowingWorkoutDetailView(item: item)
             } label: {
                 HomeFollowingWorkoutArtwork(item: item, activity: activity, height: 122, embeddedInFeedCard: true)
+                    .equatable()
             }.buttonStyle(.plain)
 
             NavigationLink {
@@ -2757,13 +2864,22 @@ private struct ATHLTHProfilePublishedWorkoutCard: View {
 }
 
 private struct HomeFollowingWorkoutArtwork:
-    View {
+    View, Equatable {
     let item: SocialFeedItem
     let activity: WorkoutActivity
     let height: CGFloat
 
     var embeddedInFeedCard = false
     @State private var sharedRouteImage: UIImage?
+
+    // Reactions/comments are not artwork inputs. Keep the same rendered
+    // route and anatomy when only social engagement changes.
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.activity == rhs.activity &&
+        lhs.height == rhs.height &&
+        lhs.embeddedInFeedCard == rhs.embeddedInFeedCard &&
+        lhs.item.activity.metadata == rhs.item.activity.metadata
+    }
 
     private var strengthMuscleProfile:
         StrengthMuscleProfile {
