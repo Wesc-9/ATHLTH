@@ -923,96 +923,7 @@ struct GhostRaceHubView: View {
         }
     }
 
-    private var liveFriendEntry: some View {
-        NavigationLink {
-            GhostFriendRaceHubView()
-        } label: {
-            ATHLTHUnifiedCard {
-                HStack(spacing: 12) {
-                    Image(
-                        systemName:
-                            "person.2.wave.2.fill"
-                    )
-                    .font(.title3)
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .frame(
-                        width: 42,
-                        height: 42
-                    )
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                    )
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Race a friend",
-                                norwegian: "Konkurrer mot en venn"
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(.semibold)
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Use an existing friend Ghost challenge when you want a shared head-to-head session.",
-                                norwegian:
-                                    "Bruk en eksisterende Ghost-utfordring med en venn når du vil ha en delt én-mot-én-økt."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                    }
-
-                    Spacer()
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(.caption.bold())
-                    .foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-            }
-        }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
-        .accessibilityLabel(
-            ATHLTHLocalization.choose(
-                english: "Race a friend",
-                norwegian: "Konkurrer mot en venn"
-            )
-        )
-        .accessibilityHint(
-            ATHLTHLocalization.choose(
-                english:
-                    "Open friend Ghost Races",
-                norwegian:
-                    "Åpner Ghost Race med venner"
-            )
-        )
-    }
-
-    // A visible shared run is a live reference, not proof that its owner
-    // agreed to a synchronized duel. Friend invites handle mutual consent.
     private var sharedLiveRunningSessions: [ATHLTHLiveWorkoutSession] {
         realtime.visibleLiveSessions.filter {
             $0.activity == "running" &&
@@ -1070,25 +981,14 @@ struct GhostRaceHubView: View {
                         .multilineTextAlignment(.center)
 
                         Text(ATHLTHLocalization.choose(
-                            english: "Only runners who enable live sharing are visible. You can still invite a friend.",
-                            norwegian: "Bare løpere som har aktivert deling vises. Du kan fortsatt invitere en venn."
+                            english: "Only runners who enable live sharing are visible. To organise a duel, use Competition above.",
+                            norwegian: "Bare løpere som har aktivert deling vises. Bruk Duell ovenfor for å avtale en konkurranse."
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .multilineTextAlignment(.center)
 
-                        NavigationLink {
-                            GhostFriendRaceHubView(openInvitationOnAppear: true)
-                        } label: {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Invite a friend",
-                                norwegian: "Inviter en venn"
-                            ), systemImage: "person.badge.plus")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 46)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
+
                     }
                     .frame(maxWidth: .infinity)
                     .padding(16)
@@ -2030,63 +1930,6 @@ struct GhostRaceHubView: View {
         }
     }
 
-    private var friendSection: some View {
-        ATHLTHUnifiedCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.2.fill")
-                        .font(.title3)
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 44, height: 44)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 13
-                            )
-                        )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Race a friend")
-                            .font(.headline)
-
-                        Text(
-                            "Send a privacy-filtered ghost from one of your runs, or accept a friend’s ghost and race it live."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-                }
-
-                NavigationLink {
-                    GhostFriendRaceHubView()
-                } label: {
-                    Label(
-                        "Open friend Ghost Races",
-                        systemImage: "figure.run.square.stack.fill"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.vitality)
-                .controlSize(.large)
-
-                NavigationLink {
-                    ChallengeCreationView()
-                } label: {
-                    Label(
-                        "Standard challenge",
-                        systemImage: "trophy.fill"
-                    )
-                    .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(ATHLTHTheme.accent)
-            }
-        }
-    }
 
     private func start(
         _ workout: WorkoutSummary
