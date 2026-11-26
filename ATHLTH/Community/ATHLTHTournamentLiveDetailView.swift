@@ -20,6 +20,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.scenePhase) private var scenePhase
 
     let tournament: ATHLTHTournamentRemote
@@ -109,6 +110,10 @@ struct ATHLTHTournamentLiveDetailView: View {
                         .background(ATHLTHArenaV3Style.panel())
                 }
                 if current.status == "inviting" { invitationSection }
+                if current.status == "active", current.raceRules.routeID != nil,
+                   myEntry?.response == "accepted" {
+                    competitionLiveGhostCard
+                }
                 Picker("Turnering", selection: $selection) {
                     ForEach(current.singleEventMode ?
                             [.overview, .lobby] :
@@ -269,6 +274,45 @@ struct ATHLTHTournamentLiveDetailView: View {
                 await reload()
             }
         }
+    }
+
+    private var competitionLiveGhostCard: some View {
+        let opponents = Set(confirmedEntries.map(\.userID)).subtracting([userID])
+        let sessions = realtime.visibleLiveSessions.filter { candidate in
+            candidate.isActive && candidate.activity == "running" &&
+            opponents.contains(candidate.ownerID) &&
+            candidate.routeKey == current.raceRules.routeID &&
+            candidate.ghostChallengeID == nil &&
+            current.raceSignalAt.map { signal in candidate.startedAt >= signal } == true
+        }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Live Ghost Race").font(.headline)
+            Text(current.raceRules.routeName).font(.subheadline)
+            Text("Følg en deltaker som deler et aktivt løp på konkurranseruten. Dette starter ikke en ny treningsøkt.")
+                .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+            ForEach(sessions) { opponent in
+                Button {
+                    realtime.selectLiveGhost(opponent)
+                } label: {
+                    HStack {
+                        Text(names[opponent.ownerID] ?? "Deltaker")
+                        Spacer()
+                        Image(systemName: realtime.selectedLiveGhostSession?.id == opponent.id
+                              ? "checkmark.circle.fill" : "chevron.right")
+                    }
+                }.buttonStyle(.bordered)
+            }
+            if sessions.isEmpty {
+                Text("Ingen synlige løpere på ruten akkurat nå.").font(.caption)
+            }
+            Button("Oppdater løpere") {
+                Task { await realtime.refreshVisibleLiveSessions() }
+            }.font(.caption)
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHArenaV3Style.panel())
+        .task(id: current.id) { await realtime.refreshVisibleLiveSessions() }
     }
 
     private var heading: some View {
