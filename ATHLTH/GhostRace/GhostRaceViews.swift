@@ -4070,6 +4070,11 @@ struct ATHLTHSoloGhostSetupView: View {
                 } label: {
                     choice("Tidligere GPS-økt", detail: "Løp mot din egen registrerte GPS-replay.", icon: "clock.arrow.circlepath")
                 }.buttonStyle(.plain)
+                NavigationLink {
+                    ATHLTHSharedSoloGhostView(onStarted: onStarted)
+                } label: {
+                    choice("Delte GPS-økter", detail: "Løp alene mot en GPS-økt en venn har delt direkte med deg.", icon: "person.2")
+                }.buttonStyle(.plain)
             }
             .padding(18).frame(maxWidth: 760).frame(maxWidth: .infinity)
         }
@@ -4487,5 +4492,123 @@ private struct ATHLTHSoloGhostPaceSetupView: View {
     private func formatDuration(_ seconds: Double) -> String {
         let n = Int(seconds.rounded())
         return String(format: "%d:%02d:%02d", n / 3_600, (n / 60) % 60, n % 60)
+    }
+}
+
+
+/// Only accepted, unexpired, recipient-scoped personal GPS invitations
+/// may serve as a solo reference. Never start or credit an Arena round.
+private struct ATHLTHSharedSoloGhostView: View {
+    let onStarted: () -> Void
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @StateObject private var shares = GhostFriendRaceStore()
+    @State private var device: WorkoutCaptureDevice = .iPhone
+    @State private var selected: GhostFriendRaceChallengeRecord?
+    @State private var starting = false
+    @State private var error: String?
+
+    private var available: [GhostFriendRaceChallengeRecord] {
+        guard session.signedIn, shares.currentUserID == session.profile.userID,
+              shares.errorMessage == nil else { return [] }
+        return shares.incoming.filter {
+            $0.recipientID == session.profile.userID && $0.status == .accepted &&
+            $0.expiresAt > Date() && $0.arenaRoundID == nil &&
+            ($0.sourceKind == nil || $0.sourceKind == "previous_workout") &&
+            social.isMutualFollow($0.senderID)
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ATHLTHTrainPageTitle(title: "Delte GPS-økter")
+                Text("Kun godtatte, aktive GPS-invitasjoner fra venner. Du løper alene, uten fellesstart eller konkurransepoeng.")
+                    .font(.subheadline).foregroundStyle(ATHLTHTheme.mutedText)
+                Picker("Registrer med", selection: $device) {
+                    Text("iPhone").tag(WorkoutCaptureDevice.iPhone)
+                    Text("Apple Watch").tag(WorkoutCaptureDevice.appleWatch)
+                }.pickerStyle(.segmented)
+                if shares.isLoading {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else if let message = shares.errorMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                } else if available.isEmpty {
+                    ContentUnavailableView("Ingen delte GPS-økter", systemImage: "person.2",
+                        description: Text("En venn må dele en GPS-økt med deg gjennom en Ghost-invitasjon først."))
+                }
+                ForEach(available) { item in
+                    Button { selected = item } label: {
+                        ATHLTHUnifiedCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(social.mutualFollows.first(where: { $0.userID == item.senderID })?.resolvedName ?? "Venn")
+                                        .font(.headline)
+                                    Text(String(format: "%.2f km", item.distanceMeters / 1_000) +
+                                        " · " + GhostTargetTimeFormatter.string(item.referenceDurationSeconds))
+                                        .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }.foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+                    }.buttonStyle(.plain).disabled(starting)
+                }
+            }.padding(18).frame(maxWidth: 760).frame(maxWidth: .infinity)
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: session.profile.userID) {
+            selected = nil
+            await social.refresh()
+            await shares.refresh()
+        }
+        .refreshable { await social.refresh(); await shares.refresh() }
+        .confirmationDialog("Start alene mot delt GPS-økt?",
+            isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } }),
+            titleVisibility: .visible, presenting: selected) { item in
+                Button("Start Ghost Race") { Task { await start(item) } }
+                Button("Avbryt", role: .cancel) {}
+            }
+        .alert("Ghost Race", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(error ?? "") }
+    }
+
+    private func start(_ item: GhostFriendRaceChallengeRecord) async {
+        guard !starting else { return }
+        starting = true
+        defer { starting = false }
+        let account = session.profile.userID
+        // Revalidate server-side visibility and revocation immediately before launch.
+        await social.refresh()
+        await shares.refresh()
+        guard !Task.isCancelled, account == session.profile.userID,
+              let fresh = available.first(where: { $0.id == item.id }) else {
+            error = "GPS-økten er ikke lenger tilgjengelig."
+            return
+        }
+        guard phoneWorkout.active == nil, !phoneWorkout.hasPendingLaunch,
+              !watchConnection.workoutLaunchInProgress,
+              device != .appleWatch || watchConnection.isReady else {
+            error = "Avslutt aktiv økt eller koble til Apple Watch før start."
+            return
+        }
+        do {
+            realtime.selectLiveGhost(nil)
+            try await GhostRaceStartService.start(reference: fresh.reference(),
+                ownerID: account,
+                opponentName: social.mutualFollows.first(where: { $0.userID == fresh.senderID })?.resolvedName,
+                ghostRace: ghostRace, watchConnection: watchConnection,
+                phoneWorkout: phoneWorkout, captureDevice: device, settings: settings)
+            onStarted()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
