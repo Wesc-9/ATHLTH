@@ -192,6 +192,8 @@ final class ATHLTHMetricDeliveryObserver: NSObject, MXMetricManagerSubscriber, @
     private static let diagnosticDateKey = "athlth.diagnostics.metricKit.lastDiagnosticDate"
     private static let crashKey = "athlth.diagnostics.metricKit.lastCrashCount"
     private static let hangKey = "athlth.diagnostics.metricKit.lastHangCount"
+    private static let memoryKey = "athlth.diagnostics.metricKit.lastPeakMemoryMB"
+    private static let cpuKey = "athlth.diagnostics.metricKit.lastCPUSeconds"
 
     @MainActor static func install() {
         guard !installed else { return }
@@ -204,9 +206,15 @@ final class ATHLTHMetricDeliveryObserver: NSObject, MXMetricManagerSubscriber, @
     static var lastCrashCount: Int { UserDefaults.standard.integer(forKey: crashKey) }
     static var lastHangCount: Int { UserDefaults.standard.integer(forKey: hangKey) }
 
+    static var lastPeakMemoryMB: Double? { UserDefaults.standard.object(forKey: memoryKey) as? Double }
+    static var lastCPUSeconds: Double? { UserDefaults.standard.object(forKey: cpuKey) as? Double }
+
     func didReceive(_ payloads: [MXMetricPayload]) {
-        guard !payloads.isEmpty else { return }
-        UserDefaults.standard.set(Date(), forKey: Self.metricDateKey)
+        guard let latest = payloads.max(by: { $0.timeStampEnd < $1.timeStampEnd }) else { return }
+        let defaults = UserDefaults.standard
+        defaults.set(latest.memoryMetrics?.peakMemoryUsage.converted(to: .megabytes).value, forKey: Self.memoryKey)
+        defaults.set(latest.cpuMetrics?.cumulativeCPUTime.converted(to: .seconds).value, forKey: Self.cpuKey)
+        defaults.set(latest.timeStampEnd, forKey: Self.metricDateKey)
         ATHLTHPerformance.event("MetricKitMetricsReceived")
     }
 
