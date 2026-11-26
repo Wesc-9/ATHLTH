@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Full-size Studio destinations for secondary iPad sidebar items.
-/// Profile and Ghost Race use the detail column like Arena and Clubs.
+/// Profile and Competition use the detail column like Clubs.
 /// Only Messages keeps its independent docked inspector.
 struct ATHLTHiPadSidebarPageView: View {
     let destination: ATHLTHSideMenuDestination
@@ -118,9 +118,9 @@ struct ATHLTHiPadSidebarPageView: View {
         case .trainTogether:
             TrainTogetherMarketplaceView()
         case .arena:
-            ATHLTHArenaV3HomeView()
+            ATHLTHCompetitionEntryView()
         case .ghostRace:
-            GhostRaceHubView()
+            ATHLTHCompetitionEntryView(openGhostInitially: true)
         case .profile:
             ATHLTHProfileView()
         case .clubs:
