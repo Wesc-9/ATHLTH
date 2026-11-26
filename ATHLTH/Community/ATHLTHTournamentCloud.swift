@@ -573,6 +573,10 @@ struct ATHLTHTournamentCloudService {
     }
 
     func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
+        guard ATHLTHTournamentActivity.canCreate(with: Set(draft.allowedActivities)) else {
+            throw NSError(domain: "ATHLTHCompetition", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Velg kun tilgjengelige konkurransegrener: løping, gange eller styrke."])
+        }
         let duel = draft.competitionSettings.race.duelMode == true
         guard (duel ? (draft.singleEventMode && draft.participants.count == 2) :
             draft.participants.count >= (draft.singleEventMode ? 3 : draft.format == .cup ? 4 : 2)) else {
