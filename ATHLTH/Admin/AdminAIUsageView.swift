@@ -100,6 +100,7 @@ struct AdminAIUsageView: View {
 
     private var content: some View {
         List {
+            ATHLTHIntelligenceAdminPilotView(isAdministrator: session.currentRole.canAccessControlCenter)
             Section {
                 Label(
                     "Live provider quota",
