@@ -19,6 +19,46 @@ private enum ATHLTHTournamentInviteSource: String, CaseIterable, Identifiable {
     }
 }
 
+/// Non-observable bookkeeping: scrolling and debounce work must not
+/// invalidate the entire competition editor.
+@MainActor
+private final class ATHLTHCompetitionRulesWork {
+    var scrollID: String?
+    var pendingCheckpoint: Task<Void, Never>?
+    init(scrollID: String?) { self.scrollID = scrollID }
+
+    func cancelCheckpoint() {
+        pendingCheckpoint?.cancel()
+        pendingCheckpoint = nil
+    }
+}
+
+/// SwiftUI scroll bindings can change repeatedly during a drag. Keep that
+/// state in this small container, not in the editor or its presenting screen.
+private struct ATHLTHCompetitionRulesScroll<Content: View>: View {
+    let work: ATHLTHCompetitionRulesWork
+    let content: Content
+    @State private var scrollID: String?
+
+    init(work: ATHLTHCompetitionRulesWork, @ViewBuilder content: () -> Content) {
+        self.work = work
+        self.content = content()
+        _scrollID = State(initialValue: work.scrollID)
+    }
+
+    var body: some View {
+        ScrollView {
+            content
+        }
+        .scrollPosition(id: $scrollID, anchor: .top)
+        .onChange(of: scrollID) { _, value in
+            if let value { work.scrollID = value }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
+    }
+}
+
 struct ATHLTHTournamentCreator: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -71,11 +111,11 @@ struct ATHLTHTournamentCreator: View {
         exerciseCount = totalExerciseCount
     }
     @State private var expandedScoringExample = false
-    @State private var rulesScrollID: String?
+    @State private var rulesWork: ATHLTHCompetitionRulesWork
     @State private var isReviewing = false
     private static let reviewCheckpointPrefix = "summary:"
     private var checkpointScrollID: String? {
-        isReviewing ? Self.reviewCheckpointPrefix + (rulesScrollID ?? "") : rulesScrollID
+        isReviewing ? Self.reviewCheckpointPrefix + (rulesWork.scrollID ?? "") : rulesWork.scrollID
     }
 
     /// Review may include a valid draft with an unsupported measurement.
@@ -236,7 +276,7 @@ struct ATHLTHTournamentCreator: View {
         let restoredRule = restoringReview
             ? String((restoredScrollID ?? "").dropFirst(Self.reviewCheckpointPrefix.count))
             : restoredScrollID
-        _rulesScrollID = State(initialValue: restoredRule == "" || restoredRule == "review" ? nil : restoredRule)
+        _rulesWork = State(initialValue: ATHLTHCompetitionRulesWork(scrollID: restoredRule == "" || restoredRule == "review" ? nil : restoredRule))
         _draftID = State(initialValue: continuation?.id ?? UUID())
         _draftCreatedAt = State(initialValue: continuation?.createdAt ?? Date())
         self.onSave = onSave
@@ -405,8 +445,10 @@ struct ATHLTHTournamentCreator: View {
                         if isReviewing {
                             returnToRules()
                         } else {
-                            onCheckpoint?(makeDraft(forCheckpoint: true), checkpointScrollID)
-                            onBack?(makeDraft(forCheckpoint: true))
+                            rulesWork.cancelCheckpoint()
+                            let draft = makeDraft(forCheckpoint: true)
+                            onCheckpoint?(draft, checkpointScrollID)
+                            onBack?(draft)
                             dismiss()
                         }
                     }
@@ -479,15 +521,16 @@ struct ATHLTHTournamentCreator: View {
                 if !Task.isCancelled { rematchSearchError = "Kunne ikke hente øvelsesdetaljer. Prøv igjen når du er tilkoblet." }
             }
         }
-        .onChange(of: competitionSettings) { _, _ in checkpoint() }
-        .onChange(of: allowedActivities) { _, _ in checkpoint() }
-        .onChange(of: rulesAuthority) { _, _ in checkpoint() }
-        .onChange(of: proofMode) { _, _ in checkpoint() }
-        .onChange(of: exerciseCount) { _, _ in checkpoint() }
-        .onChange(of: exerciseMode) { _, _ in checkpoint() }
-        .onChange(of: additionalCheckpointFields) { _, _ in checkpoint() }
+        .onChange(of: competitionSettings) { _, _ in scheduleCheckpoint() }
+        .onChange(of: allowedActivities) { _, _ in scheduleCheckpoint() }
+        .onChange(of: rulesAuthority) { _, _ in scheduleCheckpoint() }
+        .onChange(of: proofMode) { _, _ in scheduleCheckpoint() }
+        .onChange(of: exerciseCount) { _, _ in scheduleCheckpoint() }
+        .onChange(of: exerciseMode) { _, _ in scheduleCheckpoint() }
+        .onChange(of: additionalCheckpointFields) { _, _ in scheduleCheckpoint() }
         .onChange(of: scenePhase) { _, phase in if phase != .active { checkpoint() } }
-        .onAppear { checkpoint() }
+        .onAppear { scheduleCheckpoint() }
+        .onDisappear { rulesWork.cancelCheckpoint() }
         .environment(\.colorScheme, .light)
         .interactiveDismissDisabled(fixedInvitees != nil)
         .task {
@@ -577,7 +620,7 @@ struct ATHLTHTournamentCreator: View {
     }
 
     private var rulesScreen: some View {
-        ScrollView {
+        ATHLTHCompetitionRulesScroll(work: rulesWork) {
             LazyVStack(alignment: .leading, spacing: 16) {
                     if fixedInvitees == nil {
                         titleSection.id("title")
@@ -697,9 +740,6 @@ struct ATHLTHTournamentCreator: View {
                 .frame(maxWidth: 650)
                 .frame(maxWidth: .infinity)
             }
-            .scrollPosition(id: $rulesScrollID, anchor: .top)
-            .scrollDismissesKeyboard(.interactively)
-            .scrollIndicators(.hidden)
     }
 
     private var reviewScreen: some View {
@@ -761,6 +801,7 @@ struct ATHLTHTournamentCreator: View {
             }
             HStack(spacing: 12) {
                 Button {
+                    rulesWork.cancelCheckpoint()
                     onSave(makeDraft())
                     dismiss()
                 } label: {
@@ -806,13 +847,27 @@ struct ATHLTHTournamentCreator: View {
         return fields
     }
 
+    private func scheduleCheckpoint() {
+        guard !publishing, onCheckpoint != nil else { return }
+        rulesWork.cancelCheckpoint()
+        // Coalesce multiple bindings changed by one interaction, and typing.
+        rulesWork.pendingCheckpoint = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(350)) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            checkpoint()
+        }
+    }
+
     private func checkpoint() {
+        rulesWork.cancelCheckpoint()
         guard !publishing, let onCheckpoint else { return }
         onCheckpoint(makeDraft(forCheckpoint: true), checkpointScrollID)
     }
 
     private func makeDraft(forCheckpoint: Bool = false) -> ATHLTHTournamentDraft {
         var configured = competitionSettings
+        if !forCheckpoint {
         if configured.race.discipline == .workout {
             configured.race.scoringMode = configured.race.effectiveScoringMode
             configured.race.pointsPerExercise = configured.race.pointsPerExercise ?? 1
@@ -840,6 +895,7 @@ struct ATHLTHTournamentCreator: View {
             configured.unansweredPolicy = .cancel
             configured.invitationPermission = .admin
             configured.joinApproval = .admin
+        }
         }
         var draft = ATHLTHTournamentDraft(
             id: draftID,
@@ -893,6 +949,7 @@ struct ATHLTHTournamentCreator: View {
     @MainActor
     private func publishTournament() async {
         guard isReviewing, canSave, !publishing else { return }
+        checkpoint()
         publishing = true
         defer { publishing = false }
         do {
