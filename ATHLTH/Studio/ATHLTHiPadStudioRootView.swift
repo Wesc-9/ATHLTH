@@ -193,6 +193,7 @@ struct ATHLTHiPadStudioRootView: View {
     @SceneStorage("athlth.studio.sidebarUserVisible") private var sidebarUserVisible = true
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var focusedPlanningDate: Date?
+    @AppStorage(ATHLTHShortcutNavigation.preferenceKey) private var shortcutNavigationToken = ""
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
     @State private var showingTrain = false
     @State private var studioStartChoice: ATHLTHStudioSchedule.Occurrence?
@@ -430,6 +431,20 @@ struct ATHLTHiPadStudioRootView: View {
 
     private var studioLifecycleContent: some View {
         studioPresentationContent
+        .task(id: "\(shortcutNavigationToken)|\(scenePhase == .active)|\(session.signedIn)") {
+            guard scenePhase == .active, session.signedIn,
+                  let route = ATHLTHShortcutNavigation.consume(shortcutNavigationToken) else { return }
+            switch route {
+            case .coach:
+                openStudio(.coach)
+            case .today:
+                openStudio(.train)
+                trainRequest = .today
+                showingTrain = true
+            case .plan:
+                openStudio(.planner)
+            }
+        }
         .onAppear {
             if !didRestoreStudioScene {
                 didRestoreStudioScene = true

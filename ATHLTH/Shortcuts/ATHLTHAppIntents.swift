@@ -1,6 +1,7 @@
 import AppIntents
 
 struct ATHLTHRecoveryIntent: AppIntent {
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
     static let title: LocalizedStringResource =
         "Check ATHLTH recovery"
 
@@ -27,6 +28,7 @@ struct ATHLTHRecoveryIntent: AppIntent {
 }
 
 struct ATHLTHNextWorkoutIntent: AppIntent {
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
     static let title: LocalizedStringResource =
         "Check next ATHLTH workout"
 
@@ -65,6 +67,7 @@ struct ATHLTHNextWorkoutIntent: AppIntent {
 }
 
 struct ATHLTHGoalIntent: AppIntent {
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
     static let title: LocalizedStringResource =
         "Check ATHLTH goal"
 
@@ -101,6 +104,48 @@ struct ATHLTHGoalIntent: AppIntent {
     }
 }
 
+struct ATHLTHOpenCoachIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open ATHLTH Coach"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.coach.enqueue()
+        return .result()
+    }
+}
+
+struct ATHLTHOpenTodayIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open today's ATHLTH training"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.today.enqueue()
+        return .result()
+    }
+}
+
+struct ATHLTHOpenPlanIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open ATHLTH training plan"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.plan.enqueue()
+        return .result()
+    }
+}
+
 struct ATHLTHAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -131,6 +176,27 @@ struct ATHLTHAppShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Goal progress",
             systemImageName: "target"
+        )
+
+        AppShortcut(
+            intent: ATHLTHOpenCoachIntent(),
+            phrases: ["Open Coach in \(.applicationName)", "Åpne Coach i \(.applicationName)"],
+            shortTitle: "Open Coach",
+            systemImageName: "sparkles"
+        )
+
+        AppShortcut(
+            intent: ATHLTHOpenTodayIntent(),
+            phrases: ["Show today's training in \(.applicationName)", "Vis dagens trening i \(.applicationName)"],
+            shortTitle: "Today's training",
+            systemImageName: "figure.run"
+        )
+
+        AppShortcut(
+            intent: ATHLTHOpenPlanIntent(),
+            phrases: ["Open my training plan in \(.applicationName)", "Åpne treningsplanen min i \(.applicationName)"],
+            shortTitle: "Training plan",
+            systemImageName: "calendar"
         )
     }
 }

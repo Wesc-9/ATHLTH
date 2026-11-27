@@ -134,6 +134,7 @@ struct ProductRootTabView: View {
     @State private var showingDailyCheckInFromNotification = false
     @State private var deferredTabReminderTask: Task<Void, Never>?
     @State private var showingCoachFromDock = false
+    @AppStorage(ATHLTHShortcutNavigation.preferenceKey) private var shortcutNavigationToken = ""
     @State private var showingSideMenu = false
     @State private var sideMenuModalDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuUtilityDestination: ATHLTHSideMenuDestination?
@@ -651,6 +652,20 @@ struct ProductRootTabView: View {
                         }
                 }
                 .presentationDragIndicator(.visible)
+            }
+            .task(id: "\(shortcutNavigationToken)|\(scenePhase == .active)|\(session.signedIn)") {
+                guard scenePhase == .active, session.signedIn,
+                      let route = ATHLTHShortcutNavigation.consume(shortcutNavigationToken) else { return }
+                switch route {
+                case .coach:
+                    showingCoachFromDock = true
+                case .today:
+                    trainNavigationRequest = .today
+                    selectedTab = 1
+                case .plan:
+                    trainNavigationRequest = .plan
+                    selectedTab = 1
+                }
             }
             .athlthStablePresentationBoundary()
     }
