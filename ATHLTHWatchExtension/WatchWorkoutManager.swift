@@ -5884,15 +5884,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if let message = smartCoachState.nextMotivation(
             settings: settings,
             elapsed: elapsedTime,
-            paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
+            paceSecondsPerKilometer: ATHLTHCoachSensorFreshness.validPace(
+                currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
+            ) ? currentPaceSecondsPerKilometer : nil,
             norwegian: norwegian,
             environment: ATHLTHCoachEnvironmentalContext(
                 routeRemainingMeters: usesOutdoorGPS
                     ? routeRemainingMeters : nil,
                 routeProgressPercent: usesOutdoorGPS
                     ? routeProgressPercent : nil,
-                terrain: usesOutdoorGPS
-                    ? smartCoachState.inferredTerrain : nil
+                terrain: usesOutdoorGPS && smartCoachState.hasReliableTerrainEvidence
+                    ? smartCoachState.inferredTerrain : nil,
+                stepIndex: currentStructuredRunningStep == nil ? nil : structuredStepIndex,
+                stepPhase: awaitingMainStart ? "warmup" : currentStructuredRunningStep?.phase,
+                stepRemainingSeconds: adaptiveReadout?.unit == .seconds ? adaptiveReadout?.remaining : nil,
+                aboveMeasuredHeartRateTarget: hasFreshHeartRate &&
+                    target?.heartRateEnabled == true &&
+                    (target?.heartRateMaximumBPM.map { heartRate > $0 } ?? false)
             )
         ) {
             speak(

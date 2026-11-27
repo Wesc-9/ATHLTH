@@ -4,6 +4,29 @@ import XCTest
 
 @MainActor
 final class ATHLTHCoachAdaptiveMotivationTests: XCTestCase {
+    func testStablePaceReturnAfterActualWarning() {
+        var state = ATHLTHCoachAdaptiveMotivation()
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.coachingMode = .custom
+        settings.pushWhenBelowTargetPace = true
+        settings.adaptiveCooldownSeconds = 60
+        func cue(_ elapsed: Double, _ pace: Double?, _ step: Int = 1) -> String? {
+            state.nextCue(settings: settings, elapsed: elapsed,
+                measuredPaceSecondsPerKilometer: pace,
+                targetSlowestPaceSecondsPerKilometer: 300,
+                measuredHeartRateBPM: nil, targetHeartRateMinimumBPM: nil,
+                stepIndex: step, stepPhase: "work", stepRemainingSeconds: 120,
+                reliableNotClimbing: false, norwegian: true)
+        }
+        XCTAssertNil(cue(0, 340))
+        XCTAssertNotNil(cue(21, 340))
+        XCTAssertNil(cue(50, 300))
+        XCTAssertNil(cue(60, nil))
+        XCTAssertNil(cue(72, 300))
+        XCTAssertEqual(cue(84, 300), "Du er tilbake nær måltempoet. Hold innsatsen kontrollert.")
+        XCTAssertNil(cue(160, 300))
+    }
+
     func testLiveDurationEditProtectsCountdownAndRecordedTime() {
         XCTAssertEqual(ATHLTHLiveStepDurationAdjustment.adjustedDuration(
             original: 120, elapsed: 50, delta: 30, phase: "recovery", countdownProtected: false), 150)

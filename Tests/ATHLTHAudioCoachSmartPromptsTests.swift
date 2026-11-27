@@ -23,6 +23,28 @@ final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
         XCTAssertEqual(settings.resolvedTargetZoneRepeat, 600)
     }
 
+    func testContextualMotivationRespectsEasyPhaseAndCountdown() {
+        var state = ATHLTHAudioCoachSmartState()
+        var config = ATHLTHAudioCoachSmartSettings()
+        config.motivationEnabled = true
+        config.encouragementStyle = .push
+        _ = state.nextMotivation(settings: config, elapsed: 60,
+            paceSecondsPerKilometer: 400, norwegian: true,
+            environment: .init(stepIndex: 1, stepPhase: "recovery"))
+        let work = state.nextMotivation(settings: config, elapsed: 120,
+            paceSecondsPerKilometer: 280, norwegian: true,
+            environment: .init(stepIndex: 2, stepPhase: "work"))
+        XCTAssertNotNil(work)
+        XCTAssertFalse(work?.contains("økt farten") == true)
+        XCTAssertNil(state.nextMotivation(settings: config, elapsed: 180,
+            paceSecondsPerKilometer: 280, norwegian: true,
+            environment: .init(stepIndex: 2, stepPhase: "work", stepRemainingSeconds: 10)))
+        let highPulse = state.nextMotivation(settings: config, elapsed: 240,
+            paceSecondsPerKilometer: 270, norwegian: true,
+            environment: .init(stepIndex: 3, stepPhase: "work", aboveMeasuredHeartRateTarget: true))
+        XCTAssertEqual(highPulse, "Behold kontrollen og tilpass innsatsen til hvordan du føler deg.")
+    }
+
     func testMotivationIsOptInAndDoesNotRepeatWithinOneSlot() {
         var state = ATHLTHAudioCoachSmartState()
         var config = ATHLTHAudioCoachSmartSettings()

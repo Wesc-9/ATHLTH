@@ -59,6 +59,10 @@ struct ATHLTHCoachEnvironmentalContext {
     var routeRemainingMeters: Double? = nil
     var routeProgressPercent: Double? = nil
     var terrain: ATHLTHCoachTerrain? = nil
+    var stepIndex: Int? = nil
+    var stepPhase: String? = nil
+    var stepRemainingSeconds: Double? = nil
+    var aboveMeasuredHeartRateTarget = false
 
     var nearVerifiedFinish: Bool {
         guard let remaining = routeRemainingMeters,
@@ -276,6 +280,8 @@ struct ATHLTHAudioCoachSmartState {
     }
     private var lastTerrainPhraseAt: Double = -.infinity
     private var announcedFinalStretch = false
+    private var previousMotivationStepIndex: Int?
+    private var previousMotivationPhase: String?
 
     mutating func reset() { self = Self() }
 
@@ -350,13 +356,33 @@ struct ATHLTHAudioCoachSmartState {
         environment: ATHLTHCoachEnvironmentalContext = .init()
     ) -> String? {
         guard elapsed.isFinite, elapsed >= 0 else { return nil }
+        let phase = environment.stepPhase?.lowercased()
+        let easyPhase = ["warmup", "cooldown", "recovery", "rest", "pause", "activerecovery"].contains(phase ?? "")
+        if environment.stepIndex != previousMotivationStepIndex || phase != previousMotivationPhase {
+            // An interval boundary is not a measured improvement in pace.
+            priorMinutePace = nil
+            previousMotivationStepIndex = environment.stepIndex
+            previousMotivationPhase = phase
+        }
+        // Consume the ordinary motivation slot during the protected countdown
+        // so that it cannot speak immediately afterwards as a stale cue.
+        if let remaining = environment.stepRemainingSeconds,
+           remaining.isFinite, remaining <= 15 {
+            priorMinutePace = nil
+            noteExternalPrompt(elapsed: elapsed, settings: settings)
+            return nil
+        }
+        if easyPhase || environment.aboveMeasuredHeartRateTarget {
+            priorMinutePace = nil
+        }
 
         if settings.motivationEnabled {
             let slot = Int(min(floor(elapsed / settings.validatedMotivationInterval),
                                Double(Int.max / 2)))
             if slot > lastMotivationSlot {
                 lastMotivationSlot = slot
-                let currentPace = validatedPace(paceSecondsPerKilometer)
+                let currentPace = easyPhase || environment.aboveMeasuredHeartRateTarget
+                    ? nil : validatedPace(paceSecondsPerKilometer)
                 let previousPace = priorMinutePace
                 priorMinutePace = currentPace
 
@@ -364,7 +390,20 @@ struct ATHLTHAudioCoachSmartState {
                     let style = settings.encouragementStyle ?? .encouragement
                     var proposed: String?
 
-                    if settings.isContextualFeedbackEnabled &&
+                    if environment.aboveMeasuredHeartRateTarget {
+                        // No push message while a fresh measurement is above
+                        // the configured target; dedicated zone alerts own it.
+                        proposed = norwegian ? "Behold kontrollen og tilpass innsatsen til hvordan du føler deg."
+                            : "Stay in control and adjust your effort to how you feel."
+                    } else if easyPhase {
+                        proposed = pickDistinct(norwegian
+                            ? ["Dette er en rolig del av økten. Finn en behagelig rytme.",
+                               "Ta vare på kreftene og hold innsatsen kontrollert.",
+                               "Bra jobbet. Følg planen og la tempoet være behagelig."]
+                            : ["This is an easy part of the workout. Find a comfortable rhythm.",
+                               "Save your energy and keep the effort controlled.",
+                               "Nice work. Follow the plan and keep the pace comfortable."])
+                    } else if settings.isContextualFeedbackEnabled &&
                        environment.nearVerifiedFinish && !announcedFinalStretch {
                             announcedFinalStretch = true
                             proposed = pickDistinct(norwegian
@@ -473,6 +512,10 @@ struct ATHLTHAudioCoachSmartState {
         let variation = Int.random(in: -(base / 4)...(base / 4))
         nextRandomAt = elapsed + Double(base + variation)
         lastSpokenAt = elapsed
+        if easyPhase || environment.aboveMeasuredHeartRateTarget {
+            return norwegian ? "Hold innsatsen kontrollert og følg din egen rytme."
+                : "Keep the effort controlled and follow your own rhythm."
+        }
         return selectPhrase(
             settings: settings, norwegian: norwegian,
             style: settings.encouragementStyle ?? .encouragement

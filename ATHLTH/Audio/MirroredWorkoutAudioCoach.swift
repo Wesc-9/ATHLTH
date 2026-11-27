@@ -945,11 +945,21 @@ final class MirroredWorkoutAudioCoach:
         if let message = smartCoachState.nextMotivation(
             settings: settings,
             elapsed: snapshot.elapsedTime,
-            paceSecondsPerKilometer: resolvedPace(snapshot),
+            paceSecondsPerKilometer: ATHLTHCoachSensorFreshness.validPace(
+                resolvedPace(snapshot), sampledAt: snapshot.coachPaceSampleAt
+            ) ? resolvedPace(snapshot) : nil,
             norwegian: norwegian,
             environment: ATHLTHCoachEnvironmentalContext(
                 routeRemainingMeters: snapshot.routeRemainingMeters,
-                routeProgressPercent: snapshot.routeProgressPercent
+                routeProgressPercent: snapshot.routeProgressPercent,
+                stepIndex: snapshot.runningStepIndex,
+                stepPhase: snapshot.runningStepPhase,
+                stepRemainingSeconds: snapshot.runningStepRemainingSeconds,
+                aboveMeasuredHeartRateTarget: ATHLTHCoachSensorFreshness.validHeartRate(
+                    snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt
+                ) && ((snapshot.heartRateTargetMaximumBPM ?? targetRange.map {
+                    Double($0.upperBound)
+                }).map { snapshot.heartRate > $0 } ?? false)
             )
         ) {
             speak(

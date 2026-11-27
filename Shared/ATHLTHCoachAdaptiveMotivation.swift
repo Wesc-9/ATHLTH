@@ -19,6 +19,8 @@ struct ATHLTHCoachAdaptiveMotivation {
     private var dropPromptCount = 0
     private var lastStepIndex: Int?
     private var lastStepPhase: String?
+    private var awaitingPaceReturn = false
+    private var paceReturnSince: TimeInterval?
 
     private mutating func clearStepEvidence() {
         lowZoneSince = nil
@@ -26,6 +28,8 @@ struct ATHLTHCoachAdaptiveMotivation {
         slowTargetSince = nil
         paceDropSince = nil
         reliablePaceBaseline = nil
+        awaitingPaceReturn = false
+        paceReturnSince = nil
     }
 
     mutating func reset() { self = Self() }
@@ -75,6 +79,8 @@ struct ATHLTHCoachAdaptiveMotivation {
             lowZoneSince = nil
             slowTargetSince = nil
             paceDropSince = nil
+            awaitingPaceReturn = false
+            paceReturnSince = nil
             guard settings.targetZoneVoiceAlertsEnabled == true,
                   let since = highZoneSince, elapsed - since >= 18,
                   elapsed - lastHighZonePrompt >= max(60, settings.resolvedAdaptiveCooldown),
@@ -137,6 +143,17 @@ struct ATHLTHCoachAdaptiveMotivation {
             return pace > targetSlowestPaceSecondsPerKilometer * 1.04
         }()
         slowTargetSince = slowerThanTarget ? (slowTargetSince ?? elapsed) : nil
+        // Only confirm a recovery after this engine actually issued a
+        // slow-pace cue, and a fresh measured pace is stable near that target.
+        // A much faster pace is not automatically an improvement.
+        if settings.pushWhenBelowTargetPace == true, awaitingPaceReturn,
+           let pace, let target = targetSlowestPaceSecondsPerKilometer,
+           target.isFinite, (150...1200).contains(target),
+           (0.96...1.04).contains(pace / target) {
+            paceReturnSince = paceReturnSince ?? elapsed
+        } else {
+            paceReturnSince = nil
+        }
 
         // A non-climbing terrain classification must come from good GPS
         // altitude samples; unknown terrain cannot be called "flat".
@@ -151,6 +168,16 @@ struct ATHLTHCoachAdaptiveMotivation {
 
         guard elapsed - lastCueElapsed >= settings.resolvedAdaptiveCooldown
         else { return nil }
+
+        if awaitingPaceReturn, let since = paceReturnSince,
+           elapsed - since >= 12 {
+            awaitingPaceReturn = false
+            paceReturnSince = nil
+            lastCueElapsed = elapsed
+            return norwegian
+                ? "Du er tilbake nær måltempoet. Hold innsatsen kontrollert."
+                : "You're back near your target pace. Keep the effort controlled."
+        }
 
         let startupSeconds = min(max(settings.strongStartDurationSeconds ?? 0, 0), 600)
         if startupSeconds > 0, elapsed >= 15, elapsed <= Double(startupSeconds) {
@@ -207,6 +234,8 @@ struct ATHLTHCoachAdaptiveMotivation {
            elapsed - lastTargetPacePrompt >= settings.resolvedBelowPaceRepeat {
             lastCueElapsed = elapsed
             lastTargetPacePrompt = elapsed
+            awaitingPaceReturn = true
+            paceReturnSince = nil
             let choices = norwegian
                 ? (stronger ? [
                     "Du ligger bak måltempoet. Finn frekvensen og press deg kontrollert tilbake!",
