@@ -154,6 +154,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 }
             }
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
 
             VStack(alignment: .leading, spacing: 12) {
@@ -232,6 +233,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 .buttonStyle(.plain)
             }
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
             .fullScreenCover(isPresented: $showingMeetingPoint) {
                 ATHLTHCompetitionMeetingPointPicker(settings: $settings)
@@ -277,6 +279,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
 
             if !isDuel {
@@ -313,6 +316,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .font(.subheadline.weight(.semibold))
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
 
             }
@@ -349,6 +353,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .font(.subheadline.weight(.semibold))
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
         }
         .foregroundStyle(ATHLTHArenaV3Style.ink)
