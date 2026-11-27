@@ -1504,8 +1504,8 @@ struct RecoveryCoachView: View {
         } message: {
             Text(
                 recoveryAIText(
-                    "With your approval, ATHLTH sends this question, up to 16 prior messages, source-dated recovery values, summaries of up to eight weeks of completed strength and running workouts, and a limited view of your active plan, upcoming workouts and goal titles. Training summaries can include exercise names, measured weights, repetitions, pace and estimated 1RM. For an active-plan change request, the plan schedule is sent to the plan-review service. Groq processes the AI request. This approval applies to this question only.",
-                    "Ved godkjenning sendes dette spørsmålet, inntil 16 tidligere meldinger, tidsstemplede restitusjonsverdier, sammendrag fra inntil åtte uker med fullførte styrke- og løpeøkter, samt begrenset informasjon om aktiv plan, kommende økter og måltitler. Treningsdata kan omfatte øvelsesnavn, registrerte vekter, repetisjoner, tempo og estimert 1RM. Ved planendring sendes planoppsettet til tjenesten for plangjennomgang. Groq behandler AI-forespørselen. Godkjenningen gjelder kun dette spørsmålet."
+                    "For ordinary Coach chat, this approval allows local health context for this question only. Active-plan changes are separate and may use the external plan-review service; avoid entering sensitive information there.",
+                    "For vanlig Coach-chat gir godkjenningen tilgang til lokal helseinformasjon kun for dette spørsmålet. Endringer av aktiv plan er separate og kan bruke ekstern plangjennomgang; unngå sensitive opplysninger der."
                 )
             )
         }
@@ -1535,8 +1535,8 @@ struct RecoveryCoachView: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(recoveryAIText(
-                        "ATHLTH Coach uses the external AI provider Groq. Each message you send is processed by Groq to create an answer. Do not include information you do not want to share.",
-                        "ATHLTH Coach bruker den eksterne AI-leverandøren Groq. Hver melding du sender, behandles av Groq for å lage et svar. Ikke skriv informasjon du ikke ønsker å dele."
+                        "Ordinary Coach chat uses local Apple AI when available, with built-in ATHLTH guidance otherwise. Separate plan tools may still use an external provider.",
+                        "Vanlig Coach-chat bruker lokal Apple AI når tilgjengelig, ellers innebygd veiledning fra ATHLTH. Separate planverktøy kan fortsatt bruke en ekstern leverandør."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1554,8 +1554,8 @@ struct RecoveryCoachView: View {
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(recoveryAIText(
-                            "Choose 'Allow AI chat' below to allow your messages to be sent to Groq. You can decline without affecting other ATHLTH features.",
-                            "Velg «Tillat AI-chat» nedenfor for å tillate at meldingene sendes til Groq. Du kan avslå uten at andre ATHLTH-funksjoner påvirkes."
+                            "Choose 'Allow AI chat' to use Coach. Ordinary chat is processed on this device. You can decline without affecting other features.",
+                            "Velg «Tillat AI-chat» for å bruke Coach. Vanlig chat behandles på denne enheten. Du kan avslå uten at andre funksjoner påvirkes."
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2379,8 +2379,8 @@ struct RecoveryCoachView: View {
             .buttonStyle(.plain)
             .accessibilityHint(
                 recoveryAIText(
-                    "Normal questions are sent to Groq without health data. Activate and confirm to include your health data for one question.",
-                    "Vanlige spørsmål sendes til Groq uten helsedata. Aktiver og bekreft for å inkludere helsedata i ett spørsmål."
+                    "Ordinary questions stay on this device. Activate and confirm to include local health context for one question.",
+                    "Vanlige spørsmål blir på enheten. Aktiver og bekreft for å inkludere lokal helseinformasjon i ett spørsmål."
                 )
             )
 

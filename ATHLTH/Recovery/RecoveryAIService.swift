@@ -783,7 +783,7 @@ final class RecoveryAIService {
                RecoveryAIInsightCacheEntry.self,
                from: data
            ),
-           cached.signature == signature,
+           cached.signature == "private-v1:" + signature,
            Date().timeIntervalSince(cached.createdAt) <
                 6 * 60 * 60 {
             ATHLTHPerformance.event(
@@ -796,24 +796,8 @@ final class RecoveryAIService {
             "RecoveryAICacheMiss"
         )
 
-        let insight: RecoveryAIInsight =
-            try await client.functions.invoke(
-                ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .recoveryInsight),
-                options: FunctionInvokeOptions(
-                    body: RecoveryAIRequest(
-                        mode: "insight",
-                        context: context,
-                        question: nil,
-                        language:
-                            ATHLTHLocalization.isNorwegian
-                                ? "nb"
-                                : "en",
-                        history: nil,
-                        shareHealthData: true,
-                        healthSharingMode: nil
-                    )
-                )
-            )
+        let insight = try await ATHLTHPrivateHealthInsights.recovery(context,
+            norwegian: ATHLTHLocalization.isNorwegian)
 
         // Consent may have been withdrawn during the network request.
         // Never cache or present a revoked health-based insight.
@@ -826,7 +810,7 @@ final class RecoveryAIService {
 
         if let data = try? JSONEncoder().encode(
             RecoveryAIInsightCacheEntry(
-                signature: signature,
+                signature: "private-v1:" + signature,
                 createdAt: Date(),
                 insight: insight
             )
@@ -918,73 +902,22 @@ final class RecoveryAIService {
             throw RecoveryCoachHealthSharingError.automaticUnavailable
         }
 
-        let requestHistory =
-            history
-                .suffix(16)
-                .map {
-                    RecoveryAIChatTurn(
-                        role:
-                            $0.role.rawValue,
-                        content:
-                            String(
-                                $0.text
-                                    .prefix(1800)
-                            )
-                    )
-                }
-
-        let response: RecoveryAIAnswer =
-            try await client.functions.invoke(
-                ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .coachQuestion),
-                options: FunctionInvokeOptions(
-                    body: RecoveryAIRequest(
-                        mode: "ask",
-                        context: shareHealthData
-                            ? context : .withoutHealthData,
-                        question: question,
-                        // Match the text of this message, regardless of the
-                        // language chosen for buttons and navigation.
-                        language: ATHLTHCoachMessageLanguage.responseCode(
-                            for: question
-                        ),
-                        history:
-                            shareHealthData && !requestHistory.isEmpty
-                                ? requestHistory
-                                : nil,
-                        shareHealthData: shareHealthData,
-                        healthSharingMode: shareHealthData
-                            ? (shareHealthAutomatically
-                                ? "automatic" : "confirmEachQuestion")
-                            : nil,
-                        coachStrengthContext: shareHealthData
-                            ? coachStrengthContext : nil,
-                        coachRunningContext: shareHealthData
-                            ? coachRunningContext : nil,
-                        coachTrainingContext: shareHealthData
-                            ? coachTrainingContext : nil
-                    )
-                )
-            )
-
-        return RecoveryCoachReply(
-            answer: response.answer,
-            quickQuestions:
-                Array(
-                    (
-                        response.quickQuestions ??
-                        []
-                    )
-                    .filter {
-                        !$0
-                            .trimmingCharacters(
-                                in:
-                                    .whitespacesAndNewlines
-                            )
-                            .isEmpty
-                    }
-                    .prefix(3)
-                ),
-            proposal: response.proposal
-        )
+        // Private mode does not send free-text questions or health context
+        // to the existing external provider. Existing user consent still gates
+        // health access; it is never treated as consent for a new transfer.
+        guard let owner = client.auth.currentUser?.id,
+              let consent = RecoveryCoachConsentPreferences.load(userID: owner),
+              !shareHealthData || consent.healthSharingAllowed else {
+            throw RecoveryInsightAIConsentError.notAuthorized
+        }
+        let reply = try await ATHLTHPrivateHealthInsights.coach(
+            question: question, context: shareHealthData ? context : nil,
+            norwegian: ATHLTHCoachMessageLanguage.responseCode(for: question) != "en")
+        guard client.auth.currentUser?.id == owner,
+              let current = RecoveryCoachConsentPreferences.load(userID: owner),
+              !shareHealthData || current.healthSharingAllowed else {
+            throw RecoveryInsightAIConsentError.notAuthorized
+        }
+        return reply
     }
 }

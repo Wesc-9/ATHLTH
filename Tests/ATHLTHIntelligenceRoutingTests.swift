@@ -5,7 +5,8 @@ final class ATHLTHIntelligenceRoutingTests: XCTestCase {
     func testExistingRoutesRemainUnchanged() {
         XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyFormCalculation), .rules)
         XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .trainingProgram), .groq)
-        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .recoveryInsight), .groq)
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .recoveryInsight), .rules)
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .recoveryInsight, localAvailable: true), .appleLocal)
         XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .realtimeConversation), .openAIRealtime)
         XCTAssertFalse(ATHLTHIntelligenceRoutingPolicy.cloudEnabled)
     }
@@ -23,9 +24,9 @@ final class ATHLTHIntelligenceRoutingTests: XCTestCase {
     }
 
     func testExistingCloudEndpointsAndLocalOnlySeparation() throws {
-        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .workoutInsight), "workout-insight")
-        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .recoveryInsight), "recovery-sense-v2")
-        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .coachQuestion), "recovery-sense-v2")
+        XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .workoutInsight))
+        XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .recoveryInsight))
+        XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .coachQuestion))
         XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .trainingProgram), "generate-training-program")
         XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .planAdaptation), "generate-plan-adaptation")
         XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .strengthSession), "generate-strength-session")
@@ -36,6 +37,14 @@ final class ATHLTHIntelligenceRoutingTests: XCTestCase {
             adminPilotEnabled: true, isAdministrator: true, localAvailable: true), .appleLocal)
         XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyRecommendationExplanation,
             adminPilotEnabled: true, isAdministrator: false, localAvailable: true), .rules)
+    }
+
+    func testHealthFeaturesNeverSelectExternalProvider() {
+        for feature: ATHLTHIntelligenceFeature in [.workoutInsight, .recoveryInsight, .coachQuestion] {
+            XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: feature, localAvailable: true), .appleLocal)
+            XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: feature, localAvailable: false), .rules)
+            XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: feature))
+        }
     }
 
     @MainActor

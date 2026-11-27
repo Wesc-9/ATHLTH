@@ -28,7 +28,7 @@ final class WorkoutInsightAIService {
         context: WorkoutAIInsightContext
     ) async throws -> WorkoutAIInsight {
         let signature =
-            Self.signature(for: context)
+            "private-v1:" + Self.signature(for: context)
         let userScope =
             client.auth.currentUser?.id.uuidString ??
             "signed-out"
@@ -47,16 +47,8 @@ final class WorkoutInsightAIService {
             return cached.insight
         }
 
-        let response: WorkoutAIInsight =
-            try await client.functions.invoke(
-                ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .workoutInsight),
-                options: FunctionInvokeOptions(
-                    body:
-                        WorkoutAIInsightRequest(
-                            context: context
-                        )
-                )
-            )
+        let response = try await ATHLTHPrivateHealthInsights.workout(
+            context, norwegian: ATHLTHLocalization.isNorwegian)
 
         let entry =
             WorkoutAIInsightCacheEntry(
