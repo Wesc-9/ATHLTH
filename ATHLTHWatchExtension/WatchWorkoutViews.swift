@@ -884,6 +884,10 @@ struct WatchActiveWorkoutView: View {
                                           design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(WatchTheme.liveStrengthReps)
+                        if snapshot.targetKindRaw == "reps", snapshot.inputMode != .iPhone,
+                           snapshot.isEmbeddedRunningInterval != true, !snapshot.currentExerciseComplete {
+                            WatchRepCounterButton(snapshot: snapshot).environmentObject(workoutManager)
+                        }
                     }
 
                     Button {
@@ -1999,6 +2003,10 @@ struct WatchActiveWorkoutView: View {
                                       design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(WatchTheme.accent)
+                    if snapshot.targetKindRaw == "reps", snapshot.inputMode != .iPhone,
+                       snapshot.isEmbeddedRunningInterval != true, !snapshot.currentExerciseComplete {
+                        WatchRepCounterButton(snapshot: snapshot).environmentObject(workoutManager)
+                    }
                 }
 
                 Button {

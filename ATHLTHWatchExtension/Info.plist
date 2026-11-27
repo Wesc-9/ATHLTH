@@ -18,6 +18,8 @@
     <string>ATHLTH reads live heart rate, energy and distance to show your workout metrics on Apple Watch.</string>
     <key>NSHealthUpdateUsageDescription</key>
     <string>ATHLTH saves workouts and workout routes from Apple Watch to Apple Health.</string>
+    <key>NSMotionUsageDescription</key>
+    <string>ATHLTH uses wrist motion only when you choose to estimate repetitions during a strength set.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>ATHLTH uses your location during outdoor workouts to record your route and distance.</string>
     <key>CFBundleURLTypes</key>

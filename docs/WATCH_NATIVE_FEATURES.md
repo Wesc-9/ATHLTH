@@ -31,3 +31,6 @@ All new API integrations require Xcode 27 build and real Watch verification. The
 
 ## Watch AI Coach reflection
 - Existing live Coach menus and completed summary offer an explicit read-only reflection. Measured facts are displayed locally and unavailable values are omitted. Optional Apple PCC selects only an approved focus from coarse activity context after per-request consent; no raw pulse, exact distance, route, identity or history is submitted. No workout mutations, automatic requests, or background polling. Missing model/network/entitlement returns local feedback. The managed entitlement is deliberately not added to signing until Apple grants it. Conversation, comparative history, motion ML and editable adaptation proposals remain separate work.
+
+## Experimental rep counting
+- Explicit beta control during an active rep-based set uses Core Motion at 20 Hz only while its sheet is open and the user starts counting. Estimates conservative wrist rotation cycles, not a trained ML model; no raw samples retained or transmitted. User stops and approves a draft count via existing updateStrengthDraft, then completes the set normally. Set identity, pause, input mode and foreground lifecycle are checked; physical exercise validation and exercise-specific ML remain outstanding.
