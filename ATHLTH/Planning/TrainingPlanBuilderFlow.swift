@@ -3,6 +3,15 @@ import SwiftUI
 /// A location-only change must never count as a completed training day.
 /// Both the guided Next button and its action use the same policy.
 enum ATHLTHGuidedPlanDayPolicy {
+    static func isSuggestedTraining(
+        weekday: Int, week: Int, selectedDays: Set<Int>, varyWeekdays: Bool
+    ) -> Bool {
+        guard (1...7).contains(weekday), week >= 0 else { return false }
+        let shift = varyWeekdays && week % 2 == 1 ? 1 : 0
+        let originalWeekday = (weekday - 1 - shift + 7) % 7 + 1
+        return selectedDays.contains(originalWeekday)
+    }
+
     static func isPlanned(_ edit: ATHLTHPlanWeekDayEdit?) -> Bool {
         guard let edit else { return false }
         return edit.isRestDay == true ||
@@ -3435,9 +3444,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     /// Keep the first week's chosen rhythm; alternate by one weekday when
     /// variation is enabled. Never create, remove or overwrite an actual edit.
     private func isSuggestedTrainingDay(_ weekday: Int, week: Int) -> Bool {
-        let shift = varyWeekdays && week % 2 == 1 ? 1 : 0
-        let originalWeekday = (weekday - 1 - shift + 7) % 7 + 1
-        return selectedDays.contains(originalWeekday)
+        ATHLTHGuidedPlanDayPolicy.isSuggestedTraining(
+            weekday: weekday, week: week, selectedDays: selectedDays,
+            varyWeekdays: varyWeekdays
+        )
     }
 
     private var scheduleWeekPreview: some View {
