@@ -6540,12 +6540,13 @@ struct WorkoutTemplateBuilderView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         Spacer(minLength: 8)
-                        ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
-                            .accessibilityIdentifier("athlth-ipad-workout-mode")
                         if compactPlanWorkoutSettings {
+                            AnyView(compactLibrarySaveButton)
                             AnyView(workoutExtrasMenu)
                                 .accessibilityIdentifier("athlth-ipad-plan-workout-settings")
                         }
+                        ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
+                            .accessibilityIdentifier("athlth-ipad-workout-mode")
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 7)
@@ -9537,6 +9538,34 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    private var compactLibrarySaveButton: some View {
+        Button {
+            saveToMyWorkouts()
+            persistWorkoutDraft()
+        } label: {
+            Image(systemName: savedToMyWorkouts
+                  ? "checkmark.circle.fill" : "square.and.arrow.down")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 44, height: 44)
+                .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                .contentShape(Circle())
+                .opacity(canSave && !blocks.isEmpty && !savedToMyWorkouts ? 1 : 0.45)
+        }
+        .buttonStyle(.plain)
+        .disabled(!canSave || blocks.isEmpty || savedToMyWorkouts || onSaveSharedRevision != nil)
+        .accessibilityLabel(savedToMyWorkouts
+            ? tr("Saved in My Workouts", "Lagret i mine økter")
+            : savedTemplateID == nil
+                ? tr("Save workout", "Lagre treningsøkt")
+                : tr("Update saved workout", "Oppdater lagret økt"))
+        .accessibilityHint(tr(
+            "Save a reusable workout without leaving this plan",
+            "Lagre en treningsøkt i biblioteket uten å forlate planen"
+        ))
+        .accessibilityIdentifier("athlth-ipad-plan-workout-library-save")
+    }
+
     private var saveBar: some View {
         VStack(spacing: 8) {
             if let actionNotice {
@@ -9569,7 +9598,7 @@ struct WorkoutTemplateBuilderView: View {
 
             // Saving a reusable library copy is a separate action from
             // committing this scheduled workout and continuing in the plan.
-            if isPlannedWorkout && onSaveSharedRevision == nil && !blocks.isEmpty {
+            if !compactPlanWorkoutSettings && isPlannedWorkout && onSaveSharedRevision == nil && !blocks.isEmpty {
                 Button {
                     saveToMyWorkouts()
                     // Keep the builder intact after the library save.
