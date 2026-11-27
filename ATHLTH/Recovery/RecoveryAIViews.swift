@@ -1015,6 +1015,7 @@ struct RecoveryCoachView: View {
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let context: RecoveryAIContext
     let insight: RecoveryAIInsight
@@ -2973,6 +2974,35 @@ struct RecoveryCoachView: View {
         }
 
         do {
+            if ATHLTHCoachReadQuery.isRequest(clean) {
+                guard shareHealthData else {
+                    messages.append(RecoveryCoachMessage(role: .assistant,
+                        text: recoveryAIText("Enable health/training for this question to search your recorded workouts. No history was accessed.",
+                            "Aktiver Helse/trening for dette spørsmålet for å søke i registrerte økter. Ingen historikk er hentet.")))
+                    persistConversation()
+                    return
+                }
+                let readQuery = try await ATHLTHCoachReadRouter.query(clean)
+                guard session.signedIn, session.profile.userID == requestOwnerID,
+                      conversationOwnerID == requestOwnerID,
+                      RecoveryCoachConsentPreferences.load(userID: requestOwnerID)?.healthSharingAllowed == true,
+                      RecoveryCoachHealthSharingPreferences.effectiveMode(userID: requestOwnerID) != .off else { return }
+                if let readQuery {
+                    let records = try await coachReadRecords()
+                    guard session.signedIn, session.profile.userID == requestOwnerID,
+                          conversationOwnerID == requestOwnerID,
+                          RecoveryCoachConsentPreferences.load(userID: requestOwnerID)?.healthSharingAllowed == true,
+                          RecoveryCoachHealthSharingPreferences.effectiveMode(userID: requestOwnerID) != .off else { return }
+                    messages.append(RecoveryCoachMessage(role: .assistant, text: ATHLTHCoachReadExecutor.render(
+                        readQuery, records: records, norwegian: ATHLTHLocalization.isNorwegian)))
+                } else {
+                    messages.append(RecoveryCoachMessage(role: .assistant, text: recoveryAIText(
+                        "That filter is not supported yet. Try a weekly report or runs over 5 km with average heart rate below 150.",
+                        "Dette filteret støttes ikke ennå. Prøv en ukesrapport eller løpeøkter over 5 km med snittpuls under 150.")))
+                }
+                persistConversation()
+                return
+            }
             let priorPlanQuestion = priorHistory.last(where: { $0.role == .user })?.text
             let continuingPlanQuestion = priorHistory.last?.role == .assistant &&
                 priorHistory.last?.planIntake == nil && priorHistory.last?.chatPlanDraft == nil &&
@@ -3080,6 +3110,33 @@ struct RecoveryCoachView: View {
             quickQuestions =
                 contextAwareQuestions()
             persistConversation()
+        }
+    }
+
+    @MainActor
+    private func coachReadRecords() async throws -> [ATHLTHCoachReadRecord] {
+        let owner = session.profile.userID
+        let linked = strengthWorkout.workoutHistory
+        let local = linked.filter { $0.isFinished && $0.healthMetrics.healthKitWorkoutUUID == nil }
+            .map(SocialPublishableWorkout.init)
+        let summaries = health.hasRequestedAuthorization ? try await health.workoutHistory() : []
+        guard session.signedIn, session.profile.userID == owner else { throw CancellationError() }
+        let imported = summaries.map { summary -> SocialPublishableWorkout in
+            if let item = linked.first(where: { $0.healthMetrics.healthKitWorkoutUUID == summary.id }) {
+                return SocialPublishableWorkout(strengthWorkout: item)
+            }
+            return SocialPublishableWorkout(summary: summary)
+        }
+        return (local + imported).map { item in
+            let activity: ATHLTHCoachReadQuery.Activity
+            switch item.activity {
+            case .running: activity = .running
+            case .walking: activity = .walking
+            case .strength: activity = .strength
+            default: activity = .all
+            }
+            return ATHLTHCoachReadRecord(id: item.id, activity: activity, date: item.startDate,
+                seconds: item.duration, meters: item.distanceMeters, pulse: item.recordedAverageHeartRate)
         }
     }
 

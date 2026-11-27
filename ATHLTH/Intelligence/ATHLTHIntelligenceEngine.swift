@@ -23,7 +23,7 @@ enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
     case dailyFormCalculation, dailyRecommendation, fixedAudioCoach
     case workoutInsight, recoveryInsight, coachQuestion, trainingProgram
     case strengthSession, planAdaptation, equipmentRecognition, pushToTalk
-    case realtimeConversation, localDiagnostic, dailyRecommendationExplanation
+    case realtimeConversation, localDiagnostic, dailyRecommendationExplanation, privateHistorySearch
 
     var title: String {
         switch self {
@@ -33,6 +33,7 @@ enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
         case .workoutInsight: return "Workout insight"
         case .recoveryInsight: return "Recovery insight"
         case .coachQuestion: return "Coach question"
+        case .privateHistorySearch: return "Private history search / reports"
         case .trainingProgram: return "Training program"
         case .strengthSession: return "Strength session"
         case .planAdaptation: return "Plan adaptation"
@@ -53,7 +54,7 @@ enum ATHLTHIntelligenceRoutingPolicy {
         switch feature {
         case .dailyFormCalculation, .dailyRecommendation, .fixedAudioCoach:
             return .rules
-        case .workoutInsight, .recoveryInsight, .coachQuestion:
+        case .workoutInsight, .recoveryInsight, .coachQuestion, .privateHistorySearch:
             return localAvailable ? .appleLocal : .rules
         case .trainingProgram, .strengthSession, .planAdaptation, .equipmentRecognition, .pushToTalk:
             return .groq
