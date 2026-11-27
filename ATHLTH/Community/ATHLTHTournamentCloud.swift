@@ -577,6 +577,10 @@ struct ATHLTHTournamentCloudService {
             throw NSError(domain: "ATHLTHCompetition", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "Velg kun tilgjengelige konkurransegrener: løping, gange eller styrke."])
         }
+        guard draft.competitionSettings.race.plannedMeasures.isEmpty else {
+            throw NSError(domain: "ATHLTHCompetition", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "De nye måletypene kan foreløpig bare lagres som utkast eller mal."])
+        }
         let duel = draft.competitionSettings.race.duelMode == true
         guard (duel ? (draft.singleEventMode && draft.participants.count == 2) :
             draft.participants.count >= (draft.singleEventMode ? 3 : draft.format == .cup ? 4 : 2)) else {
