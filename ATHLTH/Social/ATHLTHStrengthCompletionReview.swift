@@ -757,7 +757,7 @@ struct ATHLTHStrengthCompletionReview: View {
     }
 
     private func duration(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded()))
+        guard let total = ATHLTHWorkoutSummaryEngine.roundedInteger(seconds) else { return "—" }
         if total >= 3600 {
             return String(format: "%dh %02dm", total / 3600, (total % 3600) / 60)
         }

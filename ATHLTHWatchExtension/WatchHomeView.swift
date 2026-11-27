@@ -103,6 +103,9 @@ struct WatchHomeView: View {
             get: { launchError != nil },
             set: { if !$0 { launchError = nil } }
         )) { Button("OK", role: .cancel) {} } message: { Text(launchError ?? "") }
+        .onChange(of: workoutManager.state) { _, state in
+            if state == .completed || state == .idle { shortcutPath.removeAll() }
+        }
         .fullScreenCover(isPresented: Binding(
             get: { workoutManager.isWorkoutPresented },
             set: { presented in

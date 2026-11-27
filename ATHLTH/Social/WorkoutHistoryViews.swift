@@ -2176,17 +2176,17 @@ struct PostWorkoutReviewView: View {
     }
 
     private var sportsResultsGrid: some View {
-        let distance = workout.distanceMeters ?? replayContext?.distanceMeters
-        let average = replayContext?.averageHeartRateBPM ?? workout.recordedAverageHeartRate
-        let maximum = replayContext?.maxHeartRateBPM ?? workout.recordedMaximumHeartRate
-        var metrics: [(String, String, String)] = [(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), durationText(workout.duration), "timer")]
-        if let distance, distance.isFinite, distance > 0 {
-            metrics.append((ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"), String(format: "%.2f km", distance / 1000), "location.fill"))
-            if workout.duration > 0 { metrics.append((ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Snittfart"), String(format: "%.1f km/t", distance / workout.duration * 3.6), "speedometer")) }
+        let summary = completionMetrics
+        var metrics: [(String, String, String)] = [(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), summary.durationText, "timer")]
+        if summary.distanceMeters != nil {
+            metrics.append((ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"), summary.distanceText, "location.fill"))
         }
-        if calorieText != "—" { metrics.append((ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"), calorieText, "flame.fill")) }
-        if bpmText(average) != "—" { metrics.append((ATHLTHLocalization.choose(english: "Avg HR", norwegian: "Snittpuls"), bpmText(average), "heart.fill")) }
-        if bpmText(maximum) != "—" { metrics.append((ATHLTHLocalization.choose(english: "Max HR", norwegian: "Makspuls"), bpmText(maximum), "heart.text.square.fill")) }
+        if summary.speedKilometersPerHour != nil {
+            metrics.append((ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Snittfart"), summary.speedText, "speedometer"))
+        }
+        if summary.activeCalories != nil { metrics.append((ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"), summary.calorieText, "flame.fill")) }
+        if summary.averageHeartRate != nil { metrics.append((ATHLTHLocalization.choose(english: "Avg HR", norwegian: "Snittpuls"), summary.averagePulseText, "heart.fill")) }
+        if summary.maximumHeartRate != nil { metrics.append((ATHLTHLocalization.choose(english: "Max HR", norwegian: "Makspuls"), summary.maximumPulseText, "heart.text.square.fill")) }
         if let elevation = replayContext?.elevationGainMeters, elevation.isFinite, elevation > 0 { metrics.append((ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter"), String(format: "+%.0f m", elevation), "mountain.2.fill")) }
         return ATHLTHUnifiedCard {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 17) {
@@ -2225,32 +2225,33 @@ struct PostWorkoutReviewView: View {
     /// All values here are backed by the completed workout or HealthKit.
     /// Missing pulse, energy, reliable GPS stillness or incline shows a dash.
     private var enduranceResultsGrid: some View {
-        VStack(spacing: 0) {
+        let summary = completionMetrics
+        return VStack(spacing: 0) {
             completionStatsRow(
                 (ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
-                 durationText(workout.duration), "stopwatch", completionAccent),
+                 summary.durationText, "stopwatch", completionAccent),
                 (ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
-                 completionDistanceText, "location.fill", completionAccent),
+                 summary.distanceText, "location.fill", completionAccent),
                 (ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo"),
-                 completionPaceText, "speedometer", completionAccent)
+                 summary.paceText, "speedometer", completionAccent)
             )
 
             Rectangle().fill(ATHLTHTheme.divider.opacity(0.62)).frame(height: 0.7)
 
             completionStatsRow(
                 (ATHLTHLocalization.choose(english: "Avg HR", norwegian: "Puls snitt"),
-                 bpmText(replayContext?.averageHeartRateBPM), "heart.fill", .red),
+                 summary.averagePulseText, "heart.fill", .red),
                 (ATHLTHLocalization.choose(english: "Max HR", norwegian: "Puls maks"),
-                 bpmText(replayContext?.maxHeartRateBPM), "heart.text.square.fill", .red),
+                 summary.maximumPulseText, "heart.text.square.fill", .red),
                 (ATHLTHLocalization.choose(english: "Calories", norwegian: "Kalorier"),
-                 calorieText, "flame.fill", completionAccent)
+                 summary.calorieText, "flame.fill", completionAccent)
             )
 
             Rectangle().fill(ATHLTHTheme.divider.opacity(0.62)).frame(height: 0.7)
 
             completionStatsRow(
                 (ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Hastighet snitt"),
-                 averageSpeedText, "speedometer", completionAccent),
+                 summary.speedText, "speedometer", completionAccent),
                 (ATHLTHLocalization.choose(english: "Waiting time", norwegian: "Ventetid"),
                  completionWaitingSeconds.map { waitingTimeText($0) } ?? "—",
                  "pause.circle", completionAccent),
@@ -2337,35 +2338,22 @@ struct PostWorkoutReviewView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var completionDistanceText: String {
-        guard let meters = workout.distanceMeters, meters.isFinite, meters > 0
-        else { return "—" }
-        return String(format: "%.2f km", meters / 1_000)
+    private var completionMetrics: ATHLTHWorkoutSummaryEngine {
+        ATHLTHWorkoutSummaryEngine(
+            duration: workout.duration,
+            distanceMeters: workout.distanceMeters ?? (workout.isSports ? replayContext?.distanceMeters : nil),
+            activeCalories: workout.activeEnergyKilocalories ?? replayContext?.activeEnergyKilocalories,
+            averageHeartRate: replayContext?.averageHeartRateBPM ?? workout.recordedAverageHeartRate,
+            maximumHeartRate: replayContext?.maxHeartRateBPM ?? workout.recordedMaximumHeartRate,
+            activity: workout.isSports ? "sports" : workout.activity == .running ? "running" : workout.activity == .walking ? "walking" : "other"
+        )
     }
 
-    private var completionPaceText: String {
-        guard let meters = workout.distanceMeters, meters > 0 else { return "—" }
-        return averagePaceText(duration: workout.duration, distanceMeters: meters)
-    }
-
-    private func bpmText(_ value: Double?) -> String {
-        guard let value, value.isFinite, value > 0 else { return "—" }
-        return "\(Int(value.rounded())) bpm"
-    }
-
-    private var calorieText: String {
-        guard let value = workout.activeEnergyKilocalories ??
-                replayContext?.activeEnergyKilocalories,
-              value.isFinite, value > 0 else { return "—" }
-        return "\(Int(value.rounded())) kcal"
-    }
-
-    private var averageSpeedText: String {
-        guard let distance = workout.distanceMeters,
-              distance.isFinite, distance > 0, workout.duration > 0
-        else { return "—" }
-        return String(format: "%.1f km/t", distance / workout.duration * 3.6)
-    }
+    private var completionDistanceText: String { completionMetrics.distanceText }
+    private var completionPaceText: String { completionMetrics.paceText }
+    private func bpmText(_ value: Double?) -> String { ATHLTHWorkoutSummaryEngine.pulseText(value) }
+    private var calorieText: String { completionMetrics.calorieText }
+    private var averageSpeedText: String { completionMetrics.speedText }
 
     private var elevationOrInclineText: String {
         if workout.isIndoor == true {

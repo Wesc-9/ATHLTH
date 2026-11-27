@@ -2441,51 +2441,53 @@ struct WatchActiveWorkoutView: View {
                     .padding(9)
                     .watchSurface(radius: 14)
                 }
-                Text(durationText(result.duration))
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                let summary = ATHLTHWorkoutSummaryEngine(
+                    duration: result.duration, distanceMeters: result.distanceMeters,
+                    activeCalories: result.activeCalories,
+                    averageHeartRate: result.averageHeartRate,
+                    maximumHeartRate: result.maxHeartRate,
+                    activity: result.isSports == true ? "sports" : result.kind.rawValue,
+                    completedSets: result.strengthSnapshot?.completedSets
+                )
+                Text(result.isSports == true
+                    ? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
+                    : result.kind.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(WatchTheme.planSecondary)
+                Text(summary.durationText)
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(
-                        WatchTheme.textPrimary
-                    )
-
-                HStack(spacing: 0) {
-                    metric(
-                        icon: "heart.fill",
-                        value: result.averageHeartRate.map {
-                            "\(Int($0.rounded()))"
-                        } ?? "—",
-                        label: "AVG BPM"
-                    )
-
-                    Divider()
-                        .overlay(
-                            WatchTheme.border
-                        )
-
-                    metric(
-                        icon: "flame.fill",
-                        value: "\(Int(result.activeCalories.rounded()))",
-                        label: "KCAL"
-                    )
-
-                    if result.kind != .strength {
-                        Divider()
-                            .overlay(
-                                WatchTheme.border
-                            )
-
-                        metric(
-                            icon: "location.fill",
-                            value: String(
-                                format: "%.2f",
-                                result.distanceMeters / 1000
-                            ),
-                            label: "KM"
-                        )
+                    .foregroundStyle(WatchTheme.textPrimary)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    metric(icon: "heart.fill", value: summary.averagePulseText,
+                           label: ATHLTHLocalization.choose(english: "Avg HR", norwegian: "Snittpuls"))
+                    if summary.maximumHeartRate != nil {
+                        metric(icon: "heart.text.square.fill", value: summary.maximumPulseText,
+                               label: ATHLTHLocalization.choose(english: "Max HR", norwegian: "Makspuls"))
+                    }
+                    metric(icon: "flame.fill", value: summary.calorieText,
+                           label: ATHLTHLocalization.choose(english: "Energy", norwegian: "Energi"))
+                    if summary.distanceMeters != nil {
+                        metric(icon: "location.fill", value: summary.distanceText,
+                               label: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"))
+                    }
+                    if summary.paceSecondsPerKilometer != nil {
+                        metric(icon: "speedometer", value: summary.paceText,
+                               label: ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo"))
+                    } else if summary.speedKilometersPerHour != nil {
+                        metric(icon: "speedometer", value: summary.speedText,
+                               label: ATHLTHLocalization.choose(english: "Avg speed", norwegian: "Snittfart"))
+                    } else if let split = summary.rowingSplitSeconds {
+                        metric(icon: "speedometer", value: ATHLTHWorkoutSummaryEngine.durationText(split),
+                               label: "/500 m")
+                    }
+                    if let sets = summary.completedSets {
+                        metric(icon: "checkmark.circle", value: String(sets),
+                               label: ATHLTHLocalization.choose(english: "Sets", norwegian: "Sett"))
                     }
                 }
-                .padding(.vertical, 6)
-                .watchSurface()
+                .padding(9)
+                .watchSurface(radius: 14)
 
                 if let laps =
                         result.lapSummaries,

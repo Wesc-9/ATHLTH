@@ -36,32 +36,17 @@ struct ATHLTHRunningResultShareSheet: View {
 
     private var hasUsableMap: Bool { safeCoordinates.count >= 2 }
 
-    private var distance: String {
-        guard let meters = workout.distanceMeters, meters.isFinite, meters > 0 else {
-            return "—"
-        }
-        return String(format: "%.2f km", meters / 1_000)
+    private var summary: ATHLTHWorkoutSummaryEngine {
+        ATHLTHWorkoutSummaryEngine(duration: workout.duration,
+            distanceMeters: workout.distanceMeters, averageHeartRate: averageHeartRateBPM,
+            activity: workout.activity == .walking ? "walking" : "running")
     }
 
-    private var duration: String {
-        let seconds = max(0, Int(workout.duration.rounded()))
-        return seconds >= 3_600
-            ? String(format: "%d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
-            : String(format: "%d:%02d", seconds / 60, seconds % 60)
-    }
-
-    private var pace: String {
-        guard let meters = workout.distanceMeters, meters.isFinite, meters > 0,
-              workout.duration.isFinite, workout.duration > 0 else { return "—" }
-        let seconds = workout.duration / (meters / 1_000)
-        guard seconds.isFinite, seconds > 0 else { return "—" }
-        let total = Int(seconds.rounded())
-        return String(format: "%d:%02d /km", total / 60, total % 60)
-    }
-
+    private var distance: String { summary.distanceText }
+    private var duration: String { summary.durationText }
+    private var pace: String { summary.paceText }
     private var heartRate: String? {
-        guard let hr = averageHeartRateBPM, hr.isFinite, hr > 0 else { return nil }
-        return "\(Int(hr.rounded())) bpm"
+        summary.averageHeartRate == nil ? nil : summary.averagePulseText
     }
 
     private var highlight: String? {
