@@ -1034,7 +1034,6 @@ struct RecoveryCoachView: View {
     @State private var errorMessage: String?
     @State private var didLoadConversation =
         false
-    @State private var coachPinned = true
     @State private var conversationOwnerID: UUID?
     @State private var proposalActionNotice: String?
     @State private var selectedCoachProposal: RecoveryCoachProposal?
@@ -1291,11 +1290,6 @@ struct RecoveryCoachView: View {
                 }
         )
         .onAppear {
-            coachPinned =
-                RecoveryCoachInboxPreferences
-                    .isPinned(
-                        userID: session.profile.userID
-                    )
             loadConversationIfNeeded()
             loadCoachConsent()
             receiveIncomingQuestionIfNeeded()
@@ -1636,8 +1630,8 @@ struct RecoveryCoachView: View {
                         .tint(ATHLTHTheme.accentDeep)
 
                         Text(recoveryAIText(
-                            "This does not send health metrics automatically. Select 'Share health data' in the chat and confirm every individual transfer.",
-                            "Dette sender ikke helsemålinger automatisk. Velg «Del helsedata» i chatten og bekreft hver enkelt sending."
+                            "This does not send health metrics automatically. Health-related Coach actions require a separate confirmation for each question.",
+                            "Dette sender ikke helsemålinger automatisk. Coach-funksjoner som bruker helseopplysninger krever egen bekreftelse for hvert spørsmål."
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1981,53 +1975,6 @@ struct RecoveryCoachView: View {
                     )
                 } label: {
                     Label(recoveryAIText("Weekly review", "Ukesevaluering"), systemImage: "calendar")
-                }
-
-                Button {
-                    coachPinned.toggle()
-
-                    RecoveryCoachInboxPreferences
-                        .setPinned(
-                            coachPinned,
-                            userID:
-                                session
-                                    .profile
-                                    .userID
-                        )
-                } label: {
-                    Label(
-                        coachPinned
-                            ? recoveryAIText(
-                                "Unpin conversation",
-                                "Løsne samtalen"
-                            )
-                            : recoveryAIText(
-                                "Pin conversation",
-                                "Fest samtalen"
-                            ),
-                        systemImage:
-                            coachPinned
-                                ? "pin.slash"
-                                : "pin.fill"
-                    )
-                }
-
-                Button {
-                    draftHealthPermission = healthConsentApproved
-                    draftAutomaticHealthPermission =
-                        RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
-                            userID: session.profile.userID
-                        )
-                    pendingShareAfterConsent = false
-                    showingCoachConsentSheet = true
-                } label: {
-                    Label(
-                        recoveryAIText(
-                            "AI & privacy settings",
-                            "AI- og personvernvalg"
-                        ),
-                        systemImage: "hand.raised"
-                    )
                 }
 
                 Button(
@@ -2399,109 +2346,7 @@ struct RecoveryCoachView: View {
                 isDisabled: isAsking
             )
 
-            Button {
-                if !aiConsentApproved {
-                    pendingShareAfterConsent = false
-                    draftHealthPermission = false
-                    draftAutomaticHealthPermission = false
-                    showingCoachConsentSheet = true
-                } else if !healthConsentApproved {
-                    pendingShareAfterConsent = true
-                    draftHealthPermission = false
-                    draftAutomaticHealthPermission = false
-                    showingCoachConsentSheet = true
-                } else {
-                    shareHealthForNextQuestion.toggle()
-                }
-            } label: {
-                Label(
-                    shareHealthForNextQuestion
-                        ? recoveryAIText(
-                            "Health/training · confirm to share",
-                            "Helse/trening · bekreft deling"
-                        )
-                        : recoveryAIText(
-                            "Health/training · not shared",
-                            "Helse/trening · ikke delt"
-                        ),
-                    systemImage: shareHealthForNextQuestion
-                        ? "checkmark.shield.fill"
-                        : "lock.shield"
-                )
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(
-                    shareHealthForNextQuestion
-                        ? ATHLTHPlanDesign.accentInk
-                        : ATHLTHTheme.mutedText
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 3)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(
-                recoveryAIText(
-                    "Ordinary questions stay on this device. Activate and confirm to include local health context for one question.",
-                    "Vanlige spørsmål blir på enheten. Aktiver og bekreft for å inkludere lokal helseinformasjon i ett spørsmål."
-                )
-            )
-
             HStack(spacing: 9) {
-                Menu {
-                    Button(
-                        role: .destructive
-                    ) {
-                        messages.removeAll()
-                        quickQuestions =
-                            contextAwareQuestions()
-                        errorMessage = nil
-                        RecoveryCoachConversationPersistence.delete(
-                        userID: session.profile.userID
-                    )
-                    } label: {
-                        Label(
-                            recoveryAIText(
-                                "Start new conversation",
-                                "Start ny samtale"
-                            ),
-                            systemImage:
-                                "bubble.left.and.exclamationmark.bubble.right"
-                        )
-                    }
-                } label: {
-                    Image(
-                        systemName: "plus"
-                    )
-                    .font(
-                        .system(
-                            size: 18,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .primaryText
-                    )
-                    .frame(
-                        width: 44,
-                        height: 44
-                    )
-                    .background(
-                        Color.white
-                            .opacity(0.86),
-                        in: Circle()
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                ATHLTHTheme
-                                    .border,
-                                lineWidth: 0.8
-                            )
-                    }
-                }
-                .buttonStyle(.plain)
-
                 TextField(
                     recoveryAIText(
                         "Ask ATHLTH Coach…",
@@ -2741,7 +2586,11 @@ struct RecoveryCoachView: View {
                     )
                 }
 
-                if let intake = message.planIntake, message.role == .assistant {
+                if let intake = message.planIntake, message.role == .assistant, intake.submitted {
+                    Text(recoveryAIText("Form submitted", "Skjema sendt"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                } else if let intake = message.planIntake, message.role == .assistant {
                     ATHLTHCoachChatPlanIntakeCard(
                         intake: intake,
                         onChange: { updated in
