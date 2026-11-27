@@ -6142,7 +6142,9 @@ struct WorkoutTemplateBuilderView: View {
                 // workout with no subsequent user edits before app suspension.
                 // Never overwrite an existing snapshot until restore finishes.
                 persistWorkoutDraft()
-                if openFocusedStepEditor, let focused = expandedBlockIndex {
+                if openFocusedStepEditor, let focused = expandedBlockIndex,
+                   !resumeExercisePickerAfterWake, !resumeRunningPickerAfterWake,
+                   resumeAuxiliarySheetAfterWake == nil {
                     // The parent opens this workout for one tapped plan row.
                     // Present its real step editor after the workout sheet has
                     // appeared, so the edit still uses the existing Save-to-Plan flow.
@@ -6864,7 +6866,15 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
             }
-            .sheet(item: $studioStepEditorSelection) { selection in
+            .sheet(item: $studioStepEditorSelection, onDismiss: {
+                // An intentional dismissal must not re-open a saved step.
+                if scenePhase == .active {
+                    if resumeAuxiliarySheetAfterWake?.hasPrefix("step:") == true {
+                        resumeAuxiliarySheetAfterWake = nil
+                    }
+                    persistWorkoutDraft()
+                }
+            }) { selection in
                 studioStepEditorSheet(selection)
             }
             .sheet(isPresented: $showingCopyPicker) {
@@ -7130,7 +7140,9 @@ struct WorkoutTemplateBuilderView: View {
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(tr("Done", "Ferdig")) {
+                                resumeAuxiliarySheetAfterWake = nil
                                 studioStepEditorSelection = nil
+                                persistWorkoutDraft()
                             }
                         }
                     }
@@ -7142,7 +7154,9 @@ struct WorkoutTemplateBuilderView: View {
                         )
                     }
                 }
-                .presentationDetents([.large])
+                .presentationSizing(wideLibraryPickerSizing)
+                .presentationDetents(ATHLTHDeviceRole.isIPad ? [.fraction(0.95)] : [.large])
+                .presentationDragIndicator(.visible)
         )
     }
 
@@ -8043,9 +8057,11 @@ struct WorkoutTemplateBuilderView: View {
 
     private func openStudioStepEditor(blockID: UUID) {
         // Do not present an empty sheet while a workout/draft is initializing.
-        studioStepEditorSelection = ATHLTHWorkoutStudioStepEditorSelection(
-            blockID: blockID, blocks: blocks
-        )
+        guard studioStepEditorSelection == nil,
+              let selection = ATHLTHWorkoutStudioStepEditorSelection(
+                blockID: blockID, blocks: blocks
+              ) else { return }
+        studioStepEditorSelection = selection
     }
 
     /// The same Basic entry hierarchy is used when planning a strength
