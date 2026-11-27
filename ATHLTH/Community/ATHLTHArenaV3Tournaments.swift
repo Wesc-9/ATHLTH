@@ -1765,23 +1765,61 @@ struct ATHLTHTournamentCreator: View {
     }
 
     private func reviewRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(label).foregroundStyle(ATHLTHArenaV3Style.secondary)
-            Spacer(minLength: 8)
-            Text(value).fontWeight(.medium)
-                .foregroundStyle(ATHLTHArenaV3Style.ink)
-                .multilineTextAlignment(.trailing)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(label).foregroundStyle(ATHLTHArenaV3Style.secondary).fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 8)
+                Text(value).fontWeight(.medium)
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                Text(value).fontWeight(.medium)
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.subheadline)
-        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func reviewCard<Content: View>(_ title: String, symbol: String,
+                                            @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHArenaV3Style.gold)
+            Divider()
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHArenaV3Style.panel())
     }
 
     private var preview: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(canSave ? "KLAR FOR INVITASJON" : "GJENNOMGANG AV KONKURRANSEN").font(.caption2.weight(.semibold))
+            reviewHeader
+            reviewExercises
+            reviewTiming
+            reviewRules
+            Text("Ingen invitasjon er sendt ennå. Alle deltakere må godkjenne reglene før start.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    private var reviewHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(canSave ? "KLAR FOR INVITASJON" : "GJENNOMGANG AV KONKURRANSEN")
+                .font(.caption2.weight(.semibold))
                 .tracking(1.5).foregroundStyle(ATHLTHArenaV3Style.gold)
             Text(effectiveTitle).font(.system(size: 25, weight: .semibold, design: .serif))
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
+                .fixedSize(horizontal: false, vertical: true)
             if isDuel {
                 HStack(spacing: 12) {
                     ForEach(Array(athletes.prefix(2).enumerated()), id: \.element.id) { index, athlete in
@@ -1791,7 +1829,7 @@ struct ATHLTHTournamentCreator: View {
                         VStack(spacing: 6) {
                             Text(String(athlete.username.prefix(2)).uppercased())
                                 .font(.headline)
-                                .frame(width: 45, height: 45)
+                                .frame(width: 48, height: 48)
                                 .background(ATHLTHArenaV3Style.cream, in: Circle())
                             Text(athlete.username).font(.caption.weight(.medium))
                                 .lineLimit(2).multilineTextAlignment(.center)
@@ -1802,44 +1840,132 @@ struct ATHLTHTournamentCreator: View {
                 .padding(.vertical, 8)
             } else {
                 reviewRow("Deltakere", "\(athletes.count)")
+                ForEach(athletes, id: \.id) { athlete in
+                    Label(athlete.username, systemImage: "person.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                }
                 if !isSingleEvent { reviewRow("Sesong", "\(continuationSeasonNumber ?? 1)") }
                 if !warmupRounds.isEmpty { reviewRow("Oppvarming", "\(warmupRounds.count) runder · 0 poeng") }
             }
-            Divider()
-            Text("Konkurransen").font(.headline)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
+    private var reviewExercises: some View {
+        reviewCard("Konkurranseøvelser", symbol: "list.bullet.rectangle") {
             reviewRow("Grener", ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title).joined(separator: " · "))
             reviewRow("Øvelser", exerciseMode == .open ? "Åpen liste" : "\(exerciseCount)")
+            if competitionSettings.race.discipline != .workout {
+                reviewRow("Konkurranseform", competitionSettings.race.discipline.title)
+                if competitionSettings.race.discipline == .distance ||
+                    (competitionSettings.race.discipline == .sprint && competitionSettings.race.sprintTarget == .distance) {
+                    reviewRow("Distanse", "\(competitionSettings.race.targetDistanceMeters) m")
+                }
+                if competitionSettings.race.discipline == .duration ||
+                    (competitionSettings.race.discipline == .sprint && competitionSettings.race.sprintTarget == .duration) {
+                    reviewRow("Varighet", "\(competitionSettings.race.targetDurationSeconds) sek")
+                }
+                if competitionSettings.race.discipline == .laps {
+                    reviewRow("Runder", "\(competitionSettings.race.lapCount)")
+                    reviewRow("Løype", competitionSettings.race.lapCourseName)
+                }
+            }
             ForEach(plannedMeasures) { item in
-                reviewRow(item.libraryName ?? item.routeName ?? item.activity.title, item.measure.title + " · Utkast")
+                Divider()
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(item.libraryName ?? item.routeName ?? item.activity.title, systemImage: item.activity.symbol)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    Text(item.measure.title)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    Text(reviewMeasureDetails(item))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    Text("Kun utkast · kan ikke publiseres ennå")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if competitionSettings.race.routeID != nil {
                 reviewRow("Felles løperute", competitionSettings.race.routeName)
             }
             ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
-                HStack(alignment: .firstTextBaseline) {
-                    Image(systemName: exerciseActivities[id]?.symbol ?? "figure.mixed.cardio")
-                        .foregroundStyle(ATHLTHArenaV3Style.gold)
-                    Text(rematchNames[id] ?? "Valgt øvelse").fontWeight(.medium)
-                    Spacer()
+                Divider()
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(rematchNames[id] ?? "Valgt øvelse", systemImage: exerciseActivities[id]?.symbol ?? "figure.mixed.cardio")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
                     if let goal = competitionSettings.race.goal(for: id), competitionSettings.race.effectiveScoringMode.needsGoal {
-                        Text(goal.formatted())
+                        reviewRow("Mål", goal.formatted())
                     }
-                    Text("\(competitionSettings.race.weight(for: id))×")
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                }.font(.caption)
+                    reviewRow("Poengvekt", "\(competitionSettings.race.weight(for: id))×")
+                    if let activity = exerciseActivities[id] {
+                        reviewRow("Treningsmiljø", competitionSettings.effectiveEnvironment(activity: activity, exerciseID: id).title)
+                    }
+                }
             }
-            Divider()
-            Text("Start og frister").font(.headline)
+        }
+    }
+
+    private func reviewMeasureDetails(_ item: ATHLTHCompetitionMeasureDraft) -> String {
+        var details: [String] = []
+        if item.measure.needsReps { details.append("\(item.repetitions) reps") }
+        if item.measure.needsWeight { details.append("\(item.kilograms.formatted()) kg") }
+        if item.measure.needsDistance { details.append("\(item.distanceMeters) m") }
+        if item.measure.needsDuration { details.append("\(item.durationSeconds) sek") }
+        if item.measure.needsPace {
+            let seconds = item.paceSecondsPerKM % 60
+            details.append("\(item.paceSecondsPerKM / 60):\(seconds < 10 ? "0" : "")\(seconds) min/km")
+        }
+        if item.measure.needsSpeed { details.append("\(item.speedKMH.formatted()) km/t") }
+        if item.measure == .intervalDistance {
+            details.append("\(item.intervals) × \(item.workSeconds) sek · pause \(item.restSeconds) sek")
+        }
+        details.append("\(item.attempts) forsøk")
+        details.append("\(item.pointsWeight)× poeng")
+        return details.joined(separator: " · ")
+    }
+
+    private var reviewTiming: some View {
+        reviewCard("Start og frister", symbol: "calendar") {
             reviewRow("Start", competitionSettings.startMode.title)
-            if let start = competitionSettings.startsAt { reviewRow("Tidspunkt", start.formatted(date: .abbreviated, time: .shortened)) }
+            if let start = competitionSettings.startsAt {
+                reviewRow("Tidspunkt", start.formatted(date: .abbreviated, time: .shortened))
+            }
             reviewRow("Tilgjengelighet", competitionSettings.unlock.title)
+            if competitionSettings.unlock == .interval {
+                reviewRow("Intervall", "\(competitionSettings.every) · \(competitionSettings.unit.title)")
+            }
             reviewRow("Gjennomføringsfrist", ATHLTHTournamentCadence.window(competitionSettings.completionHours))
-            if let end = competitionSettings.endsAt { reviewRow("Slutt", end.formatted(date: .abbreviated, time: .shortened)) }
+            if let end = competitionSettings.endsAt {
+                reviewRow("Slutt", end.formatted(date: .abbreviated, time: .shortened))
+            }
             reviewRow("Svarfrist", "\(competitionSettings.invitationDays) dager")
-            Divider()
-            Text("Regler og poeng").font(.headline)
+        }
+    }
+
+    private var reviewRules: some View {
+        reviewCard("Regler og poeng", symbol: "slider.horizontal.3") {
             reviewRow("Treningsmiljø", competitionSettings.environment.title)
+            ForEach(ATHLTHTournamentActivity.allCases.filter {
+                competitionSettings.activityEnvironments[$0.rawValue] != nil
+            }) { activity in
+                reviewRow(activity.title, competitionSettings.effectiveEnvironment(activity: activity).title)
+            }
+            if !competitionSettings.meetingPlace.isEmpty {
+                reviewRow("Møtested", competitionSettings.meetingPlace)
+            }
             reviewRow("Registrering", competitionSettings.race.recordingDevice.title)
+            if !competitionSettings.race.equipmentRules.isEmpty {
+                reviewRow("Utstyr", competitionSettings.race.equipmentRules)
+            }
+            reviewRow("Frivillig liveposisjon", competitionSettings.race.allowOptInLiveLocation ? "Tillatt" : "Av")
+            reviewRow("Publisering i feed", competitionSettings.allowFeedPost ? "Tillatt etter avslutning" : "Av")
             if competitionSettings.race.discipline == .workout {
                 reviewRow("Poeng", competitionSettings.race.scoringSummary)
                 reviewRow("Resultatgodkjenning", ATHLTHTournamentCadence.window(competitionSettings.race.reviewHours ?? 48))
@@ -1853,13 +1979,7 @@ struct ATHLTHTournamentCreator: View {
                     .font(.caption.weight(.medium)).tint(ATHLTHArenaV3Style.gold)
                 }
             }
-            Text("Ingen invitasjon er sendt ennå. Alle deltakere må godkjenne reglene før start.")
-                .font(.caption)
-                .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ATHLTHArenaV3Style.panel())
     }
 
     private func sectionTitle(_ title: String) -> some View {
