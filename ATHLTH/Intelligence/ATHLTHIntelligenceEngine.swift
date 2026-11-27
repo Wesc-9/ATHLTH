@@ -18,7 +18,7 @@ enum ATHLTHIntelligenceProvider: String, CaseIterable, Sendable {
 }
 
 /// Explicit feature routing: do not infer consent from a provider's availability.
-/// The only new route in this release is a synthetic administrator diagnostic.
+/// Health insights and ordinary Coach chat are private, with no cloud fallback.
 enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
     case dailyFormCalculation, dailyRecommendation, fixedAudioCoach
     case workoutInsight, recoveryInsight, coachQuestion, trainingProgram
@@ -199,6 +199,37 @@ enum ATHLTHIntelligenceEngine {
         }
         #endif
         return first
+    }
+
+    /// Free-text general Coach questions run on-device only. No tools, plan
+    /// mutations, prior chat history or HealthKit payload are passed here.
+    /// Health-context replies use the deterministic path instead.
+    static func localGeneralCoachAnswer(question: String, norwegian: Bool) async throws -> String? {
+        guard isLocalAvailable, !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            let session = LanguageModelSession(instructions: """
+                You are a general fitness education assistant, not a clinician.
+                Answer only general exercise questions. Do not diagnose, recommend treatment,
+                interpret medical symptoms, give medication advice, invent personal measurements,
+                claim access to training history or propose specific plan changes.
+                For medical questions or pain, recommend qualified healthcare advice;
+                for potentially urgent symptoms recommend emergency help.
+                Do not provide extreme exercise or dieting instructions.
+                Answer concisely in the requested language.
+                """)
+            let prompt = (norwegian ? "Svar på norsk bokmål. Spørsmål: " : "Answer in English. Question: ")
+                + String(question.prefix(1800))
+            do {
+                let response = try await session.respond(to: prompt)
+                try Task.checkCancellation()
+                let answer = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                return !answer.isEmpty && answer.count <= 1600 ? answer : nil
+            } catch is CancellationError { throw CancellationError() }
+            catch { return nil }
+        }
+        #endif
+        return nil
     }
 
     static func approvedChoice(_ answer: String, options: [String]) -> String? {

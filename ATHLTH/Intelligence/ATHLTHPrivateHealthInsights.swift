@@ -82,6 +82,10 @@ enum ATHLTHPrivateHealthInsights {
         let alternate = tr(norwegian,
             "For questions about symptoms, pain or illness, seek qualified healthcare advice. For exercise planning, use ATHLTH's plan tools and adjust intensity to how you feel.",
             "Ved spørsmål om symptomer, smerter eller sykdom, søk råd fra kvalifisert helsepersonell. Bruk planverktøyene i ATHLTH til treningsplanlegging og tilpass intensiteten etter dagsformen.")
+        if context == nil, let answer = try await ATHLTHIntelligenceEngine.localGeneralCoachAnswer(
+            question: question, norwegian: norwegian) {
+            return RecoveryCoachReply(answer: answer, quickQuestions: [], proposal: nil)
+        }
         var answer = try await ATHLTHIntelligenceEngine.privateWording(feature: .coachQuestion,
             options: [general, alternate], question: question)
         if let context, let score = context.recoveryScore, (0...100).contains(score) {

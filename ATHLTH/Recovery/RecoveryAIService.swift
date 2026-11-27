@@ -282,8 +282,8 @@ enum RecoveryInsightAIConsentError: LocalizedError {
 
     var errorDescription: String? {
         ATHLTHLocalization.choose(
-            english: "Allow AI health insights before sharing health data with Groq.",
-            norwegian: "Godkjenn AI-helseinnsikt før helsedata deles med Groq."
+            english: "Allow private AI health insights before using your health context.",
+            norwegian: "Tillat privat AI-helseinnsikt før helseinformasjonen brukes."
         )
     }
 }

@@ -1504,8 +1504,8 @@ struct RecoveryCoachView: View {
         } message: {
             Text(
                 recoveryAIText(
-                    "For ordinary Coach chat, this approval allows local health context for this question only. Active-plan changes are separate and may use the external plan-review service; avoid entering sensitive information there.",
-                    "For vanlig Coach-chat gir godkjenningen tilgang til lokal helseinformasjon kun for dette spørsmålet. Endringer av aktiv plan er separate og kan bruke ekstern plangjennomgang; unngå sensitive opplysninger der."
+                    "This approval allows local health context for this question only. Automatic plan changes are disabled in private chat.",
+                    "Godkjenningen gir tilgang til lokal helseinformasjon kun for dette spørsmålet. Automatiske planendringer er deaktivert i privat chat."
                 )
             )
         }
@@ -1600,8 +1600,8 @@ struct RecoveryCoachView: View {
                                 .font(.subheadline.weight(.semibold))
 
                                 Text(recoveryAIText(
-                                    "A separate, ongoing opt-in for questions sent to Groq. Never enabled by earlier permissions. You can withdraw at any time.",
-                                    "Eget, vedvarende samtykke for spørsmål sendt til Groq. Aktiveres aldri av tidligere tillatelser. Kan trekkes tilbake når som helst."
+                                    "Separate ongoing health access is not enabled in this release. Existing permissions do not enable it automatically.",
+                                    "Kontinuerlig helsetilgang er ikke aktivert i denne versjonen. Tidligere tillatelser aktiverer den ikke automatisk."
                                 ))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -3083,75 +3083,15 @@ struct RecoveryCoachView: View {
     private func respondToPlanChangeRequest(
         _ requestText: String, sharingApproved: Bool
     ) async {
-        guard sharingApproved else {
-            messages.append(RecoveryCoachMessage(
-                role: .assistant,
-                text: recoveryAIText(
-                    "To suggest exact changes to your active plan, I need your approval to share its schedule with the Coach service for this request. Activate health/training sharing below and send the request again. Nothing has been changed.",
-                    "For å foreslå konkrete endringer i den aktive planen trenger jeg tillatelse til å dele planoppsettet med Coach-tjenesten for dette spørsmålet. Aktiver deling av helse/trening nedenfor og send forespørselen på nytt. Ingenting er endret."
-                )
-            ))
-            return
-        }
-        guard let plan = session.activePlan else { return }
-        let requestOwnerID = session.profile.userID
-        let linkedGoals = goalStore.goals.filter {
-            $0.linkedTrainingPlanID == plan.id
-        }
-        let recentTraining = ATHLTHCoachTrainingContext.recentCompletedTraining(
-            running: ATHLTHRunningPerformanceHistory.load(
-                userID: requestOwnerID
-            ),
-            strength: strengthWorkout.workoutHistory
-        )
-        let details = CoachPlanAdaptationService.makeRequest(
-            plan: plan,
-            goals: linkedGoals,
-            recentTraining: recentTraining,
-            userNotes: requestText
-        )
-        do {
-            let candidate = try await planAdaptationService.generate(request: details)
-            guard session.signedIn, session.profile.userID == requestOwnerID else { return }
-            guard !candidate.changes.isEmpty else {
-                messages.append(RecoveryCoachMessage(
-                    role: .assistant,
-                    text: recoveryAIText(
-                        "I reviewed your current plan, but I couldn't produce a concrete, safe change. Please specify the workout and the new day or goal.",
-                        "Jeg har vurdert planen, men fant ikke en konkret og forsvarlig endring. Oppgi gjerne hvilken økt og ny dag eller ønsket mål."
-                    )
-                ))
-                return
-            }
-            guard session.stageCoachPlanProposal(candidate) else {
-                messages.append(RecoveryCoachMessage(
-                    role: .assistant,
-                    text: recoveryAIText(
-                        "Your plan changed while I was reviewing it. Please try again so I can use the latest version.",
-                        "Planen ble endret mens jeg gjennomgikk den. Prøv igjen, slik at jeg kan bruke siste versjon."
-                    )
-                ))
-                return
-            }
-            messages.append(RecoveryCoachMessage(
-                role: .assistant,
-                text: recoveryAIText(
-                    "Here is a proposed change to your active plan. Review each adjustment below before accepting. Your current plan remains unchanged until you approve.",
-                    "Her er et konkret forslag til endring av den aktive planen. Gjennomgå endringene nedenfor før du godkjenner. Planen er uendret inntil du bekrefter."
-                ),
-                planReviewPlanID: candidate.planID,
-                planReviewPlanVersion: candidate.planVersion
-            ))
-        } catch {
-            guard session.signedIn, session.profile.userID == requestOwnerID else { return }
-            messages.append(RecoveryCoachMessage(
-                role: .assistant,
-                text: recoveryAIText(
-                    "I couldn't review the plan right now. No changes were made. You can try again or open Adjust Active Plan from the menu.",
-                    "Jeg fikk ikke gjennomgått planen nå. Ingen endringer ble gjort. Prøv igjen eller åpne «Juster aktiv plan» fra menyen."
-                )
-            ))
-        }
+        // The private chat must not silently forward free text, plan details
+        // or health-derived training history to a separate cloud endpoint.
+        messages.append(RecoveryCoachMessage(
+            role: .assistant,
+            text: recoveryAIText(
+                "Automatic plan changes are not available in private Coach chat yet. Open your training plan to make changes manually. Nothing has been sent to an external AI provider or changed in your plan.",
+                "Automatiske planendringer er foreløpig ikke tilgjengelige i privat Coach-chat. Åpne treningsplanen for å gjøre endringer manuelt. Ingenting er sendt til en ekstern AI-leverandør eller endret i planen."
+            )
+        ))
     }
 
     private func normalizedQuestions(
