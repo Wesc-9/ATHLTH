@@ -113,9 +113,12 @@ struct ATHLTHTournamentCreator: View {
     @State private var expandedScoringExample = false
     @State private var rulesWork: ATHLTHCompetitionRulesWork
     @State private var isReviewing = false
+    private var liveSummary: Bool { ATHLTHCompetitionWorkspacePolicy.usesLiveSummary }
+    private var showsReviewScreen: Bool { isReviewing && !liveSummary }
+    private var showsSendAction: Bool { liveSummary || showsReviewScreen }
     private static let reviewCheckpointPrefix = "summary:"
     private var checkpointScrollID: String? {
-        isReviewing ? Self.reviewCheckpointPrefix + (rulesWork.scrollID ?? "") : rulesWork.scrollID
+        showsReviewScreen ? Self.reviewCheckpointPrefix + (rulesWork.scrollID ?? "") : rulesWork.scrollID
     }
 
     /// Review may include a valid draft with an unsupported measurement.
@@ -272,7 +275,7 @@ struct ATHLTHTournamentCreator: View {
         self.automaticDuelName = automaticDuelName
         self.onCheckpoint = onCheckpoint
         let restoringReview = restoredScrollID?.hasPrefix(Self.reviewCheckpointPrefix) == true
-        _isReviewing = State(initialValue: restoringReview)
+        _isReviewing = State(initialValue: restoringReview && !ATHLTHCompetitionWorkspacePolicy.usesLiveSummary)
         let restoredRule = restoringReview
             ? String((restoredScrollID ?? "").dropFirst(Self.reviewCheckpointPrefix.count))
             : restoredScrollID
@@ -433,19 +436,21 @@ struct ATHLTHTournamentCreator: View {
     var body: some View {
         NavigationStack {
             Group {
-                if isReviewing {
+                if liveSummary {
+                    ATHLTHCompetitionWorkspace(editor: AnyView(rulesScreen), summary: AnyView(preview))
+                } else if showsReviewScreen {
                     reviewScreen
                 } else {
                     rulesScreen
                 }
             }
             .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
-            .navigationTitle(isReviewing ? "Sammendrag" : fixedInvitees == nil ? "Ny konkurranse" : "Regler")
+            .navigationTitle(showsReviewScreen ? "Sammendrag" : fixedInvitees == nil ? "Ny konkurranse" : "Regler")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(isReviewing ? "Tilbake" : fixedInvitees == nil ? "Avbryt" : "Tilbake") {
-                        if isReviewing {
+                    Button(showsReviewScreen ? "Tilbake" : fixedInvitees == nil ? "Avbryt" : "Tilbake") {
+                        if showsReviewScreen {
                             returnToRules()
                         } else {
                             rulesWork.cancelCheckpoint()
@@ -753,8 +758,8 @@ struct ATHLTHTournamentCreator: View {
                 }
                 .scrollTargetLayout()
                 .padding(18)
-                .frame(maxWidth: 650)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: liveSummary ? .infinity : 650)
+                .frame(maxWidth: .infinity, alignment: liveSummary ? .leading : .center)
             }
     }
 
@@ -779,16 +784,16 @@ struct ATHLTHTournamentCreator: View {
     }
 
     private var creationFooter: some View {
-        let enabled = isReviewing ? canSave : canReview
+        let enabled = showsSendAction ? canSave : canReview
         return VStack(spacing: 8) {
             if !enabled && !publishing {
-                Text(isReviewing ? publishHint : reviewHint)
+                Text(showsSendAction ? publishHint : reviewHint)
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     .multilineTextAlignment(.center)
             }
             Button {
-                if isReviewing {
+                if showsSendAction {
                     Task { await publishTournament() }
                 } else {
                     showReview()
@@ -796,8 +801,8 @@ struct ATHLTHTournamentCreator: View {
             } label: {
                 HStack(spacing: 8) {
                     if publishing { ProgressView().tint(.white) }
-                    Text(isReviewing ? (publishing ? "Sender…" : isDuel ? "Send invitasjon" : "Send invitasjoner") : "Fortsett til sammendrag")
-                    if !isReviewing { Image(systemName: "arrow.right") }
+                    Text(showsSendAction ? (publishing ? "Sender…" : isDuel ? "Send invitasjon" : "Send invitasjoner") : "Fortsett til sammendrag")
+                    if !showsSendAction { Image(systemName: "arrow.right") }
                 }
                 .font(.headline)
                 .foregroundStyle(.white)
@@ -806,9 +811,9 @@ struct ATHLTHTournamentCreator: View {
             }
             .disabled(!enabled || publishing)
             .opacity(enabled ? 1 : 0.5)
-            .accessibilityIdentifier(isReviewing ? "athlth-competition-send-invitations" : "athlth-competition-continue-summary")
+            .accessibilityIdentifier(showsSendAction ? "athlth-competition-send-invitations" : "athlth-competition-continue-summary")
 
-            if isReviewing {
+            if showsReviewScreen {
                 Button("Endre regler") { returnToRules() }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
@@ -964,7 +969,7 @@ struct ATHLTHTournamentCreator: View {
 
     @MainActor
     private func publishTournament() async {
-        guard isReviewing, canSave, !publishing else { return }
+        guard showsSendAction, canSave, !publishing else { return }
         checkpoint()
         publishing = true
         defer { publishing = false }
