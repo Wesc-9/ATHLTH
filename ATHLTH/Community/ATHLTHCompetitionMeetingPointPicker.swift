@@ -2,6 +2,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import Combine
+import UIKit
 
 /// A single on-demand location fix. Never starts continuous tracking, never
 /// requests background authorization, and never writes the athlete's position
@@ -509,5 +510,126 @@ struct ATHLTHCompetitionMeetingPointPicker: View {
         let meters = distance(from: from, to: to)
         if meters < 1_000 { return "\(Int(meters.rounded())) m" }
         return (meters / 1_000).formatted(.number.precision(.fractionLength(1))) + " km"
+    }
+}
+
+
+/// Compact shared rules/review preview. The selected meeting point is the
+/// only coordinate used; no location permission or live map tracking.
+struct ATHLTHCompetitionMeetingPointPreview: View {
+    let settings: ATHLTHTournamentCompetitionSettings
+    var editable = false
+
+    private struct Point: Hashable {
+        let latitude: Double
+        let longitude: Double
+    }
+
+    @State private var renderedPoint: Point?
+    @State private var snapshot: UIImage?
+    @State private var attemptedPoint: Point?
+
+    private var point: Point? {
+        guard let latitude = settings.meetingLat, let longitude = settings.meetingLon,
+              CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+        else { return nil }
+        return Point(latitude: latitude, longitude: longitude)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.title3)
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Møtested")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    Text(settings.meetingDisplayAddress)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let description = settings.meetingDisplayDescription {
+                        Text(description)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 4)
+                if editable {
+                    Text("Endre")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+            }
+            if let point {
+                mapPreview(point)
+            } else {
+                Label("Kartutsnitt vises når et punkt er valgt på kartet.", systemImage: "map")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: point) {
+            guard let point else {
+                snapshot = nil
+                renderedPoint = nil
+                attemptedPoint = nil
+                return
+            }
+            if renderedPoint == point, snapshot != nil { return }
+            snapshot = nil
+            renderedPoint = nil
+            attemptedPoint = nil
+            let image = await RouteMapSnapshotCache.meetingPointImage(
+                latitude: point.latitude, longitude: point.longitude)
+            guard !Task.isCancelled, self.point == point else { return }
+            snapshot = image
+            renderedPoint = image == nil ? nil : point
+            attemptedPoint = point
+        }
+    }
+
+    private func mapPreview(_ point: Point) -> some View {
+        Color.clear
+            .aspectRatio(2.5, contentMode: .fit)
+            .overlay {
+                if renderedPoint == point, let snapshot {
+                    Image(uiImage: snapshot)
+                        .resizable()
+                        .scaledToFit()
+                        .overlay {
+                            // The snapshot is centered on the saved coordinate.
+                            // Align the bottom of the pin to that center.
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: 29, weight: .semibold))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, ATHLTHArenaV3Style.gold)
+                                .shadow(color: .black.opacity(0.22), radius: 3, y: 2)
+                                .offset(y: -12)
+                        }
+                } else {
+                    VStack(spacing: 6) {
+                        if attemptedPoint != point {
+                            ProgressView().controlSize(.small)
+                            Text("Henter kart…").font(.caption)
+                        } else {
+                            Image(systemName: "map").font(.title3)
+                            Text("Kartutsnitt utilgjengelig").font(.caption)
+                        }
+                    }
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
+            .background(ATHLTHArenaV3Style.cream)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityLabel("Kartutsnitt av valgt møtested")
+            .allowsHitTesting(false)
     }
 }
