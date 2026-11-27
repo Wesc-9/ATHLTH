@@ -6,6 +6,7 @@ struct ATHLTHCompetitionExercisePicker: View {
     @Environment(\.dismiss) private var dismiss
     let allowed: Set<ATHLTHTournamentActivity>
     let selected: Set<UUID>
+    var templatesOnly: Bool? = nil
     let onSelect: (ATHLTHTournamentExerciseSearchResult) -> Void
     @State private var query = ""
     @State private var results: [ATHLTHTournamentExerciseSearchResult] = []
@@ -16,7 +17,7 @@ struct ATHLTHCompetitionExercisePicker: View {
     @State private var filter: ATHLTHTournamentActivity?
 
     private var visible: [ATHLTHTournamentExerciseSearchResult] {
-        results.filter { $0.activity.isAvailableForCreation && allowed.contains($0.activity) && (filter == nil || $0.activity == filter) }
+        results.filter { $0.activity.isAvailableForCreation && allowed.contains($0.activity) && (filter == nil || $0.activity == filter) && (templatesOnly == nil || $0.isActivityTemplate == templatesOnly) }
     }
 
     var body: some View {
@@ -42,7 +43,7 @@ struct ATHLTHCompetitionExercisePicker: View {
                     }
                 }
                 if !visible.filter(\.isActivityTemplate).isEmpty {
-                    Section("Treningsøkter og konkurranseformer") {
+                    Section("Forhåndsdefinerte konkurranseøvelser og treningsøkter") {
                         ForEach(visible.filter(\.isActivityTemplate)) { item in row(item) }
                     }
                 }
@@ -54,7 +55,7 @@ struct ATHLTHCompetitionExercisePicker: View {
             }
             .listStyle(.insetGrouped)
             .searchable(text: $query, prompt: "Søk etter øvelse eller treningsøkt")
-            .navigationTitle("Legg til")
+            .navigationTitle(templatesOnly == true ? "Forhåndsdefinerte" : templatesOnly == false ? "Bibliotekøvelser" : "Legg til")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
