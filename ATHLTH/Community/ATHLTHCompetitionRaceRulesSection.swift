@@ -229,6 +229,7 @@ struct ATHLTHCompetitionRaceRulesSection: View {
         .foregroundStyle(ATHLTHArenaV3Style.ink)
         .tint(ATHLTHArenaV3Style.gold)
         .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHArenaV3Style.panel())
         .fullScreenCover(isPresented: $showingSavedRoutes) {
             NavigationStack {
