@@ -115,6 +115,7 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                             .foregroundStyle(ATHLTHArenaV3Style.gold)
                     }
                     .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ATHLTHArenaV3Style.panel())
                 }
                 .buttonStyle(.plain)
@@ -166,6 +167,7 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
             .font(.subheadline)
             .foregroundStyle(ATHLTHArenaV3Style.ink)
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
 
             if completionHours > cadenceDays * 24 {
