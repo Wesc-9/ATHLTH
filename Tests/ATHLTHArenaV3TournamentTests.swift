@@ -213,4 +213,39 @@ final class ATHLTHArenaV3TournamentTests: XCTestCase {
         XCTAssertTrue(old.isValid)
         XCTAssertTrue(old.isOperational)
     }
+
+    func testStrengthMeasurementUsesOneConsecutiveSetAndExactLibraryIdentity() {
+        let id = UUID()
+        let rule = ATHLTHCompetitionMeasureDraft(activity: .strength,
+            measure: .heaviestForReps, libraryID: id, libraryName: "Benkpress")
+        let sets: [ATHLTHCompetitionMeasureCalculator.CompletedSet] = [
+            .init(repetitions: 5, kilograms: 100, holdSeconds: nil),
+            .init(repetitions: 5, kilograms: 100, holdSeconds: nil),
+            .init(repetitions: 10, kilograms: 80, holdSeconds: nil),
+            .init(repetitions: 12, kilograms: 70, holdSeconds: nil)
+        ]
+        XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.strength(rule, libraryID: id, sets: sets), 80)
+        XCTAssertNil(ATHLTHCompetitionMeasureCalculator.strength(rule, libraryID: id, sets: Array(sets.prefix(2))))
+        XCTAssertNil(ATHLTHCompetitionMeasureCalculator.strength(rule, libraryID: UUID(), sets: sets))
+        var volume = rule
+        volume.measure = .volume
+        XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.strength(volume, libraryID: id, sets: sets), 2640)
+        var reps = rule
+        reps.measure = .mostReps
+        XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.strength(reps, libraryID: id, sets: sets), 12)
+        reps.measure = .repsInTime
+        XCTAssertNil(ATHLTHCompetitionMeasureCalculator.strength(reps, libraryID: id, sets: sets))
+    }
+
+    func testBestConfiguredAttemptRespectsDirectionAndAttemptCount() {
+        var rule = ATHLTHCompetitionMeasureDraft(activity: .running, measure: .fastestDistance)
+        rule.attempts = 3
+        XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.bestAttempt(rule, values: [1200, 1190, 1220]), 1190)
+        XCTAssertNil(ATHLTHCompetitionMeasureCalculator.bestAttempt(rule, values: [1200, 1190, 1220, 1180]))
+        XCTAssertNil(ATHLTHCompetitionMeasureCalculator.bestAttempt(rule, values: [Double.nan]))
+        rule.measure = .distanceInTime
+        XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.bestAttempt(rule, values: [5000, 5100]), 5100)
+        rule.measure = .closestPace
+        XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.bestAttempt(rule, values: [12, 0]), 0)
+    }
 }
