@@ -282,4 +282,19 @@ final class ATHLTHArenaV3TournamentTests: XCTestCase {
         XCTAssertFalse(settings.isValid)
         XCTAssertTrue(settings.meetingPlace.count > 240)
     }
+
+    func testMeetingPreviewUsesSeparateAddressAndDescriptionWithLegacyFallback() {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        XCTAssertFalse(settings.hasMeetingPoint)
+        settings.meetingPlace = "Tidligere adresse"
+        XCTAssertTrue(settings.hasMeetingPoint)
+        XCTAssertEqual(settings.meetingDisplayAddress, "Tidligere adresse")
+        XCTAssertNil(settings.meetingDisplayDescription)
+        settings.setMeetingPoint(address: "Testveien 12", description: "Hovedinngangen",
+                                 latitude: 63.4, longitude: 10.4)
+        XCTAssertEqual(settings.meetingDisplayAddress, "Testveien 12")
+        XCTAssertEqual(settings.meetingDisplayDescription, "Hovedinngangen")
+        settings.setMeetingPoint(address: "", description: "", latitude: nil, longitude: nil)
+        XCTAssertFalse(settings.hasMeetingPoint)
+    }
 }
