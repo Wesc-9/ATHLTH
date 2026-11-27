@@ -89,7 +89,119 @@ enum ATHLTHCompetitionScoringMode: String, Codable, CaseIterable, Identifiable {
     var needsGoal: Bool { self == .target || self == .closest }
 }
 
+/// Shared definition of a configurable competition measurement. These are draft
+/// entries until the result backend supports the same rules and evidence.
+enum ATHLTHCompetitionMeasure: String, Codable, CaseIterable, Identifiable {
+    case heaviest, heaviestForReps, mostReps, repsAtWeight, repsInTime, volume
+    case relativeStrength, holdTime, fastestReps
+    case fastestDistance, distanceInTime, continuousDistance, paceEndurance, speedEndurance
+    case intervalDistance, mostLaps, elevationGain, closestPace, sprint
+    case routeTime, routeSpeed, routeRepeats, routeClosestTime
+
+    var id: String { rawValue }
+    static var strength: [Self] {
+        [.heaviest, .heaviestForReps, .mostReps, .repsAtWeight, .repsInTime, .volume,
+         .relativeStrength, .holdTime, .fastestReps]
+    }
+    static var cardio: [Self] {
+        [.fastestDistance, .distanceInTime, .continuousDistance, .paceEndurance,
+         .speedEndurance, .intervalDistance, .mostLaps, .elevationGain, .closestPace, .sprint]
+    }
+    static var route: [Self] { [.routeTime, .routeSpeed, .routeRepeats, .routeClosestTime] }
+
+    var title: String {
+        switch self {
+        case .heaviest: "Høyeste vekt (1 rep)"
+        case .heaviestForReps: "Høyeste vekt ved X reps"
+        case .mostReps: "Flest sammenhengende reps"
+        case .repsAtWeight: "Flest reps ved bestemt vekt"
+        case .repsInTime: "Flest reps innen en tid"
+        case .volume: "Høyest treningsvolum"
+        case .relativeStrength: "Relativ styrke"
+        case .holdTime: "Lengst holdetid"
+        case .fastestReps: "Raskeste gjennomføring av X reps"
+        case .fastestDistance: "Raskeste distanse"
+        case .distanceInTime: "Lengst distanse innen en tid"
+        case .continuousDistance: "Lengst sammenhengende distanse"
+        case .paceEndurance: "Hold bestemt pace lengst mulig"
+        case .speedEndurance: "Hold bestemt hastighet lengst mulig"
+        case .intervalDistance: "Lengst samlet intervalldistanse"
+        case .mostLaps: "Flest runder innen en tid"
+        case .elevationGain: "Flest høydemeter innen en tid"
+        case .closestPace: "Nærmest avtalt pace"
+        case .sprint: "Raskeste sprint"
+        case .routeTime: "Raskeste tid"
+        case .routeSpeed: "Beste gjennomsnittsfart"
+        case .routeRepeats: "Flest gjennomføringer"
+        case .routeClosestTime: "Nærmest avtalt sluttid"
+        }
+    }
+    var lowerIsBetter: Bool { [.fastestDistance, .fastestReps, .sprint, .routeTime].contains(self) }
+    var needsReps: Bool { [.heaviestForReps, .fastestReps].contains(self) }
+    var needsWeight: Bool { self == .repsAtWeight }
+    var needsDistance: Bool { [.fastestDistance, .closestPace, .sprint].contains(self) }
+    var needsDuration: Bool { [.repsInTime, .distanceInTime, .mostLaps, .elevationGain, .routeRepeats, .routeClosestTime].contains(self) }
+    var needsPace: Bool { [.paceEndurance, .closestPace].contains(self) }
+    var needsSpeed: Bool { self == .speedEndurance }
+}
+
+/// The identifier belongs to the competition entry, not a fictitious catalog
+/// exercise. Several entries can reference the same real library exercise.
+struct ATHLTHCompetitionMeasureDraft: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var activity: ATHLTHTournamentActivity
+    var measure: ATHLTHCompetitionMeasure
+    var libraryID: UUID? = nil
+    var libraryName: String? = nil
+    var routeID: UUID? = nil
+    var routeName: String? = nil
+    var repetitions = 10
+    var kilograms = 60.0
+    var distanceMeters = 5_000
+    var durationSeconds = 1_800
+    var paceSecondsPerKM = 300
+    var speedKMH = 12.0
+    var intervals = 4
+    var workSeconds = 240
+    var restSeconds = 180
+    var paceToleranceSeconds = 10
+    var speedToleranceKMH = 0.5
+    var attempts = 1
+    var pointsWeight = 1
+
+    var isValid: Bool {
+        guard activity.isAvailableForCreation, (1...10).contains(attempts),
+              (1...5).contains(pointsWeight),
+              (1...1_000).contains(repetitions),
+              kilograms.isFinite, (0.1...1_000).contains(kilograms),
+              (50...500_000).contains(distanceMeters),
+              (1...86_400).contains(durationSeconds),
+              (60...3_600).contains(paceSecondsPerKM),
+              speedKMH.isFinite, (0.5...60).contains(speedKMH),
+              (1...100).contains(intervals), (1...3_600).contains(workSeconds),
+              (0...3_600).contains(restSeconds),
+              (1...120).contains(paceToleranceSeconds),
+              speedToleranceKMH.isFinite, (0.1...5).contains(speedToleranceKMH)
+        else { return false }
+        if ATHLTHCompetitionMeasure.strength.contains(measure) {
+            return activity == .strength && libraryID != nil && routeID == nil &&
+                !(libraryName ?? "").isEmpty && (libraryName ?? "").count <= 240
+        }
+        if ATHLTHCompetitionMeasure.route.contains(measure) {
+            return (activity == .running || activity == .walking) && routeID != nil && libraryID == nil &&
+                !(routeName ?? "").isEmpty && (routeName ?? "").count <= 120
+        }
+        return (activity == .running || activity == .walking) && libraryID == nil && routeID == nil &&
+            ATHLTHCompetitionMeasure.cardio.contains(measure) &&
+            (activity == .running || measure != .sprint)
+    }
+}
+
 struct ATHLTHCompetitionRaceRules: Codable, Hashable {
+    /// Local/template-only until server-side measurement validation is available.
+    var measureDrafts: [ATHLTHCompetitionMeasureDraft]? = nil
+    var plannedMeasures: [ATHLTHCompetitionMeasureDraft] { measureDrafts ?? [] }
+
     var scoringMode: ATHLTHCompetitionScoringMode? = nil
     var pointsPerExercise: Int? = nil
     var reviewHours: Int? = nil
@@ -177,11 +289,12 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
              lapCount, lapVerification, lapCourseName, lapCourseLatitude,
              lapCourseLongitude, countdownSeconds, allowOptInLiveLocation,
              equipmentRules, exerciseScoringVersion, duelMode, competitionEndsAt, previousCompetitionID, seasonNumber,
-             scoringMode, pointsPerExercise, reviewHours, scoringGoals, exerciseWeights, handicapPercentages
+             scoringMode, pointsPerExercise, reviewHours, scoringGoals, exerciseWeights, handicapPercentages, measureDrafts
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        measureDrafts = try c.decodeIfPresent([ATHLTHCompetitionMeasureDraft].self, forKey: .measureDrafts)
         scoringMode = try c.decodeIfPresent(ATHLTHCompetitionScoringMode.self, forKey: .scoringMode)
         pointsPerExercise = try c.decodeIfPresent(Int.self, forKey: .pointsPerExercise)
         reviewHours = try c.decodeIfPresent(Int.self, forKey: .reviewHours)
@@ -229,6 +342,7 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     /// Unsupported capture origins and synchronized formats can be saved
     /// as private drafts, but must never be published as working competitions.
     var isOperational: Bool {
+        if !plannedMeasures.isEmpty { return false }
         if recordingDevice != .any { return false }
         if discipline == .sprint {
             return sprintMode == .massStart && sprintTarget != .route
@@ -238,7 +352,10 @@ struct ATHLTHCompetitionRaceRules: Codable, Hashable {
     }
 
     var isValid: Bool {
-        guard (12...168).contains(reviewHours ?? 48),
+        guard plannedMeasures.count <= 12,
+              Set(plannedMeasures.map(\.id)).count == plannedMeasures.count,
+              plannedMeasures.allSatisfy(\.isValid),
+              (12...168).contains(reviewHours ?? 48),
               (1...10).contains(pointsPerExercise ?? 1),
               (scoringGoals ?? [:]).values.allSatisfy({ $0.isFinite && $0 > 0 && $0 <= 100_000_000 }),
               (exerciseWeights ?? [:]).values.allSatisfy({ (1...5).contains($0) }),
