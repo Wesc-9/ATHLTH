@@ -3098,7 +3098,7 @@ struct RecoveryCoachView: View {
                 let intake = ATHLTHCoachChatWorkoutIntake.prefilled(from: clean,
                     preferences: ATHLTHTrainingProfile.load(userID: requestOwnerID).coachPreferences)
                 messages.append(RecoveryCoachMessage(role: .assistant,
-                    text: recoveryAIText("Confirm the workout details. I'll use your available library exercises.",
+                    text: intake.forTogether == true ? recoveryAIText("Confirm a shared workout that suits both of you. Choose your partner and invitation settings in the workout editor.", "Bekreft en fellesøkt som passer begge. Velg treningspartner og invitasjonsinnstillinger i øktbyggeren.") : recoveryAIText("Confirm the workout details. I'll use your available library exercises.",
                                          "Bekreft øktdetaljene. Jeg bruker øvelsene som finnes i biblioteket ditt."),
                     workoutIntake: intake))
                 persistConversation()

@@ -1,5 +1,4 @@
 import SwiftUI
-import Supabase
 
 struct ATHLTHTournamentCoachDraft: Decodable {
     let title: String
@@ -14,50 +13,84 @@ struct ATHLTHTournamentCoachDraft: Decodable {
     let explanation: String
 }
 
-private struct ATHLTHTournamentCoachRequest: Encodable {
-    let prompt: String
-    let format: String
-    let activities: [String]
-    let maxExercises: Int
-}
-private struct ATHLTHTournamentCoachError: Decodable {
-    let error: String
+/// Local selection over server-supported catalog entries. The free-text goal
+/// never goes to the catalog service or an external language model.
+enum ATHLTHTournamentLocalCoachPolicy {
+    static func suggest(prompt: String, activities: [ATHLTHTournamentActivity],
+                        exerciseCount: Int, catalog: [ATHLTHTournamentExerciseSearchResult]) -> ATHLTHTournamentCoachDraft? {
+        let allowed = Set(activities.filter(\.isAvailableForCreation))
+        guard !allowed.isEmpty, (1...12).contains(exerciseCount) else { return nil }
+        let clean = prompt.lowercased()
+        let environment: ATHLTHCompetitionEnvironment =
+            clean.contains("kun ute") || clean.contains("only outdoor") ? .outdoor :
+            clean.contains("kun treningssenter") || clean.contains("gym only") ? .gym : .any
+        guard environment.canPublish(for: allowed) else { return nil }
+        // Only match words against known entries. Never manufacture IDs or
+        // exercise names. If an explicit muscle focus cannot be resolved,
+        // ask the athlete to choose manually rather than silently ignore it.
+        let focusAliases: [(String, [String])] = [
+            ("rygg", ["row", "pull", "lat", "back", "roing", "rygg"]),
+            ("bryst", ["chest", "bench press", "push up", "bryst"]),
+            ("bein", ["squat", "lunge", "leg", "knebøy", "utfall"]),
+            ("lår", ["squat", "lunge", "leg", "knebøy", "utfall"])
+        ]
+        let focus = focusAliases.first { clean.contains($0.0) }?.1
+        let tokens = clean.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init).filter { $0.count >= 4 }
+        var seen = Set<UUID>()
+        let eligible = catalog.filter { item in
+            guard allowed.contains(item.activity), seen.insert(item.id).inserted else { return false }
+            if let focus, item.activity == .strength {
+                return focus.contains { item.name.lowercased().contains($0) }
+            }
+            return true
+        }
+        func score(_ item: ATHLTHTournamentExerciseSearchResult) -> Int {
+            let name = item.name.lowercased()
+            return tokens.filter { name.contains($0) }.count
+        }
+        let sorted = eligible.sorted {
+            let left = score($0), right = score($1)
+            if left != right { return left > right }
+            if $0.name != $1.name { return $0.name < $1.name }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+        // Every selected branch gets a supported exercise first, when the
+        // requested count permits it. Then fill with distinct catalog IDs.
+        guard exerciseCount >= allowed.count else { return nil }
+        var selected: [ATHLTHTournamentExerciseSearchResult] = []
+        for activity in allowed.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let first = sorted.first(where: { $0.activity == activity }) else { return nil }
+            selected.append(first)
+        }
+        for item in sorted where selected.count < exerciseCount && !selected.contains(where: { $0.id == item.id }) {
+            selected.append(item)
+        }
+        guard selected.count == exerciseCount else { return nil }
+        let start = clean.contains("alle er klare") || clean.contains("everyone is ready") ? "when_ready" : "manual"
+        return ATHLTHTournamentCoachDraft(
+            title: "Konkurranse · " + allowed.sorted(by: { $0.rawValue < $1.rawValue }).map(\.title).joined(separator: " og "),
+            exerciseIDs: selected.map(\.id), exerciseNames: selected.map(\.name),
+            startMode: start, environment: environment.rawValue,
+            releaseEvery: 1, completionHours: 24, allowedRules: "", prohibitedRules: "",
+            explanation: "Lokalt forslag basert på tilgjengelige konkurranseøvelser. Kontroller øvelser, frister, poeng og regler før publisering. Uspesifiserte regler er ikke fastsatt av Coach.")
+    }
 }
 
 @MainActor
 struct ATHLTHTournamentCoachService {
-    private let client = SupabaseEnvironment.client
-
-    func suggest(
-        prompt: String, format: ATHLTHTournamentFormat,
-        activities: [ATHLTHTournamentActivity],
-        exerciseCount: Int
-    ) async throws -> ATHLTHTournamentCoachDraft {
-        do {
-            return try await client.functions.invoke(
-                "generate-competition-draft",
-                options: FunctionInvokeOptions(
-                    body: ATHLTHTournamentCoachRequest(
-                        prompt: prompt,
-                        format: format.rawValue,
-                        activities: activities.map(\.rawValue),
-                        maxExercises: min(12, max(1, exerciseCount))
-                    ),
-                    timeoutInterval: 40
-                )
-            )
-        } catch FunctionsError.httpError(_, let data) {
-            let response = try? JSONDecoder().decode(
-                ATHLTHTournamentCoachError.self, from: data
-            )
-            throw ATHLTHTournamentCoachFailure.unavailable(
-                response?.error ?? "Coach var utilgjengelig akkurat nå."
-            )
-        } catch {
-            throw ATHLTHTournamentCoachFailure.unavailable(
-                "Coach var utilgjengelig akkurat nå."
-            )
+    func suggest(prompt: String, format: ATHLTHTournamentFormat,
+                 activities: [ATHLTHTournamentActivity], exerciseCount: Int) async throws -> ATHLTHTournamentCoachDraft {
+        // Use only the existing bounded public catalog browse; no user prompt
+        // or participant information is included in this network request.
+        let catalog = try await ATHLTHTournamentLobbyCloudService()
+            .searchCompetitionExercises("", allowed: activities, browse: true)
+        try Task.checkCancellation()
+        guard let proposal = ATHLTHTournamentLocalCoachPolicy.suggest(prompt: prompt,
+            activities: activities, exerciseCount: exerciseCount, catalog: catalog) else {
+            throw ATHLTHTournamentCoachFailure.unavailable("Fant ikke nok passende konkurranseøvelser. Juster antallet eller velg øvelser manuelt.")
         }
+        return proposal
     }
 }
 
@@ -112,7 +145,7 @@ struct ATHLTHTournamentCoachWizard: View {
                         .padding(15)
                         .background(ATHLTHArenaV3Style.panel())
 
-                    Text("Bare teksten du skriver her og tilgjengelige øvelsesnavn sendes til AI-tjenesten. Ingen helseopplysninger eller deltakerdata sendes.")
+                    Text("Coach henter godkjente konkurranseøvelser fra biblioteket. Teksten du skriver, behandles lokalt. Ingen helseopplysninger eller deltakerdata sendes til AI.")
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
@@ -202,6 +235,7 @@ struct ATHLTHTournamentCoachWizard: View {
     private func generate() async {
         guard !busy else { return }
         busy = true
+        proposal = nil
         errorMessage = nil
         defer { busy = false }
         do {

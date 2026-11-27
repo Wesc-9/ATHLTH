@@ -30,6 +30,14 @@ struct ATHLTHCoachChatWorkoutIntakeCard: View {
             Picker(workoutText("Experience", "Erfaring"), selection: binding(\.experience)) {
                 ForEach(ATHLTHCoachChatPlanIntake.Experience.allCases, id: \.self) { Text($0.title).tag($0) }
             }
+            Toggle(workoutText("Train together", "Tren sammen"), isOn: Binding(
+                get: { intake.forTogether == true },
+                set: { value in var updated = intake; updated.forTogether = value; onChange(updated) }))
+            if intake.forTogether == true {
+                Text(workoutText("Choose a shared difficulty and equipment you both have. No partner health data is read.",
+                    "Velg et nivå og utstyr som passer begge. Ingen helseopplysninger fra treningspartneren hentes."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Toggle(workoutText("Only my exercises", "Kun mine øvelser"), isOn: binding(\.ownOnly))
             Toggle(workoutText("Remember these preferences", "Husk disse preferansene"), isOn: Binding(
                 get: { intake.rememberPreferences == true },
@@ -75,6 +83,7 @@ struct ATHLTHCoachChatWorkoutPreview: View {
     @State private var date = Date()
     @State private var error: String?
     @State private var saving = false
+    @State private var showingTogetherEditor = false
 
     var body: some View {
         NavigationStack {
@@ -95,6 +104,22 @@ struct ATHLTHCoachChatWorkoutPreview: View {
                     }
                     DatePicker(workoutText("Date and time", "Dato og klokkeslett"), selection: $date)
                     if let error { Text(error).foregroundStyle(.red).font(.caption) }
+                    if !draft.used {
+                        Button {
+                            guard session.signedIn, session.profile.userID == ownerID,
+                                  ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(draft.workout,
+                                    library: exerciseLibrary.selectableExercises) else {
+                                error = workoutText("A library exercise is unavailable.", "En bibliotekøvelse er ikke tilgjengelig.")
+                                return
+                            }
+                            showingTogetherEditor = true
+                        } label: {
+                            Label(workoutText("Train together", "Tren sammen"), systemImage: "person.2")
+                                .font(.headline).frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTrainDesign.bronze)
+                    }
                     Button { apply() } label: {
                         Text(draft.used ? workoutText("Already scheduled", "Allerede planlagt") : workoutText("Schedule workout", "Planlegg økten"))
                             .font(.headline).frame(maxWidth: .infinity)
@@ -105,6 +130,11 @@ struct ATHLTHCoachChatWorkoutPreview: View {
             .navigationTitle(workoutText("Workout draft", "Øktforslag"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button(workoutText("Close", "Lukk")) { dismiss() } } }
+            .sheet(isPresented: $showingTogetherEditor) {
+                if session.signedIn, session.profile.userID == ownerID {
+                    SessionEditorView(standaloneDate: date, initialSourceWorkout: draft.workout)
+                }
+            }
             .onAppear {
                 date = Calendar.current.isDateInToday(draft.date) ? Date() :
                     Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: draft.date) ?? draft.date

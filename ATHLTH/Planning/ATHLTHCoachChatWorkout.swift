@@ -40,12 +40,19 @@ struct ATHLTHCoachChatWorkoutIntake: Codable, Hashable {
     var ownOnly = false
     var submitted = false
     var rememberPreferences: Bool? = nil
+    var forTogether: Bool? = nil
+
+    static func isTogetherRequest(_ source: String) -> Bool {
+        let text = source.lowercased()
+        return ["tren sammen", "trene sammen", "fellesøkt", "felles økt", "train together", "workout together"].contains { text.contains($0) } &&
+            ["lag", "planlegg", "foreslå", "sett opp", "create", "plan", "suggest", "gi meg"].contains { text.contains($0) }
+    }
 
     static func isRequest(_ source: String) -> Bool {
         let text = source.lowercased()
         guard !ATHLTHCoachChatPlanIntake.isCreationRequest(text),
               !["flytt ", "utsett ", "endre ", "postpone ", "reschedule "].contains(where: { text.contains($0) }) else { return false }
-        return ATHLTHCoachWorkoutCreationIntent.isRequest(source) ||
+        return isTogetherRequest(source) || ATHLTHCoachWorkoutCreationIntent.isRequest(source) ||
             (["økt", "workout", "session"].contains { text.contains($0) } &&
              ["planlegg", "planlegge", "gi meg", "foreslå", "forslag", "alternativ", "suggest", "plan a", "give me"].contains { text.contains($0) })
     }
@@ -54,6 +61,7 @@ struct ATHLTHCoachChatWorkoutIntake: Codable, Hashable {
                           preferences: ATHLTHCoachPreferences? = nil) -> Self {
         let text = source.lowercased()
         var intake = Self()
+        intake.forTogether = isTogetherRequest(source) ? true : nil
         intake.focus = preferences?.workoutFocus ?? intake.focus
         if let minutes = preferences?.minutes, (15...60).contains(minutes) { intake.minutes = minutes }
         let plan = ATHLTHCoachChatPlanIntake.prefilled(from: source, preferences: preferences)
@@ -88,6 +96,7 @@ struct ATHLTHCoachChatWorkoutDraft: Codable, Hashable, Identifiable {
     let workout: PlannedSession
     let date: Date
     var used = false
+    var forTogether: Bool? = nil
 }
 
 enum ATHLTHCoachLibraryGate {
@@ -120,7 +129,7 @@ enum ATHLTHCoachChatWorkoutFactory {
                 targetPaceSecondsPerKilometer: nil, routeID: nil, exercises: [], notes: nil)
             workout.workoutBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
             guard ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(workout, library: library) else { return [] }
-            return [ATHLTHCoachChatWorkoutDraft(workout: workout, date: intake.date)]
+            return [ATHLTHCoachChatWorkoutDraft(workout: workout, date: intake.date, forTogether: intake.forTogether)]
         }
         let bodyweight = intake.place == .outdoors || intake.place == .home
         let candidates = StrengthAIExerciseSelectionPolicy.available(from: library, excluding: [],
@@ -155,7 +164,7 @@ enum ATHLTHCoachChatWorkoutFactory {
                 estimatedMinutes: intake.minutes, to: &workout)
             guard ATHLTHWorkoutExerciseBinding.bind(&workout, library: library).isReady,
                   ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(workout, library: library) else { return [] }
-            drafts.append(ATHLTHCoachChatWorkoutDraft(workout: workout, date: intake.date))
+            drafts.append(ATHLTHCoachChatWorkoutDraft(workout: workout, date: intake.date, forTogether: intake.forTogether))
         }
         return drafts
     }
