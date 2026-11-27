@@ -2274,6 +2274,9 @@ struct HomeWeeklyProgressStrip:
                 date
             )
 
+        let isPast = calendar.startOfDay(for: date) < calendar.startOfDay(for: Date())
+        let activityIconColor = isToday ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary
+
         return VStack(spacing: 2) {
             ZStack {
                 Circle()
@@ -2284,43 +2287,16 @@ struct HomeWeeklyProgressStrip:
                             : Color.clear
                     )
 
-                if !isCompleted {
+                // Only today has a gold ring. Earlier incomplete days use
+                // a quiet neutral outline; upcoming days retain a dashed ring.
+                if !isCompleted && !isToday {
                     Circle()
                         .stroke(
-                            plannedSession ==
-                                nil &&
-                            plannedCommunityEvent ==
-                                nil
-                                ? Color
-                                    .secondary
-                                    .opacity(
-                                        0.18
-                                    )
-                                : ATHLTHTheme
-                                    .accentDeep
-                                    .opacity(
-                                        0.72
-                                    ),
-                            style:
-                                StrokeStyle(
-                                    lineWidth:
-                                        plannedSession ==
-                                        nil &&
-                                    plannedCommunityEvent ==
-                                        nil
-                                            ? 1
-                                            : 1.5,
-                                    dash:
-                                        plannedSession ==
-                                        nil &&
-                                    plannedCommunityEvent ==
-                                        nil
-                                            ? [
-                                                3,
-                                                3
-                                            ]
-                                            : []
-                                )
+                            Color.gray.opacity(isPast ? 0.32 : 0.20),
+                            style: StrokeStyle(
+                                lineWidth: isPast ? 1.25 : 1,
+                                dash: isPast ? [] : [3, 3]
+                            )
                         )
                 }
 
@@ -2353,8 +2329,7 @@ struct HomeWeeklyProgressStrip:
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        activityIconColor
                     )
                 } else if let plannedCommunityEvent {
                     Image(
@@ -2370,8 +2345,7 @@ struct HomeWeeklyProgressStrip:
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
+                        activityIconColor
                     )
                 }
             }
@@ -6257,7 +6231,7 @@ struct ATHLTHHomeQuickStartCard: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
                 .frame(width: 32, height: 26)
-                .background(ATHLTHTrainDesign.paleGold.opacity(0.45), in: Capsule())
+                .background(ATHLTHTrainDesign.canvas.opacity(0.55), in: Capsule())
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -6301,7 +6275,7 @@ struct ATHLTHHomeQuickStartCard: View {
         .padding(.horizontal, 6)
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
         .background(
-            all ? ATHLTHTrainDesign.paleGold.opacity(0.45) : ATHLTHTrainDesign.canvas.opacity(0.65),
+            all ? ATHLTHTrainDesign.paleGold.opacity(0.16) : ATHLTHTrainDesign.canvas.opacity(0.45),
             in: RoundedRectangle(cornerRadius: 11, style: .continuous)
         )
         .contentShape(Rectangle())
