@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -53,7 +54,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
 
     var terms: String {
         switch self {
-        case .health: return "health helse apple health watch klokke sync synkronisering import calendar kalender spotify garmin home assistant tilkobling connections"
+        case .health: return "health helse apple health watch klokke sync synkronisering import calendar kalender spotify garmin airpods headphones hodetelefoner puls home assistant tilkobling connections"
         case .training: return "training trening workout styrke løping løp guidance veiledning audio coach ghost notifications varsler alarm achievements trophies medalje exercise data repdb øvelsesdatabase"
         case .account: return "profile profil account konto health helseprofil sign-in login innlogging password passord security sikkerhet data privacy pet pets kjæledyr hund katt dyr"
         case .app: return "app språk language engelsk norsk måleenheter measurements units tid time format widget widgets lock screen siri"
@@ -87,6 +88,8 @@ struct ATHLTHSettingsView: View {
     @State private var healthRequestInProgress = false
     @State private var showingAppleHealthPauseConfirmation = false
     @State private var settingsSearchText = ""
+    @State private var airPodsRoute = ATHLTHAirPodsRoute.current()
+    @AppStorage("athlth.airpods.recognizedAudioRoute") private var recognizedAirPodsRoute = ""
 
     var body: some View {
         ZStack {
@@ -1008,7 +1011,7 @@ settingsSection(ATHLTHLocalization.choose(
     }
 
     private enum ConnectionItem: String, CaseIterable, Identifiable {
-        case health, calendar, watch, garmin, spotify, homeAssistant
+        case health, calendar, watch, airPods, garmin, spotify, homeAssistant
         var id: String { rawValue }
     }
 
@@ -1029,6 +1032,7 @@ settingsSection(ATHLTHLocalization.choose(
         )
         case .calendar: return session.subscriptionAccess.hasPaidAccess && calendarSync.isEnabled && calendarSync.hasFullAccess
         case .watch: return !ATHLTHDeviceRole.isIPad && watchConnection.isReady
+        case .airPods: return airPodsRoute.isRecognized(rememberedUID: recognizedAirPodsRoute)
         case .spotify: return spotify.isConnected
         case .homeAssistant: return homeAssistant.isConnected
         case .garmin:
@@ -1045,8 +1049,17 @@ settingsSection(ATHLTHLocalization.choose(
     private var connectionsSettingsSection: some View {
         let active = ConnectionItem.allCases.filter { connectionIsActive($0) }
         let available = ConnectionItem.allCases.filter { !connectionIsActive($0) }
-        connectionGroup("Active connections", items: active)
-        connectionGroup("Available connections", items: available)
+        Group {
+            connectionGroup("Active connections", items: active)
+            connectionGroup("Available connections", items: available)
+        }
+        .onAppear { airPodsRoute = ATHLTHAirPodsRoute.current() }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification).receive(on: RunLoop.main)) { _ in
+            airPodsRoute = ATHLTHAirPodsRoute.current()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            airPodsRoute = ATHLTHAirPodsRoute.current()
+        }
     }
 
     private func connectionGroup(_ title: String, items: [ConnectionItem]) -> some View {
@@ -1199,6 +1212,27 @@ settingsSection(ATHLTHLocalization.choose(
                 }
                 .buttonStyle(.plain)
             }
+        case .airPods:
+            NavigationLink {
+                connectionDestination(.airPods)
+            } label: {
+                PremiumSettingsRow(
+                    icon: "airpodspro",
+                    iconTint: ATHLTHTheme.accentDeep,
+                    title: "AirPods",
+                    subtitle: connectionIsActive(.airPods)
+                        ? (airPodsRoute.name ?? "AirPods")
+                        : ATHLTHLocalization.choose(english: "Audio and compatible training sensors", norwegian: "Lyd og kompatible treningssensorer")
+                ) {
+                    connectionTrailing(
+                        connectionIsActive(.airPods)
+                            ? ATHLTHLocalization.choose(english: "Audio selected", norwegian: "Valgt lydutgang")
+                            : ATHLTHLocalization.choose(english: "Set up", norwegian: "Konfigurer"),
+                        showChevron: true
+                    )
+                }
+            }
+            .buttonStyle(.plain)
         case .garmin:
             NavigationLink {
                 connectionDestination(.garmin)
@@ -1272,6 +1306,7 @@ settingsSection(ATHLTHLocalization.choose(
         case .health: appleHealthSettingsPage
         case .calendar: AppleCalendarSettingsView()
         case .watch: AppleWatchConnectionView()
+        case .airPods: ATHLTHAirPodsSettingsView()
         case .spotify: SpotifySettingsView()
         case .homeAssistant: HomeAssistantSettingsView()
         case .garmin:
