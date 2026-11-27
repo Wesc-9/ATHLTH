@@ -5,6 +5,8 @@ import SwiftUI
 struct ATHLTHCoachPostponeWizardView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     let onSaved: (String) -> Void
 
     struct Option: Identifiable {
@@ -14,6 +16,7 @@ struct ATHLTHCoachPostponeWizardView: View {
         let planTitle: String?
         let scheduledDate: Date
         let lastPlanDate: Date?
+        var planVersion: Int? = nil
 
         var id: String { (planID?.uuidString ?? "standalone") + sessionID.uuidString }
     }
@@ -22,13 +25,17 @@ struct ATHLTHCoachPostponeWizardView: View {
     @State private var newDate = Calendar.current.startOfDay(for: Date())
     @State private var showingConfirmation = false
     @State private var errorMessage: String?
+    @State private var ownerID: UUID?
+    @State private var saving = false
+    @State private var moveTask: Task<Void, Never>?
 
     private var options: [Option] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         var rows: [Option] = session.standalonePlannedSessions.compactMap { workout in
             guard let date = workout.scheduledStart,
-                  date >= today else { return nil }
+                  date >= today, workout.cancelledAt == nil, workout.trainTogetherMode == nil,
+                  session.recordedTimes(for: workout.id) == nil else { return nil }
             return Option(sessionID: workout.id, planID: nil,
                           title: workout.title, planTitle: nil,
                           scheduledDate: date, lastPlanDate: nil)
@@ -45,10 +52,14 @@ struct ATHLTHCoachPostponeWizardView: View {
                         value: weekIndex * 7 + max(day.dayIndex - 1, 0), to: start) else { continue }
                     for workout in day.sessions {
                         let date = workout.scheduledStart ?? fallback
-                        guard date >= today else { continue }
+                        guard date >= today, !workout.isExplicitRestDay, workout.cancelledAt == nil,
+                              workout.trainTogetherMode == nil, session.recordedTimes(for: workout.id) == nil,
+                              !session.isPlanSessionSkipped(planID: plan.id, sessionID: workout.id),
+                              !session.isPlanSessionManuallyCompleted(planID: plan.id, sessionID: workout.id),
+                              session.linkedHealthWorkoutID(planID: plan.id, sessionID: workout.id) == nil else { continue }
                         rows.append(Option(sessionID: workout.id, planID: plan.id,
                                            title: workout.title, planTitle: plan.title,
-                                           scheduledDate: date, lastPlanDate: lastDay))
+                                           scheduledDate: date, lastPlanDate: lastDay, planVersion: plan.version))
                     }
                 }
             }
@@ -165,6 +176,8 @@ struct ATHLTHCoachPostponeWizardView: View {
                     Button(tr("Cancel", "Avbryt")) { dismiss() }
                 }
             }
+            .onAppear { ownerID = session.profile.userID }
+            .onDisappear { moveTask?.cancel() }
             .onChange(of: selectedID) { _, _ in
                 if let chosen {
                     newDate = Calendar.current.date(byAdding: .day, value: 1,
@@ -180,7 +193,7 @@ struct ATHLTHCoachPostponeWizardView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHPlanDesign.accentInk)
-                .disabled(!isDateValid)
+                .disabled(!isDateValid || saving)
                 .padding()
                 .background(.regularMaterial)
             }
@@ -201,36 +214,59 @@ struct ATHLTHCoachPostponeWizardView: View {
         }
     }
 
+    @MainActor
     private func applyMove() {
-        guard isDateValid, let chosen else { return }
+        guard !saving, isDateValid, let chosen, session.signedIn,
+              let ownerID, ownerID == session.profile.userID else { return }
         let calendar = Calendar.current
         let target = calendar.startOfDay(for: newDate)
-        if let planID = chosen.planID {
-            guard session.movePlanSession(planID: planID, sessionID: chosen.sessionID,
-                                          to: target) else {
-                errorMessage = tr("Unable to move this plan workout. No changes were saved.",
-                                  "Kunne ikke flytte denne planøkten. Ingenting ble lagret.")
-                return
+        saving = true
+        errorMessage = nil
+        moveTask = Task { @MainActor in
+            defer { saving = false; moveTask = nil }
+            do {
+                let history = health.hasRequestedAuthorization ? try await health.workoutHistory() : []
+                try Task.checkCancellation()
+                guard session.signedIn, session.profile.userID == ownerID,
+                      let latest = options.first(where: { $0.id == chosen.id }),
+                      latest.scheduledDate == chosen.scheduledDate,
+                      latest.planVersion == chosen.planVersion else {
+                    errorMessage = tr("The workout changed. Nothing was saved.", "Økten er endret. Ingenting ble lagret.")
+                    return
+                }
+                if let planID = chosen.planID, let version = chosen.planVersion {
+                    guard session.movePlanStudioWorkout(planID: planID, workoutID: chosen.sessionID,
+                        targetDate: target, expectedVersion: version, healthWorkouts: history,
+                        strengthHistory: strength.workoutHistory) else {
+                        errorMessage = tr("Unable to move this plan workout. No changes were saved.",
+                                          "Kunne ikke flytte denne planøkten. Ingenting ble lagret.")
+                        return
+                    }
+                } else {
+                    guard var workout = session.standalonePlannedSessions.first(where: { $0.id == chosen.sessionID }),
+                          session.recordedTimes(for: workout.id) == nil, workout.cancelledAt == nil,
+                          workout.trainTogetherMode == nil else {
+                        errorMessage = tr("This workout is no longer eligible.", "Denne økten kan ikke flyttes lenger.")
+                        return
+                    }
+                    let time = calendar.dateComponents([.hour, .minute], from: chosen.scheduledDate)
+                    workout.scheduledStart = calendar.date(bySettingHour: time.hour ?? 18, minute: time.minute ?? 0,
+                        second: 0, of: target) ?? target
+                    session.updateStandalonePlannedSession(workout)
+                    guard session.standalonePlannedSessions.contains(where: {
+                        $0.id == workout.id && $0.scheduledStart == workout.scheduledStart
+                    }) else {
+                        errorMessage = tr("The move was not saved.", "Flyttingen ble ikke lagret.")
+                        return
+                    }
+                }
+                onSaved(tr("Moved \(chosen.title) to \(target.formatted(date: .abbreviated, time: .omitted)).",
+                           "Flyttet \(chosen.title) til \(target.formatted(date: .abbreviated, time: .omitted))."))
+            } catch is CancellationError {} catch {
+                errorMessage = tr("Could not verify workout history. Nothing was saved.",
+                                  "Kunne ikke kontrollere treningshistorikken. Ingenting ble lagret.")
             }
-        } else {
-            guard var workout = session.standalonePlannedSessions.first(where: {
-                $0.id == chosen.sessionID
-            }) else {
-                errorMessage = tr("This workout is no longer available.",
-                                  "Denne økten er ikke lenger tilgjengelig.")
-                return
-            }
-            let time = calendar.dateComponents([.hour, .minute], from: chosen.scheduledDate)
-            workout.scheduledStart = calendar.date(
-                bySettingHour: time.hour ?? 18, minute: time.minute ?? 0,
-                second: 0, of: target
-            ) ?? target
-            session.updateStandalonePlannedSession(workout)
         }
-        onSaved(tr(
-            "Moved \(chosen.title) to \(target.formatted(date: .abbreviated, time: .omitted)).",
-            "Flyttet \(chosen.title) til \(target.formatted(date: .abbreviated, time: .omitted))."
-        ))
     }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
