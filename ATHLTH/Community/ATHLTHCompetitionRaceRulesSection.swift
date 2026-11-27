@@ -57,7 +57,7 @@ struct ATHLTHCompetitionRaceRulesSection: View {
         VStack(alignment: .leading, spacing: 13) {
             if workoutOnly {
                 Text("Registrering og utstyr")
-                    .font(.system(size: 21, weight: .semibold, design: .serif))
+                    .font(.system(size: 21, weight: .regular, design: .serif))
                     .foregroundStyle(ATHLTHArenaV3Style.ink)
             } else {
             HStack(spacing: 12) {
@@ -71,7 +71,7 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                         .font(.caption2.weight(.semibold)).tracking(1.5)
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                     Text("Hva konkurrerer dere i?")
-                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .font(.system(size: 21, weight: .regular, design: .serif))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
                 }
                 Spacer(minLength: 0)
@@ -124,7 +124,7 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                     .font(.subheadline)
             }
 
-            if runningAllowed {
+            if runningAllowed && !workoutOnly {
                 Text("Felles løperute").font(.subheadline.weight(.semibold))
                 Button {
                     showingSavedRoutes = true
@@ -225,6 +225,9 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
+        .font(.subheadline)
+        .foregroundStyle(ATHLTHArenaV3Style.ink)
+        .tint(ATHLTHArenaV3Style.gold)
         .padding(15)
         .background(ATHLTHArenaV3Style.panel())
         .fullScreenCover(isPresented: $showingSavedRoutes) {
