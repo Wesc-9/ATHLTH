@@ -223,7 +223,25 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
         activityEnvironments.isEmpty && exerciseEnvironments.isEmpty && environment.canPublish(for: activities)
     }
 
+    // Preserve the server's existing meeting_place contract. The optional
+    // split fields retain editable address and instructions in local drafts.
     var meetingPlace: String = ""
+    var meetingAddress: String? = nil
+    var meetingDescription: String? = nil
+
+    static func combinedMeetingPlace(address: String, description: String) -> String {
+        [address, description].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }.joined(separator: "\n")
+    }
+
+    mutating func setMeetingPoint(address: String, description: String,
+                                  latitude: Double?, longitude: Double?) {
+        meetingAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        meetingDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        meetingPlace = Self.combinedMeetingPlace(address: address, description: description)
+        meetingLat = latitude
+        meetingLon = longitude
+    }
     var meetingLat: Double? = nil
     var meetingLon: Double? = nil
     var coachExerciseIDs: [UUID] = []
@@ -279,7 +297,7 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     // Decode missing fields to safe defaults instead of discarding a draft.
     init() {}
     private enum CodingKeys: String, CodingKey {
-        case startsAt, endsAt, startMode, environment, activityEnvironments, exerciseEnvironments, meetingPlace, meetingLat,
+        case startsAt, endsAt, startMode, environment, activityEnvironments, exerciseEnvironments, meetingPlace, meetingAddress, meetingDescription, meetingLat,
              meetingLon, coachExerciseIDs, selectedExerciseIDs, race, invitationDays, unansweredPolicy,
              allowFeedPost, unlock, every, unit, completionHours,
              invitationPermission, joinApproval, agreement
@@ -296,6 +314,8 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
         exerciseEnvironments = try c.decodeIfPresent([UUID: ATHLTHCompetitionEnvironment].self, forKey: .exerciseEnvironments) ?? [:]
         meetingPlace = try c.decodeIfPresent(String.self,
                                              forKey: .meetingPlace) ?? ""
+        meetingAddress = try c.decodeIfPresent(String.self, forKey: .meetingAddress)
+        meetingDescription = try c.decodeIfPresent(String.self, forKey: .meetingDescription)
         meetingLat = try c.decodeIfPresent(Double.self, forKey: .meetingLat)
         meetingLon = try c.decodeIfPresent(Double.self, forKey: .meetingLon)
         coachExerciseIDs = try c.decodeIfPresent([UUID].self,
