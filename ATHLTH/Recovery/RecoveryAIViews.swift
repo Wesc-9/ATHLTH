@@ -699,6 +699,39 @@ struct RecoverySuggestedTodayCard: View {
     }
 }
 
+/// UI-only ranking based on the same seven-day muscle recovery snapshot.
+/// Do not rank by readiness: a fully recovered muscle may still have been
+/// heavily trained. Minutes allow running and walking to count alongside strength.
+enum RecoveryCoachMuscleRanking {
+    static func mostTrained(_ statuses: [MuscleRecoveryStatus]) -> [RecoveryAIMuscleInput] {
+        func minutes(_ item: MuscleRecoveryStatus) -> Double {
+            item.strengthMinutes + item.runningMinutes + item.walkingMinutes
+        }
+        let ranked = statuses.filter { $0.completedSets > 0 || minutes($0) > 0 }
+            .sorted { lhs, rhs in
+                if minutes(lhs) != minutes(rhs) { return minutes(lhs) > minutes(rhs) }
+                if lhs.completedSets != rhs.completedSets { return lhs.completedSets > rhs.completedSets }
+                if lhs.lastTrainedAt != rhs.lastTrainedAt {
+                    return (lhs.lastTrainedAt ?? .distantPast) > (rhs.lastTrainedAt ?? .distantPast)
+                }
+                return lhs.muscleGroup < rhs.muscleGroup
+            }
+        return ranked.prefix(3).map {
+            RecoveryAIMuscleInput(name: $0.muscleGroup,
+                recoveryPercent: Int(($0.progress * 100).rounded()),
+                status: $0.statusTitle, completedSets: $0.completedSets)
+        }
+    }
+
+    /// Other Coach entry points may only have a compact legacy context.
+    static func fromContext(_ muscles: [RecoveryAIMuscleInput]) -> [RecoveryAIMuscleInput] {
+        Array(muscles.filter { $0.completedSets > 0 }.sorted {
+            if $0.completedSets != $1.completedSets { return $0.completedSets > $1.completedSets }
+            return $0.name < $1.name
+        }.prefix(3))
+    }
+}
+
 struct RecoveryCoachInboxDestinationView:
     View {
     var initialQuestion: String? = nil
@@ -751,7 +784,9 @@ struct RecoveryCoachInboxDestinationView:
                     initialQuestion:
                         initialQuestion,
                     submitInitialQuestion:
-                        submitInitialQuestion
+                        submitInitialQuestion,
+                    insightMostTrainedMuscles:
+                        RecoveryCoachMuscleRanking.mostTrained(derivedSnapshot.statuses)
                 )
             }
         }
@@ -1022,6 +1057,9 @@ struct RecoveryCoachView: View {
     var showsDoneButton: Bool = true
     var initialQuestion: String? = nil
     var submitInitialQuestion = false
+    var insightMostTrainedMuscles: [RecoveryAIMuscleInput]? = nil
+
+    @State private var coachInsightExpanded = false
 
     @State private var didHandleIncomingQuestion = false
     @State private var incomingQuestionAwaitingConsent: String?
@@ -1295,6 +1333,7 @@ struct RecoveryCoachView: View {
             receiveIncomingQuestionIfNeeded()
         }
         .onChange(of: session.profile.userID) { _, _ in
+            coachInsightExpanded = false
             messages = []
             quickQuestions = []
             question = ""
@@ -1852,40 +1891,92 @@ struct RecoveryCoachView: View {
     }
 
     private var coachPinnedInsight: some View {
-        ATHLTHCoachInsightDisclosure(
-            userID: session.profile.userID,
-            summary: context.recoveryScore.map {
-                recoveryAIText("Readiness \($0)", "Dagsform \($0)")
-            } ?? recoveryAIText(
-                "No measurements yet", "Ingen målinger ennå"
-            )
-        ) {
-            if context.recoveryScore != nil || !context.muscles.isEmpty {
-                // Keep an expanded insight usable without covering the
-                // entire conversation on small iPhones.
-                ScrollView(.vertical) {
-                    coachInsightCard
+        VStack(spacing: 0) {
+            if coachInsightExpanded {
+                if context.recoveryScore != nil || !coachVisibleMuscles.isEmpty ||
+                    context.sleepSeconds != nil || context.hrvMilliseconds != nil ||
+                    context.restingHeartRate != nil {
+                    // Fit the short card when possible. Only use an internal
+                    // scroll view for large accessibility text / tight space.
+                    ViewThatFits(in: .vertical) {
+                        coachInsightCard.fixedSize(horizontal: false, vertical: true)
+                        ScrollView {
+                            coachInsightCard
+                        }
+                        .scrollIndicators(.visible)
+                    }
+                    .frame(maxHeight: 264)
+                    .accessibilityLabel(recoveryAIText(
+                        "Today's detailed insight", "Detaljer for dagens innsikt"
+                    ))
+                } else {
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(recoveryAIText(
+                            "No recovery measurements available. You can still ask training questions.",
+                            "Ingen restitusjonsmålinger tilgjengelig. Du kan fortsatt stille spørsmål om trening."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Spacer(minLength: 0)
+                        collapseInsightButton
+                    }
+                    .padding(12)
                 }
-                .frame(height: 280)
-                .scrollIndicators(.hidden)
-                .accessibilityLabel(recoveryAIText(
-                    "Today's detailed insight", "Detaljer for dagens innsikt"
-                ))
             } else {
-                Text(recoveryAIText(
-                    "No recovery measurements available. You can still ask training questions.",
-                    "Ingen restitusjonsmålinger tilgjengelig. Du kan fortsatt stille spørsmål om trening."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .padding(13)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.20)) {
+                        coachInsightExpanded = true
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.title3)
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(recoveryAIText("TODAY'S INSIGHT", "DAGENS INNSIKT"))
+                                .font(.caption.weight(.bold))
+                                .tracking(1)
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(context.recoveryScore.map {
+                                recoveryAIText("Readiness \($0)", "Dagsform \($0)")
+                            } ?? recoveryAIText("No measurements yet", "Ingen målinger ennå"))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(recoveryAIText("Expand insight", "Utvid dagens innsikt"))
             }
         }
         .frame(maxWidth: 760)
         .padding(.horizontal, 17)
-        .padding(.top, 7)
-        .padding(.bottom, 8)
+        .padding(.vertical, 7)
         .background(Color.white.opacity(0.95))
+    }
+
+    private var collapseInsightButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.20)) {
+                coachInsightExpanded = false
+            }
+        } label: {
+            Image(systemName: "chevron.up")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(recoveryAIText("Collapse insight", "Skjul dagens innsikt"))
     }
 
     private var coachConversationHero:
@@ -2076,11 +2167,10 @@ struct RecoveryCoachView: View {
                     )
                 }
 
-                Spacer(
-                    minLength: 0
-                )
+                Spacer(minLength: 0)
+                collapseInsightButton
             }
-            .padding(.top, 9)
+            .padding(.top, 2)
 
             HStack(spacing: 7) {
                 coachMetricTile(
@@ -2135,24 +2225,15 @@ struct RecoveryCoachView: View {
                         .green
                 )
             }
-            .padding(.top, 11)
+            .padding(.top, 8)
 
             coachMuscleReadinessSection
-                .padding(.top, 12)
+                .padding(.top, 8)
         }
     }
 
-    // Show both areas estimated to need rest and areas estimated ready.
-    // These percentages are not a medical measurement or a guarantee.
     private var coachVisibleMuscles: [RecoveryAIMuscleInput] {
-        let ordered = context.muscles.sorted {
-            $0.recoveryPercent < $1.recoveryPercent
-        }
-        let needingRest = Array(ordered.prefix(3))
-        let ready = ordered.reversed().filter { muscle in
-            !needingRest.contains(where: { $0.name == muscle.name })
-        }.prefix(2)
-        return needingRest + ready
+        insightMostTrainedMuscles ?? RecoveryCoachMuscleRanking.fromContext(context.muscles)
     }
 
     private var coachMuscleReadinessSection: some View {
@@ -2160,17 +2241,17 @@ struct RecoveryCoachView: View {
             HStack(spacing: 6) {
                 Image(systemName: "figure.strengthtraining.traditional")
                     .foregroundStyle(ATHLTHTheme.accentDeep)
-                Text(recoveryAIText("MUSCLE RECOVERY · INSIGHTS", "MUSKELRESTITUSJON · INNSIKT"))
+                Text(recoveryAIText("MUSCLE RECOVERY · LAST 7 DAYS", "MUSKELRESTITUSJON · SISTE 7 DAGER"))
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.5)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 Spacer(minLength: 0)
             }
 
-            if context.muscles.isEmpty {
+            if coachVisibleMuscles.isEmpty {
                 Text(recoveryAIText(
-                    "No muscle estimates available yet.",
-                    "Ingen beregnede muskelverdier tilgjengelig ennå."
+                    "No recorded muscle training in the last seven days.",
+                    "Ingen registrert muskeltrening de siste syv dagene."
                 ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2198,8 +2279,8 @@ struct RecoveryCoachView: View {
             }
 
             Text(recoveryAIText(
-                "Estimates, not a verdict. Your own feeling matters. Nothing is shared without confirming a question.",
-                "Beregnete verdier, ikke en fasit. Din egen opplevelse teller. Ingenting deles uten at du bekrefter et spørsmål."
+                "Most trained muscles. Recovery is an estimate.",
+                "Mest trente muskler. Restitusjon er estimert."
             ))
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
