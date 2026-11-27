@@ -27,6 +27,7 @@ struct ATHLTHAirPodsRoute: Equatable {
 struct ATHLTHAirPodsSettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("athlth.airpods.recognizedAudioRoute") private var recognizedUID = ""
+    @AppStorage("athlth.airpods.liveSensorPilot") private var liveSensorPilot = false
     @State private var route = ATHLTHAirPodsRoute.current()
     @State private var motionTestID: UUID?
     @State private var motionResult = MotionResult.unchecked
@@ -84,6 +85,14 @@ struct ATHLTHAirPodsSettingsView: View {
                     feature("heart", tr("Heart rate", "Puls"),
                         tr("AirPods Pro 3 have a heart-rate sensor. Older models do not. Live sensor delivery must be verified in a supported HealthKit workout; the audio route cannot confirm it.", "AirPods Pro 3 har pulssensor. Eldre modeller har ikke dette. Live puls må verifiseres i en støttet HealthKit-økt; lydutgangen kan ikke bekrefte det."))
                     SettingsDivider()
+                    if #available(iOS 26.0, *) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle(tr("Live heart rate (beta)", "Livepuls (beta)"), isOn: $liveSensorPilot)
+                            Text(tr("Optional for new phone-recorded running and walking workouts. Requires Apple Health workout and heart-rate access and a compatible sensor. No change to Watch workouts. Missing readings remain unavailable.", "Valgfritt for nye løpe- og gåøkter registrert på telefon. Krever Apple Helse-tilgang til økter og puls samt kompatibel sensor. Endrer ikke Watch-økter. Manglende målinger vises som utilgjengelige."))
+                                .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                        }.padding(12)
+                        SettingsDivider()
+                    }
                     feature("gyroscope", tr("Motion", "Bevegelse"), motionStatus)
                     VStack(alignment: .leading, spacing: 8) {
                         Button(tr("Test motion sensor", "Test bevegelsessensor")) {

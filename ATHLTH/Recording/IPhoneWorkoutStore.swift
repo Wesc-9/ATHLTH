@@ -657,6 +657,43 @@ final class IPhoneWorkoutStore:
     private var structuredTickTask: Task<Void, Never>?
     private let manager = CLLocationManager()
     private let healthStore = HKHealthStore()
+    // Type erased because the native iPhone workout builder requires iOS 26.
+    private var nativeSensorCapture: AnyObject?
+
+    @available(iOS 26.0, *)
+    private var nativeCapture: ATHLTHPhoneLiveSensorCapture? {
+        nativeSensorCapture as? ATHLTHPhoneLiveSensorCapture
+    }
+
+    func freshWorkoutHeartRate(at now: Date = Date()) -> Double? {
+        guard #available(iOS 26.0, *), let active, active.resumedAt != nil,
+              let capture = nativeCapture, capture.workoutID == active.id else { return nil }
+        return capture.freshHeartRate(at: now)
+    }
+
+    private func stopNativeCapture() {
+        if #available(iOS 26.0, *) { nativeCapture?.discard() }
+        nativeSensorCapture = nil
+    }
+
+    private func startNativeCapture(for workout: PhoneWorkout) {
+        guard #available(iOS 26.0, *),
+              UserDefaults.standard.bool(forKey: "athlth.airpods.liveSensorPilot"),
+              UserDefaults.standard.object(forKey: "settings.appleHealthIntegrationEnabled") as? Bool ?? true,
+              HKHealthStore.isHealthDataAvailable(),
+              healthStore.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { return }
+        stopNativeCapture()
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = workout.walking ? .walking : .running
+        configuration.locationType = ATHLTHPhoneRunEnvironmentPolicy.isIndoor(workout.runEnvironment) ? .indoor : .outdoor
+        let capture = ATHLTHPhoneLiveSensorCapture(workoutID: workout.id, startedAt: workout.start)
+        nativeSensorCapture = capture
+        capture.start(store: healthStore, configuration: configuration)
+    }
+
+    private func setNativeCapturePaused(_ paused: Bool) {
+        if #available(iOS 26.0, *) { nativeCapture?.setPaused(paused) }
+    }
 
     override init() {
         super.init()
@@ -673,6 +710,7 @@ final class IPhoneWorkoutStore:
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
         pause()
+        stopNativeCapture()
         treadmillTickTask?.cancel()
         treadmillTickTask = nil
         structuredTickTask?.cancel()
@@ -1078,6 +1116,7 @@ final class IPhoneWorkoutStore:
             }
         }
 
+        if let active { startNativeCapture(for: active) }
         requestLiveWorkoutPresentationAfterLaunch()
 
         lastLocation = nil
@@ -1196,6 +1235,7 @@ final class IPhoneWorkoutStore:
         }
 
         pause()
+        stopNativeCapture()
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
         manager.distanceFilter = 5
@@ -1343,7 +1383,7 @@ final class IPhoneWorkoutStore:
                 ) ? ATHLTHLiveCoachWorkoutStatus.positiveInteger(
                     workout.currentPaceSecondsPerKilometer
                 ) : nil,
-            heartRateBPM: nil,
+            heartRateBPM: ATHLTHLiveCoachWorkoutStatus.positiveInteger(freshWorkoutHeartRate(at: now)),
             currentStep: activeStep?.title,
             nextStep: activeStep != nil && steps.indices.contains(stepIndex + 1)
                 ? steps[stepIndex + 1].title : nil,
@@ -1682,6 +1722,7 @@ final class IPhoneWorkoutStore:
         }
 
         active = workout
+        setNativeCapturePaused(true)
         autoPauseDetector.reset(
             enabled: false
         )
@@ -1754,6 +1795,7 @@ final class IPhoneWorkoutStore:
         workout.lastCheckpoint = now
         recoveredWorkoutLastCheckpoint = nil
         active = workout
+        setNativeCapturePaused(false)
         automaticPauseActive = false
         autoPauseDetector.reset(
             enabled:
@@ -1840,6 +1882,7 @@ final class IPhoneWorkoutStore:
         }
 
         automaticPauseActive = true
+        setNativeCapturePaused(true)
         lastLocation = nil
         coachPaceSampleAt = nil
         message = ATHLTHLocalization.choose(
@@ -1872,6 +1915,7 @@ final class IPhoneWorkoutStore:
         workout.resumedAt = date
         workout.lastCheckpoint = date
         automaticPauseActive = false
+        setNativeCapturePaused(false)
         lastLocation = nil
         coachPaceSampleAt = nil
         message = nil
@@ -2084,6 +2128,11 @@ final class IPhoneWorkoutStore:
     }
 
     private func saveToHealth(_ workout: PhoneWorkout, userID: UUID) async {
+        defer {
+            if #available(iOS 26.0, *), nativeCapture?.workoutID == workout.id {
+                stopNativeCapture()
+            }
+        }
         // Reject late completion callbacks that belong to a deleted or
         // switched account before starting any HealthKit side effects.
         guard ATHLTHPhoneHealthExportPolicy.canExport(
@@ -2259,17 +2308,28 @@ final class IPhoneWorkoutStore:
         configuration.locationType =
             isIndoor ? .indoor : .outdoor
 
-        let builder = HKWorkoutBuilder(
-            healthStore: healthStore,
-            configuration: configuration,
-            device: .local()
-        )
+        // Use the already collecting native builder, never a second live
+        // workout. If collection could not start, discard it before legacy export.
+        let builder: HKWorkoutBuilder
+        let alreadyCollecting: Bool
+        if #available(iOS 26.0, *), let capture = nativeCapture,
+           capture.workoutID == workout.id,
+           let liveBuilder = await capture.stopForExport(at: end) {
+            builder = liveBuilder
+            alreadyCollecting = true
+        } else {
+            builder = HKWorkoutBuilder(
+                healthStore: healthStore,
+                configuration: configuration,
+                device: .local()
+            )
+            alreadyCollecting = false
+        }
 
         do {
-            try await beginCollection(
-                builder,
-                at: workout.start
-            )
+            if !alreadyCollecting {
+                try await beginCollection(builder, at: workout.start)
+            }
 
             try await addMetadata(
                 [
@@ -2341,6 +2401,9 @@ final class IPhoneWorkoutStore:
 
             let saved =
                 try await finishWorkout(builder)
+            if #available(iOS 26.0, *), alreadyCollecting {
+                nativeCapture?.markExported()
+            }
 
             return (
                 workout: saved,
@@ -5369,8 +5432,7 @@ final class IPhoneWorkoutStore:
         let remaining = step?.durationSeconds.map {
             max(0, $0 - max(0, elapsed - (workout.structuredStepStartElapsedTime ?? 0)))
         }
-        // GPS pace only. The phone recorder does not own a fresh heart-rate
-        // sensor stream; neither target values nor treadmill entries are measurements.
+        // GPS pace only; entered treadmill values are not sensor measurements.
         let pace = workout.runEnvironment == .outdoor &&
             ATHLTHCoachSensorFreshness.validPace(
                 workout.currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
@@ -5380,7 +5442,7 @@ final class IPhoneWorkoutStore:
             settings: settings, elapsed: elapsed, measuredPaceSecondsPerKilometer: pace,
             targetSlowestPaceSecondsPerKilometer: step?.targetPaceMaxSecondsPerKilometer ??
                 step?.targetPaceMinSecondsPerKilometer,
-            measuredHeartRateBPM: nil, targetHeartRateMinimumBPM: nil,
+            measuredHeartRateBPM: freshWorkoutHeartRate(at: now), targetHeartRateMinimumBPM: nil,
             stepIndex: index, stepPhase: step?.phase, stepRemainingSeconds: remaining,
             reliableNotClimbing: false, norwegian: norwegian
         ) {
@@ -5443,7 +5505,7 @@ final class IPhoneWorkoutStore:
             distanceMeters: workout.distanceMeters,
             elapsedSeconds: elapsed,
             paceSecondsPerKilometer: freshPace,
-            heartRateBPM: nil,
+            heartRateBPM: freshWorkoutHeartRate(),
             norwegian: norwegian,
             context: context,
             lastSlots: &customAudioCoachLastSlots
@@ -6209,7 +6271,7 @@ final class IPhoneWorkoutStore:
             capturedAt: Date(),
             elapsedTime:
                 workout.elapsed(at: Date()),
-            heartRate: 0,
+            heartRate: freshWorkoutHeartRate() ?? 0,
             activeCalories: 0,
             distanceMeters:
                 workout.distanceMeters,
@@ -6369,7 +6431,7 @@ final class IPhoneWorkoutStore:
                 capturedAt: Date(),
                 elapsedTime:
                     workout.elapsed(at: Date()),
-                heartRate: 0,
+                heartRate: freshWorkoutHeartRate() ?? 0,
                 activeCalories: 0,
                 distanceMeters:
                     workout.distanceMeters,

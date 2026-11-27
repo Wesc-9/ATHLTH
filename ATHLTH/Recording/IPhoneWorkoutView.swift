@@ -1209,16 +1209,8 @@ struct IPhoneWorkoutView: View {
             else { return nil }
             return plan.steps[index]
         }()
-        // History cache is not live telemetry. Show an actual heart rate only
-        // when HealthKit has a suitably recent sensor sample.
-        let freshPulse: Double? = {
-            guard let sample = health.heart.latestHeartRate,
-                  let time = health.heart.latestHeartRateDate,
-                  now.timeIntervalSince(time) >= -2,
-                  now.timeIntervalSince(time) <= 15
-            else { return nil }
-            return sample
-        }()
+        // Only measurements collected by this specific native workout count.
+        let freshPulse = recorder.freshWorkoutHeartRate(at: now)
         let maximum = workout.structuredRunningWorkout?.heartRateZoneMaximumBPM ??
             ATHLTHHeartRateZones.resolvedMaximumBPM(
                 configured: session.onboardingProfile?.maximumHeartRateBPM,
