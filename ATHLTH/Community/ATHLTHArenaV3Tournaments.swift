@@ -123,7 +123,7 @@ struct ATHLTHTournamentCreator: View {
     private var canReview: Bool {
         effectiveTitle.count >= 3 &&
         ATHLTHTournamentActivity.canCreate(with: allowedActivities) &&
-        (isDuel ? athletes.count == 2 : athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
+        (isDuel ? participantCount == 2 : participantCount >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
         (!usesExplicitExercises || totalExerciseCount > 0) &&
         !publishing
     }
@@ -131,8 +131,8 @@ struct ATHLTHTournamentCreator: View {
     private var reviewHint: String {
         if effectiveTitle.count < 3 { return "Legg til et navn på konkurransen." }
         if !ATHLTHTournamentActivity.canCreate(with: allowedActivities) { return "Velg minst én tilgjengelig treningsform." }
-        if isDuel && athletes.count != 2 { return "Velg én motstander." }
-        if athletes.count < (isSingleEvent ? 3 : format == .cup ? 4 : 2) && !isDuel { return "Legg til flere deltakere." }
+        if isDuel && participantCount != 2 { return "Velg én motstander." }
+        if participantCount < (isSingleEvent ? 3 : format == .cup ? 4 : 2) && !isDuel { return "Legg til flere deltakere." }
         if usesExplicitExercises && totalExerciseCount == 0 { return "Legg til minst én konkurranseøvelse." }
         return "Fullfør konkurranseoppsettet."
     }
@@ -356,6 +356,8 @@ struct ATHLTHTournamentCreator: View {
             fixedInvitees != nil || (fixedClubID ?? continuation?.clubID) == nil ? .friends : .club)
     }
 
+    private var participantCount: Int { 1 + chosenIDs.count }
+
     private var athletes: [ATHLTHTournamentParticipant] {
         let ownHandle = session.profile.username.trimmingCharacters(in: .whitespacesAndNewlines)
         let current = ATHLTHTournamentParticipant(
@@ -372,7 +374,8 @@ struct ATHLTHTournamentCreator: View {
 
     private var effectiveTitle: String {
         if automaticDuelName && isDuel {
-            return ATHLTHCompetitionCreationPolicy.duelName(owner: athletes.first?.username ?? "Du", opponent: athletes.dropFirst().first?.username, branches: ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title))
+            let roster = athletes
+            return ATHLTHCompetitionCreationPolicy.duelName(owner: roster.first?.username ?? "Du", opponent: roster.dropFirst().first?.username, branches: ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title))
         }
         return String(title.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
     }
@@ -380,7 +383,7 @@ struct ATHLTHTournamentCreator: View {
     private var publishHint: String {
         if allowedActivities.isEmpty { return "Velg minst én gren." }
         if !ATHLTHTournamentActivity.canCreate(with: allowedActivities) { return "Fjern grener som ikke er tilgjengelige ennå." }
-        if isDuel && athletes.count != 2 { return "Velg én motstander." }
+        if isDuel && participantCount != 2 { return "Velg én motstander." }
         if !plannedMeasures.isEmpty { return "Nye resultatmål kan foreløpig lagres som utkast eller mal." }
         if usesExplicitExercises && (competitionSettings.selectedExerciseIDs ?? []).isEmpty { return "Legg til minst én konkurranseøvelse." }
         if !scoringValid { return "Kontroller øvelser, mål og resultatgodkjenning." }
@@ -401,7 +404,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSave: Bool {
         effectiveTitle.count >= 3 &&
         // The shared event engine has distinct roster limits for duel and single event.
-        (isDuel ? athletes.count == 2 : athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
+        (isDuel ? participantCount == 2 : participantCount >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
         !busy && ATHLTHTournamentActivity.canCreate(with: allowedActivities) &&
         (!isDuel || competitionSettings.race.discipline == .workout) &&
         (!isSingleEvent || competitionSettings.race.discipline == .workout ||
@@ -530,7 +533,12 @@ struct ATHLTHTournamentCreator: View {
         .onChange(of: additionalCheckpointFields) { _, _ in scheduleCheckpoint() }
         .onChange(of: scenePhase) { _, phase in if phase != .active { checkpoint() } }
         .onAppear { scheduleCheckpoint() }
-        .onDisappear { rulesWork.cancelCheckpoint() }
+        .onDisappear {
+            // A full-screen picker may cover this view before the debounce
+            // expires. Flush pending edits; explicit save/back/publish already
+            // cancel their pending work.
+            if rulesWork.pendingCheckpoint != nil { checkpoint() }
+        }
         .environment(\.colorScheme, .light)
         .interactiveDismissDisabled(fixedInvitees != nil)
         .task {
