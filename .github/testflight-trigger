@@ -375,3 +375,4 @@ ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27: replace unavailable watc
 ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27 after Watch navigation intent missing TargetContentProvidingIntent conformance; preserve all exact-commit release gates.
 ATHLTH 3.0.6 build 146 — authorized retry: replace unavailable watchOS navigation protocol with foreground AppIntent and expiring app-group navigation handoff; preserve all five exact-commit gates.
 ATHLTH 3.0.6 build 146 — authorized retry: fix local Vision call and Coach error shadowing; preserve exact-commit gates.
+ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27 after exhaustive iPad workout shortcut navigation fix 97972ef0. Require all five exact-commit release gates, signed archive and Apple upload; no gate bypass or frozen branch changes.
