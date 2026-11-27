@@ -2447,7 +2447,8 @@ struct WatchActiveWorkoutView: View {
                     averageHeartRate: result.averageHeartRate,
                     maximumHeartRate: result.maxHeartRate,
                     activity: result.isSports == true ? "sports" : result.kind.rawValue,
-                    completedSets: result.strengthSnapshot?.completedSets
+                    completedSets: result.strengthSnapshot?.completedSets,
+                    nativeRunningMetrics: result.nativeRunningMetrics
                 )
                 Text(result.isSports == true
                     ? ATHLTHLocalization.choose(english: "Sports", norwegian: "Idrett")
@@ -2480,6 +2481,24 @@ struct WatchActiveWorkoutView: View {
                     } else if let split = summary.rowingSplitSeconds {
                         metric(icon: "speedometer", value: ATHLTHWorkoutSummaryEngine.durationText(split),
                                label: "/500 m")
+                    }
+                    if let native = summary.nativeRunningMetrics {
+                        if let watts = ATHLTHWorkoutSummaryEngine.roundedInteger(native.powerWatts), watts > 0 {
+                            metric(icon: "bolt.fill", value: "\(watts) W",
+                                   label: ATHLTHLocalization.choose(english: "Avg power", norwegian: "Snittwatt"))
+                        }
+                        if let stride = ATHLTHWorkoutSummaryEngine.positive(native.strideMeters) {
+                            metric(icon: "figure.run", value: String(format: "%.2f m", stride),
+                                   label: ATHLTHLocalization.choose(english: "Stride", norwegian: "Steglengde"))
+                        }
+                        if let vertical = ATHLTHWorkoutSummaryEngine.positive(native.verticalCentimeters) {
+                            metric(icon: "arrow.up.and.down", value: String(format: "%.1f cm", vertical),
+                                   label: ATHLTHLocalization.choose(english: "Oscillation", norwegian: "Vertikal"))
+                        }
+                        if let contact = ATHLTHWorkoutSummaryEngine.roundedInteger(native.groundContactMilliseconds), contact > 0 {
+                            metric(icon: "timer", value: "\(contact) ms",
+                                   label: ATHLTHLocalization.choose(english: "Ground contact", norwegian: "Bakkekontakt"))
+                        }
                     }
                     if let sets = summary.completedSets {
                         metric(icon: "checkmark.circle", value: String(sets),

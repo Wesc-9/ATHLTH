@@ -4942,6 +4942,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             announceAudioCoachReadyIfNeeded()
             announceCurrentStructuredStep(prefix: "Starting")
+            if kind == .running || kind == .walking {
+                Task { await ATHLTHWatchActionButtonBridge.donateNextActionIfActive() }
+            }
             // Return only the identity opened by THIS invocation. A different
             // active workout cannot acknowledge a competing prepared card.
             return workoutSession === session ? startedWorkoutID : nil
@@ -5010,14 +5013,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
-    private func requestAuthorization() async throws {
-        guard HKHealthStore.isHealthDataAvailable() else {
-            throw WatchWorkoutError.healthDataUnavailable
-        }
-
-        // Match Apple's workout-app authorization model: ATHLTH writes the
-        // workout (and route), while live sensor quantities are read by the
-        // HKLiveWorkoutDataSource.
+    // Use one permission definition for normal and hardware-button starts.
+    private func workoutAuthorizationTypes() -> (share: Set<HKSampleType>, read: Set<HKObjectType>) {
+        // ATHLTH writes the workout/route; native sensor quantities are read.
         let shareTypes: Set<HKSampleType> = [
             HKObjectType.workoutType(),
             HKSeriesType.workoutRoute()
@@ -5033,16 +5031,45 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             .activeEnergyBurned,
             .distanceWalkingRunning,
             .distanceCycling,
-            .runningSpeed
+            .runningSpeed,
+            .runningPower,
+            .runningStrideLength,
+            .runningVerticalOscillation,
+            .runningGroundContactTime
         ] {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
                 readTypes.insert(type)
             }
         }
 
+        return (shareTypes, readTypes)
+    }
+
+    /// The hardware intent must not block waiting for an authorization sheet
+    /// that cannot appear until the intent returns. Direct the user through the
+    /// normal Watch start flow first when new permission requests are needed.
+    func actionButtonAuthorizationReady() async -> Bool {
+        guard HKHealthStore.isHealthDataAvailable(),
+              healthStore.authorizationStatus(for: HKObjectType.workoutType()) == .sharingAuthorized
+        else { return false }
+        let types = workoutAuthorizationTypes()
+        return await withCheckedContinuation { continuation in
+            healthStore.getRequestStatusForAuthorization(
+                toShare: types.share, read: types.read
+            ) { status, error in
+                continuation.resume(returning: error == nil && status == .unnecessary)
+            }
+        }
+    }
+
+    private func requestAuthorization() async throws {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw WatchWorkoutError.healthDataUnavailable
+        }
+        let types = workoutAuthorizationTypes()
         try await healthStore.requestAuthorization(
-            toShare: shareTypes,
-            read: readTypes
+            toShare: types.share,
+            read: types.read
         )
 
         if healthStore.authorizationStatus(
@@ -5402,6 +5429,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         returningToRouteStart ||
         ghostRaceTitle != nil ||
         liveSurfaceContext.liveGhost != nil ||
+        liveSurfaceContext.challenge != nil ||
+        liveSurfaceContext.liveShare != nil ||
+        targetAlertConfiguration != nil ||
         automaticPauseEnabled ||
         audioCoachConfiguration.enabled
     }
@@ -9101,6 +9131,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         result.accountOwnerID = workoutOwnerID
         result.isSports = workout.workoutActivityType == .play ? true : nil
+        if workout.workoutActivityType == .running {
+            // Read only Apple's actual statistics from this saved workout.
+            // Unsupported or unavailable measurements stay absent.
+            func nativeAverage(_ identifier: HKQuantityTypeIdentifier, unit: HKUnit) -> Double? {
+                guard let type = HKObjectType.quantityType(forIdentifier: identifier) else { return nil }
+                return ATHLTHWorkoutSummaryEngine.positive(
+                    workout.statistics(for: type)?.averageQuantity()?.doubleValue(for: unit)
+                )
+            }
+            let metrics = ATHLTHNativeRunningMetrics(
+                powerWatts: nativeAverage(.runningPower, unit: .watt()),
+                strideMeters: nativeAverage(.runningStrideLength, unit: .meter()),
+                verticalCentimeters: nativeAverage(.runningVerticalOscillation, unit: .meter()).map { $0 * 100 },
+                groundContactMilliseconds: nativeAverage(.runningGroundContactTime, unit: .second()).map { $0 * 1_000 }
+            )
+            if metrics.hasMeasurements { result.nativeRunningMetrics = metrics }
+        }
         if result.isSports == true,
            let type = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning),
            let measured = workout.statistics(for: type)?.sumQuantity()?.doubleValue(for: .meter()),

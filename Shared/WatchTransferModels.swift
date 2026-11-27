@@ -2156,6 +2156,7 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var routePointCount: Int
 
     // Optional so queued results created by older Watch builds still decode.
+    var nativeRunningMetrics: ATHLTHNativeRunningMetrics? = nil
     var lapSummaries: [WatchWorkoutLapSummary]? = nil
     var automaticPauseCount: Int? = nil
 

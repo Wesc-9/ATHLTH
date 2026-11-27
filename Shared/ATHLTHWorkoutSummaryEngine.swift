@@ -1,5 +1,19 @@
 import Foundation
 
+/// Native Apple running dynamics in explicit units. No estimates or zeros
+/// are inserted for missing sensor data. Additive to older workout results.
+struct ATHLTHNativeRunningMetrics: Codable, Hashable {
+    var powerWatts: Double?
+    var strideMeters: Double?
+    var verticalCentimeters: Double?
+    var groundContactMilliseconds: Double?
+
+    var hasMeasurements: Bool {
+        [powerWatts, strideMeters, verticalCentimeters, groundContactMilliseconds]
+            .contains { ATHLTHWorkoutSummaryEngine.positive($0) != nil }
+    }
+}
+
 /// Device-independent, read-only result metrics. The recorder remains the
 /// owner of the saved workout; this engine never writes HealthKit or creates
 /// another workout. Missing measurements stay missing.
@@ -13,11 +27,13 @@ struct ATHLTHWorkoutSummaryEngine: Equatable {
     let speedKilometersPerHour: Double?
     let rowingSplitSeconds: Double?
     let completedSets: Int?
+    let nativeRunningMetrics: ATHLTHNativeRunningMetrics?
 
     init(duration: Double, distanceMeters: Double? = nil,
          activeCalories: Double? = nil, averageHeartRate: Double? = nil,
          maximumHeartRate: Double? = nil, activity: String,
-         completedSets: Int? = nil) {
+         completedSets: Int? = nil,
+         nativeRunningMetrics: ATHLTHNativeRunningMetrics? = nil) {
         let sport = activity.lowercased().filter { $0.isLetter || $0.isNumber }
         let foot = ["running", "walking", "treadmill", "hiking"].contains(sport)
         let cycling = ["cycling", "bicycle"].contains(sport)
@@ -29,6 +45,7 @@ struct ATHLTHWorkoutSummaryEngine: Equatable {
         self.activeCalories = Self.positive(activeCalories)
         self.averageHeartRate = Self.positive(averageHeartRate)
         self.maximumHeartRate = Self.positive(maximumHeartRate)
+        self.nativeRunningMetrics = sport == "running" && nativeRunningMetrics?.hasMeasurements == true ? nativeRunningMetrics : nil
         self.completedSets = sport == "strength" ? completedSets.flatMap { $0 >= 0 ? $0 : nil } : nil
         if let meters, let seconds = Self.positive(duration) {
             let pace = seconds / (meters / 1000)
