@@ -188,3 +188,38 @@ final class ATHLTHCoachPlanMuscleFocusTests: XCTestCase {
         XCTAssertNil(ATHLTHCoachChatPlanFactory.makeDraft(intake, library: []))
     }
 }
+
+
+@MainActor
+final class RecoveryCoachMuscleRankingTests: XCTestCase {
+    func testRankingUsesRecordedTrainingRatherThanRecoveryAndLimitsToThree() {
+        let now = Date()
+        func status(_ name: String, sets: Int = 0, strength: Double = 0,
+                    running: Double = 0, walking: Double = 0,
+                    last: Date? = nil) -> MuscleRecoveryStatus {
+            MuscleRecoveryStatus(muscleGroup: name, lastTrainedAt: last,
+                completedSets: sets, strengthMinutes: strength, runningMinutes: running,
+                walkingMinutes: walking, estimatedRecoveryHours: 24, soreness: .none)
+        }
+        let values = [
+            status("Untrained"),
+            status("Chest", sets: 12, strength: 40, last: now.addingTimeInterval(-3 * 86_400)),
+            status("Quads", running: 60, last: now),
+            status("Back", sets: 8, strength: 35, last: now),
+            status("Arms", sets: 5, strength: 10, last: now)
+        ]
+        XCTAssertEqual(RecoveryCoachMuscleRanking.mostTrained(values).map(\.name),
+                       ["Quads", "Chest", "Back"])
+        XCTAssertTrue(RecoveryCoachMuscleRanking.mostTrained([status("Untrained")]).isEmpty)
+        XCTAssertEqual(RecoveryCoachMuscleRanking.mostTrained([values[1]]).map(\.name), ["Chest"])
+    }
+
+    func testLegacyContextNeverFillsWithUntrainedMuscles() {
+        let values = [
+            RecoveryAIMuscleInput(name: "Back", recoveryPercent: 100, status: "", completedSets: 10),
+            RecoveryAIMuscleInput(name: "Chest", recoveryPercent: 35, status: "", completedSets: 3),
+            RecoveryAIMuscleInput(name: "Core", recoveryPercent: 100, status: "", completedSets: 0)
+        ]
+        XCTAssertEqual(RecoveryCoachMuscleRanking.fromContext(values).map(\.name), ["Back", "Chest"])
+    }
+}
