@@ -1960,8 +1960,10 @@ struct ATHLTHTournamentCreator: View {
             }) { activity in
                 reviewRow(activity.title, competitionSettings.effectiveEnvironment(activity: activity).title)
             }
-            if !competitionSettings.meetingPlace.isEmpty {
-                reviewRow("Møtested", competitionSettings.meetingPlace)
+            if competitionSettings.hasMeetingPoint {
+                Divider()
+                ATHLTHCompetitionMeetingPointPreview(settings: competitionSettings)
+                Divider()
             }
             reviewRow("Registrering", competitionSettings.race.recordingDevice.title)
             if !competitionSettings.race.equipmentRules.isEmpty {
