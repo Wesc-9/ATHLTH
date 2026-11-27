@@ -151,3 +151,40 @@ final class ATHLTHAccountPlanDocumentsTests: XCTestCase {
         XCTAssertTrue(session.planTemplates.isEmpty)
     }
 }
+
+
+@MainActor
+final class ATHLTHCoachPlanMuscleFocusTests: XCTestCase {
+    func testGeneralIsDefaultAndOldIntakesDecode() throws {
+        let initial = ATHLTHCoachChatPlanIntake()
+        XCTAssertTrue(initial.activeMuscleFocus.isEmpty)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(initial)) as? [String: Any])
+        object.removeValue(forKey: "muscleFocus")
+        let old = try JSONDecoder().decode(ATHLTHCoachChatPlanIntake.self,
+            from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertTrue(old.activeMuscleFocus.isEmpty)
+    }
+
+    func testMultipleMuscleGroupsAndRememberedChoices() throws {
+        var intake = ATHLTHCoachChatPlanIntake.prefilled(from: "Lag en treningsplan for bryst og rygg")
+        XCTAssertEqual(Set(intake.activeMuscleFocus), [.chest, .back])
+        var preferences = ATHLTHCoachPreferences()
+        preferences.remember(intake)
+        let decoded = try JSONDecoder().decode(ATHLTHCoachPreferences.self,
+            from: JSONEncoder().encode(preferences))
+        XCTAssertEqual(decoded.planMuscleFocus, Set([.chest, .back]))
+        XCTAssertEqual(Set(ATHLTHCoachChatPlanIntake.prefilled(from: "Lag en treningsplan",
+            preferences: decoded).activeMuscleFocus), [.chest, .back])
+        intake.goal = .running
+        XCTAssertTrue(intake.activeMuscleFocus.isEmpty)
+        intake.goal = .hybrid
+        XCTAssertEqual(Set(intake.activeMuscleFocus), [.chest, .back])
+    }
+
+    func testFocusedPlanDoesNotInventMissingLibraryExercises() {
+        var intake = ATHLTHCoachChatPlanIntake()
+        intake.muscleFocus = [.back, .chest]
+        XCTAssertNil(ATHLTHCoachChatPlanFactory.makeDraft(intake, library: []))
+    }
+}
