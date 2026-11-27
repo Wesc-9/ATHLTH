@@ -30,17 +30,6 @@ struct TrophyInscriptionResolution {
     let isPersisted: Bool
 }
 
-private struct TrophyInscriptionRequest:
-    Encodable
-{
-    let trophyID: String
-    let username: String
-    let achievementTitle: String
-    let achievementDetail: String
-    let unlockedAt: String?
-    let language: String
-}
-
 private struct TrophyInscriptionCacheEntry:
     Codable
 {
@@ -118,102 +107,34 @@ final class TrophyInscriptionAIService {
                 TrophyInscriptionCacheEntry.self,
                 from: data
             ),
-        cached.achievementTitle ==
-            achievementTitle {
+        cached.achievementTitle == achievementTitle,
+        cached.username == cleanUsername.uppercased() {
             return TrophyInscriptionResolution(
                 inscription: cached.inscription,
                 isPersisted: true
             )
         }
 
-        let formatter =
-            ISO8601DateFormatter()
-        let request =
-            TrophyInscriptionRequest(
-                trophyID: trophyID,
-                username: cleanUsername,
-                achievementTitle:
-                    achievementTitle,
-                achievementDetail:
-                    achievementDetail,
-                unlockedAt:
-                    unlockedAt.map {
-                        formatter.string(
-                            from: $0
-                        )
-                    },
-                language: language
-            )
-
-        do {
-            let generated:
-                TrophyInscription =
-                try await client
-                    .functions
-                    .invoke(
-                        "generate-trophy-inscription",
-                        options:
-                            FunctionInvokeOptions(
-                                body: request
-                            )
-                    )
-
-            let normalized =
-                TrophyInscription(
-                    athlete:
-                        clipped(
-                            generated
-                                .athlete,
-                            maximum: 24
-                        )
-                        .uppercased(),
-                    achievement:
-                        clipped(
-                            generated
-                                .achievement,
-                            maximum: 28
-                        )
-                        .uppercased(),
-                    inscription:
-                        clipped(
-                            generated
-                                .inscription,
-                            maximum: 48
-                        )
-                        .uppercased()
-                )
-
-            if let data =
-                try? JSONEncoder()
-                    .encode(
-                        TrophyInscriptionCacheEntry(
-                            username:
-                                normalized
-                                    .athlete,
-                            achievementTitle:
-                                achievementTitle,
-                            inscription:
-                                normalized
-                        )
-                    ) {
-                defaults.set(
-                    data,
-                    forKey: cacheKey
-                )
-            }
-
-            return TrophyInscriptionResolution(
-                inscription: normalized,
-                isPersisted: true
-            )
-        } catch {
-            // The trophy must always render even if AI is offline.
-            // A later visit can retry because fallbacks are not cached.
-            return TrophyInscriptionResolution(
-                inscription: fallback,
-                isPersisted: false
-            )
+        // Only two generic, approved inscriptions reach the local model.
+        // Username, achievement details and dates are never sent to AI.
+        let options = [fallback.inscription, ATHLTHLocalization.choose(
+            english: "EARNED THROUGH DEDICATION", norwegian: "FORTJENT GJENNOM INNSATS")]
+        let wording = (try? await ATHLTHIntelligenceEngine.privateWording(
+            feature: .trophyInscription, options: options)) ?? fallback.inscription
+        let normalized = TrophyInscription(
+            athlete: clipped(cleanUsername, maximum: 24).uppercased(),
+            achievement: clipped(achievementTitle, maximum: 28).uppercased(),
+            inscription: clipped(wording, maximum: 48).uppercased())
+        guard !Task.isCancelled,
+              (client.auth.currentUser?.id.uuidString ?? "signed-out") == userScope else {
+            return TrophyInscriptionResolution(inscription: fallback, isPersisted: false)
         }
+        if let data = try? JSONEncoder().encode(TrophyInscriptionCacheEntry(
+            username: normalized.athlete, achievementTitle: achievementTitle, inscription: normalized)) {
+            defaults.set(data, forKey: cacheKey)
+            return TrophyInscriptionResolution(inscription: normalized, isPersisted: true)
+        }
+        return TrophyInscriptionResolution(inscription: normalized, isPersisted: false)
     }
 
     private func sanitizedUsername(

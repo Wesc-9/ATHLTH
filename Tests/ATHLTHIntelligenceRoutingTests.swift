@@ -39,6 +39,14 @@ final class ATHLTHIntelligenceRoutingTests: XCTestCase {
             adminPilotEnabled: true, isAdministrator: false, localAvailable: true), .rules)
     }
 
+    func testNewPrivateFeaturesHaveNoGroqFallback() {
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .trophyInscription, localAvailable: true), .appleLocal)
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .trophyInscription), .rules)
+        for feature: ATHLTHIntelligenceFeature in [.trophyInscription, .equipmentRecognition, .sharedWorkoutDraft, .competitionDraft] {
+            XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: feature))
+        }
+    }
+
     func testKnownHealthPayloadCannotUseLegacyCloudPlanning() {
         XCTAssertNoThrow(try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: false))
         XCTAssertThrowsError(try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: true))

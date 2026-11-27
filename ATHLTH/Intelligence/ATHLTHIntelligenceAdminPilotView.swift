@@ -59,8 +59,8 @@ struct ATHLTHIntelligenceAdminPilotView: View {
                             adminPilotEnabled: recommendationPilot, isAdministrator: isAdministrator,
                             localAvailable: ATHLTHIntelligenceEngine.isLocalAvailable)?.title ?? "—")
                 }
-                Text(tr("Existing cloud requests retain their original endpoints and consent checks.",
-                        "Eksisterende skyforespørsler beholder endepunkter og samtykkekontroller."))
+                Text(tr("External planning and experimental voice remain separate. Equipment photos and private health insights have no remote AI fallback. Competition drafts only fetch catalog entries.",
+                        "Ekstern planlegging og eksperimentell tale er fortsatt separate. Apparatbilder og privat helseinnsikt har ingen ekstern AI-reserve. Konkurranseforslag henter kun bibliotekoppføringer."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             .onDisappear { task?.cancel(); task = nil; enabled = false; result = nil; busy = false }

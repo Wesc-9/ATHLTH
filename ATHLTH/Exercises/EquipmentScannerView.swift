@@ -61,7 +61,7 @@ struct ATHLTHEquipmentScanResponse: Decodable {
     /// Reject uncertain, unknown and duplicate IDs even if an AI response is malformed.
     func matchedExercises(in candidates: [ExerciseLibraryEntry]) -> [ExerciseLibraryEntry] {
         guard confidence == "high" || confidence == "medium" else { return [] }
-        let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id.uuidString, $0) })
+        let byID = Dictionary(candidates.map { ($0.id.uuidString, $0) }, uniquingKeysWith: { first, _ in first })
         var seen = Set<String>()
         return exerciseIDs.compactMap { id in
             guard seen.insert(id).inserted else { return nil }
@@ -591,6 +591,7 @@ struct ATHLTHEquipmentScannerView: View {
             .fullScreenCover(isPresented: $isCameraOpen) {
                 ATHLTHEquipmentCameraPicker(
                     onCapture: { captured in
+                        selectedPhoto = nil
                         replacePhoto(captured)
                         isCameraOpen = false
                     },

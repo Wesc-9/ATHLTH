@@ -25,6 +25,7 @@ enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
     case workoutInsight, recoveryInsight, coachQuestion, trainingProgram
     case strengthSession, planAdaptation, equipmentRecognition, pushToTalk
     case realtimeConversation, localDiagnostic, dailyRecommendationExplanation, privateHistorySearch
+    case trophyInscription, sharedWorkoutDraft, competitionDraft
 
     var title: String {
         switch self {
@@ -35,6 +36,9 @@ enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
         case .recoveryInsight: return "Recovery insight"
         case .coachQuestion: return "Coach question"
         case .privateHistorySearch: return "Private history search / reports"
+        case .trophyInscription: return "Trophy inscription"
+        case .sharedWorkoutDraft: return "Shared workout draft"
+        case .competitionDraft: return "Competition draft"
         case .trainingProgram: return "Training program"
         case .strengthSession: return "Strength session"
         case .planAdaptation: return "Plan adaptation"
@@ -53,9 +57,9 @@ enum ATHLTHIntelligenceRoutingPolicy {
                          isAdministrator: Bool = false,
                          localAvailable: Bool = false) -> ATHLTHIntelligenceProvider? {
         switch feature {
-        case .dailyFormCalculation, .dailyRecommendation, .fixedAudioCoach:
+        case .dailyFormCalculation, .dailyRecommendation, .fixedAudioCoach, .sharedWorkoutDraft, .competitionDraft:
             return .rules
-        case .workoutInsight, .recoveryInsight, .coachQuestion, .privateHistorySearch:
+        case .workoutInsight, .recoveryInsight, .coachQuestion, .privateHistorySearch, .trophyInscription:
             return localAvailable ? .appleLocal : .rules
         case .equipmentRecognition: return .appleVision
         case .trainingProgram, .strengthSession, .planAdaptation, .pushToTalk:
