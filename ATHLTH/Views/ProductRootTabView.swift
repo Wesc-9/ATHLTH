@@ -2988,14 +2988,27 @@ struct ATHLTHHomeView: View {
             }
             .buttonStyle(.plain)
         case .recorded(let workout):
-            Button {
-                if compact { selectedHomeCompletedWorkout = workout }
-            } label: {
-                homeCompactCalendarRow(time: workout.startDate, endTime: workout.endDate,
-                    title: completedWorkoutCalendarTitle(workout), icon: "checkmark.circle.fill")
+            if compact {
+                Button {
+                    selectedHomeCompletedWorkout = workout
+                } label: {
+                    homeCompactCalendarRow(time: workout.startDate, endTime: workout.endDate,
+                        title: completedWorkoutCalendarTitle(workout), icon: "checkmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-home-calendar-completed-\(workout.id)")
+            } else {
+                NavigationLink {
+                    WorkoutHistoryDetailView(workout: workout)
+                        .navigationTitle(ATHLTHLocalization.choose(english: "Completed workout", norwegian: "Fullført økt"))
+                        .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    homeCalendarEventRow(time: workout.startDate, endTime: workout.endDate,
+                        title: completedWorkoutCalendarTitle(workout), systemImage: "checkmark.circle.fill",
+                        detail: ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført"))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("athlth-home-calendar-completed-\(workout.id)")
         case .tournament(let item):
             if let tournament = tournamentCalendar.tournament(for: item.tournamentID) {
                 NavigationLink {
@@ -3094,162 +3107,32 @@ struct ATHLTHHomeView: View {
         .background(ATHLTHTrainDesign.canvas.opacity(0.55), in: RoundedRectangle(cornerRadius: 11))
     }
 
-    // The compact Home card displays two slots, but "See all" must expose
-    // every saved workout, including sessions created from Weekly Progress.
+    // The preview is capped at four entries; See all retains the entire horizon.
     private var homeTodayCalendarAllSheet: some View {
-        let activePlan = session.activePlan
-        let workouts = HomeTodayCalendarSchedule.workouts(
-            plan: activePlan,
-            standalone: session.standalonePlannedSessions
-        )
-        let completedToday = homeCompletedWorkoutsToday
-        let personalEvents = homeTodayCommunityEvents
-        let clubEvents = homeTodayGroupEvents
-        let tournamentItems = tournamentCalendar.events(on: Date())
-
+        let entries = homeAgendaEntries
         return NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 11) {
-                    if workouts.isEmpty && completedToday.isEmpty &&
-                       tournamentItems.isEmpty && personalEvents.isEmpty &&
-                       clubEvents.isEmpty {
+                LazyVStack(alignment: .leading, spacing: 11) {
+                    if entries.isEmpty {
                         ContentUnavailableView(
-                            ATHLTHLocalization.choose(
-                                english: "Nothing scheduled today",
-                                norwegian: "Ingenting planlagt i dag"
-                            ),
+                            ATHLTHLocalization.choose(english: "Nothing scheduled", norwegian: "Ingen aktiviteter i kalenderen"),
                             systemImage: "calendar",
                             description: Text(ATHLTHLocalization.choose(
-                                english: "Your planned workouts and events will appear here.",
-                                norwegian: "Planlagte økter og arrangementer vises her."
-                            ))
+                                english: "Today's workouts and upcoming events for the next 14 days will appear here.",
+                                norwegian: "Dagens økter og kommende aktiviteter de neste 14 dagene vises her."))
                         )
                     }
-
-                    ForEach(workouts) { workout in
-                        HStack(spacing: 8) {
-                            Button {
-                                selectedHomeAllStandaloneWorkout = workout
-                            } label: {
-                                homeCalendarPlanRow(workout)
-                                    .padding(13)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(
-                                        ATHLTHPlanDesign.surface,
-                                        in: RoundedRectangle(cornerRadius: 16)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        if index == 0 || entries[index - 1].day != entry.day {
+                            Text(homeAgendaDateLabel(entry.day))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                                .accessibilityAddTraits(.isHeader)
                         }
-                    }
-
-                    ForEach(completedToday) { workout in
-                        NavigationLink {
-                            WorkoutHistoryDetailView(workout: workout)
-                                .navigationTitle(ATHLTHLocalization.choose(
-                                    english: "Completed workout", norwegian: "Fullført økt"
-                                ))
-                                .navigationBarTitleDisplayMode(.inline)
-                        } label: {
-                            homeCalendarEventRow(
-                                time: workout.startDate,
-                                title: completedWorkoutCalendarTitle(workout),
-                                systemImage: "checkmark.circle.fill",
-                                detail: ATHLTHLocalization.choose(
-                                    english: "Completed", norwegian: "Fullført"
-                                ) + " · " + workout.endDate.formatted(
-                                    date: .omitted, time: .shortened
-                                )
-                            )
+                        homeAgendaRow(entry, compact: false)
                             .padding(13)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                ATHLTHPlanDesign.surface,
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    ForEach(tournamentItems) { item in
-                        if let tournament = tournamentCalendar.tournament(
-                            for: item.tournamentID
-                        ) {
-                            NavigationLink {
-                                ATHLTHTournamentLiveDetailView(tournament: tournament)
-                            } label: {
-                                homeCalendarEventRow(
-                                    time: item.relevantDate(on: Date()),
-                                    title: item.isDeadline(on: Date())
-                                        ? "Frist · \(item.exerciseTitle)"
-                                        : item.isOngoing(on: Date())
-                                        ? "Pågår · \(item.exerciseTitle)"
-                                        : item.exerciseTitle,
-                                    systemImage: "trophy",
-                                    detail: "\(item.tournamentTitle) · Frist " +
-                                        item.deadlineAt.formatted(
-                                            date: .abbreviated, time: .shortened
-                                        )
-                                )
-                                .padding(13)
-                                .background(
-                                    ATHLTHPlanDesign.surface,
-                                    in: RoundedRectangle(cornerRadius: 16)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    ForEach(personalEvents) { event in
-                        NavigationLink {
-                            CommunityEventDetailView(eventID: event.id)
-                        } label: {
-                            homeCalendarEventRow(
-                                time: event.event.startsAt,
-                                title: event.event.title,
-                                systemImage: event.event.activityType.systemImage,
-                                detail: event.event.meetingName.isEmpty
-                                    ? event.event.activityType.title
-                                    : event.event.meetingName
-                            )
-                            .padding(13)
-                            .background(
-                                ATHLTHPlanDesign.surface,
-                                in: RoundedRectangle(cornerRadius: 16)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    ForEach(clubEvents) { event in
-                        if let group = groups.group(for: event.groupID) {
-                            NavigationLink {
-                                CommunityGroupEventDetailView(
-                                    group: group, event: event
-                                )
-                            } label: {
-                                homeCalendarEventRow(
-                                    time: event.startsAt,
-                                    title: event.title,
-                                    systemImage: homeGroupEventSystemImage(
-                                        event.activityType
-                                    ),
-                                    detail: event.meetingName.isEmpty
-                                        ? homeGroupEventActivityTitle(
-                                            event.activityType
-                                        )
-                                        : event.meetingName
-                                )
-                                .padding(13)
-                                .background(
-                                    ATHLTHPlanDesign.surface,
-                                    in: RoundedRectangle(cornerRadius: 16)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                            .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
                     }
                 }
                 .padding(18)
@@ -3257,8 +3140,8 @@ struct ATHLTHHomeView: View {
             .scrollIndicators(.hidden)
             .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle(ATHLTHLocalization.choose(
-                english: "Today's calendar",
-                norwegian: "Kalender i dag"
+                english: "Calendar",
+                norwegian: "Kalender"
             ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
