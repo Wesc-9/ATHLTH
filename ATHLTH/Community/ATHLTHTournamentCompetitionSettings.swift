@@ -229,6 +229,21 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
     var meetingAddress: String? = nil
     var meetingDescription: String? = nil
 
+    var hasMeetingPoint: Bool {
+        !meetingPlace.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            (meetingLat != nil && meetingLon != nil)
+    }
+
+    var meetingDisplayAddress: String {
+        let address = (meetingAddress ?? meetingPlace).trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.isEmpty ? "Valgt punkt på kart" : address
+    }
+
+    var meetingDisplayDescription: String? {
+        let value = (meetingDescription ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
     static func combinedMeetingPlace(address: String, description: String) -> String {
         [address, description].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }.joined(separator: "\n")
