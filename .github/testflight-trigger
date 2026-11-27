@@ -372,3 +372,4 @@ ATHLTH 3.0.5 build 145 — user-authorized TestFlight 2026-11-26; corrected obso
 
 ATHLTH 3.0.6 — user-authorized overnight TestFlight upload 2026-11-27. Source 13a75f3c02615681c6d97df240ce46d36da22359; require all exact-commit release gates, signed archive and successful App Store Connect upload. Diagnose and fix verified failures on release/v3.0.6 and retry; no gate bypass or frozen branch changes.
 ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27: replace unavailable watchOS Menu with native Picker and explicit save for optional effort rating. Preserve all five exact-commit gates.
+ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27 after Watch navigation intent missing TargetContentProvidingIntent conformance; preserve all exact-commit release gates.

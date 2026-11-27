@@ -16,7 +16,7 @@ enum ATHLTHWatchNavigationTarget: String, AppEnum {
 /// Included in the Watch app and widget target. Navigation is handled by
 /// the foreground SwiftUI root, never by the widget extension recorder.
 @available(watchOS 26.0, *)
-struct ATHLTHWatchNavigationIntent: OpenIntent {
+struct ATHLTHWatchNavigationIntent: OpenIntent, TargetContentProvidingIntent {
     static var title: LocalizedStringResource { "Åpne ATHLTH" }
     @Parameter(title: "Visning") var target: ATHLTHWatchNavigationTarget
 
