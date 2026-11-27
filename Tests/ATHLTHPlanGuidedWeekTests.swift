@@ -43,6 +43,27 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
         }
     }
 
+    func testSuggestedTrainingRhythmCanVaryWithoutChangingTrainingCount() {
+        let selected: Set<Int> = [1, 3, 5]
+        func trainingDays(week: Int, varies: Bool) -> [Int] {
+            (1...7).filter {
+                ATHLTHGuidedPlanDayPolicy.isSuggestedTraining(
+                    weekday: $0, week: week, selectedDays: selected,
+                    varyWeekdays: varies
+                )
+            }
+        }
+        XCTAssertEqual(trainingDays(week: 0, varies: true), [1, 3, 5])
+        XCTAssertEqual(trainingDays(week: 1, varies: true), [2, 4, 6])
+        XCTAssertEqual(trainingDays(week: 2, varies: true), [1, 3, 5])
+        XCTAssertEqual(trainingDays(week: 1, varies: false), [1, 3, 5])
+        XCTAssertTrue(ATHLTHGuidedPlanDayPolicy.isSuggestedTraining(
+            weekday: 1, week: 1, selectedDays: [7], varyWeekdays: true
+        ))
+        XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(nil),
+                       "A suggestion never completes a day.")
+    }
+
     func testGuidedDayRequiresExplicitRestOrValidWorkout() {
         XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(nil))
 
