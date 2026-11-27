@@ -24,6 +24,7 @@ final class ATHLTHPhoneLiveSensorCapture: NSObject, HKWorkoutSessionDelegate, HK
     private var paused = false
     private var exporting = false
     private var exported = false
+    private var stopRequested = false
     private var reading: (bpm: Double, date: Date)?
     private var freshAfter: Date
 
@@ -73,7 +74,7 @@ final class ATHLTHPhoneLiveSensorCapture: NSObject, HKWorkoutSessionDelegate, HK
     }
 
     func freshHeartRate(at now: Date) -> Double? {
-        guard began, !paused, !exporting, let reading else { return nil }
+        guard began, !paused, !exporting, !stopRequested, let reading else { return nil }
         return ATHLTHPhonePulseFreshness.value(reading.bpm, sampledAt: reading.date,
             startedAt: freshAfter, now: now)
     }
@@ -86,6 +87,32 @@ final class ATHLTHPhoneLiveSensorCapture: NSObject, HKWorkoutSessionDelegate, HK
         if value { session?.pause() } else { session?.resume() }
     }
 
+    func summary() -> (activeCalories: Double?, averageHeartRate: Double?, maxHeartRate: Double?) {
+        guard began, let builder else { return (nil, nil, nil) }
+        let pulse = HKQuantityType.quantityType(forIdentifier: .heartRate)
+            .flatMap { builder.statistics(for: $0) }
+        let bpm = HKUnit.count().unitDivided(by: .minute())
+        let energy = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)
+            .flatMap { builder.statistics(for: $0) }?.sumQuantity()?.doubleValue(for: .kilocalorie())
+        let average = pulse?.averageQuantity()?.doubleValue(for: bpm)
+        let maximum = pulse?.maximumQuantity()?.doubleValue(for: bpm)
+        return (Self.valid(energy), Self.valid(average), Self.valid(maximum))
+    }
+
+    private static func valid(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    /// Stop collection immediately when the local journal commits; the
+    /// canonical exporter can finish the same builder asynchronously.
+    func requestStop(at end: Date) {
+        guard !stopRequested else { return }
+        stopRequested = true
+        reading = nil
+        session?.stopActivity(with: end)
+    }
+
     /// Wait briefly for HealthKit's stopped state before letting the existing
     /// exporter attach metadata, pause events and distance to this builder.
     func stopForExport(at end: Date) async -> HKLiveWorkoutBuilder? {
@@ -95,7 +122,7 @@ final class ATHLTHPhoneLiveSensorCapture: NSObject, HKWorkoutSessionDelegate, HK
         }
         exporting = true
         reading = nil
-        session.stopActivity(with: end)
+        requestStop(at: end)
         for _ in 0..<30 {
             guard self.session === session, self.builder === builder else { return nil }
             if session.state == .stopped { return builder }
@@ -153,7 +180,7 @@ final class ATHLTHPhoneLiveSensorCapture: NSObject, HKWorkoutSessionDelegate, HK
         guard collectedTypes.contains(where: { $0.identifier == HKQuantityTypeIdentifier.heartRate.rawValue }) else { return }
         let identity = ObjectIdentifier(workoutBuilder)
         Task { @MainActor [weak self] in
-            guard let self, !self.paused, !self.exporting, let builder = self.builder,
+            guard let self, !self.paused, !self.exporting, !self.stopRequested, let builder = self.builder,
                   ObjectIdentifier(builder) == identity,
                   let type = HKQuantityType.quantityType(forIdentifier: .heartRate),
                   let stats = builder.statistics(for: type),

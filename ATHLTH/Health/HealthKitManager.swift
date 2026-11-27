@@ -274,6 +274,56 @@ final class HealthKitManager: ObservableObject {
         private let healthStore = HKHealthStore()
     private var workoutObjects: [UUID: HKWorkout] = [:]
     private var manualStrengthWrites = ATHLTHManualStrengthWorkoutWriteGate()
+    private var strengthSensorCapture: AnyObject?
+    private var strengthSensorOwner: UUID?
+
+    @available(iOS 26.0, *)
+    private var nativeStrengthCapture: ATHLTHPhoneLiveSensorCapture? {
+        strengthSensorCapture as? ATHLTHPhoneLiveSensorCapture
+    }
+
+    func startStrengthSensorCapture(workoutID: UUID, startedAt: Date, ownerID: UUID) {
+        guard #available(iOS 26.0, *), ATHLTHDeviceRole.isIPhone,
+              integrationEnabled, healthDataAvailable, canWriteWorkouts,
+              UserDefaults.standard.bool(forKey: "athlth.airpods.liveSensorPilot") else { return }
+        // A previously stopped builder is still owned by its exporter.
+        // Do not replace it or attribute it to a new strength workout.
+        guard nativeStrengthCapture == nil else { return }
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .traditionalStrengthTraining
+        configuration.locationType = .indoor
+        let capture = ATHLTHPhoneLiveSensorCapture(workoutID: workoutID, startedAt: startedAt)
+        strengthSensorOwner = ownerID
+        strengthSensorCapture = capture
+        capture.start(store: healthStore, configuration: configuration)
+    }
+
+    func strengthSensorHeartRate(workoutID: UUID, ownerID: UUID, at now: Date = Date()) -> Double? {
+        guard #available(iOS 26.0, *), integrationEnabled, strengthSensorOwner == ownerID,
+              let capture = nativeStrengthCapture, capture.workoutID == workoutID else { return nil }
+        return capture.freshHeartRate(at: now)
+    }
+
+    func strengthSensorSummary(workoutID: UUID, ownerID: UUID) -> (activeCalories: Double?, averageHeartRate: Double?, maxHeartRate: Double?) {
+        guard #available(iOS 26.0, *), integrationEnabled, strengthSensorOwner == ownerID,
+              let capture = nativeStrengthCapture, capture.workoutID == workoutID else { return (nil, nil, nil) }
+        return capture.summary()
+    }
+
+    func stopStrengthSensorCapture(workoutID: UUID, ownerID: UUID, at end: Date) {
+        guard #available(iOS 26.0, *), strengthSensorOwner == ownerID,
+              let capture = nativeStrengthCapture, capture.workoutID == workoutID else { return }
+        capture.requestStop(at: end)
+    }
+
+    func discardStrengthSensorCapture(ownerID: UUID, workoutID: UUID? = nil) {
+        guard #available(iOS 26.0, *), strengthSensorOwner == ownerID,
+              let capture = nativeStrengthCapture,
+              workoutID == nil || capture.workoutID == workoutID else { return }
+        capture.discard()
+        strengthSensorCapture = nil
+        strengthSensorOwner = nil
+    }
     private var workoutObjectCacheOrder: [UUID] = []
     private static let workoutObjectCacheLimit = 128
 
@@ -1724,8 +1774,12 @@ final class HealthKitManager: ObservableObject {
         startDate: Date,
         endDate: Date,
         externalID: UUID,
-        recoveryPauseIntervals: [DateInterval] = []
+        recoveryPauseIntervals: [DateInterval] = [],
+        sensorOwnerID: UUID? = nil
     ) async -> UUID? {
+        defer {
+            if let sensorOwnerID { discardStrengthSensorCapture(ownerID: sensorOwnerID, workoutID: externalID) }
+        }
         guard integrationEnabled,
               healthDataAvailable,
               canWriteWorkouts,
@@ -1748,14 +1802,20 @@ final class HealthKitManager: ObservableObject {
         configuration.activityType = .traditionalStrengthTraining
         configuration.locationType = .indoor
 
-        let builder = HKWorkoutBuilder(
-            healthStore: healthStore,
-            configuration: configuration,
-            device: nil
-        )
+        let builder: HKWorkoutBuilder
+        let native: Bool
+        if #available(iOS 26.0, *), let sensorOwnerID, strengthSensorOwner == sensorOwnerID,
+           let capture = nativeStrengthCapture, capture.workoutID == externalID,
+           let liveBuilder = await capture.stopForExport(at: endDate) {
+            builder = liveBuilder
+            native = true
+        } else {
+            builder = HKWorkoutBuilder(healthStore: healthStore, configuration: configuration, device: nil)
+            native = false
+        }
 
         do {
-            try await builder.beginCollection(at: startDate)
+            if !native { try await builder.beginCollection(at: startDate) }
             try await builder.addMetadata([
                 HKMetadataKeyExternalUUID: externalID.uuidString,
                 HKMetadataKeySyncIdentifier: syncIdentifier,
@@ -1807,6 +1867,10 @@ final class HealthKitManager: ObservableObject {
             }
             try await builder.endCollection(at: endDate)
             let workout = try await builder.finishWorkout()
+            if #available(iOS 26.0, *), native, workout != nil,
+               nativeStrengthCapture?.workoutID == externalID {
+                nativeStrengthCapture?.markExported()
+            }
 
             if let workout {
                 cacheWorkoutObject(

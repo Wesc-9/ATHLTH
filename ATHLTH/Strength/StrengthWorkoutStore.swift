@@ -345,6 +345,7 @@ final class StrengthWorkoutStore: ObservableObject {
 
     func switchAccount(_ userID: UUID?) {
         guard accountID != userID else { return }
+        if let accountID { HealthKitManager.shared.discardStrengthSensorCapture(ownerID: accountID) }
         // Flush an outstanding set/exercise edit before changing ownership.
         // Otherwise the 350 ms debounce can discard the athlete's last set.
         if activeWorkout != nil, checkpointSaveTask != nil {
@@ -3262,6 +3263,7 @@ final class StrengthWorkoutStore: ObservableObject {
             allowsLiveExerciseBuilding:
                 true
         )
+        startPhoneSensorCaptureIfEligible()
 
         currentExerciseIndex = 0
         currentSetIndex = 0
@@ -4031,6 +4033,7 @@ final class StrengthWorkoutStore: ObservableObject {
         launchedWorkout.liveHeartRateTargetZone =
             session.targetAlertConfiguration?.heartRateZone
         activeWorkout = launchedWorkout
+        startPhoneSensorCaptureIfEligible()
         currentExerciseIndex = 0
         currentSetIndex = 0
         restEndsAt = nil
@@ -5959,6 +5962,20 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     @discardableResult
+    private func startPhoneSensorCaptureIfEligible() {
+        guard let workout = activeWorkout, workout.captureDevice == .iPhone,
+              let accountID else { return }
+        HealthKitManager.shared.startStrengthSensorCapture(workoutID: workout.id,
+            startedAt: workout.startedAt, ownerID: accountID)
+    }
+
+    func freshPhoneHeartRate(at now: Date = Date()) -> Double? {
+        guard let workout = activeWorkout, workout.captureDevice == .iPhone,
+              let accountID, recoveredCheckpointSavedAt == nil else { return nil }
+        return HealthKitManager.shared.strengthSensorHeartRate(workoutID: workout.id,
+            ownerID: accountID, at: now)
+    }
+
     func finish(
         healthKitWorkoutUUID: UUID? = nil,
         duration: TimeInterval? = nil,
@@ -6010,17 +6027,23 @@ final class StrengthWorkoutStore: ObservableObject {
         )
 
         let existingMetrics = workout.healthMetrics
+        let sensorMetrics: (activeCalories: Double?, averageHeartRate: Double?, maxHeartRate: Double?)
+        if workout.captureDevice == .iPhone, let accountID {
+            sensorMetrics = HealthKitManager.shared.strengthSensorSummary(workoutID: workout.id, ownerID: accountID)
+        } else {
+            sensorMetrics = (nil, nil, nil)
+        }
         workout.healthMetrics = LinkedHealthWorkoutMetrics(
             healthKitWorkoutUUID:
                 healthKitWorkoutUUID ?? existingMetrics.healthKitWorkoutUUID,
             duration:
                 duration ?? existingMetrics.duration,
             activeCalories:
-                activeCalories ?? existingMetrics.activeCalories,
+                activeCalories ?? sensorMetrics.activeCalories ?? existingMetrics.activeCalories,
             averageHeartRate:
-                averageHeartRate ?? existingMetrics.averageHeartRate,
+                averageHeartRate ?? sensorMetrics.averageHeartRate ?? existingMetrics.averageHeartRate,
             maxHeartRate:
-                maxHeartRate ?? existingMetrics.maxHeartRate
+                maxHeartRate ?? sensorMetrics.maxHeartRate ?? existingMetrics.maxHeartRate
         )
 
         guard let accountID,
@@ -6050,6 +6073,9 @@ final class StrengthWorkoutStore: ObservableObject {
             return false
         }
 
+        if workout.captureDevice == .iPhone {
+            HealthKitManager.shared.stopStrengthSensorCapture(workoutID: workout.id, ownerID: accountID, at: workout.endedAt ?? finishDate)
+        }
         completedWorkout = workout
         setEffortClock = nil
         cardioWatchCaptures = [:]
@@ -6094,13 +6120,14 @@ final class StrengthWorkoutStore: ObservableObject {
     }
 
     func discardActiveWorkout() {
-        guard activeWorkout != nil else {
+        guard let activeWorkout else {
             return
         }
+        if let accountID { HealthKitManager.shared.discardStrengthSensorCapture(ownerID: accountID, workoutID: activeWorkout.id) }
 
         checkpointSaveTask?.cancel()
         checkpointSaveTask = nil
-        activeWorkout = nil
+        self.activeWorkout = nil
         isFreeTrainingBetweenExercises = false
         recoveredCheckpointSavedAt = nil
         currentExerciseIndex = 0

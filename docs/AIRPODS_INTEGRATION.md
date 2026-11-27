@@ -15,3 +15,6 @@
 
 ## Phone run/walk pilot
 Opt-in from AirPods settings on iOS 26+. Native live capture is attached only to newly admitted phone run/walk workouts. It uses the associated builder for the existing export; if it cannot collect/stop, it is discarded before legacy export. GPS/manual distance and recorded pause events remain authoritative. Heart rate is timestamp-checked and wired to the running gauge, live snapshot and Coach. No AirPods model or sensor-source inference. Default is off; recovered checkpoints retain legacy export. Watch, strength and sport are unchanged. Physical tests, Xcode build, energy summary and broader rollout remain open. Do not enable by default without validation.
+
+## Strength pilot
+Reuses the same live sensor collector. New phone strength sessions only; Watch and recovered sessions remain unchanged. The durable strength completion journal precedes the stop request; the canonical app-level exporter reuses the exact matching native builder. Missing measurements remain nil. Account switch and discard clear only the owned capture. Timed sports remain a separate manual record and require a separate provenance/HealthKit export decision.

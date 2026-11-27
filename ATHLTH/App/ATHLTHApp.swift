@@ -4083,7 +4083,8 @@ struct AppRootView: View {
                     startDate: workout.startedAt,
                     endDate: endedAt,
                     externalID: workout.id,
-                    recoveryPauseIntervals: workout.recoveryPauseIntervals ?? []
+                    recoveryPauseIntervals: workout.recoveryPauseIntervals ?? [],
+                    sensorOwnerID: completionOwnerID
                 )
                 guard appSession.signedIn,
                       appSession.profile.userID == completionOwnerID else {

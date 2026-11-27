@@ -4697,7 +4697,8 @@ struct ActiveStrengthWorkoutView: View {
     /// Pulse zone is always measured automatically from Watch heart rate.
     /// A workout target is a separate, optional pre-workout preference.
     private func liveHeartRateAndZoneRow(_ workout: StrengthWorkoutLog) -> some View {
-        let pulse = strengthWatchSnapshot?.heartRate
+        let pulse = workout.captureDevice == .appleWatch
+            ? strengthWatchSnapshot?.heartRate : strength.freshPhoneHeartRate()
         let maximum = appSession.onboardingProfile?.maximumHeartRateBPM
         let maxBPM = maximum.map(Double.init)
         let observed = ATHLTHHeartRateZones.measuredZone(
@@ -4711,8 +4712,8 @@ struct ActiveStrengthWorkoutView: View {
                 (pulse ?? 0) > 0
                     ? "\(Int((pulse ?? 0).rounded())) bpm"
                     : ATHLTHLocalization.choose(
-                        english: "Waiting for Apple Watch pulse",
-                        norwegian: "Venter på puls fra Apple Watch"
+                        english: workout.captureDevice == .appleWatch ? "Waiting for Apple Watch pulse" : "No live sensor pulse",
+                        norwegian: workout.captureDevice == .appleWatch ? "Venter på puls fra Apple Watch" : "Ingen livepuls fra sensor"
                     ),
                 systemImage: "heart.fill"
             )
