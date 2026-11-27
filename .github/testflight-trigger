@@ -371,3 +371,4 @@ ATHLTH 3.0.4 build 144 — authorized retry 2026-11-26: isolate strength dock ca
 ATHLTH 3.0.5 build 145 — user-authorized TestFlight 2026-11-26; corrected obsolete Ghost Race test initializer and Xcode version. Run unsigned archive in parallel with all five exact-commit acceptance gates, then verify signing and upload. No stale source or gate bypass.
 
 ATHLTH 3.0.6 — user-authorized overnight TestFlight upload 2026-11-27. Source 13a75f3c02615681c6d97df240ce46d36da22359; require all exact-commit release gates, signed archive and successful App Store Connect upload. Diagnose and fix verified failures on release/v3.0.6 and retry; no gate bypass or frozen branch changes.
+ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27: replace unavailable watchOS Menu with native Picker and explicit save for optional effort rating. Preserve all five exact-commit gates.

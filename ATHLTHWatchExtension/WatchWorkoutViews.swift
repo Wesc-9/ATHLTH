@@ -5182,6 +5182,7 @@ private struct WatchCompletedEffortRatingView: View {
     @EnvironmentObject private var workoutManager: WatchWorkoutManager
     let resultID: UUID
     @State private var savedScore: Int?
+    @State private var selectedScore = 5
     @State private var saving = false
     @State private var failed = false
 
@@ -5201,27 +5202,29 @@ private struct WatchCompletedEffortRatingView: View {
             } else if saving {
                 ProgressView()
             } else {
-                Menu {
+                Picker(ATHLTHLocalization.choose(
+                    english: "Workout effort", norwegian: "Anstrengelse"
+                ), selection: $selectedScore) {
                     ForEach(1...10, id: \.self) { score in
-                        Button("\(score)/10") {
-                            saving = true
-                            failed = false
-                            Task { @MainActor in
-                                do {
-                                    savedScore = try await workoutManager.saveCompletedWorkoutEffort(score, resultID: resultID)
-                                } catch {
-                                    failed = true
-                                }
-                                saving = false
-                            }
-                        }
+                        Text("\(score)/10").tag(score)
                     }
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Rate this workout (1–10)", norwegian: "Vurder økten (1–10)"
-                    ))
-                    .font(.caption.weight(.semibold))
                 }
+                Button(ATHLTHLocalization.choose(
+                    english: "Save rating", norwegian: "Lagre vurdering"
+                )) {
+                    let score = selectedScore
+                    saving = true
+                    failed = false
+                    Task { @MainActor in
+                        do {
+                            savedScore = try await workoutManager.saveCompletedWorkoutEffort(score, resultID: resultID)
+                        } catch {
+                            failed = true
+                        }
+                        saving = false
+                    }
+                }
+                .font(.caption.weight(.semibold))
                 Text(ATHLTHLocalization.choose(
                     english: "Optional · 1 easy, 10 maximum",
                     norwegian: "Valgfritt · 1 lett, 10 maksimalt"
