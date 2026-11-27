@@ -256,7 +256,9 @@ struct ATHLTHTournamentCompetitionSettings: Codable, Equatable {
             exerciseEnvironments.count <= 12 &&
             Set(exerciseEnvironments.keys).isSubset(of: Set(selectedExerciseIDs ?? [])) &&
             (1...30).contains(invitationDays) &&
-            (selectedExerciseIDs.map { (1...12).contains($0.count) && Set($0).count == $0.count && coachExerciseIDs.isEmpty } ?? true) &&
+            race.plannedMeasures.count + (selectedExerciseIDs?.count ?? 0) <= 12 &&
+            (selectedExerciseIDs.map { ($0.count > 0 || !race.plannedMeasures.isEmpty) && Set($0).count == $0.count && coachExerciseIDs.isEmpty } ?? true) &&
+            (race.plannedMeasures.isEmpty || (race.discipline == .workout && coachExerciseIDs.isEmpty)) &&
             coachExerciseIDs.count <= 12 &&
             Set(coachExerciseIDs).count == coachExerciseIDs.count &&
             (startMode != .scheduled || startsAt != nil) &&
