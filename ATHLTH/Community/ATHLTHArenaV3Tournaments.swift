@@ -711,6 +711,7 @@ struct ATHLTHTournamentCreator: View {
                             .font(.caption)
                             .foregroundStyle(.orange)
                             .padding(13)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(ATHLTHArenaV3Style.panel())
                     }
                     if competitionSettings.race.discipline == .workout {
@@ -992,6 +993,7 @@ struct ATHLTHTournamentCreator: View {
                       "Navn på liga eller cup", text: $title)
                 .font(.title3.weight(.medium))
                 .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHArenaV3Style.panel())
                 .onChange(of: title) { _, value in
                     if value.count > 80 { title = String(value.prefix(80)) }
@@ -1032,6 +1034,7 @@ struct ATHLTHTournamentCreator: View {
                     }
                     .foregroundStyle(ATHLTHArenaV3Style.ink)
                     .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ATHLTHArenaV3Style.panel())
                 }
                 .buttonStyle(.plain)
@@ -1057,6 +1060,7 @@ struct ATHLTHTournamentCreator: View {
             }
             .foregroundStyle(ATHLTHArenaV3Style.gold)
             .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
         }
         .buttonStyle(.plain)
@@ -1148,6 +1152,7 @@ struct ATHLTHTournamentCreator: View {
                 }
                 .foregroundStyle(ATHLTHArenaV3Style.gold)
                 .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHArenaV3Style.panel())
             }
             .buttonStyle(.plain)
@@ -1489,6 +1494,7 @@ struct ATHLTHTournamentCreator: View {
                     }
                     .foregroundStyle(ATHLTHArenaV3Style.ink)
                     .padding(13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ATHLTHArenaV3Style.panel())
                 }
                 .buttonStyle(.plain)
@@ -1519,6 +1525,7 @@ struct ATHLTHTournamentCreator: View {
                     .fixedSize()
                 }
                 .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHArenaV3Style.panel())
             }
 
@@ -1537,6 +1544,7 @@ struct ATHLTHTournamentCreator: View {
                 }
                 .font(.subheadline)
                 .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHArenaV3Style.panel())
             }
 
@@ -1551,6 +1559,7 @@ struct ATHLTHTournamentCreator: View {
             }
             .tint(ATHLTHArenaV3Style.gold)
             .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
         }
     }
@@ -1583,6 +1592,7 @@ struct ATHLTHTournamentCreator: View {
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
         .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHArenaV3Style.panel())
     }
 
@@ -1639,6 +1649,7 @@ struct ATHLTHTournamentCreator: View {
             }
         }
         .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHArenaV3Style.panel())
     }
 
@@ -1677,6 +1688,7 @@ struct ATHLTHTournamentCreator: View {
             }
         }
         .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHArenaV3Style.panel())
     }
 
@@ -1735,6 +1747,7 @@ struct ATHLTHTournamentCreator: View {
                             }
                             .foregroundStyle(ATHLTHArenaV3Style.ink)
                             .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(ATHLTHArenaV3Style.panel())
                         }
                         .buttonStyle(.plain)
@@ -1761,6 +1774,7 @@ struct ATHLTHTournamentCreator: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ATHLTHArenaV3Style.panel())
                 ForEach(discovered, id: \.userID) { person in
                     personRow(person.userID,
@@ -1797,6 +1811,7 @@ struct ATHLTHTournamentCreator: View {
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
             }
             .padding(13)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(ATHLTHArenaV3Style.panel())
         }
         .buttonStyle(.plain)
