@@ -1746,6 +1746,13 @@ enum HomeTodayCalendarSchedule {
 /// Pure calendar calculations shared by Home's week pager and tests.
 /// Plan weeks start on the configured plan start, not necessarily Monday.
 enum HomeWeeklyProgressCalendar {
+    /// HealthKit maps ball sports and play to .other. Preserve their sports
+    /// identity in the weekly summary without relabeling generic workouts.
+    static func extraWorkoutIcon(activity: WorkoutActivity?, sportsOnly: Bool) -> String {
+        if sportsOnly { return "sportscourt.fill" }
+        return activity?.icon ?? "figure.mixed.cardio"
+    }
+
     /// Only use a plan ID when this exact workout belongs to that plan.
     /// Standalone calendar workouts intentionally have no plan parent.
     static func containingPlanID(
@@ -2781,14 +2788,27 @@ struct HomeWeeklyProgressStrip:
         return activities.first
     }
 
+    private var visibleWeekOtherWorkoutsAreSports: Bool {
+        let extra = visibleWeekOtherWorkouts
+        return !extra.isEmpty && extra.allSatisfy(\.isSports)
+    }
+
     private var visibleWeekOtherWorkoutIcon:
         String {
-        visibleWeekOtherActivity?.icon ??
-            "figure.mixed.cardio"
+        HomeWeeklyProgressCalendar.extraWorkoutIcon(
+            activity: visibleWeekOtherActivity,
+            sportsOnly: visibleWeekOtherWorkoutsAreSports
+        )
     }
 
     private var visibleWeekOtherWorkoutTitle:
         String {
+        if visibleWeekOtherWorkoutsAreSports {
+            return ATHLTHLocalization.choose(
+                english: "Sports sessions",
+                norwegian: "Idrettsøkter"
+            )
+        }
         guard let activity = visibleWeekOtherActivity
         else {
             return ATHLTHLocalization.choose(
