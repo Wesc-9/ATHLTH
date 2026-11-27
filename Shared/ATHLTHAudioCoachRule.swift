@@ -140,6 +140,14 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             default: return false
             }
         }
+        /// Existing zone-trigger rules retain their authored intensity scale.
+        var requiresAuthoredZoneScale: Bool {
+            switch self {
+            case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow, .plannedZoneOutside:
+                return true
+            default: return false
+            }
+        }
         var isHeartRateCondition: Bool {
             switch self {
             case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit,
@@ -514,8 +522,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             return norwegian ? "Puls \(Int(heartRateBPM.rounded()))"
                 : "Heart rate \(Int(heartRateBPM.rounded()))"
         case .heartRateZone:
-            guard let zone = ATHLTHHeartRateZones.measuredZone(
-                heartRateBPM: heartRateBPM, maximumBPM: maximumHeartRateBPM
+            guard let zone = ATHLTHLiveZonePolicy.measuredZone(
+                bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM,
+                appleZones: context.appleLiveHeartRateZones
             ) else { return nil }
             return norwegian ? "Pulssone \(zone)" : "Heart-rate zone \(zone)"
         case .lastKilometerPace:
@@ -987,9 +996,9 @@ enum ATHLTHAudioCoachRuleDelivery {
                 switch metric {
                 case .heartRate: return heartRateBPM != nil
                 case .heartRateZone:
-                    return ATHLTHHeartRateZones.measuredZone(
-                        heartRateBPM: heartRateBPM,
-                        maximumBPM: maximumHeartRateBPM
+                    return ATHLTHLiveZonePolicy.measuredZone(
+                        bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM,
+                        appleZones: context.appleLiveHeartRateZones
                     ) != nil
                 case .pace: return paceSecondsPerKilometer != nil
                 case .lastKilometerPace:
@@ -1438,6 +1447,7 @@ struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
 
 /// Planned estimates and segment measurements supplied by the recording owner.
 struct ATHLTHCoachReadoutContext: Codable, Hashable {
+    var appleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]? = nil
     var stepName: String?
     var stepIndex: Int?
     var isEffort = false

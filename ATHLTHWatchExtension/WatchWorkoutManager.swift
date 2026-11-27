@@ -54,7 +54,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         ATHLTHLiveZonePolicy.prefersApple(
             hasStructuredWorkout: structuredRunningWorkout != nil || strengthSession != nil,
             hasTarget: targetAlertConfiguration?.heartRateEnabled == true,
-            coachEnabled: audioCoachConfiguration.enabled
+            coachEnabled: audioCoachConfiguration.enabled &&
+                (audioCoachConfiguration.smartPrompts?.preferredHeartRateZone != nil ||
+                 audioCoachConfiguration.activeCustomRules.contains { $0.trigger.requiresAuthoredZoneScale })
         )
     }
 
@@ -5759,6 +5761,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let running = ATHLTHAudioCoachSportPolicy.supportsRunningPace(sport)
         let eligibleDistance = kind.supportsDistanceMetric &&
             distanceMeters.isFinite ? max(0, distanceMeters) : 0
+        var readout = running || kind == .strength ? coachReadoutContext : .init()
+        readout.appleLiveHeartRateZones = effectiveAppleLiveHeartRateZones
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: rules,
             distanceMeters: eligibleDistance,
@@ -5771,8 +5775,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             norwegian: coachPhrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: audioCoachConfiguration.smartPrompts?
                 .maximumHeartRateBPM ?? structuredRunningWorkout?.heartRateZoneMaximumBPM,
-            context: running || kind == .strength
-                ? coachReadoutContext : .init(),
+            context: readout,
             sport: sport,
             lastSlots: &customAudioCoachLastSlots
         )
@@ -8011,9 +8014,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         let explicitPeriodicZone = audioCoachConfiguration.smartPrompts?
             .measuredZoneAnnouncementIntervalSeconds != nil
         guard (target?.heartRateEnabled != true || explicitPeriodicZone),
-              let zone = ATHLTHHeartRateZones.measuredZone(
-                  heartRateBPM: heartRate,
-                  maximumBPM: resolvedMaximumBPM
+              let zone = ATHLTHLiveZonePolicy.measuredZone(
+                  bpm: heartRate, maximumBPM: resolvedMaximumBPM,
+                  appleZones: effectiveAppleLiveHeartRateZones
               )
         else {
             measuredCoachZoneCandidate = nil

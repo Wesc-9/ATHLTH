@@ -613,6 +613,25 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(last[restored.id], 1)
     }
 
+    func testNativeZoneReadoutUsesRecorderBoundariesWithoutHRMax() {
+        let rule = ATHLTHAudioCoachRule(trigger: .distance, metric: .heartRateZone, interval: 1_000)
+        var context = ATHLTHCoachReadoutContext()
+        context.appleLiveHeartRateZones = [
+            ATHLTHRecordedHeartRateZone(index: 0, minimumBPM: nil, maximumBPM: 130, durationSeconds: 0),
+            ATHLTHRecordedHeartRateZone(index: 1, minimumBPM: 130, maximumBPM: 170, durationSeconds: 0),
+            ATHLTHRecordedHeartRateZone(index: 2, minimumBPM: 170, maximumBPM: nil, durationSeconds: 0)
+        ]
+        var slots: [UUID: Int] = [:]
+        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [rule], distanceMeters: 1_020, elapsedSeconds: 300,
+            paceSecondsPerKilometer: nil, heartRateBPM: 125,
+            norwegian: true, maximumHeartRateBPM: nil, context: context, lastSlots: &slots
+        )
+        XCTAssertEqual(messages, ["Pulssone 1"])
+        XCTAssertTrue(ATHLTHAudioCoachRule.Trigger.zoneEnter.requiresAuthoredZoneScale)
+        XCTAssertFalse(ATHLTHAudioCoachRule.Trigger.distance.requiresAuthoredZoneScale)
+    }
+
     func testMissingHeartRateZoneDoesNotSuppressDistanceOrMotivation() {
         let distance = ATHLTHAudioCoachRule(
             trigger: .distance, metric: .distance, interval: 1_000,

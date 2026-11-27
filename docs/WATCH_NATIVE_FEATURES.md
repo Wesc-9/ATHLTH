@@ -24,3 +24,7 @@ All new API integrations require Xcode 27 build and real Watch verification. The
 ## Native live heart-rate zones: staged rollout
 - A free Watch workout without an explicit target, structured prescription or active Audio Coach captures the actual HealthKit builder zone configuration. The same thresholds drive the Watch and mirrored phone/iPad gauges. No extra sample query or timer. Older OS and unavailable configurations fall back to ATHLTH.
 - Existing structured and coach workouts retain ATHLTH live-zone semantics pending a complete migration of authored targets and custom coach triggers. Apple recorded duration data stays source-labelled and separate. Explicit user settings and native coach integration remain outstanding.
+
+## Coach follow-up
+- Free-workout measured-zone speech and periodic readouts use the same native Watch thresholds on both voice owners. Explicit zone-trigger rules, preferred zone targets and structured sessions keep existing authored ATHLTH scale. No language model runs in the live control path.
+- Fixed the ControlWidget initializer conformance reported by CI. New build confirmation remains required.

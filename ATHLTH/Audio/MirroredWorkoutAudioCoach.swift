@@ -769,6 +769,10 @@ final class MirroredWorkoutAudioCoach:
             )
         let measuredDistanceSupported = verifiedDistance != nil
         let distance = verifiedDistance ?? 0
+        var readout = ATHLTHAudioCoachSportPolicy.supportsRunningSteps(sport)
+            ? (snapshot.coachReadoutContext ?? .init(routeRemainingMeters: snapshot.routeRemainingMeters))
+            : .init()
+        readout.appleLiveHeartRateZones = snapshot.appleLiveHeartRateZones
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: ATHLTHAudioCoachSportPolicy.eligibleRules(
                 configuration.activeCustomRules, sport: sport,
@@ -784,10 +788,7 @@ final class MirroredWorkoutAudioCoach:
             norwegian: phrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
                 configuration.smartPrompts?.maximumHeartRateBPM,
-            context: ATHLTHAudioCoachSportPolicy.supportsRunningSteps(sport)
-                ? (snapshot.coachReadoutContext ??
-                    .init(routeRemainingMeters: snapshot.routeRemainingMeters))
-                : .init(),
+            context: readout,
             sport: sport,
             lastSlots: &customAudioCoachLastSlots
         )
@@ -810,10 +811,11 @@ final class MirroredWorkoutAudioCoach:
                   snapshot.heartRate,
                   sampledAt: snapshot.coachHeartRateSampleAt
               ),
-              let zone = ATHLTHHeartRateZones.measuredZone(
-                  heartRateBPM: snapshot.heartRate,
+              let zone = ATHLTHLiveZonePolicy.measuredZone(
+                  bpm: snapshot.heartRate,
                   maximumBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
-                    configuration.smartPrompts?.maximumHeartRateBPM
+                    configuration.smartPrompts?.maximumHeartRateBPM,
+                  appleZones: snapshot.appleLiveHeartRateZones
               )
         else {
             measuredZoneCandidate = nil

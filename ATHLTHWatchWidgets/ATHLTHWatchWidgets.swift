@@ -353,6 +353,16 @@ private struct ATHLTHWatchNavigationControl: ControlWidget {
     let name: String
     let symbol: String
 
+    init() {
+        self.init(target: .today, name: "Dagens økt", symbol: "calendar.badge.clock")
+    }
+
+    init(target: ATHLTHWatchNavigationTarget, name: String, symbol: String) {
+        self.target = target
+        self.name = name
+        self.symbol = symbol
+    }
+
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.\(target.rawValue)") {
             ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: target)) {
