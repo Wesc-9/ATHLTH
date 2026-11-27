@@ -794,61 +794,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
             Rectangle()
                 .fill(outline)
                 .frame(height: 1)
-            if let activeDay, activeDay.planned.isEmpty,
-               activeDay.recorded.isEmpty, activeDay.restDays.isEmpty,
-               HomeWeeklyProgressCalendar.canScheduleStandalone(on: activeDay.date) {
-                emptyDayPlanningCard(activeDay.date)
-            } else {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: activeDay?.restDays.isEmpty == false
-                          ? "moon.zzz" : "calendar.badge.clock")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(bronze)
-                        .frame(width: 42, height: 42)
-                        .background(cream, in: RoundedRectangle(cornerRadius: 13))
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(weekSelectionSummary(activeDay))
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(ink)
-                            .accessibilityAddTraits(.isHeader)
-                        if let activeDay {
-                            Text(activeDay.date.formatted(
-                                .dateTime.weekday(.wide).day().month(.wide)
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer(minLength: 8)
-                    if let activeDay, activeDay.restDays.isEmpty,
-                       HomeWeeklyProgressCalendar.canScheduleStandalone(on: activeDay.date) {
-                        Button {
-                            focusedPlanningDate = activeDay.date
-                        } label: {
-                            Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
-                                .padding(.horizontal, 13)
-                                .frame(minHeight: 44)
-                                .background(cream, in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(outline, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("athlth-ipad-week-plan-selected-day")
-                    }
-                }
-
-                if let activeDay,
-                   !activeDay.planned.isEmpty || !activeDay.recorded.isEmpty {
-                    selectedDayWorkouts(activeDay, availableWidth: width)
-                        .accessibilityIdentifier("athlth-ipad-selected-week-day-details")
-                } else if let activeDay, !activeDay.restDays.isEmpty {
-                    Label(tr("Planned rest day", "Planlagt hviledag"), systemImage: "moon.zzz")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
-                }
+            if let activeDay {
+                selectedDayCard(activeDay)
             }
 
             if !hasHealth {
@@ -874,116 +821,192 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
     }
 
-    /// Equal cards for pending sessions, compact text rows for completed
-    /// sessions and actual recordings. Do not infer a plan completion from
-    /// an unrelated Health workout on the same date.
+    /// The day card keeps the same header, surface and body height while
+    /// browsing dates. Only its status, actions and workout rows change.
+    private func selectedDayCard(_ day: ATHLTHStudioHomeWeek.Day) -> some View {
+        let isPast = Calendar.current.startOfDay(for: day.date) < Calendar.current.startOfDay(for: .now)
+        let canPlan = day.restDays.isEmpty &&
+            HomeWeeklyProgressCalendar.canScheduleStandalone(on: day.date)
+        let hasWorkouts = !day.planned.isEmpty || !day.recorded.isEmpty
+
+        return VStack(alignment: .leading, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    dayCardHeading(day, isPast: isPast)
+                    Spacer(minLength: 8)
+                    if canPlan { primaryPlanningButton(day.date) }
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    dayCardHeading(day, isPast: isPast)
+                    if canPlan { primaryPlanningButton(day.date) }
+                }
+            }
+            Divider()
+            Group {
+                if hasWorkouts {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        selectedDayWorkouts(day, isPast: isPast)
+                    } else {
+                        ScrollView(.vertical) {
+                            selectedDayWorkouts(day, isPast: isPast)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                        .scrollIndicators(.automatic)
+                        .frame(height: 148)
+                        .id(Calendar.current.startOfDay(for: day.date))
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if !day.restDays.isEmpty {
+                            Label(tr("Rest day in your plan.", "Hviledag i treningsplanen."),
+                                  systemImage: "moon.zzz")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } else if canPlan {
+                            Text(tr("Choose how to plan your next workout.",
+                                    "Velg hvordan du vil planlegge økten."))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 8) { planningShortcuts }
+                                VStack(alignment: .leading, spacing: 8) { planningShortcuts }
+                            }
+                        } else {
+                            Text(isPast ? tr("No workouts are recorded for this date.",
+                                            "Ingen økter er registrert denne dagen.")
+                                        : tr("No workouts are scheduled for this date.",
+                                             "Ingen økter er planlagt denne dagen."))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 0 : 148, alignment: .topLeading)
+                    .accessibilityIdentifier("athlth-ipad-week-empty-planning")
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 17)
+                .fill(LinearGradient(colors: [.white, cream],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .strokeBorder(outline, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .accessibilityIdentifier("athlth-ipad-selected-week-day-details")
+    }
+
+    private func dayCardHeading(_ day: ATHLTHStudioHomeWeek.Day, isPast: Bool) -> some View {
+        HStack(alignment: .center, spacing: 13) {
+            Image(systemName: !day.restDays.isEmpty && day.planned.isEmpty && day.recorded.isEmpty
+                  ? "moon.zzz" : "calendar.badge.clock")
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(bronze)
+                .frame(width: 48, height: 48)
+                .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(outline, lineWidth: 1))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(day.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+                Text(weekSelectionSummary(day, isPast: isPast))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+        .frame(minHeight: 50, alignment: .leading)
+    }
+
+    /// Use the same compact row layout for planned and recorded sessions.
+    /// Preserve the existing detail/start/Watch actions and exact recording links.
     private func selectedDayWorkouts(
-        _ day: ATHLTHStudioHomeWeek.Day, availableWidth: CGFloat
+        _ day: ATHLTHStudioHomeWeek.Day, isPast: Bool
     ) -> some View {
         let grouped = ATHLTHStudioDayCompletionPolicy.partition(day.planned) {
-            completed($0) || skipped($0)
+            completed($0) || skipped($0) || $0.workout.cancelledAt != nil
         }
-        let contentWidth = ATHLTHStudioDayWorkoutLayout.contentWidth(
-            viewport: availableWidth, accessibilityText: dynamicTypeSize.isAccessibilitySize)
-        let columns = ATHLTHStudioDayWorkoutLayout.columns(
-            contentWidth: contentWidth, count: grouped.pending.count,
-            accessibilityText: dynamicTypeSize.isAccessibilitySize)
-        let cardWidth = max(0, (contentWidth - CGFloat(columns - 1) * 12) / CGFloat(columns) - 50)
         let representedRecordingIDs = Set(grouped.finished.filter { completed($0) }
             .flatMap { linkedRecordingIDs(for: $0) })
         let remainingRecorded = day.recorded.filter { !representedRecordingIDs.contains($0.id) }
 
-        return VStack(alignment: .leading, spacing: 12) {
-            if !grouped.pending.isEmpty {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0),
-                    spacing: 12, alignment: .top), count: columns),
-                    alignment: .leading, spacing: 12) {
-                    ForEach(grouped.pending) { entry in
-                        HStack(alignment: .top, spacing: 8) {
-                            ATHLTHStudioPlannedWorkoutHeroCard(
-                                workout: entry.workout,
-                                availableWidth: cardWidth,
-                                isCompleted: false,
-                                isSkipped: false,
-                                canStart: canStart(entry, alreadyCompleted: false),
-                                onOpen: { onOpenWorkout(entry) },
-                                onStart: { onStartWorkout(entry) },
-                                compact: columns == 2
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
-                            .contextMenu { workoutActions(entry) }
-                            Menu {
-                                workoutActions(entry)
-                            } label: {
-                                Image(systemName: "ellipsis")
-                                    .font(.headline)
-                                    .foregroundStyle(ink)
-                                    .frame(width: 42, height: 44)
-                                    .background(cream, in: RoundedRectangle(cornerRadius: 13))
-                            }
-                            .accessibilityLabel(tr("Workout actions", "Valg for økten"))
-                        }
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(grouped.pending) { entry in
+                HStack(spacing: 4) {
+                    compactFinishedRow(
+                        title: entry.workout.title,
+                        time: entry.workout.scheduledStart?.formatted(date: .omitted, time: .shortened),
+                        duration: entry.workout.durationMinutes.map { "\($0) min" },
+                        status: isPast ? tr("Not completed", "Ikke fullført") : tr("Planned", "Planlagt"),
+                        symbol: entry.workout.kind.systemImage,
+                        action: { onOpenWorkout(entry) }
+                    )
+                    .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
+                    .contextMenu { workoutActions(entry) }
+                    Menu {
+                        workoutActions(entry)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(bronze)
+                            .frame(width: 44, height: 44)
                     }
+                    .accessibilityLabel(tr("Workout actions", "Valg for økten"))
                 }
-                .accessibilityIdentifier("athlth-ipad-pending-workout-grid")
+                if entry.id != grouped.pending.last?.id || !grouped.finished.isEmpty || !remainingRecorded.isEmpty {
+                    Divider().padding(.leading, 28)
+                }
             }
-
-            if !grouped.finished.isEmpty || !remainingRecorded.isEmpty {
-                if !grouped.pending.isEmpty { Divider() }
-                Text(tr("Completed and recorded", "Fullførte og registrerte økter"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .accessibilityAddTraits(.isHeader)
-                VStack(spacing: 0) {
-                    ForEach(grouped.finished) { entry in
-                        let done = completed(entry)
-                        let receipt = session.recordedTimes(for: entry.workout.id)
-                        let ids = linkedRecordingIDs(for: entry)
-                        let recording = day.recorded.first { ids.contains($0.id) }
-                        let time = recording.map(ATHLTHStudioRecordedWorkouts.timeRange)
-                            ?? receipt?.startedAt.formatted(date: .omitted, time: .shortened)
-                            ?? entry.workout.scheduledStart?.formatted(date: .omitted, time: .shortened)
-                        let duration: String? = {
-                            if let recording {
-                                return "\(Int(recording.duration / 60)) min"
-                            }
-                            if let receipt, let end = receipt.endedAt, end >= receipt.startedAt {
-                                return "\(Int(end.timeIntervalSince(receipt.startedAt) / 60)) min"
-                            }
-                            return nil
-                        }()
-                        compactFinishedRow(
-                            title: entry.workout.title, time: time, duration: duration,
-                            status: done ? tr("Completed", "Fullført") : tr("Skipped", "Hoppet over"),
-                            symbol: done ? "checkmark.circle.fill" : "minus.circle",
-                            action: { onOpenWorkout(entry) }
-                        )
-                        .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
-                        .contextMenu { workoutActions(entry) }
-                        if entry.id != grouped.finished.last?.id || !remainingRecorded.isEmpty {
-                            Divider().padding(.leading, 28)
-                        }
+            ForEach(grouped.finished) { entry in
+                let done = completed(entry)
+                let receipt = session.recordedTimes(for: entry.workout.id)
+                let ids = linkedRecordingIDs(for: entry)
+                let recording = day.recorded.first { ids.contains($0.id) }
+                let time = recording.map(ATHLTHStudioRecordedWorkouts.timeRange)
+                    ?? receipt?.startedAt.formatted(date: .omitted, time: .shortened)
+                    ?? entry.workout.scheduledStart?.formatted(date: .omitted, time: .shortened)
+                let duration: String? = {
+                    if let recording { return "\(Int(recording.duration / 60)) min" }
+                    if let receipt, let end = receipt.endedAt, end >= receipt.startedAt {
+                        return "\(Int(end.timeIntervalSince(receipt.startedAt) / 60)) min"
                     }
-                    ForEach(remainingRecorded) { workout in
-                        compactFinishedRow(
-                            title: recordedActivityTitle(workout),
-                            time: ATHLTHStudioRecordedWorkouts.timeRange(workout),
-                            duration: "\(Int(workout.duration / 60)) min",
-                            status: tr("Recorded", "Registrert"),
-                            symbol: "checkmark.circle.fill",
-                            action: { onInspect(workout) }
-                        )
-                        if workout.id != remainingRecorded.last?.id {
-                            Divider().padding(.leading, 28)
-                        }
-                    }
+                    return nil
+                }()
+                compactFinishedRow(
+                    title: entry.workout.title, time: time, duration: duration,
+                    status: done ? tr("Completed", "Fullført") :
+                        (entry.workout.cancelledAt != nil ? tr("Cancelled", "Avlyst") : tr("Skipped", "Hoppet over")),
+                    symbol: done ? "checkmark.circle.fill" : "minus.circle",
+                    action: { onOpenWorkout(entry) }
+                )
+                .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
+                .contextMenu { workoutActions(entry) }
+                if entry.id != grouped.finished.last?.id || !remainingRecorded.isEmpty {
+                    Divider().padding(.leading, 28)
                 }
-                .padding(.horizontal, 10)
-                .background(cream.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
-                .accessibilityIdentifier("athlth-ipad-finished-workout-list")
+            }
+            ForEach(remainingRecorded) { workout in
+                compactFinishedRow(
+                    title: recordedActivityTitle(workout),
+                    time: ATHLTHStudioRecordedWorkouts.timeRange(workout),
+                    duration: "\(Int(workout.duration / 60)) min",
+                    status: tr("Recorded", "Registrert"),
+                    symbol: "checkmark.circle.fill",
+                    action: { onInspect(workout) }
+                )
+                if workout.id != remainingRecorded.last?.id {
+                    Divider().padding(.leading, 28)
+                }
             }
         }
+        .padding(.horizontal, 10)
+        .background(.white.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
         .accessibilityIdentifier("athlth-ipad-selected-day-workouts")
     }
 
@@ -1043,11 +1066,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func weekSelectionSummary(
-        _ day: ATHLTHStudioHomeWeek.Day?
+        _ day: ATHLTHStudioHomeWeek.Day, isPast: Bool
     ) -> String {
-        guard let day else {
-            return tr("Select a day in the calendar", "Velg en dag i kalenderen")
-        }
         if !day.planned.isEmpty {
             let plannedLabel = tr(
                 ATHLTHStudioHomeWeek.plannedCountLabel(
@@ -1073,65 +1093,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 : tr("\(day.recorded.count) recorded workouts",
                      "\(day.recorded.count) registrerte økter")
         }
-        return tr("No workout scheduled", "Ingen økt planlagt")
-    }
-
-    // A single integrated action surface replaces the duplicate empty label
-    // and floating pill. Adaptive stacks keep the card usable in split view.
-    private func emptyDayPlanningCard(_ date: Date) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 18) {
-                    emptyDayHeading(date)
-                    Spacer(minLength: 12)
-                    primaryPlanningButton(date)
-                }
-                VStack(alignment: .leading, spacing: 14) {
-                    emptyDayHeading(date)
-                    primaryPlanningButton(date)
-                }
-            }
-            Rectangle()
-                .fill(outline)
-                .frame(height: 1)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { planningShortcuts }
-                VStack(alignment: .leading, spacing: 8) { planningShortcuts }
-            }
-        }
-        .padding(16)
-        .background {
-            RoundedRectangle(cornerRadius: 17)
-                .fill(LinearGradient(colors: [.white, cream],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-        }
-        .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(outline, lineWidth: 1))
-        .accessibilityIdentifier("athlth-ipad-week-empty-planning")
-    }
-
-    private func emptyDayHeading(_ date: Date) -> some View {
-        HStack(alignment: .top, spacing: 13) {
-            Image(systemName: "calendar.badge.plus")
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(bronze)
-                .frame(width: 48, height: 48)
-                .background(.white, in: RoundedRectangle(cornerRadius: 13))
-                .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(outline, lineWidth: 1))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(bronze)
-                Text(tr("No workout scheduled", "Ingen økt planlagt"))
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .accessibilityAddTraits(.isHeader)
-                Text(tr("Make room for your next workout.", "Sett av tid til din neste treningsøkt."))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
+        return isPast ? tr("No recorded workouts", "Ingen registrerte økter")
+            : tr("No workout scheduled", "Ingen økt planlagt")
     }
 
     private func primaryPlanningButton(_ date: Date) -> some View {
