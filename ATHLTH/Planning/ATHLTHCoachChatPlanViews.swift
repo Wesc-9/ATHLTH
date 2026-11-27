@@ -190,7 +190,6 @@ struct ATHLTHCoachChatPlanIntakeCard: View {
             choiceLabel(planText("Muscle groups", "Muskelgrupper"), symbol: "figure.strengthtraining.traditional",
                         value: intake.muscleFocusTitle)
         }
-        .menuActionDismissBehavior(.disabled)
         .accessibilityLabel(planText("Muscle groups", "Muskelgrupper"))
         .accessibilityValue(intake.muscleFocusTitle)
         .accessibilityIdentifier("athlth-coach-plan-muscles")
