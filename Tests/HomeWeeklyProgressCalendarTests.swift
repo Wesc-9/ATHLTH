@@ -24,6 +24,18 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         XCTAssertEqual(HomeWeeklyProgressCalendar.extraWorkoutIcon(activity: nil, sportsOnly: false), "figure.mixed.cardio")
     }
 
+    func testUpcomingCalendarIncludesTodayAndFourteenFutureDates() throws {
+        let reference = date(2026, 10, 23)
+        let days = HomeTodayCalendarSchedule.upcomingDays(referenceDate: reference, calendar: calendar)
+        let interval = HomeTodayCalendarSchedule.upcomingInterval(referenceDate: reference, calendar: calendar)
+        XCTAssertEqual(days.count, 15)
+        XCTAssertEqual(days.first, calendar.startOfDay(for: reference))
+        XCTAssertEqual(days.last, calendar.date(byAdding: .day, value: 14, to: interval.start))
+        XCTAssertEqual(interval.end, calendar.date(byAdding: .day, value: 15, to: interval.start))
+        XCTAssertEqual(Set(days).count, 15)
+        XCTAssertTrue(days.allSatisfy { calendar.startOfDay(for: $0) == $0 })
+    }
+
     func testWeeklyStrengthAndWalkingMetricUsesDashWhenEmpty() {
         XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(0), "—")
         XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(1), "1")
