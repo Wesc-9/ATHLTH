@@ -137,6 +137,7 @@ struct RecoveryCoachMessage:
     var chatPlanDraft: ATHLTHCoachChatPlanDraft? = nil
     var workoutIntake: ATHLTHCoachChatWorkoutIntake? = nil
     var workoutDrafts: [ATHLTHCoachChatWorkoutDraft]? = nil
+    var localPlanReview: ATHLTHCoachLocalPlanReview? = nil
 
     init(
         id: UUID = UUID(),
@@ -149,7 +150,8 @@ struct RecoveryCoachMessage:
         planIntake: ATHLTHCoachChatPlanIntake? = nil,
         chatPlanDraft: ATHLTHCoachChatPlanDraft? = nil,
         workoutIntake: ATHLTHCoachChatWorkoutIntake? = nil,
-        workoutDrafts: [ATHLTHCoachChatWorkoutDraft]? = nil
+        workoutDrafts: [ATHLTHCoachChatWorkoutDraft]? = nil,
+        localPlanReview: ATHLTHCoachLocalPlanReview? = nil
     ) {
         self.id = id
         self.role = role
@@ -162,6 +164,7 @@ struct RecoveryCoachMessage:
         self.chatPlanDraft = chatPlanDraft
         self.workoutIntake = workoutIntake
         self.workoutDrafts = workoutDrafts
+        self.localPlanReview = localPlanReview
     }
 }
 

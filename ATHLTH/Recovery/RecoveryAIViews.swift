@@ -1040,6 +1040,7 @@ struct RecoveryCoachView: View {
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var selectedChatPlan: ATHLTHCoachChatPlanDraft?
     @State private var selectedChatWorkout: ATHLTHCoachChatWorkoutDraft?
+    @State private var selectedLocalPlanReview: ATHLTHCoachLocalPlanReview?
     @State private var showingCoachWorkoutBuilder = false
     @State private var showingCoachPlanBuilder = false
     @State private var activeQuickWizard: ATHLTHCoachQuickAction?
@@ -1320,8 +1321,17 @@ struct RecoveryCoachView: View {
             selectedCoachProposal = nil
             selectedChatPlan = nil
             selectedChatWorkout = nil
+            selectedLocalPlanReview = nil
             loadConversationIfNeeded()
             loadCoachConsent()
+        }
+        .sheet(item: $selectedLocalPlanReview.keepingPresentedItemWhenInactive(scenePhase)) { review in
+            ATHLTHCoachLocalPlanReviewView(review: review, ownerID: session.profile.userID) { notice in
+                guard session.signedIn, conversationOwnerID == session.profile.userID else { return }
+                messages.append(RecoveryCoachMessage(role: .assistant, text: notice))
+                persistConversation()
+                selectedLocalPlanReview = nil
+            }
         }
         .sheet(item: $selectedChatWorkout.keepingPresentedItemWhenInactive(scenePhase)) { draft in
             ATHLTHCoachChatWorkoutPreview(draft: draft, ownerID: session.profile.userID) {
@@ -1944,10 +1954,10 @@ struct RecoveryCoachView: View {
         } trailing: {
             Menu {
                 Button {
-                    showingCoachPlanAdaptation = true
+                    requestAnswer(recoveryAIText("Review my active plan", "Gjennomgå treningsplanen min"))
                 } label: {
                     Label(
-                        recoveryAIText("Adjust active plan", "Juster aktiv plan"),
+                        recoveryAIText("Review active plan", "Gjennomgå aktiv plan"),
                         systemImage: "calendar.badge.clock"
                     )
                 }
@@ -2745,6 +2755,22 @@ struct RecoveryCoachView: View {
                         }
                     )
                 }
+                if let review = message.localPlanReview, message.role == .assistant {
+                    Button {
+                        selectedLocalPlanReview = review
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "calendar.badge.clock").foregroundStyle(ATHLTHTrainDesign.bronze)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(recoveryAIText("PLAN REVIEW", "PLANGJENNOMGANG")).font(.caption2).foregroundStyle(.secondary)
+                                Text(review.title).font(.headline)
+                                Text(recoveryAIText("Open findings and proposals", "Åpne funn og forslag")).font(.caption)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                        }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 18))
+                    }.buttonStyle(.plain)
+                }
                 if let intake = message.workoutIntake, message.role == .assistant {
                     ATHLTHCoachChatWorkoutIntakeCard(intake: intake, onChange: { updated in
                         guard session.signedIn, conversationOwnerID == session.profile.userID,
@@ -2995,6 +3021,34 @@ struct RecoveryCoachView: View {
         }
 
         do {
+            if ATHLTHCoachLocalGoalReview.isRequest(clean) {
+                guard shareHealthData else {
+                    messages.append(RecoveryCoachMessage(role: .assistant, text: recoveryAIText(
+                        "Enable health/training for this question to review your personal goals.",
+                        "Aktiver Helse/trening for dette spørsmålet for å gjennomgå dine personlige mål.")))
+                    persistConversation()
+                    return
+                }
+                let profile = ATHLTHTrainingProfile.load(userID: requestOwnerID)
+                let report = ATHLTHCoachLocalGoalReview.render(goals: goalStore.activeGoals, profile: profile,
+                    norwegian: ATHLTHLocalization.isNorwegian)
+                messages.append(RecoveryCoachMessage(role: .assistant, text: report))
+                persistConversation()
+                return
+            }
+            if ATHLTHCoachLocalPlanReview.isMoveRequest(clean) {
+                messages.append(RecoveryCoachMessage(role: .assistant, text: recoveryAIText(
+                    "Choose the exact workout and a new date. Nothing moves before confirmation.",
+                    "Velg hvilken økt og hvilken ny dato. Ingenting flyttes før du bekrefter.")))
+                persistConversation()
+                activeQuickWizard = .postponeWorkout
+                return
+            }
+            if ATHLTHCoachLocalPlanReview.isReviewRequest(clean) {
+                appendPrivatePlanReview()
+                persistConversation()
+                return
+            }
             if ATHLTHCoachReadQuery.isRequest(clean) {
                 guard shareHealthData else {
                     messages.append(RecoveryCoachMessage(role: .assistant,
@@ -3313,15 +3367,23 @@ struct RecoveryCoachView: View {
     private func respondToPlanChangeRequest(
         _ requestText: String, sharingApproved: Bool
     ) async {
-        // The private chat must not silently forward free text, plan details
-        // or health-derived training history to a separate cloud endpoint.
-        messages.append(RecoveryCoachMessage(
-            role: .assistant,
-            text: recoveryAIText(
-                "Automatic plan changes are not available in private Coach chat yet. Open your training plan to make changes manually. Nothing has been sent to an external AI provider or changed in your plan.",
-                "Automatiske planendringer er foreløpig ikke tilgjengelige i privat Coach-chat. Åpne treningsplanen for å gjøre endringer manuelt. Ingenting er sendt til en ekstern AI-leverandør eller endret i planen."
-            )
-        ))
+        // An ambiguous edit never changes a workout on its own. Reopen the
+        // deterministic review rather than forwarding to an external service.
+        appendPrivatePlanReview()
+    }
+
+    @MainActor
+    private func appendPrivatePlanReview() {
+        guard let plan = session.activePlan else {
+            messages.append(RecoveryCoachMessage(role: .assistant, text: recoveryAIText(
+                "You have no active training plan to review.", "Du har ingen aktiv treningsplan å gjennomgå.")))
+            return
+        }
+        let findings = ATHLTHPlanReviewAdvisor.inspect(plan)
+        messages.append(RecoveryCoachMessage(role: .assistant, text: recoveryAIText(
+            "I found \(findings.count) points to review in your planned schedule. Open the review to see the evidence and available proposals. Your plan has not changed.",
+            "Jeg fant \(findings.count) punkter å gjennomgå i planoppsettet. Åpne gjennomgangen for å se grunnlaget og mulige endringer. Planen er ikke endret."),
+            localPlanReview: ATHLTHCoachLocalPlanReview(plan: plan)))
     }
 
     private func normalizedQuestions(
