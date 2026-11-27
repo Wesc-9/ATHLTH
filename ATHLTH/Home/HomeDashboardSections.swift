@@ -353,6 +353,17 @@ struct HomeMetricPoint:
     var id: Date { date }
 }
 
+/// Training duration has real zero-days. Keep them in the chart and
+/// period average, but show the latest day with recorded training separately.
+enum HomeTrainingLoadTrend {
+    static func latestTrainingDay(in points: [HomeMetricPoint]) -> HomeMetricPoint? {
+        points.filter {
+            guard let value = $0.value else { return false }
+            return value.isFinite && value > 0
+        }.max { $0.date < $1.date }
+    }
+}
+
 /// The step trend uses Apple's cumulative daily quantities, never estimated
 /// values. Keep every calendar day in the sequence so the Home mini chart has
 /// seven positions; missing HealthKit readings remain nil, not invented zeroes.
@@ -1001,7 +1012,9 @@ struct HomeHealthMetricDetailView:
                                 .leading,
                             spacing: 3
                         ) {
-                            Text("Siste verdi")
+                            Text(kind == .load
+                                 ? ATHLTHLocalization.choose(english: "Latest training day", norwegian: "Siste treningsdag")
+                                 : ATHLTHLocalization.choose(english: "Latest value", norwegian: "Siste verdi"))
                                 .font(
                                     .caption
                                 )
@@ -1023,6 +1036,20 @@ struct HomeHealthMetricDetailView:
                                     ATHLTHTheme
                                         .primaryText
                                 )
+                            if kind == .load {
+                                if let latest = latestTrainingDay {
+                                    Text(latest.date.formatted(.dateTime.day().month(.abbreviated)))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                } else {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "No training in this period",
+                                        norwegian: "Ingen trening i perioden"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
                         }
 
                         Spacer(minLength: 16)
@@ -1403,8 +1430,16 @@ struct HomeHealthMetricDetailView:
         isLoadingRange = false
     }
 
+    private var latestTrainingDay: HomeMetricPoint? {
+        HomeTrainingLoadTrend.latestTrainingDay(in: points)
+    }
+
     private var latestValueText:
         String {
+        if kind == .load {
+            guard let value = latestTrainingDay?.value else { return "—" }
+            return formattedMetricValue(value)
+        }
         if let reading = garminReading { return formattedMetricValue(reading.value) }
         // Match the live Home sleep value, not a possibly older trend cache.
         if kind == .sleep, health.sleep.totalAsleep > 0 {
