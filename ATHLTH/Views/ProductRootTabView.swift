@@ -407,6 +407,20 @@ struct ProductRootTabView: View {
         guard !Task.isCancelled, selectedTab == 0,
               ATHLTHTrainSmokeTrace.hasRecorded("native-home-appeared")
         else { ATHLTHTrainSmokeTrace.record("native-home-timeout"); return }
+        // In the extended regression, do not switch tabs until the real
+        // weekly progress sheet has mounted and closed on every weekday.
+        if args.contains("--athlth-smoke-weekly-day") {
+            for _ in 0..<600 {
+                if Task.isCancelled { return }
+                if ATHLTHTrainSmokeTrace.hasRecorded("weekly-day-all-verified") { break }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            guard !Task.isCancelled, selectedTab == 0,
+                  ATHLTHTrainSmokeTrace.hasRecorded("weekly-day-all-verified") else {
+                ATHLTHTrainSmokeTrace.record("weekly-day-timeout")
+                return
+            }
+        }
         // The first transition uses the real native TabView binding.
         selectedTab = 1
         for _ in 0..<600 {
