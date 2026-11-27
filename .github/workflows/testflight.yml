@@ -75,6 +75,7 @@ on:
       - release/v3.0.4
       - release/v3.0.5
       - release/v3.0.6
+      - release/v3.0.7
     paths:
       - .github/testflight-trigger
 
@@ -90,13 +91,13 @@ permissions:
 
 jobs:
   release-checks:
-    if: ${{ !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref) }}
+    if: ${{ !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref) }}
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - name: Verify full release gate before legacy signing and archive
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1","refs/heads/release/v3.0.2","refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref) && !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1","refs/heads/release/v3.0.2","refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref) && !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -104,7 +105,7 @@ jobs:
 
   testflight:
     needs: release-checks
-    if: ${{ !cancelled() && (needs.release-checks.result == 'success' || (contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref) && needs.release-checks.result == 'skipped')) }}
+    if: ${{ !cancelled() && (needs.release-checks.result == 'success' || (contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref) && needs.release-checks.result == 'skipped')) }}
     runs-on: xcode-27
     timeout-minutes: 240
     env:
@@ -120,7 +121,7 @@ jobs:
       # Refuse an obsolete checkout before doing any release work. The full
       # exact-commit gate is checked again before signing and upload.
       - name: Recheck release branch before signing
-        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1","refs/heads/release/v3.0.2","refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v2.2.5","refs/heads/release/v2.2.6","refs/heads/release/v2.2.7","refs/heads/release/v2.2.8","refs/heads/release/v2.2.9","refs/heads/release/v2.3.0","refs/heads/release/v3.0.0","refs/heads/release/v3.0.1","refs/heads/release/v3.0.2","refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -269,13 +270,13 @@ jobs:
           grep -q 'testFlightInternalTestingOnly' "$RUNNER_TEMP/xcodebuild-help.txt"
 
       - name: Archive unsigned release in parallel with acceptance tests
-        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref)
         shell: bash
         timeout-minutes: 120
         run: bash scripts/archive_testflight_release.sh
 
       - name: Verify full exact-commit release gate before signing
-        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -345,7 +346,7 @@ jobs:
           retention-days: 90
 
       - name: Archive without creating development certificates
-        if: ${{ !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref) }}
+        if: ${{ !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -701,7 +702,7 @@ jobs:
           fi
 
       - name: Recheck legacy same-commit release status before upload
-        if: ${{ !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref) }}
+        if: ${{ !contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref) }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -749,7 +750,7 @@ jobs:
           done
 
       - name: Recheck full exact-commit release gate before upload
-        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref)
+        if: contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref)
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -806,7 +807,7 @@ jobs:
       # Create a GitHub release only when the version is explicitly locked.
 
       - name: Preserve unsigned Release compiler timing log
-        if: always() && contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6"]'), github.ref)
+        if: always() && contains(fromJSON('["refs/heads/release/v3.0.3","refs/heads/release/v3.0.4","refs/heads/release/v3.0.5","refs/heads/release/v3.0.6","refs/heads/release/v3.0.7"]'), github.ref)
         uses: actions/upload-artifact@v4
         with:
           name: athlth-release-archive-timing
