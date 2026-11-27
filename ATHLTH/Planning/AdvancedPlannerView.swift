@@ -165,6 +165,7 @@ struct AdvancedPlannerView: View {
                 }
             }
         }
+        .athlthStablePresentationBoundary()
         .sheet(item: $preparedShare) { draft in
             ATHLTHDirectShareSheet(draft: draft)
         }
@@ -191,6 +192,7 @@ struct AdvancedPlannerView: View {
         .onChange(of: displayedPlan?.version) { _, _ in
             reconcileSelection()
         }
+        .athlthStablePresentationBoundary()
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 if suspendedAt == nil {
@@ -218,6 +220,7 @@ struct AdvancedPlannerView: View {
                 suspendedDayEditor = false
             }
         }
+        .athlthStablePresentationBoundary()
         .sheet(isPresented: $showingSessionEditor) {
             if let selectedDayID,
                let plan = displayedPlan {
@@ -235,6 +238,7 @@ struct AdvancedPlannerView: View {
                 standaloneDate: Date()
             )
         }
+        .athlthStablePresentationBoundary()
         .sheet(isPresented: $showingPlanEditor) {
             if let plan = displayedPlan {
                 PlanMetadataEditorView(plan: plan)
@@ -245,12 +249,14 @@ struct AdvancedPlannerView: View {
                 TrainingPlanProgressDetailView(planID: plan.id)
             }
         }
+        .athlthStablePresentationBoundary()
         .sheet(isPresented: $showingAllPlans) {
             AllTrainingPlansView()
         }
         .sheet(isPresented: $showingProgramCreation) {
             TrainingPlanCreationView()
         }
+        .athlthStablePresentationBoundary()
         .sheet(item: $selectedStandaloneLobbyWorkout) { workout in
             NavigationStack {
                 PlannedWorkoutLobbyView(workout: workout)
@@ -265,6 +271,7 @@ struct AdvancedPlannerView: View {
                     }
             }
         }
+        .athlthStablePresentationBoundary()
         .sheet(item: $selectedWorkout) { workout in
             if let planID = displayedPlan?.id {
                 NavigationStack {
@@ -326,6 +333,7 @@ struct AdvancedPlannerView: View {
                 .environmentObject(session)
             }
         }
+        .athlthStablePresentationBoundary()
         .sheet(item: $workoutPendingPremiumEdit) { workout in
             if let planID = displayedPlan?.id {
                 SessionEditorView(planID: planID, workout: workout)
