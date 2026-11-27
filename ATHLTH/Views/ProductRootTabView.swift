@@ -665,6 +665,18 @@ struct ProductRootTabView: View {
                 case .plan:
                     trainNavigationRequest = .plan
                     selectedTab = 1
+                case .runSetup:
+                    trainNavigationRequest = .quick(.running)
+                    selectedTab = 1
+                case .walkSetup:
+                    trainNavigationRequest = .quick(.walking)
+                    selectedTab = 1
+                case .strengthSetup:
+                    trainNavigationRequest = .quick(.strength)
+                    selectedTab = 1
+                case .sportSetup:
+                    trainNavigationRequest = .allWorkoutCategories
+                    selectedTab = 1
                 }
             }
             .athlthStablePresentationBoundary()

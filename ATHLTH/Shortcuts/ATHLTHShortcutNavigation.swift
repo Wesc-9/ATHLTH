@@ -3,7 +3,7 @@ import Foundation
 /// A one-shot, short-lived navigation request. No account identity, workout
 /// data, health data, free text or start-workout command is stored.
 enum ATHLTHShortcutNavigation: String, CaseIterable {
-    case coach, today, plan
+    case coach, today, plan, runSetup, walkSetup, strengthSetup, sportSetup
 
     static let preferenceKey = "athlth.shortcut.navigation.v1"
 

@@ -88,7 +88,7 @@ struct ATHLTHAirPodsSettingsView: View {
                     if #available(iOS 26.0, *) {
                         VStack(alignment: .leading, spacing: 8) {
                             Toggle(tr("Live heart rate (beta)", "Livepuls (beta)"), isOn: $liveSensorPilot)
-                            Text(tr("Optional for new phone-recorded running, walking and strength workouts. Requires Apple Health workout and heart-rate access and a compatible sensor. No change to Watch workouts. Missing readings remain unavailable.", "Valgfritt for nye løpe-, gå- og styrkeøkter registrert på telefon. Krever Apple Helse-tilgang til økter og puls samt kompatibel sensor. Endrer ikke Watch-økter. Manglende målinger vises som utilgjengelige."))
+                            Text(tr("Optional for new phone-recorded running, walking, strength and sports workouts. Requires Apple Health workout and heart-rate access and a compatible sensor. No change to Watch workouts. Missing readings remain unavailable.", "Valgfritt for nye løpe-, gå-, styrke- og idrettsøkter registrert på telefon. Krever Apple Helse-tilgang til økter og puls samt kompatibel sensor. Endrer ikke Watch-økter. Manglende målinger vises som utilgjengelige."))
                                 .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
                         }.padding(12)
                         SettingsDivider()

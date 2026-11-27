@@ -67,8 +67,8 @@ struct CustomQuickIPhoneWorkoutView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ink)
                             Text(configuration.activity == .sports && isTimed
-                                ? tr("Only elapsed time is recorded on iPhone. For sensor measurements, start the workout on Apple Watch.",
-                                     "iPhone registrerer kun treningstid. Start økten på Apple Watch for sensormålinger.")
+                                ? tr("iPhone records elapsed time. With optional live heart rate (beta), a compatible sensor may also deliver heart rate and energy.",
+                                     "iPhone registrerer treningstid. Med valgfri livepuls (beta) kan en kompatibel sensor også levere puls og energi.")
                                 : tr(
                                     "ATHLTH stores this as a manual workout. Time is measured by the iPhone timer or entered by you. Distance and effort are not verified by GPS, Apple Watch or HealthKit.",
                                     "ATHLTH lagrer dette som en manuelt registrert økt. Tiden måles med iPhone-tidtaker eller oppgis av deg. Distanse og innsats er ikke bekreftet av GPS, Apple Watch eller HealthKit."
@@ -262,6 +262,12 @@ struct CustomQuickIPhoneWorkoutView: View {
                         }
                         .font(.subheadline.weight(.semibold))
                     }
+                    if configuration.activity == .sports, let id = manualCaptureID,
+                       let pulse = ATHLTHManualTimedCapture.freshSensorPulse(id: id, userID: session.profile.userID, at: context.date) {
+                        Label("\(Int(pulse.rounded())) bpm", systemImage: "heart.fill")
+                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(ink)
+                    }
                     if let cue = intervalCue(at: context.date) {
                         Text(cue)
                             .font(.subheadline.weight(.semibold))
@@ -433,6 +439,19 @@ struct CustomQuickIPhoneWorkoutView: View {
                 .font(.title2.weight(.bold))
             Text(clockText(seconds: record.durationSeconds))
                 .font(.title3.monospacedDigit())
+            if let metrics = record.measuredSensors {
+                VStack(spacing: 6) {
+                    if let value = metrics.averageHeartRate {
+                        Text(tr("Average heart rate: ", "Snittpuls: ") + String(Int(value.rounded())) + " bpm")
+                    }
+                    if let value = metrics.maxHeartRate {
+                        Text(tr("Maximum heart rate: ", "Makspuls: ") + String(Int(value.rounded())) + " bpm")
+                    }
+                    if let value = metrics.activeCalories {
+                        Text(tr("Active energy: ", "Aktiv energi: ") + String(Int(value.rounded())) + " kcal")
+                    }
+                }.font(.subheadline.monospacedDigit())
+            }
             Label(record.evidence.label, systemImage: "info.circle.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(muted)
@@ -482,7 +501,7 @@ struct CustomQuickIPhoneWorkoutView: View {
             )
             return
         }
-        guard let record = CustomQuickWorkoutRecord.make(
+        guard var record = CustomQuickWorkoutRecord.make(
             configuration: configuration,
             recordedAt: isTimed ? Date() : workoutDate,
             durationSeconds: seconds,
@@ -498,6 +517,9 @@ struct CustomQuickIPhoneWorkoutView: View {
                 "Registrer minst ett sekund og bruk distanse over 0 og maks 1 000 km."
             )
             return
+        }
+        if isTimed, configuration.activity == .sports, let id = manualCaptureID {
+            record.measuredSensors = ATHLTHManualTimedCapture.sensorSummary(id: id, userID: session.profile.userID)
         }
         guard CustomQuickWorkoutJournal.save(
             record, userID: session.profile.userID
@@ -520,7 +542,7 @@ struct CustomQuickIPhoneWorkoutView: View {
         }
         accumulatedSeconds = seconds
         resumedAt = nil
-        savedRecord = record
+        savedRecord = CustomQuickWorkoutJournal.load(userID: session.profile.userID).first(where: { $0.id == record.id }) ?? record
     }
 
     private func elapsed(at now: Date) -> TimeInterval {

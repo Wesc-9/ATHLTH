@@ -146,8 +146,92 @@ struct ATHLTHOpenPlanIntent: AppIntent {
     }
 }
 
+struct ATHLTHRunSetupIntent: AppIntent {
+    static let title: LocalizedStringResource = "Set up a run"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.runSetup.enqueue()
+        return .result()
+    }
+}
+
+struct ATHLTHWalkSetupIntent: AppIntent {
+    static let title: LocalizedStringResource = "Set up a walk"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.walkSetup.enqueue()
+        return .result()
+    }
+}
+
+struct ATHLTHStrengthSetupIntent: AppIntent {
+    static let title: LocalizedStringResource = "Set up strength training"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.strengthSetup.enqueue()
+        return .result()
+    }
+}
+
+struct ATHLTHSportSetupIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open workout categories"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ATHLTHShortcutNavigation.sportSetup.enqueue()
+        return .result()
+    }
+}
+
 struct ATHLTHAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: ATHLTHRunSetupIntent(),
+            phrases: ["Set up a run in \(.applicationName)", "Klargjør løping i \(.applicationName)"],
+            shortTitle: "Set up run",
+            systemImageName: "figure.run"
+        )
+
+        AppShortcut(
+            intent: ATHLTHWalkSetupIntent(),
+            phrases: ["Set up a walk in \(.applicationName)", "Klargjør gange i \(.applicationName)"],
+            shortTitle: "Set up walk",
+            systemImageName: "figure.walk"
+        )
+
+        AppShortcut(
+            intent: ATHLTHStrengthSetupIntent(),
+            phrases: ["Set up strength training in \(.applicationName)", "Klargjør styrketrening i \(.applicationName)"],
+            shortTitle: "Set up strength",
+            systemImageName: "dumbbell"
+        )
+
+        AppShortcut(
+            intent: ATHLTHSportSetupIntent(),
+            phrases: ["Open workout categories in \(.applicationName)", "Åpne treningsformer i \(.applicationName)"],
+            shortTitle: "Workout categories",
+            systemImageName: "sportscourt"
+        )
+
         AppShortcut(
             intent: ATHLTHRecoveryIntent(),
             phrases: [

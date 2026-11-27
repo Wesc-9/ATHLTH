@@ -18,3 +18,6 @@ Opt-in from AirPods settings on iOS 26+. Native live capture is attached only to
 
 ## Strength pilot
 Reuses the same live sensor collector. New phone strength sessions only; Watch and recovered sessions remain unchanged. The durable strength completion journal precedes the stop request; the canonical app-level exporter reuses the exact matching native builder. Missing measurements remain nil. Account switch and discard clear only the owned capture. Timed sports remain a separate manual record and require a separate provenance/HealthKit export decision.
+
+## Sports and Siri pilot
+New phone-timed sports sessions may collect optional pulse and energy via the shared native collector. Metrics are stored separately in the original local journal; the temporary builder is discarded, not exported to HealthKit, to avoid a second history workout until import reconciliation is designed. Manual distance/effort remains unverified. Timer cap, pause, discard and account switch stop or pause collection. No sensor start during retrospective entry or restored checkpoints. Siri adds authenticated foreground setup navigation for run, walk, strength and workout categories; it does not silently start or control a workout. Physical tests and compilation remain required.

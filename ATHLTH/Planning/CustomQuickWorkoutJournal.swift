@@ -22,6 +22,26 @@ enum CustomQuickWorkoutEvidence: String, Codable, Hashable {
     }
 }
 
+/// System-collected metrics kept separate from entered distance/effort.
+/// A manual timer does not become a GPS-verified or competition workout.
+struct CustomQuickMeasuredSensorMetrics: Codable, Hashable {
+    let activeCalories: Double?
+    let averageHeartRate: Double?
+    let maxHeartRate: Double?
+
+    static func make(activeCalories: Double?, averageHeartRate: Double?, maxHeartRate: Double?) -> Self? {
+        func valid(_ x: Double?) -> Double? {
+            guard let x, x.isFinite, x > 0 else { return nil }
+            return x
+        }
+        let energy = valid(activeCalories)
+        let average = valid(averageHeartRate)
+        let peak = valid(maxHeartRate)
+        guard energy != nil || average != nil || peak != nil else { return nil }
+        return Self(activeCalories: energy, averageHeartRate: average, maxHeartRate: peak)
+    }
+}
+
 struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let activity: CustomQuickWorkoutActivity
@@ -36,6 +56,7 @@ struct CustomQuickWorkoutRecord: Identifiable, Codable, Hashable {
     /// Retains "Fri trening" when a generic .other session is completed.
     /// Optional for backward-compatible decoding of existing workout history.
     var titleOverride: String? = nil
+    var measuredSensors: CustomQuickMeasuredSensorMetrics? = nil
 
     var title: String {
         if let titleOverride, !titleOverride.isEmpty { return titleOverride }

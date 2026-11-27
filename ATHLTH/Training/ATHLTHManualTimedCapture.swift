@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import HealthKit
 
 /// A real iPhone wall-clock timer, not a GPS, heart-rate or HealthKit workout.
 /// The original CustomQuickWorkoutJournal remains the ONE finished-history
@@ -87,6 +88,70 @@ enum ATHLTHManualTimedCapture {
     private static let name = "manualTimedActiveV1"
     private static var active: ATHLTHManualTimedCheckpoint?
     private static var blockedUnreadableOwner: UUID?
+    private static var sensorCapture: AnyObject?
+    private static var sensorDeadline: Task<Void, Never>?
+
+    @available(iOS 26.0, *)
+    private static var nativeSensor: ATHLTHPhoneLiveSensorCapture? {
+        sensorCapture as? ATHLTHPhoneLiveSensorCapture
+    }
+
+    private static func discardSensor() {
+        sensorDeadline?.cancel()
+        sensorDeadline = nil
+        if #available(iOS 26.0, *) { nativeSensor?.discard() }
+        sensorCapture = nil
+    }
+
+    private static func startSensor(for snapshot: ATHLTHManualTimedCheckpoint) {
+        guard #available(iOS 26.0, *), snapshot.activity == .sports,
+              UserDefaults.standard.bool(forKey: "athlth.airpods.liveSensorPilot"),
+              UserDefaults.standard.object(forKey: "settings.appleHealthIntegrationEnabled") as? Bool ?? true,
+              HKHealthStore.isHealthDataAvailable() else { return }
+        let store = HKHealthStore()
+        guard store.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { return }
+        let config = HKWorkoutConfiguration()
+        config.activityType = .other
+        config.locationType = .unknown
+        let capture = ATHLTHPhoneLiveSensorCapture(workoutID: snapshot.id, startedAt: snapshot.startedAt)
+        sensorCapture = capture
+        capture.start(store: store, configuration: config)
+        updateSensor(for: snapshot)
+    }
+
+    private static func updateSensor(for snapshot: ATHLTHManualTimedCheckpoint) {
+        sensorDeadline?.cancel()
+        sensorDeadline = nil
+        guard #available(iOS 26.0, *), let sensor = nativeSensor,
+              sensor.workoutID == snapshot.id else { return }
+        let remaining = snapshot.approvedTimeLimit - snapshot.elapsed(at: Date())
+        sensor.setPaused(snapshot.resumedAt == nil || remaining <= 0)
+        guard snapshot.resumedAt != nil, remaining > 0 else { return }
+        sensorDeadline = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(remaining)) } catch { return }
+            guard !Task.isCancelled, active?.id == snapshot.id, active?.userID == snapshot.userID,
+                  nativeSensor?.workoutID == snapshot.id else { return }
+            nativeSensor?.setPaused(true)
+        }
+    }
+
+    static func freshSensorPulse(id: UUID, userID: UUID, at now: Date) -> Double? {
+        guard #available(iOS 26.0, *), let checkpoint = current(for: userID),
+              checkpoint.id == id, checkpoint.resumedAt != nil,
+              checkpoint.elapsed(at: now) < checkpoint.approvedTimeLimit,
+              UserDefaults.standard.object(forKey: "settings.appleHealthIntegrationEnabled") as? Bool ?? true,
+              nativeSensor?.workoutID == id else { return nil }
+        return nativeSensor?.freshHeartRate(at: now)
+    }
+
+    static func sensorSummary(id: UUID, userID: UUID) -> CustomQuickMeasuredSensorMetrics? {
+        guard #available(iOS 26.0, *), current(for: userID)?.id == id,
+              UserDefaults.standard.object(forKey: "settings.appleHealthIntegrationEnabled") as? Bool ?? true,
+              let sensor = nativeSensor, sensor.workoutID == id else { return nil }
+        let totals = sensor.summary()
+        return CustomQuickMeasuredSensorMetrics.make(activeCalories: totals.activeCalories,
+            averageHeartRate: totals.averageHeartRate, maxHeartRate: totals.maxHeartRate)
+    }
 
     static var hasActiveCapture: Bool {
         active != nil || blockedUnreadableOwner != nil
@@ -104,6 +169,7 @@ enum ATHLTHManualTimedCapture {
         _ userID: UUID?,
         defaults: UserDefaults = .standard
     ) -> ATHLTHManualTimedCheckpoint? {
+        discardSensor()
         active = nil
         blockedUnreadableOwner = nil
         guard let userID else { return nil }
@@ -170,6 +236,7 @@ enum ATHLTHManualTimedCapture {
         guard commit(snapshot, defaults: defaults) else {
             throw CaptureError.checkpointNotSaved
         }
+        if defaults === UserDefaults.standard { startSensor(for: snapshot) }
         return snapshot
     }
 
@@ -205,7 +272,9 @@ enum ATHLTHManualTimedCapture {
         updated.accumulatedSeconds = accumulatedSeconds
         updated.resumedAt = resumedAt
         updated.approvedTimeLimit = approvedTimeLimit
-        return commit(updated, defaults: defaults)
+        guard commit(updated, defaults: defaults) else { return false }
+        updateSensor(for: updated)
+        return true
     }
 
     /// Finish only after the canonical manual record has been durably
@@ -248,6 +317,7 @@ enum ATHLTHManualTimedCapture {
         let key = AccountLocalStorage.key(name, userID: userID)
         defaults.removeObject(forKey: key)
         guard defaults.data(forKey: key) == nil else { return false }
+        discardSensor()
         active = nil
         return true
     }
