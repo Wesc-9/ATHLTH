@@ -39,7 +39,7 @@ REQUIRED = {
     # cannot accidentally satisfy a missing bounds check.
     "ATHLTH/Community/ATHLTHCommunityV5View.swift": (
         r"GeometryReader\s*\{\s*viewport\s+in.*?\.frame\(width:\s*min\(viewport\.size\.width,\s*760\)\)",
-        r"private var cover: some View\s*\{(?:(?!\n    private ).)*?\.accessibilityIdentifier\(\"athlth-community-header\"\)",
+        r"private func cover\(onArtwork:\s*Bool\)\s*->\s*some View\s*\{(?:(?!\n    private ).)*?\.accessibilityIdentifier\(\"athlth-community-header\"\)",
         r"private var myClubsSection: some View\s*\{(?:(?!\n    private ).)*?\.athlthBoundedFill\(\)\s*\.frame\(width:\s*146,\s*height:\s*62\)",
         r"private func clubRow\((?:(?!\n    private ).)*?\.athlthBoundedFill\(\)\s*\.frame\(height:\s*96\)\s*\.frame\(maxWidth:\s*\.infinity\)",
         r"private var nextGatheringCard: some View\s*\{(?:(?!\n    private ).)*?\.athlthBoundedFill\(\)\s*\.frame\(height:\s*61\)\s*\.frame\(maxWidth:\s*\.infinity\)",

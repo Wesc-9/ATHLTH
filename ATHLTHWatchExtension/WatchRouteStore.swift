@@ -117,6 +117,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         loadRoutes()
         loadTodayWorkout()
         loadTodayWorkouts()
+        publishScheduledWorkoutRelevance()
         if let bytes = UserDefaults.standard.data(forKey: homeDashboardDefaultsKey),
            let saved = try? JSONDecoder().decode(WatchHomeDashboardTransfer.self, from: bytes),
            saved.ownerID == companionAccountID { homeDashboard = saved }
@@ -137,6 +138,18 @@ final class WatchRouteStore: NSObject, ObservableObject {
         if ATHLTHWatchFaceFormSnapshot.write(snapshot,
             to: UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite)) {
             WidgetCenter.shared.reloadTimelines(ofKind: ATHLTHWatchFaceFormSnapshot.widgetKind)
+        }
+    }
+
+    private func publishScheduledWorkoutRelevance() {
+        let date = companionAccountID == nil ? nil : ATHLTHWatchScheduleRelevance.nextDate(
+            todayWorkouts.filter { canLaunchTodayWorkout($0.workoutID) }.compactMap(\.scheduledStart)
+        )
+        if ATHLTHWatchScheduleRelevance.write(date, to: UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite)) {
+            WidgetCenter.shared.reloadTimelines(ofKind: ATHLTHWatchScheduleRelevance.widgetKind)
+            if #available(watchOS 26.0, *) {
+                WidgetCenter.shared.invalidateRelevance(ofKind: ATHLTHWatchScheduleRelevance.widgetKind)
+            }
         }
     }
 
@@ -173,6 +186,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         companionAccountID = transfer.ownerID
         latestCompanionAccountUpdatedAt = transfer.updatedAt
         publishWatchFaceForm()
+        publishScheduledWorkoutRelevance()
         WatchWorkoutManager.shared.replayCompletedResults()
         if let data = try? JSONEncoder().encode(transfer) {
             UserDefaults.standard.set(data, forKey: accountIdentityDefaultsKey)
@@ -851,6 +865,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
             )
             storeTodayWorkout(snapshot.workout)
             storeTodayWorkouts(snapshot.scheduledWorkouts)
+            publishScheduledWorkoutRelevance()
             if let dashboard = snapshot.dashboard {
                 homeDashboard = dashboard
                 if let data = try? JSONEncoder().encode(dashboard) {

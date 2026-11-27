@@ -85,6 +85,18 @@ struct WatchHomeView: View {
                 }
             }
         }
+        .modifier(ATHLTHWatchNavigationHandler { target in
+            // Keep the active workout visible; a shortcut must not interrupt it.
+            guard !workoutManager.isWorkoutPresented else { return }
+            switch target {
+            case "today": shortcutPath = [.planned]
+            case "dailyForm": shortcutPath = [.dailyForm]
+            case "sent": shortcutPath = [.sent]
+            case "ghost": shortcutPath = [.ghostRace]
+            case "favorites": shortcutPath = [.favoriteWorkouts]
+            default: break
+            }
+        })
         .onAppear { routeStore.requestTodayWorkoutSnapshot() }
         .onOpenURL { url in
             guard url.scheme == "athlth-watch" else { return }
@@ -615,5 +627,21 @@ private struct WatchRoutesListView: View {
             WatchTheme.textPrimary
         )
         .navigationTitle("Routes")
+    }
+}
+
+
+private struct ATHLTHWatchNavigationHandler: ViewModifier {
+    let navigate: (String) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(watchOS 26.0, *) {
+            content.onAppIntentExecution(ATHLTHWatchNavigationIntent.self) { intent in
+                navigate(intent.target.rawValue)
+            }
+        } else {
+            content
+        }
     }
 }

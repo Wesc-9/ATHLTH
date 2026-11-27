@@ -40,3 +40,27 @@ struct ATHLTHWatchFaceFormSnapshot: Codable, Equatable {
         return true
     }
 }
+
+
+/// Only a scheduled date is shared with WidgetKit. Never includes workout
+/// title, account identity, location or health information.
+enum ATHLTHWatchScheduleRelevance {
+    static let key = "athlth.watch.face.nextScheduledDate.v1"
+    static let widgetKind = "ATHLTHTodayWorkoutWatchWidget"
+
+    static func nextDate(_ dates: [Date], now: Date = Date()) -> Date? {
+        dates.filter { $0 >= now && $0 <= now.addingTimeInterval(7 * 86400) }.min()
+    }
+
+    static func read(from defaults: UserDefaults?) -> Date? {
+        defaults?.object(forKey: key) as? Date
+    }
+
+    @discardableResult
+    static func write(_ date: Date?, to defaults: UserDefaults?) -> Bool {
+        guard let defaults, read(from: defaults) != date else { return false }
+        if let date { defaults.set(date, forKey: key) }
+        else { defaults.removeObject(forKey: key) }
+        return true
+    }
+}

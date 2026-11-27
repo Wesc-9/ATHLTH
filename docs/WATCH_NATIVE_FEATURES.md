@@ -15,3 +15,8 @@
 - WorkoutKit: explicit export of accurately representable plans; preserve ATHLTH session identity and do not double-import Apple workouts.
 
 All new API integrations require Xcode 27 build and real Watch verification. The iPhone companion remains mandatory.
+
+## Control Center and schedule relevance
+- Five watchOS 26+ system controls open the existing planned, daily form, sent, Ghost and favorites destinations via a shared OpenIntent. Active workout presentation is not interrupted.
+- The existing Today widget provides a date-based Smart Stack relevance window around the next cached eligible planned workout. The shared projection contains a date only and clears on account changes. Location and invitation context are future extensions.
+- Corrected the obsolete Community header audit signature to the actual cover(onArtwork:) method, keeping the rest of the layout audit intact.

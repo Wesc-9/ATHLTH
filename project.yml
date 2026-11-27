@@ -313,6 +313,7 @@ targets:
       # Reuse the same original ATHLTH pulse-A mark as the Watch home.
       - path: Shared/ATHLTHBrandMark.swift
       - path: Shared/ATHLTHWatchFaceFormSnapshot.swift
+      - path: Shared/ATHLTHWatchNavigationIntent.swift
     info:
       path: ATHLTHWatchWidgets/Info.plist
       properties:

@@ -1,5 +1,7 @@
 import SwiftUI
 import WidgetKit
+import AppIntents
+import RelevanceKit
 
 // Different Watch-face choices, not just alternate artwork for Quick Run.
 // Keep the original Quick Run kind to preserve existing Watch-face placements.
@@ -92,6 +94,17 @@ private struct ATHLTHWatchWidgetEntry: TimelineEntry {
 }
 
 private struct ATHLTHWatchWidgetProvider: TimelineProvider {
+    var shortcut: ATHLTHWatchShortcut = .home
+
+    @available(watchOS 26.0, *)
+    func relevance() async -> WidgetRelevance<Void> {
+        guard shortcut == .today,
+              let date = ATHLTHWatchScheduleRelevance.read(from: UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite)),
+              date.addingTimeInterval(30 * 60) > Date()
+        else { return WidgetRelevance([]) }
+        let context = RelevantContext.date(from: date.addingTimeInterval(-30 * 60), to: date.addingTimeInterval(30 * 60))
+        return WidgetRelevance([WidgetRelevanceAttribute(context: context)])
+    }
     func placeholder(in context: Context) -> ATHLTHWatchWidgetEntry {
         ATHLTHWatchWidgetEntry(date: Date())
     }
@@ -220,7 +233,7 @@ private struct ATHLTHWatchShortcutWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(
             kind: shortcut.kind,
-            provider: ATHLTHWatchWidgetProvider()
+            provider: ATHLTHWatchWidgetProvider(shortcut: shortcut)
         ) { _ in
             ATHLTHWatchShortcutView(shortcut: shortcut)
         }
@@ -334,6 +347,23 @@ private struct ATHLTHDailyFormWatchWidget: Widget {
     }
 }
 
+@available(watchOS 26.0, *)
+private struct ATHLTHWatchNavigationControl: ControlWidget {
+    let target: ATHLTHWatchNavigationTarget
+    let name: String
+    let symbol: String
+
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.\(target.rawValue)") {
+            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: target)) {
+                Label(name, systemImage: symbol)
+            }
+        }
+        .displayName("ATHLTH · \(name)")
+        .description("Åpne valgt visning i ATHLTH.")
+    }
+}
+
 @main
 struct ATHLTHWatchWidgetsBundle: WidgetBundle {
     var body: some Widget {
@@ -346,5 +376,12 @@ struct ATHLTHWatchWidgetsBundle: WidgetBundle {
         ATHLTHWatchShortcutWidget(shortcut: .routes)
         ATHLTHWatchShortcutWidget(shortcut: .sent)
         ATHLTHDailyFormWatchWidget()
+        if #available(watchOS 26.0, *) {
+            ATHLTHWatchNavigationControl(target: .today, name: "Dagens økt", symbol: "calendar.badge.clock")
+            ATHLTHWatchNavigationControl(target: .dailyForm, name: "Dagens form", symbol: "heart.text.square")
+            ATHLTHWatchNavigationControl(target: .sent, name: "Sendt til klokken", symbol: "applewatch.and.arrow.forward")
+            ATHLTHWatchNavigationControl(target: .ghost, name: "Ghost Race", symbol: "scope")
+            ATHLTHWatchNavigationControl(target: .favorites, name: "Favorittøkter", symbol: "star")
+        }
     }
 }
