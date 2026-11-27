@@ -107,6 +107,7 @@ struct ATHLTHTournamentCreator: View {
     private func returnToRules() {
         guard !publishing else { return }
         isReviewing = false
+        errorMessage = nil
         checkpoint()
     }
     @State private var draftID: UUID
@@ -1805,6 +1806,7 @@ struct ATHLTHTournamentCreator: View {
             reviewExercises
             reviewTiming
             reviewRules
+            if competitionSettings.agreement.hasTerms { reviewAgreement }
             Text("Ingen invitasjon er sendt ennå. Alle deltakere må godkjenne reglene før start.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
@@ -1946,6 +1948,7 @@ struct ATHLTHTournamentCreator: View {
                 reviewRow("Slutt", end.formatted(date: .abbreviated, time: .shortened))
             }
             reviewRow("Svarfrist", "\(competitionSettings.invitationDays) dager")
+            reviewRow("Ubesvarte invitasjoner", isDuel ? "Duellen avlyses" : competitionSettings.unansweredPolicy.title)
         }
     }
 
@@ -1979,6 +1982,18 @@ struct ATHLTHTournamentCreator: View {
                     .font(.caption.weight(.medium)).tint(ATHLTHArenaV3Style.gold)
                 }
             }
+        }
+    }
+
+    private var reviewAgreement: some View {
+        reviewCard("Avtalte regler og premier", symbol: "checkmark.shield") {
+            let terms = competitionSettings.agreement
+            if !terms.allowed.isEmpty { reviewRow("Tillatt", terms.allowed) }
+            if !terms.prohibited.isEmpty { reviewRow("Ikke tillatt", terms.prohibited) }
+            if !terms.firstPrize.isEmpty { reviewRow("Premie – 1. plass", terms.firstPrize) }
+            if !terms.secondPrize.isEmpty { reviewRow("Premie – 2. plass", terms.secondPrize) }
+            if !terms.thirdPrize.isEmpty { reviewRow("Premie – 3. plass", terms.thirdPrize) }
+            if !terms.loserConsequence.isEmpty { reviewRow("Frivillig konsekvens", terms.loserConsequence) }
         }
     }
 
