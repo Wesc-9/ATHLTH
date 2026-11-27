@@ -220,6 +220,14 @@ struct ATHLTHCompetitionCreationCheckpoint: Codable {
     }
 }
 
+/// Live rule autosaves must not mutate the presenting view's SwiftUI state.
+@MainActor
+private final class ATHLTHCompetitionLiveCheckpoint {
+    var draft: ATHLTHTournamentDraft?
+    var scrollID: String?
+    func reset() { draft = nil; scrollID = nil }
+}
+
 struct ATHLTHCompetitionCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -247,6 +255,7 @@ struct ATHLTHCompetitionCreationView: View {
     @State private var showingRules = false
     @State private var finishAfterRules = false
     @State private var ruleDraft: ATHLTHTournamentDraft?
+    @State private var liveRuleCheckpoint = ATHLTHCompetitionLiveCheckpoint()
     @State private var didInitialize = false
 
     private var selectedPeople: [SocialProfileCard] {
@@ -279,10 +288,11 @@ struct ATHLTHCompetitionCreationView: View {
         ATHLTHCompetitionCreationCheckpoint(owner: owner, format: format.rawValue,
             leagueStyle: leagueStyle, customTitle: competitionTitle,
             opponents: chosenIDs.sorted { $0.uuidString < $1.uuidString },
-            rules: ruleDraft, inRules: inRules ?? showingRules,
-            scrollID: restoredRuleScrollID).save(entry: checkpointEntry)
+            rules: liveRuleCheckpoint.draft ?? ruleDraft, inRules: inRules ?? showingRules,
+            scrollID: liveRuleCheckpoint.draft == nil ? restoredRuleScrollID : liveRuleCheckpoint.scrollID).save(entry: checkpointEntry)
     }
     private func clearCheckpoint() {
+        liveRuleCheckpoint.reset()
         if let owner = checkpointOwner {
             ATHLTHCompetitionCreationCheckpoint.clear(owner: owner, entry: checkpointEntry)
         }
@@ -321,6 +331,8 @@ struct ATHLTHCompetitionCreationView: View {
                                         chosenIDs, format: item, preferred: preselectedFriend?.userID)
                                     competitionTitle = item == .duel ? "" : item.title
                                     ruleDraft = nil
+                                    restoredRuleScrollID = nil
+                                    liveRuleCheckpoint.reset()
                                 } label: {
                                     HStack {
                                         Label(item.title, systemImage: item.symbol)
@@ -354,7 +366,11 @@ struct ATHLTHCompetitionCreationView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button { showingRules = true; persistCheckpoint(inRules: true) } label: {
+                Button {
+                    liveRuleCheckpoint.reset()
+                    showingRules = true
+                    persistCheckpoint(inRules: true)
+                } label: {
                     Label("Fortsett til regler", systemImage: "arrow.right")
                         .font(.headline).foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -368,7 +384,14 @@ struct ATHLTHCompetitionCreationView: View {
         }
         .fullScreenCover(isPresented: $showingRules.keepingPresentedWhenInactive(scenePhase), onDismiss: {
             if finishAfterRules { clearCheckpoint(); dismiss() }
-            else if scenePhase == .active { persistCheckpoint(inRules: false) }
+            else if scenePhase == .active {
+                if let latest = liveRuleCheckpoint.draft {
+                    ruleDraft = latest
+                    restoredRuleScrollID = liveRuleCheckpoint.scrollID
+                    liveRuleCheckpoint.reset()
+                }
+                persistCheckpoint(inRules: false)
+            }
         }) {
             ATHLTHTournamentCreator(
                 preset: format == .cup ? .cup : format == .league ? leagueStyle : .league,
@@ -380,13 +403,18 @@ struct ATHLTHCompetitionCreationView: View {
                 fixedInvitees: participants,
                 initialActivity: choosesActivityInRules ? nil :
                     ATHLTHCompetitionCreationPolicy.tournamentActivity(initialActivity),
-                onBack: { ruleDraft = $0; persistCheckpoint(inRules: false) },
+                onBack: { draft in
+                    ruleDraft = draft
+                    if liveRuleCheckpoint.draft != nil { restoredRuleScrollID = liveRuleCheckpoint.scrollID }
+                    liveRuleCheckpoint.reset()
+                    persistCheckpoint(inRules: false)
+                },
                 automaticDuelName: format == .duel && competitionTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 restoredScrollID: restoredRuleScrollID,
                 onCheckpoint: { draft, scrollID in
-                    guard !finishAfterRules else { return }
-                    ruleDraft = draft
-                    restoredRuleScrollID = scrollID
+                    guard !finishAfterRules, !closeAfterDraftDecision else { return }
+                    liveRuleCheckpoint.draft = draft
+                    liveRuleCheckpoint.scrollID = scrollID
                     persistCheckpoint(inRules: true)
                 },
                 onPublished: { _ in finishAfterRules = true; clearCheckpoint() },
