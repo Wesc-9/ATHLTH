@@ -866,6 +866,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
                         .scrollIndicators(.automatic)
+                        .scrollBounceBehavior(.basedOnSize)
                         .frame(height: bodyHeight)
                         .id(Calendar.current.startOfDay(for: day.date))
                     }
