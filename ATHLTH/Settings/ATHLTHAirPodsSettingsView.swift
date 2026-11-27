@@ -26,6 +26,7 @@ struct ATHLTHAirPodsRoute: Equatable {
 
 struct ATHLTHAirPodsSettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var session: AppSessionStore
     @AppStorage("athlth.airpods.recognizedAudioRoute") private var recognizedUID = ""
     @AppStorage("athlth.airpods.liveSensorPilot") private var liveSensorPilot = false
     @State private var route = ATHLTHAirPodsRoute.current()
@@ -104,6 +105,22 @@ struct ATHLTHAirPodsSettingsView: View {
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
                     }.padding(12)
+                }
+            }
+            if session.signedIn && !session.previewModeEnabled && session.currentRole.canAccessControlCenter {
+                ATHLTHSettingsGroup(title: tr("Sensor lab · admin", "Sensorlab · admin")) {
+                    PremiumSettingsCard {
+                        NavigationLink {
+                            ATHLTHHeadphoneMotionLabView()
+                        } label: {
+                            PremiumSettingsRow(icon: "waveform.path", iconTint: ATHLTHTheme.accentDeep,
+                                title: tr("Motion and activity lab", "Bevegelses- og aktivitetslab"),
+                                subtitle: tr("Local 20-second diagnostic · no workout commands", "Lokal 20-sekunders diagnostikk · ingen øktkommandoer")) {
+                                Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }.buttonStyle(.plain)
+                        .disabled(motionTestID != nil)
+                    }
                 }
             }
         }

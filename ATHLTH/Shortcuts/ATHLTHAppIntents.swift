@@ -202,6 +202,49 @@ struct ATHLTHSportSetupIntent: AppIntent {
     }
 }
 
+struct ATHLTHPausePhoneWorkoutIntent: AppIntent {
+    static let title: LocalizedStringResource = "Pause ATHLTH phone run or walk"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let recorder = ATHLTHWorkoutRecordingArbiter.phone,
+              recorder.recordingAccountID != nil, let workout = recorder.active else {
+            return .result(dialog: "No active phone run or walk in ATHLTH.")
+        }
+        recorder.pause()
+        guard recorder.active?.id == workout.id, recorder.active?.resumedAt == nil else {
+            return .result(dialog: "The workout could not be paused.")
+        }
+        return .result(dialog: "Workout paused.")
+    }
+}
+
+struct ATHLTHResumePhoneWorkoutIntent: AppIntent {
+    static let title: LocalizedStringResource = "Resume ATHLTH phone run or walk"
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
+    static let openAppWhenRun = true
+    @available(iOS 26.0, *)
+    static let supportedModes: IntentModes = .foreground(.immediate)
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let recorder = ATHLTHWorkoutRecordingArbiter.phone,
+              recorder.recordingAccountID != nil, let workout = recorder.active,
+              !recorder.hasRecoveredActiveWorkout else {
+            return .result(dialog: "Open ATHLTH to restore or select your workout.")
+        }
+        recorder.resume()
+        guard recorder.active?.id == workout.id, recorder.active?.resumedAt != nil else {
+            return .result(dialog: "The workout could not be resumed.")
+        }
+        return .result(dialog: "Workout resumed.")
+    }
+}
+
 struct ATHLTHAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
