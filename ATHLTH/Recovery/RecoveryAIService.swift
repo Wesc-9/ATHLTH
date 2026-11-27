@@ -133,6 +133,8 @@ struct RecoveryCoachMessage:
     /// These optional identifiers keep old saved chat messages compatible.
     let planReviewPlanID: UUID?
     let planReviewPlanVersion: Int?
+    var planIntake: ATHLTHCoachChatPlanIntake? = nil
+    var chatPlanDraft: ATHLTHCoachChatPlanDraft? = nil
 
     init(
         id: UUID = UUID(),
@@ -141,7 +143,9 @@ struct RecoveryCoachMessage:
         createdAt: Date = Date(),
         proposal: RecoveryCoachProposal? = nil,
         planReviewPlanID: UUID? = nil,
-        planReviewPlanVersion: Int? = nil
+        planReviewPlanVersion: Int? = nil,
+        planIntake: ATHLTHCoachChatPlanIntake? = nil,
+        chatPlanDraft: ATHLTHCoachChatPlanDraft? = nil
     ) {
         self.id = id
         self.role = role
@@ -150,6 +154,8 @@ struct RecoveryCoachMessage:
         self.proposal = proposal
         self.planReviewPlanID = planReviewPlanID
         self.planReviewPlanVersion = planReviewPlanVersion
+        self.planIntake = planIntake
+        self.chatPlanDraft = chatPlanDraft
     }
 }
 
