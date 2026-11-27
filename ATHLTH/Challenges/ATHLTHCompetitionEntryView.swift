@@ -291,6 +291,7 @@ struct ATHLTHCompetitionEntryView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Ghost Race, løp alene mot en tidligere økt eller en digital fartsholder.")
+        .accessibilityValue("1 deltaker")
         .accessibilityIdentifier("athlth-competition-entry-ghost")
     }
 
@@ -304,7 +305,7 @@ struct ATHLTHCompetitionEntryView: View {
             switch format.title {
             case "Duell": return "StrengthQuickHero"
             case "Enkeltkonkurranse": return "TrainHero"
-            case "Liga": return isStudioHub ? "ATHLTHTrackRace" : "GoalRunning"
+            case "Liga": return isStudioHub ? "ATHLTHTrackTeam" : "GoalRunning"
             case "Cup": return "GoalAdventure"
             default: return "TrainHero"
             }
