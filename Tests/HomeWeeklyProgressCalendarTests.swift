@@ -17,6 +17,13 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         ))!
     }
 
+    func testSportsWeeklyMetricUsesDedicatedIconWithoutRelabelingOtherWorkouts() {
+        XCTAssertEqual(HomeWeeklyProgressCalendar.extraWorkoutIcon(activity: .other, sportsOnly: true), "sportscourt.fill")
+        XCTAssertEqual(HomeWeeklyProgressCalendar.extraWorkoutIcon(activity: .other, sportsOnly: false), "figure.mixed.cardio")
+        XCTAssertEqual(HomeWeeklyProgressCalendar.extraWorkoutIcon(activity: .cycling, sportsOnly: false), WorkoutActivity.cycling.icon)
+        XCTAssertEqual(HomeWeeklyProgressCalendar.extraWorkoutIcon(activity: nil, sportsOnly: false), "figure.mixed.cardio")
+    }
+
     func testWeeklyStrengthAndWalkingMetricUsesDashWhenEmpty() {
         XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(0), "—")
         XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(1), "1")
