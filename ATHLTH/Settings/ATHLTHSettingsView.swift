@@ -1599,6 +1599,25 @@ settingsSection("Account") {
                 SettingsDivider()
 
                 NavigationLink {
+                    ATHLTHCoachPrivacySettingsView()
+                } label: {
+                    PremiumSettingsRow(
+                        icon: "sparkles",
+                        title: ATHLTHLocalization.choose(english: "Coach", norwegian: "Coach"),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "AI permission and optional health context",
+                            norwegian: "AI-tillatelse og valgfri bruk av helsedata"
+                        )
+                    ) {
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                SettingsDivider()
+
+                NavigationLink {
                     LegalDocumentView(kind: .terms)
                 } label: {
                     PremiumSettingsRow(
@@ -3771,5 +3790,82 @@ private struct ATHLTHNotificationSettingsView: View {
         settings.challengeNotificationsEnabled ||
         settings.messageNotificationsEnabled ||
         settings.mentionNotificationsEnabled
+    }
+}
+
+
+/// Account-scoped Coach controls outside the chat. First-use AI approval
+/// remains in Coach, and health context still requires per-question confirmation.
+private struct ATHLTHCoachPrivacySettingsView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var consent: RecoveryCoachConsentRecord?
+    @State private var showingRevoke = false
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent(
+                    ATHLTHLocalization.choose(english: "AI chat", norwegian: "AI-chat"),
+                    value: consent == nil
+                        ? ATHLTHLocalization.choose(english: "Not approved", norwegian: "Ikke godkjent")
+                        : ATHLTHLocalization.choose(english: "Approved", norwegian: "Godkjent")
+                )
+                if consent != nil {
+                    Toggle(ATHLTHLocalization.choose(
+                        english: "Allow optional health context",
+                        norwegian: "Tillat valgfri bruk av helsedata"
+                    ), isOn: Binding(
+                        get: { consent?.healthSharingAllowed == true },
+                        set: { allowed in
+                            guard session.signedIn,
+                                  RecoveryCoachConsentPreferences.load(userID: session.profile.userID) != nil else { return }
+                            consent = RecoveryCoachConsentPreferences.approve(
+                                userID: session.profile.userID, healthSharingAllowed: allowed)
+                            RecoveryCoachHealthSharingPreferences.save(
+                                userID: session.profile.userID,
+                                requestedMode: allowed ? .confirmEveryQuestion : .off)
+                        }
+                    ))
+                    .tint(ATHLTHTrainDesign.bronze)
+                    Button(ATHLTHLocalization.choose(
+                        english: "Withdraw AI permission", norwegian: "Trekk tilbake AI-tillatelse"
+                    ), role: .destructive) { showingRevoke = true }
+                }
+            } footer: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Ordinary Coach chat uses local Apple AI when available, otherwise built-in guidance. Separate plan tools may use an external provider. Health context is optional and requires confirmation per question. Automatic sharing is not enabled. To approve AI chat, open Coach.",
+                    norwegian: "Vanlig Coach-chat bruker lokal Apple AI når tilgjengelig, ellers innebygd veiledning. Separate planverktøy kan bruke en ekstern leverandør. Helsedata er valgfrie og krever bekreftelse per spørsmål. Automatisk deling er ikke aktivert. Åpne Coach for å godkjenne AI-chat."
+                ))
+            }
+            Section {
+                NavigationLink {
+                    LegalDocumentView(kind: .privacy)
+                } label: {
+                    Text(ATHLTHLocalization.choose(english: "Privacy policy", norwegian: "Personvernerklæring"))
+                }
+            }
+        }
+        .navigationTitle("Coach")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { reload() }
+        .onChange(of: session.profile.userID) { _, _ in
+            showingRevoke = false
+            reload()
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(english: "Withdraw AI permission?", norwegian: "Trekke tilbake AI-tillatelsen?"),
+            isPresented: $showingRevoke, titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(english: "Withdraw", norwegian: "Trekk tilbake"), role: .destructive) {
+                guard session.signedIn else { return }
+                RecoveryCoachConsentPreferences.revoke(userID: session.profile.userID)
+                reload()
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
+        }
+    }
+
+    private func reload() {
+        consent = session.signedIn ? RecoveryCoachConsentPreferences.load(userID: session.profile.userID) : nil
     }
 }
