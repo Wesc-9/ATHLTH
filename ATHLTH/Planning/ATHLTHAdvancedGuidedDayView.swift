@@ -11,6 +11,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let startDate: Date
     let workouts: [ATHLTHPlanStructuredWorkoutBlueprint]
     let isRestDay: Bool
+    var suggestedTraining: Bool? = nil
     let onSelectDay: (Int) -> Void
     let onAddExercise: (WorkoutPhaseKind, Int) -> Void
     let onAddWorkout: () -> Void
@@ -71,10 +72,16 @@ struct ATHLTHAdvancedGuidedDayView: View {
                         confirmingRestReplacement = true
                     }
                 } label: {
-                    Label(tr("Rest day", "Legg til hviledag"), systemImage: "moon.stars")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(secondary)
-                        .frame(minHeight: 44, alignment: .leading)
+                    Label(tr("Set as rest day", "Sett som hviledag"), systemImage: "moon.stars")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(gold)
+                        .frame(maxWidth: .infinity, minHeight: widthClass == .regular ? 54 : 46)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 15)
+                                .strokeBorder(gold.opacity(0.35), lineWidth: 1)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 15))
                 }
                 .buttonStyle(.plain)
             }
@@ -240,6 +247,16 @@ struct ATHLTHAdvancedGuidedDayView: View {
             Label(tr("No workouts planned", "Ingen økter planlagt"),
                   systemImage: "calendar.badge.plus")
                 .font(.system(size: 16, weight: .semibold, design: .serif))
+            if let suggestedTraining {
+                Label(
+                    suggestedTraining
+                        ? tr("Suggested training day", "Foreslått treningsdag")
+                        : tr("Suggested rest day", "Foreslått hviledag"),
+                    systemImage: suggestedTraining ? "figure.run" : "moon.stars"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(suggestedTraining ? gold : secondary)
+            }
             Text(tr("Add exercises or a complete workout, or mark this date as a rest day.",
                     "Legg til øvelser eller en komplett treningsøkt, eller sett dagen som hviledag."))
                 .font(.caption).foregroundStyle(secondary)
@@ -447,27 +464,35 @@ struct ATHLTHAdvancedGuidedDayView: View {
     // One consistent two-row action palette across empty and populated dates.
     // Choices append directly to the current workout when one exists.
     private var quickActions: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    quick("walking", "figure.walk", tr("Walk", "Gå"))
-                    quick("running", "figure.run", tr("Running", "Løping"))
-                    quick("strength", "dumbbell", tr("Strength", "Styrke"))
-                    quick("cycling", "bicycle", tr("Cycling", "Sykling"))
-                    quick("yoga", "figure.yoga", "Yoga")
-                    quick("meditation", "leaf", tr("Meditation", "Meditasjon"))
-                }
-                .frame(minHeight: 35)
+        VStack(alignment: .leading, spacing: widthClass == .regular ? 10 : 7) {
+            quickRow {
+                quick("walking", "figure.walk", tr("Walk", "Gå"))
+                quick("running", "figure.run", tr("Running", "Løping"))
+                quick("strength", "dumbbell", tr("Strength", "Styrke"))
+                quick("cycling", "bicycle", tr("Cycling", "Sykling"))
+                quick("yoga", "figure.yoga", "Yoga")
+                quick("meditation", "leaf", tr("Meditation", "Meditasjon"))
             }
+            quickRow {
+                quick("workout", "list.bullet", tr("Workout", "Treningsøkt"))
+                quick("exercise", "dumbbell", tr("Exercise", "Øvelse"))
+                quick("rest", "pause.fill", tr("Rest", "Pause"))
+                quick("active-rest", "figure.walk", tr("Active rest", "Aktiv pause"))
+                quick("stretching", "figure.cooldown", tr("Stretching", "Uttøying"))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func quickRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        if widthClass == .regular {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 8)], spacing: 8) {
+                content()
+            }
+        } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    quick("workout", "list.bullet", tr("Workout", "Treningsøkt"))
-                    quick("exercise", "dumbbell", tr("Exercise", "Øvelse"))
-                    quick("rest", "pause.fill", tr("Rest", "Pause"))
-                    quick("active-rest", "figure.walk", tr("Active rest", "Aktiv pause"))
-                    quick("stretching", "figure.cooldown", tr("Stretching", "Uttøying"))
-                }
-                .frame(minHeight: 35)
+                HStack(spacing: 6) { content() }
+                    .frame(minHeight: 35)
             }
         }
     }
@@ -477,11 +502,12 @@ struct ATHLTHAdvancedGuidedDayView: View {
             onQuick(id)
         } label: {
             Label(text, systemImage: symbol)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: widthClass == .regular ? 14 : 11, weight: .medium))
                 .foregroundStyle(ink)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 34)
-                .background(.white, in: Capsule())
+                .padding(.horizontal, widthClass == .regular ? 8 : 12)
+                .frame(maxWidth: widthClass == .regular ? .infinity : nil,
+                       minHeight: widthClass == .regular ? 52 : 34)
+                .background(.white, in: RoundedRectangle(cornerRadius: widthClass == .regular ? 14 : 17))
         }
         .buttonStyle(.plain)
     }
