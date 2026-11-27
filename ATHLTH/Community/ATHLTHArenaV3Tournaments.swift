@@ -460,6 +460,7 @@ struct ATHLTHTournamentCreator: View {
             }
             .safeAreaInset(edge: .bottom) { creationFooter }
         }
+        .athlthStablePresentationBoundary()
         .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
                 selected: Set(competitionSettings.selectedExerciseIDs ?? []), templatesOnly: exerciseTemplatesOnly,
@@ -476,6 +477,7 @@ struct ATHLTHTournamentCreator: View {
                 exerciseCount = totalExerciseCount
             }
         }
+        .athlthStablePresentationBoundary()
         .fullScreenCover(isPresented: $showingDuelRoute.keepingPresentedWhenInactive(scenePhase)) {
             NavigationStack {
                 SavedRoutesView(selectionTitle: "Konkurranserute") { route in
@@ -496,6 +498,7 @@ struct ATHLTHTournamentCreator: View {
                 }
             }
         }
+        .athlthStablePresentationBoundary()
         .sheet(item: $editingMeasure, onDismiss: { convertingLibraryID = nil }) { value in
             ATHLTHCompetitionMeasureEditor(initial: value) { updated in
                 saveMeasure(updated)
@@ -524,6 +527,7 @@ struct ATHLTHTournamentCreator: View {
                 if !Task.isCancelled { rematchSearchError = "Kunne ikke hente øvelsesdetaljer. Prøv igjen når du er tilkoblet." }
             }
         }
+        .athlthStablePresentationBoundary()
         .onChange(of: competitionSettings) { _, _ in scheduleCheckpoint() }
         .onChange(of: allowedActivities) { _, _ in scheduleCheckpoint() }
         .onChange(of: rulesAuthority) { _, _ in scheduleCheckpoint() }
@@ -531,6 +535,7 @@ struct ATHLTHTournamentCreator: View {
         .onChange(of: exerciseCount) { _, _ in scheduleCheckpoint() }
         .onChange(of: exerciseMode) { _, _ in scheduleCheckpoint() }
         .onChange(of: additionalCheckpointFields) { _, _ in scheduleCheckpoint() }
+        .athlthStablePresentationBoundary()
         .onChange(of: scenePhase) { _, phase in if phase != .active { checkpoint() } }
         .onAppear { scheduleCheckpoint() }
         .onDisappear {
@@ -558,6 +563,7 @@ struct ATHLTHTournamentCreator: View {
                 clubSeasons = []
             }
         }
+        .athlthStablePresentationBoundary()
         .fullScreenCover(isPresented: $showingTemplatePicker) {
             ATHLTHTournamentTemplatePicker { saved in
                 applyTemplate(saved)
@@ -572,6 +578,7 @@ struct ATHLTHTournamentCreator: View {
         } message: {
             Text("Malen lagrer regler og øvelser, men ingen venner, invitasjoner eller gamle startdatoer.")
         }
+        .athlthStablePresentationBoundary()
         .fullScreenCover(isPresented: $showingCompetitionCoach) {
             ATHLTHTournamentCoachWizard(
                 format: format,
@@ -606,6 +613,7 @@ struct ATHLTHTournamentCreator: View {
                 coachNames = proposal.exerciseNames
             }
         }
+        .athlthStablePresentationBoundary()
         .fullScreenCover(isPresented: $showingSeasonCreation) {
             if let clubID = activeClubID {
                 ATHLTHArenaSeasonCreateView(
