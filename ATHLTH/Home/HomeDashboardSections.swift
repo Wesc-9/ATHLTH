@@ -1961,6 +1961,7 @@ struct HomeWeeklyProgressStrip:
         .onChange(of: session.signedIn) { _, signedIn in
             if signedIn { restoreWorkoutComposerIfNeeded() }
         }
+        .athlthStablePresentationBoundary()
         .sheet(item: $selectedDay, onDismiss: {
             if pendingComposerPresentation {
                 pendingComposerPresentation = false
@@ -2012,6 +2013,7 @@ struct HomeWeeklyProgressStrip:
                 28
             )
         }
+        .athlthStablePresentationBoundary()
         .fullScreenCover(
             isPresented: $showingStandaloneSessionEditor,
             onDismiss: { restoreWorkoutComposerIfNeeded() }
@@ -2025,7 +2027,58 @@ struct HomeWeeklyProgressStrip:
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
             .interactiveDismissDisabled(composerActive)
         }
+        .athlthStablePresentationBoundary()
+        .task {
+            #if targetEnvironment(simulator)
+            await runWeeklyDaySmoke()
+            #endif
+        }
     }
+
+    private func presentDay(_ date: Date) {
+        guard !composerActive, !showingStandaloneSessionEditor, selectedDay == nil else { return }
+        daySheetDetent = .fraction(0.78)
+        persistedOpenDay = date.timeIntervalSince1970
+        selectedDay = makeDaySelection(for: date)
+    }
+
+    #if targetEnvironment(simulator)
+    @MainActor
+    private func runWeeklyDaySmoke() async {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("--athlth-compatibility-preview"),
+              args.contains("--athlth-smoke-weekly-day"),
+              !ATHLTHTrainSmokeTrace.hasRecorded("weekly-day-started") else { return }
+        ATHLTHTrainSmokeTrace.record("weekly-day-started")
+        do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+        let dates = visibleWeekDates
+        guard dates.count == 7, !composerActive, selectedDay == nil else { return }
+        for date in dates {
+            guard !Task.isCancelled, selectedDay == nil else { return }
+            let weekday = calendar.component(.weekday, from: date)
+            presentDay(date)
+            let stage = "weekly-day-mounted-\(weekday)"
+            for _ in 0..<160 {
+                if Task.isCancelled { return }
+                if ATHLTHTrainSmokeTrace.hasRecorded(stage) { break }
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            }
+            guard ATHLTHTrainSmokeTrace.hasRecorded(stage), selectedDay != nil else { return }
+            // Keep the sheet mounted beyond the initial metadata resolution.
+            do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
+            selectedDay = nil
+            for _ in 0..<80 {
+                if Task.isCancelled { return }
+                if persistedOpenDay == 0 { break }
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            }
+            guard persistedOpenDay == 0 else { return }
+            do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
+            ATHLTHTrainSmokeTrace.record("weekly-day-verified-\(weekday)")
+        }
+        ATHLTHTrainSmokeTrace.record("weekly-day-all-verified")
+    }
+    #endif
 
     private func openWorkoutComposer(on date: Date) {
         composerAccount = session.profile.userID.uuidString
@@ -2146,9 +2199,7 @@ struct HomeWeeklyProgressStrip:
             )
 
         Button {
-            daySheetDetent = .fraction(0.78)
-            persistedOpenDay = date.timeIntervalSince1970
-            selectedDay = makeDaySelection(for: date)
+            presentDay(date)
         } label: {
             day(
                 date,
@@ -3596,6 +3647,12 @@ private struct HomeWeeklyProgressDaySheet: View {
             .onAppear {
                 dailyFormEntry = RecoverySorenessStore(accountID: session.profile.userID).todayEntry
                 restoreCompletedWorkoutIfNeeded()
+                #if targetEnvironment(simulator)
+                if ProcessInfo.processInfo.arguments.contains("--athlth-smoke-weekly-day") {
+                    let weekday = Calendar.current.component(.weekday, from: selection.date)
+                    ATHLTHTrainSmokeTrace.record("weekly-day-mounted-\(weekday)")
+                }
+                #endif
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("athlth.dailyCheckInDidUpdate"))) { _ in
                 dailyFormEntry = RecoverySorenessStore(accountID: session.profile.userID).todayEntry
