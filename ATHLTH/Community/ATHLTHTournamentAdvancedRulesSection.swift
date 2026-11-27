@@ -34,6 +34,7 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
                 .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHArenaV3Style.panel())
             }
             .buttonStyle(.plain)
@@ -106,6 +107,7 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHArenaV3Style.ink)
                     .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ATHLTHArenaV3Style.panel())
                     .onChange(of: winPoints) { _, points in
                         drawPoints=min(drawPoints,max(0,points-1))
@@ -142,6 +144,7 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
                     .font(.subheadline)
                     .tint(ATHLTHArenaV3Style.gold)
                     .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ATHLTHArenaV3Style.panel())
 
                     }
