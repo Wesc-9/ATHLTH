@@ -9580,7 +9580,7 @@ struct WorkoutTemplateBuilderView: View {
                     .accessibilityIdentifier("athlth-focused-workout-save-notice")
                     .accessibilityAddTraits(.updatesFrequently)
             }
-            if focusedPlannerDay == nil && onSaveSharedRevision == nil && !blocks.isEmpty {
+            if !compactPlanWorkoutSettings && focusedPlannerDay == nil && onSaveSharedRevision == nil && !blocks.isEmpty {
                 Button {
                     showingWorkoutReview = true
                 } label: {
