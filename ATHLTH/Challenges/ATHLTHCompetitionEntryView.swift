@@ -439,28 +439,67 @@ struct ATHLTHCompetitionEntryView: View {
     }
 
     private var emptyCompetitionState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: hubTab == .invitations ? "envelope" : hubTab == .history ? "clock.arrow.circlepath" : "flag.checkered")
-                .font(.system(size: 24, weight: .light))
-                .foregroundStyle(ATHLTHTrainDesign.bronze)
-                .frame(width: 54, height: 54)
-                .background(ATHLTHTrainDesign.paleGold, in: Circle())
-            Text(hubTab == .invitations ? "Ingen nye invitasjoner" : hubTab == .history ? "Ingen avsluttede konkurranser" : "Klar for en utfordring?")
-                .font(ATHLTHTrainDesign.cardTitle)
-            Text(hubTab == .invitations ? "Invitasjoner fra andre vises her." : hubTab == .history ? "Fullførte og avlyste konkurranser samles her." : "Opprett en konkurranse og utfordre en venn eller en gruppe.")
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-                .multilineTextAlignment(.center)
-            if hubTab == .mine && !isStudioHub {
-                Button("Velg konkurranseform") { showingFormats = true }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    .padding(.top, 5)
+        VStack(spacing: 0) {
+            if hubTab == .mine {
+                emptyCompetitionArtwork
             }
+            VStack(spacing: 10) {
+                if hubTab != .mine {
+                    Image(systemName: hubTab == .invitations ? "envelope" : "clock.arrow.circlepath")
+                        .font(.system(size: 24, weight: .light))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 54, height: 54)
+                        .background(ATHLTHTrainDesign.paleGold, in: Circle())
+                        .accessibilityHidden(true)
+                }
+                Text(hubTab == .invitations ? "Ingen nye invitasjoner" : hubTab == .history ? "Ingen avsluttede konkurranser" : "Klar for en utfordring?")
+                    .font(ATHLTHTrainDesign.cardTitle)
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .multilineTextAlignment(.center)
+                Text(hubTab == .invitations ? "Invitasjoner fra andre vises her." : hubTab == .history ? "Fullførte og avlyste konkurranser samles her." : "Opprett en konkurranse og utfordre en venn eller en gruppe.")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                if hubTab == .mine && !isStudioHub {
+                    Button("Velg konkurranseform") { showingFormats = true }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, hubTab == .mine ? 18 : 24)
+            .frame(maxWidth: .infinity)
         }
-        .padding(24)
         .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius, style: .continuous))
         .athlthTrainEditorialCard()
+    }
+
+    /// Fixed bundled artwork, shared by compact and Studio hub layouts.
+    /// A top-aligned crop keeps the two foreground athletes visible.
+    private var emptyCompetitionArtwork: some View {
+        Color.clear
+            .aspectRatio(2, contentMode: .fit)
+            .overlay {
+                GeometryReader { geometry in
+                    Image("ATHLTHTrackRace")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                        .clipped()
+                        .overlay {
+                            LinearGradient(
+                                colors: [.clear, ATHLTHTrainDesign.bronze.opacity(0.12)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        }
+                }
+            }
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
     }
 
     private func historyDate(_ item: ATHLTHTournamentRemote) -> Date {
