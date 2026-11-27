@@ -13,16 +13,20 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
     @State private var showingMeetingPoint = false
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
+    @State private var expandedEnvironments = false
 
     private func activityVenuePicker(_ activity: ATHLTHTournamentActivity) -> some View {
         let options = settings.allowedEnvironments(activity: activity)
         let current = settings.activityEnvironments[activity.rawValue]
         return VStack(alignment: .leading, spacing: 3) {
+            Label(activity.title, systemImage: activity.symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHArenaV3Style.ink)
             Picker(activity.title, selection: Binding<ATHLTHCompetitionEnvironment?>(
                 get: { settings.activityEnvironments[activity.rawValue] },
                 set: { settings.activityEnvironments[activity.rawValue] = $0 }
             )) {
-                Text("Arv: " + settings.environment.title).tag(ATHLTHCompetitionEnvironment?.none)
+                Text("Samme som fellesregelen").tag(ATHLTHCompetitionEnvironment?.none)
                 ForEach(ATHLTHCompetitionEnvironment.allCases.filter {
                     ($0 != settings.environment && options.contains($0)) || $0 == current
                 }) { venue in
@@ -39,11 +43,10 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            Text("Start og progresjon")
-                .font(.system(size: 23, weight: .regular, design: .serif))
-                .foregroundStyle(ATHLTHArenaV3Style.ink)
-
             VStack(alignment: .leading, spacing: 14) {
+                Text("Start og progresjon")
+                    .font(.system(size: 21, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
                 if showsStartTiming {
                 Text("Hvordan starter konkurransen?")
                     .font(.subheadline.weight(.semibold))
@@ -154,7 +157,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Treningsmiljø og sted")
-                    .font(.system(size: 21, design: .serif))
+                    .font(.system(size: 21, weight: .regular, design: .serif))
+                Text("Tillatt treningsmiljø")
+                    .font(.subheadline.weight(.semibold))
                 Picker("Hvor er trening tillatt?", selection: $settings.environment) {
                     ForEach(ATHLTHCompetitionEnvironment.allCases.filter {
                         $0.supports(activities) || $0 == settings.environment
@@ -172,12 +177,24 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 }
                 if activities.count > 1 || !settings.activityEnvironments.isEmpty {
                     Divider()
-                    Text("Per treningsform").font(.subheadline.weight(.semibold))
-                    Text("Arv bruker fellesregelen. En egen regel kan bare snevre inn tillatt miljø.")
-                        .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
-                    ForEach(ATHLTHTournamentActivity.allCases.filter { activities.contains($0) }) { activity in
-                        activityVenuePicker(activity)
+                    DisclosureGroup("Egne miljøregler per treningsform", isExpanded: $expandedEnvironments) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Valgfritt. En egen regel kan bare begrense fellesregelen. Egne miljøkrav kan foreløpig bare lagres som mal.")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            ForEach(ATHLTHTournamentActivity.allCases.filter { activities.contains($0) && $0.isAvailableForCreation }) { activity in
+                                activityVenuePicker(activity)
+                            }
+                            if !settings.activityEnvironments.isEmpty {
+                                Button("Bruk fellesregelen for alle") {
+                                    settings.activityEnvironments.removeAll()
+                                }.font(.caption.weight(.medium))
+                            }
+                        }
+                        .padding(.top, 10)
                     }
+                    .font(.subheadline.weight(.semibold))
+                    .tint(ATHLTHArenaV3Style.gold)
                 }
                 if !settings.environmentsCanPublish(activities: activities) {
                     Text("Kan lagres som mal. Publisering av disse miljøkravene er sperret inntil serveren kan kontrollere dem.")
@@ -213,7 +230,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
 
             VStack(alignment: .leading, spacing: 13) {
                 Text("Svarfrist for invitasjoner")
-                    .font(.system(size: 21, design: .serif))
+                    .font(.system(size: 21, weight: .regular, design: .serif))
                 Stepper("Svarfrist: \(settings.invitationDays) dager",
                         value: $settings.invitationDays, in: 1...30)
                     .font(.subheadline.weight(.semibold))
@@ -321,6 +338,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
             .padding(15)
             .background(ATHLTHArenaV3Style.panel())
         }
+        .foregroundStyle(ATHLTHArenaV3Style.ink)
+        .font(.subheadline)
+        .tint(ATHLTHArenaV3Style.gold)
         .onChange(of: settings.startMode) { _, value in
             if value == .scheduled && settings.startsAt == nil {
                 settings.startsAt = Date().addingTimeInterval(86_400)
