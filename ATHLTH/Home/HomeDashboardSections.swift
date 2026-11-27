@@ -3517,16 +3517,24 @@ private struct HomeWeeklyProgressDaySheet: View {
     // exhaust the main-thread stack before the first frame is displayed.
     var body: some View {
         NavigationStack(path: $completedWorkoutPath) {
-            supplementalLoading(plannedWorkoutPresentation(cancellationPresentation(
-                timePresentation(movePresentation(standaloneTrackingPresentation(
-                    planTrackingPresentation(invitationPresentation(suggestionPresentation(
-                        libraryPresentation(coachPresentation(sceneRecovery(
-                            removalPresentation(dayNavigation)
-                        )))
-                    )))
-                )))
-            )))
+            dayPresentationContent
         }
+    }
+
+    private var dayPresentationContent: AnyView {
+        let removal = removalPresentation(dayNavigation)
+        let recovery = sceneRecovery(removal)
+        let coach = coachPresentation(recovery)
+        let library = libraryPresentation(coach)
+        let suggestion = suggestionPresentation(library)
+        let invitation = invitationPresentation(suggestion)
+        let planTracking = planTrackingPresentation(invitation)
+        let standaloneTracking = standaloneTrackingPresentation(planTracking)
+        let move = movePresentation(standaloneTracking)
+        let time = timePresentation(move)
+        let cancellation = cancellationPresentation(time)
+        let planned = plannedWorkoutPresentation(cancellation)
+        return supplementalLoading(planned)
     }
 
     private var dayNavigation: AnyView {
