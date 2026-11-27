@@ -203,22 +203,28 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 Button {
                     showingMeetingPoint = true
                 } label: {
-                    HStack {
-                        Image(systemName: "mappin.and.ellipse")
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(settings.meetingPlace.isEmpty
-                                 ? "Legg til møtepunkt (valgfritt)"
-                                 : settings.meetingPlace)
-                                .font(.subheadline.weight(.semibold))
-                            Text("Søk i kart eller skriv adresse")
-                                .font(.caption)
+                    Group {
+                        if settings.hasMeetingPoint {
+                            ATHLTHCompetitionMeetingPointPreview(settings: settings, editable: true)
+                        } else {
+                            HStack(spacing: 10) {
+                                Image(systemName: "mappin.and.ellipse")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Legg til møtepunkt (valgfritt)")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Søk i kart eller skriv adresse")
+                                        .font(.caption)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
                     }
-                    .foregroundStyle(ATHLTHArenaV3Style.gold)
                     .padding(13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
