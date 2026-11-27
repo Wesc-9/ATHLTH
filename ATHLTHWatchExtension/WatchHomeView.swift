@@ -285,7 +285,8 @@ struct WatchHomeView: View {
     private func recipeRow(_ recipe: WatchPreparedWorkoutTransfer) -> some View {
         let ready = (recipe.routeID == nil || recipe.routeID.flatMap { routeStore.route(with: $0) } != nil)
             && routeStore.automaticStartCountdownSeconds == nil && workoutManager.canAcceptPreparedWorkout()
-        return Button { launch(recipe) } label: {
+        return VStack(spacing: 3) {
+        Button { launch(recipe) } label: {
             HStack(spacing: 8) {
                 Image(systemName: recipe.kind.systemImage).foregroundStyle(WatchTheme.planAccent)
                 VStack(alignment: .leading, spacing: 3) {
@@ -296,6 +297,16 @@ struct WatchHomeView: View {
                 Image(systemName: ready ? "play.circle.fill" : "arrow.triangle.2.circlepath")
             }.padding(9).watchSurface(radius: 12)
         }.buttonStyle(.plain).disabled(!ready).opacity(ready ? 1 : 0.6)
+            if ATHLTHWorkoutKitExportPolicy.canExport(recipe) {
+                WatchWorkoutKitExportButton(recipe: recipe, canOpen: {
+                    routeStore.companionAccountID != nil &&
+                    (recipe.ownerID == nil || recipe.ownerID == routeStore.companionAccountID) &&
+                    routeStore.automaticStartCountdownSeconds == nil &&
+                    workoutManager.canAcceptPreparedWorkout() &&
+                    workoutManager.companionWorkoutActivity?.isActive != true
+                })
+            }
+        }
     }
 
     private func page<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -479,6 +490,18 @@ struct WatchHomeView: View {
                 empty(tr("Open ATHLTH on your paired iPhone to finish account setup and sync. Once linked, you can train without your iPhone nearby.", "Åpne ATHLTH på den sammenkoblede iPhonen for å fullføre kontooppsett og synkronisering. Når kontoen er tilkoblet, kan du trene uten telefonen i nærheten."))
             } else {
                 empty(routeStore.companionLinked ? tr("iPhone connected", "iPhone tilkoblet") : tr("Your workouts are saved locally and queued for sync when iPhone is available.", "Øktene lagres lokalt og synkroniseres når iPhone er tilgjengelig."))
+            }
+            NavigationLink {
+                page(tr("Training sensors", "Treningssensorer")) {
+                    Label(tr("Bluetooth heart-rate belt", "Bluetooth-pulsbelte"), systemImage: "heart.text.square")
+                        .font(.headline)
+                    empty(tr("Pair a compatible belt in Apple Watch Settings → Bluetooth. HealthKit supplies the measured heart rate during the workout; ATHLTH does not create a second connection.", "Koble til et kompatibelt pulsbelte i Innstillinger → Bluetooth på Apple Watch. HealthKit leverer målt puls under økten. ATHLTH oppretter ikke en ekstra tilkobling."))
+                    empty(tr("During training, the pulse page shows the latest valid measurement. This does not verify which physical sensor produced it.", "Under trening viser pulssiden siste gyldige måling. Dette bekrefter ikke hvilken fysisk sensor målingen kommer fra."))
+                    empty(tr("Other sensors and gym equipment require compatible hardware and separate integration.", "Andre sensorer og treningsapparater krever kompatibelt utstyr og egen integrasjon."))
+                }
+            } label: {
+                Label(tr("Training sensors", "Treningssensorer"), systemImage: "sensor.tag.radiowaves.forward")
+                    .font(.caption)
             }
             if let message = workoutManager.errorMessage { empty(message) }
             Button { routeStore.requestTodayWorkoutSnapshot() } label: {

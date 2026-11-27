@@ -27,6 +27,18 @@ struct AppleWatchConnectionView: View {
                     statusRow("checkmark.shield", tr("Last verified", "Sist verifisert"), verificationText)
                 }
             }
+            ATHLTHSettingsGroup(title: tr("Training sensors", "Treningssensorer")) {
+                PremiumSettingsCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(tr("External heart rate", "Ekstern pulsmåling"), systemImage: "heart.text.square")
+                            .font(.subheadline.weight(.semibold))
+                        Text(tr("Pair a compatible Bluetooth heart-rate belt in Settings → Bluetooth on your Apple Watch. Apple Health handles measurements during your workout. ATHLTH uses the existing HealthKit pulse stream.", "Koble til et kompatibelt Bluetooth-pulsbelte i Innstillinger → Bluetooth på Apple Watch. Apple Helse håndterer målingene under økten. ATHLTH bruker den eksisterende pulsstrømmen fra HealthKit."))
+                            .font(.footnote).foregroundStyle(ATHLTHTheme.mutedText)
+                        Text(tr("This screen does not confirm an external sensor is connected.", "Denne visningen bekrefter ikke at en ekstern sensor er tilkoblet."))
+                            .font(.caption).foregroundStyle(ATHLTHTheme.mutedText)
+                    }.padding(12)
+                }
+            }
 
         }
         .task { watchConnection.connect() }
