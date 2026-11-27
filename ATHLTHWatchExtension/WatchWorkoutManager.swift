@@ -5522,14 +5522,25 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 }
                 self.updateLocationPowerPolicy()
 
-                self.evaluateIndoorSuggestion(now: Date())
-                self.evaluateCriticalCountToStrengthRest()
-                self.evaluateCriticalStrengthGroupCountdown()
-                self.evaluateCriticalRunningRecoveryCountdown()
-                self.announceStrengthEMOMMinuteIfDue(now: Date())
-                self.recordRunningMinuteIfDue()
-                self.advanceEmbeddedHybridIntervalIfNeeded(at: Date())
-                self.evaluateStructuredRunningWorkout()
+                // Preserve the one-second deadline clock, but do not run
+                // unrelated strength, running or coach work for every sport.
+                let now = Date()
+                if self.kind == .running {
+                    self.evaluateIndoorSuggestion(now: now)
+                }
+                if self.kind == .strength {
+                    self.evaluateCriticalCountToStrengthRest()
+                    self.evaluateCriticalStrengthGroupCountdown()
+                    self.announceStrengthEMOMMinuteIfDue(now: now)
+                    self.advanceEmbeddedHybridIntervalIfNeeded(at: now)
+                }
+                if self.kind == .running || self.kind == .walking {
+                    self.evaluateCriticalRunningRecoveryCountdown()
+                    self.recordRunningMinuteIfDue()
+                    self.evaluateStructuredRunningWorkout()
+                }
+                // Target and coach functions retain their own gating and
+                // time-based triggers, including during hybrid workouts.
                 self.evaluateWorkoutTargetAlerts()
                 self.evaluateMeasuredHeartRateZoneCoach()
                 self.evaluateFuelAudioCoach()
@@ -9481,51 +9492,66 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
     }
 
+    private let completedResultOutboxKey = "athlth.watch.completedResultOutbox.v1"
+
+    private func pendingCompletedResults() -> [WatchWorkoutResult] {
+        guard let data = UserDefaults.standard.data(forKey: completedResultOutboxKey),
+              let results = try? JSONDecoder().decode([WatchWorkoutResult].self, from: data)
+        else { return [] }
+        return results
+    }
+
+    private func persistCompletedResults(_ results: [WatchWorkoutResult]) {
+        guard let data = try? JSONEncoder().encode(results) else { return }
+        UserDefaults.standard.set(data, forKey: completedResultOutboxKey)
+    }
+
     private func sendToPhone(_ result: WatchWorkoutResult) {
-        guard
-            WCSession.isSupported(),
-            let data = try? JSONEncoder().encode(result)
-        else {
-            return
-        }
+        // A Watch installed without an ATHLTH account records to Apple Health
+        // only. Never silently assign that result to a subsequently linked user.
+        guard result.accountOwnerID != nil else { return }
+        let existing = pendingCompletedResults()
+        let updated = ATHLTHWatchCompletedResultOutbox.enqueue(result, into: existing)
+        persistCompletedResults(updated)
+        replayCompletedResults()
+    }
 
-        let payload: [String: Any] = [
-            WatchTransferMetadataKey.kind:
-                WatchTransferKind.workoutResult.rawValue,
-            WatchTransferMetadataKey.payload:
-                data,
-            WatchTransferMetadataKey.sentAt:
-                Date().timeIntervalSince1970
-        ]
-
+    /// WCSession can be inactive or lack a companion installation entirely.
+    /// Keep the result on disk until the transport confirms delivery.
+    func replayCompletedResults() {
+        guard WCSession.isSupported() else { return }
         let session = WCSession.default
-
-        // Keep a durable copy even when the iPhone is currently
-        // reachable. HealthKit finalization can outlive the foreground
-        // connection by several seconds, so relying on sendMessage alone can
-        // lose the completion handshake when reachability changes at the
-        // wrong moment. The iPhone de-duplicates results by result.id.
-        session.transferUserInfo(
-            payload
+        guard session.activationState == .activated,
+              session.isCompanionAppInstalled else { return }
+        let queuedIDs = Set(session.outstandingUserInfoTransfers.compactMap { transfer -> UUID? in
+            guard transfer.userInfo[WatchTransferMetadataKey.kind] as? String == WatchTransferKind.workoutResult.rawValue,
+                  let data = transfer.userInfo[WatchTransferMetadataKey.payload] as? Data else { return nil }
+            return (try? JSONDecoder().decode(WatchWorkoutResult.self, from: data))?.id
+        })
+        let eligible = ATHLTHWatchCompletedResultOutbox.eligible(
+            pendingCompletedResults(),
+            linkedOwner: WatchRouteStore.shared.companionAccountID,
+            queuedIDs: queuedIDs
         )
-
-        if session.activationState == .activated,
-           session.isReachable {
-            session.sendMessage(
-                payload,
-                replyHandler: nil,
-                errorHandler: nil
-            )
+        for result in eligible {
+            guard let data = try? JSONEncoder().encode(result) else { continue }
+            let payload: [String: Any] = [
+                WatchTransferMetadataKey.kind: WatchTransferKind.workoutResult.rawValue,
+                WatchTransferMetadataKey.payload: data,
+                WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
+            ]
+            session.transferUserInfo(payload)
+            if session.isReachable {
+                session.sendMessage(payload, replyHandler: nil, errorHandler: nil)
+            }
         }
     }
 
-    nonisolated private static func makeWorkoutResultFallbackHandler(
-        payload: [String: Any]
-    ) -> (Error) -> Void {
-        { _ in
-            WCSession.default
-                .transferUserInfo(payload)
-        }
+    func completedResultTransferDidFinish(id: UUID, succeeded: Bool) {
+        guard succeeded else { return } // retained for the next activation/reconnect
+        persistCompletedResults(ATHLTHWatchCompletedResultOutbox.acknowledge(
+            id, in: pendingCompletedResults()
+        ))
     }
 
     private func sendLiveSnapshot(

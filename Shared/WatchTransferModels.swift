@@ -2303,6 +2303,29 @@ enum ATHLTHWatchWorkoutOwnershipPolicy {
     }
 }
 
+/// Durable Watch-side result delivery. Account and HealthKit identities
+/// remain immutable across retries, logout and later companion installation.
+enum ATHLTHWatchCompletedResultOutbox {
+    static func enqueue(_ result: WatchWorkoutResult, into pending: [WatchWorkoutResult]) -> [WatchWorkoutResult] {
+        guard result.accountOwnerID != nil,
+              ATHLTHWatchWorkoutResultIdentity.shouldEnqueue(
+                result, handledReceiptIDs: [], handledOriginalIDs: [], pending: pending
+              ) else { return pending }
+        return pending + [result]
+    }
+
+    static func eligible(_ pending: [WatchWorkoutResult], linkedOwner: UUID?, queuedIDs: Set<UUID>) -> [WatchWorkoutResult] {
+        pending.filter {
+            ATHLTHWatchWorkoutOwnershipPolicy.canApply(resultOwnerID: $0.accountOwnerID, signedInUserID: linkedOwner)
+                && !queuedIDs.contains($0.id)
+        }
+    }
+
+    static func acknowledge(_ id: UUID, in pending: [WatchWorkoutResult]) -> [WatchWorkoutResult] {
+        pending.filter { $0.id != id }
+    }
+}
+
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
     case preparing
     case running

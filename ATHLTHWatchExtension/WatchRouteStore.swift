@@ -173,6 +173,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         companionAccountID = transfer.ownerID
         latestCompanionAccountUpdatedAt = transfer.updatedAt
         publishWatchFaceForm()
+        WatchWorkoutManager.shared.replayCompletedResults()
         if let data = try? JSONEncoder().encode(transfer) {
             UserDefaults.standard.set(data, forKey: accountIdentityDefaultsKey)
         }
@@ -674,6 +675,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
     // Keep transport internals private, but expose this idempotent request.
     func requestTodayWorkoutSnapshot() {
         guard WCSession.isSupported(),
+              WCSession.default.isCompanionAppInstalled,
               WCSession.default.activationState == .activated
         else {
             return
@@ -1108,6 +1110,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 .syncWorkoutActivityStateToPhone()
             WatchWorkoutManager.shared
                 .replayRelayCompletionProofs(durable: false)
+            WatchWorkoutManager.shared.replayCompletedResults()
         } else if activated {
             companionLinked = false
             // WCSession reachability is false when the companion iPhone
@@ -1408,7 +1411,9 @@ extension WatchRouteStore:
                 receive(context)
             }
             Task { @MainActor [weak self] in
-                WCSession.default.transferUserInfo(Self.connectivityAck(probeID: "watch-launch"))
+                if WCSession.default.isCompanionAppInstalled {
+                    WCSession.default.transferUserInfo(Self.connectivityAck(probeID: "watch-launch"))
+                }
                 self?.requestTodayWorkoutSnapshot()
                 self?.requestSpotifyPlaybackState()
                 WatchWorkoutManager.shared
@@ -1416,6 +1421,7 @@ extension WatchRouteStore:
                 // Requeue tiny completion proofs if Watch terminated after
                 // saving HealthKit but before the iPhone received the result.
                 WatchWorkoutManager.shared.replayRelayCompletionProofs()
+                WatchWorkoutManager.shared.replayCompletedResults()
             }
         }
     }
@@ -1439,6 +1445,23 @@ extension WatchRouteStore:
             message,
             replyHandler: replyHandler
         )
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didFinish userInfoTransfer: WCSessionUserInfoTransfer,
+        error: Error?
+    ) {
+        let payload = userInfoTransfer.userInfo
+        guard payload[WatchTransferMetadataKey.kind] as? String == WatchTransferKind.workoutResult.rawValue,
+              let data = payload[WatchTransferMetadataKey.payload] as? Data,
+              let result = try? JSONDecoder().decode(WatchWorkoutResult.self, from: data)
+        else { return }
+        let id = result.id
+        let succeeded = error == nil
+        Task { @MainActor in
+            WatchWorkoutManager.shared.completedResultTransferDidFinish(id: id, succeeded: succeeded)
+        }
     }
 
     nonisolated func session(

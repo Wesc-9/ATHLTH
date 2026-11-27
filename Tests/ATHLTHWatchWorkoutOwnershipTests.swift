@@ -15,6 +15,22 @@ final class ATHLTHWatchWorkoutOwnershipTests: XCTestCase {
         )
     }
 
+    func testStandaloneOutboxNeverReassignsGuestOrOtherAccount() {
+        let owner = UUID(), other = UUID()
+        let guest = completedResult()
+        XCTAssertTrue(ATHLTHWatchCompletedResultOutbox.enqueue(guest, into: []).isEmpty)
+        var result = completedResult()
+        result.accountOwnerID = owner
+        let pending = ATHLTHWatchCompletedResultOutbox.enqueue(result, into: [])
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertEqual(ATHLTHWatchCompletedResultOutbox.enqueue(result, into: pending).count, 1)
+        XCTAssertTrue(ATHLTHWatchCompletedResultOutbox.eligible(pending, linkedOwner: other, queuedIDs: []).isEmpty)
+        XCTAssertTrue(ATHLTHWatchCompletedResultOutbox.eligible(pending, linkedOwner: nil, queuedIDs: []).isEmpty)
+        XCTAssertTrue(ATHLTHWatchCompletedResultOutbox.eligible(pending, linkedOwner: owner, queuedIDs: [result.id]).isEmpty)
+        XCTAssertEqual(ATHLTHWatchCompletedResultOutbox.eligible(pending, linkedOwner: owner, queuedIDs: []), pending)
+        XCTAssertTrue(ATHLTHWatchCompletedResultOutbox.acknowledge(result.id, in: pending).isEmpty)
+    }
+
     func testMatchingSignedInOwnerAcceptsDelayedWatchResult() {
         let owner = UUID()
         XCTAssertTrue(ATHLTHWatchWorkoutOwnershipPolicy.canApply(

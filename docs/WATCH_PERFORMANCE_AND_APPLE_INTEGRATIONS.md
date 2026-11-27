@@ -15,3 +15,8 @@
 - Instrument SwiftUI view invalidation and the per-second manager loop before larger event-driven refactoring; do not change workout deadlines without device regressions.
 - Inspect full independence separately: current app depends on phone provisioning/ownership and transfer queues; do not flip WKRunsIndependentlyOfCompanionApp without first-run account and identity design.
 - WorkoutKit export is a separate optional interoperability project. Only workouts accurately representable by WorkoutKit should be exported, with explicit user action and duplicate-recording/import protection.
+
+## Standalone follow-up
+- Independent installation enabled in both XcodeGen and Info.plist. Unlinked users can record local HealthKit workouts; ATHLTH account features still require linking via iPhone. Guest results are never silently attached to a later account.
+- Owned results are persisted on Watch before WCSession delivery, retried on activation/reconnection/account link, and removed after transport success. The existing iPhone identity/deduplication policy remains authoritative.
+- Deadline clock remains at one second; unrelated sport-specific work is no longer evaluated for every sport. Device testing and full account-independent sign-in remain outstanding.
