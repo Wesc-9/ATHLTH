@@ -157,3 +157,16 @@ final class ATHLTHLiveZonePolicyTests: XCTestCase {
         XCTAssertEqual(decoded, zones)
     }
 }
+
+
+final class ATHLTHAuthoredHealthKitZoneTests: XCTestCase {
+    func testBoundariesPreserveBelowZoneAndFiveExistingZones() throws {
+        let boundaries = try XCTUnwrap(ATHLTHLiveZonePolicy.authoredBoundaries(maximumBPM: 200))
+        XCTAssertEqual(boundaries, [100, 120, 140, 160, 180])
+        XCTAssertNil(ATHLTHLiveZonePolicy.authoredBoundaries(maximumBPM: nil))
+        XCTAssertNil(ATHLTHLiveZonePolicy.authoredBoundaries(maximumBPM: .nan))
+        XCTAssertEqual(ATHLTHLiveZonePolicy.recordedLabel(index: 0, authored: true), "‹ Z1")
+        XCTAssertEqual(ATHLTHLiveZonePolicy.recordedLabel(index: 5, authored: true), "Z5")
+        XCTAssertEqual(ATHLTHLiveZonePolicy.recordedLabel(index: 0, authored: false), "Z1")
+    }
+}

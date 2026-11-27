@@ -64,6 +64,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         shouldUseAppleLiveZones ? appleLiveHeartRateZones : nil
     }
 
+    /// Apple measures time in zones even for an existing ATHLTH prescription.
+    /// Apply the app's own thresholds before the first sample; never modify
+    /// the athlete's system-wide preferred zones.
+    private func configureAuthoredHealthKitZones(on builder: HKLiveWorkoutBuilder) async {
+        guard #available(watchOS 27.0, *), !shouldUseAppleLiveZones,
+              let boundaries = ATHLTHLiveZonePolicy.authoredBoundaries(
+                  maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+                      audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM),
+              let type = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+        let unit = HKUnit.count().unitDivided(by: .minute())
+        do {
+            let configuration = try HKWorkoutZoneConfiguration(quantityType: type,
+                zoneBoundaries: boundaries.map { HKQuantity(unit: unit, doubleValue: $0) })
+            try await builder.setCustomZoneConfiguration(configuration, for: type)
+        } catch {
+            // HealthKit may not support custom zones on this device.
+            // The original workout targets and recording remain available.
+        }
+    }
+
     private func captureAppleLiveHeartRateZones(from builder: HKLiveWorkoutBuilder) {
         guard #available(watchOS 27.0, *), appleLiveHeartRateZones == nil,
               shouldUseAppleLiveZones,
@@ -4929,6 +4949,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 workoutConfiguration: configuration
             )
 
+            await configureAuthoredHealthKitZones(on: builder)
+            guard pendingWorkoutStartAdmissionID == admittedStartID,
+                  state == .preparing, workoutSession == nil,
+                  !recoveryInProgress, !finishing else { return nil }
+
             // Collect only measured walking/running distance for open sports, without adding a second recorder.
             if configuration.activityType == .play,
                let type = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning) {
@@ -9300,7 +9325,18 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     maximumBPM: item.zone.maximum?.doubleValue(for: unit),
                     durationSeconds: item.duration)
             }
-            result.nativeHeartRateZones = ATHLTHRecordedHeartRateZones.validated(zones)
+            let valid = ATHLTHRecordedHeartRateZones.validated(zones)
+            // Never call an Apple preferred-zone breakdown an ATHLTH one.
+            // App-defined configurations above have six buckets: below Z1 + Z1...Z5.
+            if case .app = group.configuration.source {
+                if valid?.count == 6 {
+                    result.nativeHeartRateZones = valid
+                    result.nativeHeartRateZonesUseATHLTHScale = true
+                }
+            } else {
+                result.nativeHeartRateZones = valid
+                result.nativeHeartRateZonesUseATHLTHScale = false
+            }
         }
         result.isSports = workout.workoutActivityType == .play ? true : nil
         if workout.workoutActivityType == .running {

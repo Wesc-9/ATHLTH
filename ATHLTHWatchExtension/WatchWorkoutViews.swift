@@ -2531,11 +2531,14 @@ struct WatchActiveWorkoutView: View {
                    let valid = ATHLTHRecordedHeartRateZones.validated(zones),
                    valid.contains(where: { $0.durationSeconds > 0 }) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(ATHLTHLocalization.choose(english: "Apple Health heart rate zones", norwegian: "Pulssoner fra Apple Helse"))
+                        Text(result.nativeHeartRateZonesUseATHLTHScale == true
+                            ? ATHLTHLocalization.choose(english: "ATHLTH zones · Apple Health", norwegian: "ATHLTH-soner · Apple Helse")
+                            : ATHLTHLocalization.choose(english: "Apple Health heart rate zones", norwegian: "Pulssoner fra Apple Helse"))
                             .font(.caption.weight(.semibold))
                         ForEach(valid) { zone in
                             HStack {
-                                Text("Z\(zone.index + 1)")
+                                Text(ATHLTHLiveZonePolicy.recordedLabel(index: zone.index,
+                                    authored: result.nativeHeartRateZonesUseATHLTHScale == true))
                                     .font(.caption2.weight(.semibold))
                                 Spacer()
                                 Text(ATHLTHWorkoutSummaryEngine.durationText(zone.durationSeconds))

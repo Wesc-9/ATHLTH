@@ -348,28 +348,66 @@ private struct ATHLTHDailyFormWatchWidget: Widget {
 }
 
 @available(watchOS 26.0, *)
-private struct ATHLTHWatchNavigationControl: ControlWidget {
-    let target: ATHLTHWatchNavigationTarget
-    let name: String
-    let symbol: String
-
-    init() {
-        self.init(target: .today, name: "Dagens økt", symbol: "calendar.badge.clock")
-    }
-
-    init(target: ATHLTHWatchNavigationTarget, name: String, symbol: String) {
-        self.target = target
-        self.name = name
-        self.symbol = symbol
-    }
-
+private struct ATHLTHWatchTodayControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.\(target.rawValue)") {
-            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: target)) {
-                Label(name, systemImage: symbol)
+        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.today") {
+            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: .today)) {
+                Label("Dagens økt", systemImage: "calendar.badge.clock")
             }
         }
-        .displayName("ATHLTH · \(name)")
+        .displayName("ATHLTH · Dagens økt")
+        .description("Åpne valgt visning i ATHLTH.")
+    }
+}
+
+@available(watchOS 26.0, *)
+private struct ATHLTHWatchFormControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.dailyForm") {
+            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: .dailyForm)) {
+                Label("Dagens form", systemImage: "heart.text.square")
+            }
+        }
+        .displayName("ATHLTH · Dagens form")
+        .description("Åpne valgt visning i ATHLTH.")
+    }
+}
+
+@available(watchOS 26.0, *)
+private struct ATHLTHWatchSentControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.sent") {
+            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: .sent)) {
+                Label("Sendt til klokken", systemImage: "applewatch.and.arrow.forward")
+            }
+        }
+        .displayName("ATHLTH · Sendt til klokken")
+        .description("Åpne valgt visning i ATHLTH.")
+    }
+}
+
+@available(watchOS 26.0, *)
+private struct ATHLTHWatchGhostControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.ghost") {
+            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: .ghost)) {
+                Label("Ghost Race", systemImage: "scope")
+            }
+        }
+        .displayName("ATHLTH · Ghost Race")
+        .description("Åpne valgt visning i ATHLTH.")
+    }
+}
+
+@available(watchOS 26.0, *)
+private struct ATHLTHWatchFavoritesControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "com.wesc9.athlth.watch.control.favorites") {
+            ControlWidgetButton(action: ATHLTHWatchNavigationIntent(target: .favorites)) {
+                Label("Favorittøkter", systemImage: "star")
+            }
+        }
+        .displayName("ATHLTH · Favorittøkter")
         .description("Åpne valgt visning i ATHLTH.")
     }
 }
@@ -387,11 +425,11 @@ struct ATHLTHWatchWidgetsBundle: WidgetBundle {
         ATHLTHWatchShortcutWidget(shortcut: .sent)
         ATHLTHDailyFormWatchWidget()
         if #available(watchOS 26.0, *) {
-            ATHLTHWatchNavigationControl(target: .today, name: "Dagens økt", symbol: "calendar.badge.clock")
-            ATHLTHWatchNavigationControl(target: .dailyForm, name: "Dagens form", symbol: "heart.text.square")
-            ATHLTHWatchNavigationControl(target: .sent, name: "Sendt til klokken", symbol: "applewatch.and.arrow.forward")
-            ATHLTHWatchNavigationControl(target: .ghost, name: "Ghost Race", symbol: "scope")
-            ATHLTHWatchNavigationControl(target: .favorites, name: "Favorittøkter", symbol: "star")
+            ATHLTHWatchTodayControl()
+            ATHLTHWatchFormControl()
+            ATHLTHWatchSentControl()
+            ATHLTHWatchGhostControl()
+            ATHLTHWatchFavoritesControl()
         }
     }
 }

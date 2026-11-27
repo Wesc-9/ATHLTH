@@ -444,6 +444,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         if todayWorkout?.workoutID == sessionID {
             todayWorkout = nil
         }
+        publishScheduledWorkoutRelevance()
     }
 
     private func loadTodayWorkout() {

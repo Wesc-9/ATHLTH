@@ -2158,6 +2158,7 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     // Optional so queued results created by older Watch builds still decode.
     var nativeRunningMetrics: ATHLTHNativeRunningMetrics? = nil
     var nativeHeartRateZones: [ATHLTHRecordedHeartRateZone]? = nil
+    var nativeHeartRateZonesUseATHLTHScale: Bool? = nil
     var lapSummaries: [WatchWorkoutLapSummary]? = nil
     var automaticPauseCount: Int? = nil
 

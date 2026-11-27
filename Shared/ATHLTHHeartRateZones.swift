@@ -159,6 +159,19 @@ enum ATHLTHLiveZonePolicy {
         return ATHLTHHeartRateZones.measuredZone(heartRateBPM: bpm, maximumBPM: maximumBPM)
     }
 
+    /// Preserve the existing five-zone scale, with an extra below-Z1
+    /// bucket because HealthKit zones must cover the entire range.
+    static func authoredBoundaries(maximumBPM: Double?) -> [Double]? {
+        guard let maximumBPM, maximumBPM.isFinite,
+              (100...240).contains(maximumBPM) else { return nil }
+        return [0.5, 0.6, 0.7, 0.8, 0.9].map { maximumBPM * $0 }
+    }
+
+    static func recordedLabel(index: Int, authored: Bool) -> String {
+        if authored { return index == 0 ? "‹ Z1" : "Z\(index)" }
+        return "Z\(index + 1)"
+    }
+
     static func zoneNumbers(_ appleZones: [ATHLTHRecordedHeartRateZone]?) -> [Int] {
         appleZones.flatMap(ATHLTHRecordedHeartRateZones.validated)?.map { $0.index + 1 } ?? Array(1...5)
     }
