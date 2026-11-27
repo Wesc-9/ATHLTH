@@ -3431,12 +3431,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    /// A non-binding suggestion shared by setup and the dated day editor.
+    /// Keep the first week's chosen rhythm; alternate by one weekday when
+    /// variation is enabled. Never create, remove or overwrite an actual edit.
+    private func isSuggestedTrainingDay(_ weekday: Int, week: Int) -> Bool {
+        let shift = varyWeekdays && week % 2 == 1 ? 1 : 0
+        let originalWeekday = (weekday - 1 - shift + 7) % 7 + 1
+        return selectedDays.contains(originalWeekday)
+    }
+
     private var scheduleWeekPreview: some View {
         builderPanel {
             VStack(alignment: .leading, spacing: 14) {
                 Label(ATHLTHLocalization.choose(english: "Your training weeks", norwegian: "Treningsukene dine"), systemImage: "calendar")
                     .font(.title3.weight(.semibold))
-                Text(ATHLTHLocalization.choose(english: "Preview · selected training days and recovery", norwegian: "Forhåndsvisning · valgte treningsdager og hvile"))
+                Text(ATHLTHLocalization.choose(english: "Suggested training and rest days · can be adjusted", norwegian: "Forslag til trenings- og hviledager · kan tilpasses"))
                     .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
                 ForEach(0..<weekCount, id: \.self) { week in
                     VStack(alignment: .leading, spacing: 8) {
@@ -3448,7 +3457,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             ForEach(0..<7, id: \.self) { index in
                                 let date = calendarDate(for: week, offset: index)
                                 let weekday = (Calendar.current.component(.weekday, from: date) + 5) % 7 + 1
-                                let training = selectedDays.contains(weekday)
+                                let training = isSuggestedTrainingDay(weekday, week: week)
                                 VStack(spacing: 6) {
                                     Text(date.formatted(.dateTime.weekday(.abbreviated)))
                                     Image(systemName: training ? "figure.strengthtraining.traditional" : "moon.stars")
@@ -3483,6 +3492,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 let position = guidedCurrentWeek * 7 + index
                 let date = Calendar.current.date(byAdding: .day, value: position, to: startDate) ?? startDate
                 let edit = weekDayEdits[guidedDateKey(at: position)]
+                let weekday = (Calendar.current.component(.weekday, from: date) + 5) % 7 + 1
+                let suggestedTraining = isSuggestedTrainingDay(weekday, week: guidedCurrentWeek)
+                let isPlanned = ATHLTHGuidedPlanDayPolicy.isPlanned(edit)
+                let isRest = edit?.isRestDay == true
                 Button {
                     guidedWeekAwaitingDecision = nil
                     guidedDayCursor = position
@@ -3493,9 +3506,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .font(.subheadline.weight(.semibold))
                             Text(date.formatted(.dateTime.day().month()))
                                 .font(.caption)
+                            Text(ATHLTHLocalization.choose(
+                                english: isPlanned ? (isRest ? "Rest day" : "Workout planned") :
+                                    (suggestedTraining ? "Suggested training" : "Suggested rest"),
+                                norwegian: isPlanned ? (isRest ? "Hviledag" : "Økt planlagt") :
+                                    (suggestedTraining ? "Foreslått trening" : "Foreslått hvile")
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(isPlanned || suggestedTraining
+                                ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary)
                         }
                         Spacer()
-                        Image(systemName: edit?.isRestDay == true ? "moon.stars" : edit?.detailedWorkout?.kind.systemImage ?? "circle.dotted")
+                        Image(systemName: isRest ? "moon.stars.fill" :
+                            edit?.detailedWorkout?.kind.systemImage ??
+                                (suggestedTraining ? "figure.run" : "moon.stars"))
+                            .foregroundStyle(isPlanned || suggestedTraining
+                                ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary)
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -3820,6 +3846,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             isRestDay: weekDayEdits[
                 weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
             ]?.isRestDay == true,
+            suggestedTraining: isSuggestedTrainingDay(guidedCurrentWeekday, week: guidedCurrentWeek),
             onSelectDay: { absoluteDay in
                 // The grouped menu spans all plan weeks, not just this week.
                 guidedDayCursor = min(max(0, absoluteDay), weekCount * 7 - 1)
