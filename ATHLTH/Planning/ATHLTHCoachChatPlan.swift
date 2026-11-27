@@ -83,7 +83,7 @@ struct ATHLTHCoachChatPlanDraft: Codable, Hashable, Identifiable {
 /// Build with existing curated executable workouts, never model-invented
 /// exercise identifiers. No plan is saved until the existing store accepts it.
 enum ATHLTHCoachChatPlanFactory {
-    static func makeDraft(_ intake: ATHLTHCoachChatPlanIntake, calendar: Calendar = .current) -> ATHLTHCoachChatPlanDraft? {
+    static func makeDraft(_ intake: ATHLTHCoachChatPlanIntake, calendar: Calendar = .current, library: [ExerciseLibraryEntry]? = nil) -> ATHLTHCoachChatPlanDraft? {
         guard intake.isValid else { return nil }
         let slug: String
         switch intake.goal {
@@ -141,6 +141,10 @@ enum ATHLTHCoachChatPlanFactory {
                         workout.notes = (workout.notes ?? "") + "\n" + ATHLTHLocalization.choose(
                             english: "Bodyweight session; focus on controlled lower-body movements.",
                             norwegian: "Kroppsvektøkt; fokuser på kontrollerte beinøvelser.")
+                    }
+                    if let library {
+                        guard ATHLTHWorkoutExerciseBinding.bind(&workout, library: library).isReady,
+                              ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(workout, library: library) else { return nil }
                     }
                     workouts = [AIProgramDraftSession(title: workout.title, kind: workout.kind.rawValue,
                         durationMinutes: workout.durationMinutes, targetDistanceKilometers: workout.targetDistanceKilometers,

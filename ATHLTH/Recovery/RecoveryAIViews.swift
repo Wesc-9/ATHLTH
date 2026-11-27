@@ -1014,6 +1014,7 @@ struct RecoveryCoachView: View {
         AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     let context: RecoveryAIContext
     let insight: RecoveryAIInsight
@@ -1037,6 +1038,7 @@ struct RecoveryCoachView: View {
     @State private var proposalActionNotice: String?
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var selectedChatPlan: ATHLTHCoachChatPlanDraft?
+    @State private var selectedChatWorkout: ATHLTHCoachChatWorkoutDraft?
     @State private var showingCoachWorkoutBuilder = false
     @State private var showingCoachPlanBuilder = false
     @State private var activeQuickWizard: ATHLTHCoachQuickAction?
@@ -1314,8 +1316,21 @@ struct RecoveryCoachView: View {
             progressScopeForNextQuestion = nil
             selectedCoachProposal = nil
             selectedChatPlan = nil
+            selectedChatWorkout = nil
             loadConversationIfNeeded()
             loadCoachConsent()
+        }
+        .sheet(item: $selectedChatWorkout.keepingPresentedItemWhenInactive(scenePhase)) { draft in
+            ATHLTHCoachChatWorkoutPreview(draft: draft, ownerID: session.profile.userID) {
+                guard session.signedIn, conversationOwnerID == session.profile.userID else { return }
+                for index in messages.indices {
+                    if let item = messages[index].workoutDrafts?.firstIndex(where: { $0.id == draft.id }) {
+                        messages[index].workoutDrafts?[item].used = true
+                    }
+                }
+                persistConversation()
+                selectedChatWorkout = nil
+            }
         }
         .sheet(item: $selectedChatPlan.keepingPresentedItemWhenInactive(scenePhase)) { draft in
             ATHLTHCoachChatPlanPreview(draft: draft, ownerID: session.profile.userID) {
@@ -2345,6 +2360,8 @@ struct RecoveryCoachView: View {
                 onSelect: { action in
                     if action == .createPlan {
                         requestAnswer(recoveryAIText("Create a training plan for me", "Lag en treningsplan til meg"))
+                    } else if action == .createWorkout {
+                        requestAnswer(recoveryAIText("Plan a workout for me today", "Planlegg en treningsøkt for meg i dag"))
                     } else { activeQuickWizard = action }
                 },
                 isDisabled: isAsking
@@ -2565,6 +2582,12 @@ struct RecoveryCoachView: View {
     private func coachMessageBubble(
         _ message: RecoveryCoachMessage
     ) -> some View {
+        if message.planIntake?.submitted == true || message.workoutIntake?.submitted == true {
+            Text(recoveryAIText("Form submitted", "Skjema sendt"))
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 36)
+        } else {
         HStack(alignment: .bottom) {
             if message.role == .user {
                 Spacer(
@@ -2700,6 +2723,23 @@ struct RecoveryCoachView: View {
                         }
                     )
                 }
+                if let intake = message.workoutIntake, message.role == .assistant {
+                    ATHLTHCoachChatWorkoutIntakeCard(intake: intake, onChange: { updated in
+                        guard session.signedIn, conversationOwnerID == session.profile.userID,
+                              let index = messages.firstIndex(where: { $0.id == message.id }) else { return }
+                        messages[index].workoutIntake = updated
+                        persistConversation()
+                    }, onGenerate: { confirmed in
+                        generateChatWorkout(confirmed, messageID: message.id)
+                    })
+                }
+                if let drafts = message.workoutDrafts, message.role == .assistant {
+                    ForEach(drafts) { draft in
+                        Button { selectedChatWorkout = draft } label: {
+                            ATHLTHCoachChatWorkoutCard(draft: draft)
+                        }.buttonStyle(.plain)
+                    }
+                }
                 if let draft = message.chatPlanDraft, message.role == .assistant {
                     Button {
                         selectedChatPlan = draft
@@ -2767,6 +2807,7 @@ struct RecoveryCoachView: View {
         .frame(
             maxWidth: .infinity
         )
+        }
     }
 
     @MainActor
@@ -2840,14 +2881,6 @@ struct RecoveryCoachView: View {
     ) {
         let clean = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, !isAsking else { return }
-
-        if !reviewedWorkout &&
-           !ATHLTHCoachChatPlanIntake.isCreationRequest(clean) &&
-           ATHLTHCoachWorkoutCreationIntent.isRequest(clean) {
-            pendingWorkoutCreationPrompt = clean
-            showingCoachWorkoutProfileReview = true
-            return
-        }
 
         guard aiConsentApproved,
               RecoveryCoachConsentPreferences.load(
@@ -2955,6 +2988,15 @@ struct RecoveryCoachView: View {
                 persistConversation()
                 return
             }
+            if ATHLTHCoachChatWorkoutIntake.isRequest(clean) {
+                let intake = ATHLTHCoachChatWorkoutIntake.prefilled(from: clean)
+                messages.append(RecoveryCoachMessage(role: .assistant,
+                    text: recoveryAIText("Confirm the workout details. I'll use your available library exercises.",
+                                         "Bekreft øktdetaljene. Jeg bruker øvelsene som finnes i biblioteket ditt."),
+                    workoutIntake: intake))
+                persistConversation()
+                return
+            }
             // An explicit command to change an existing plan uses the real
             // plan-diff generator, not an ungrounded chat suggestion.
             if ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
@@ -3046,7 +3088,7 @@ struct RecoveryCoachView: View {
         guard session.signedIn, conversationOwnerID == session.profile.userID,
               aiConsentApproved, let index = messages.firstIndex(where: { $0.id == messageID }),
               messages[index].planIntake?.submitted == false else { return }
-        guard let draft = ATHLTHCoachChatPlanFactory.makeDraft(intake) else {
+        guard let draft = ATHLTHCoachChatPlanFactory.makeDraft(intake, library: exerciseLibrary.selectableExercises) else {
             errorMessage = recoveryAIText("Check the plan choices. No plan was created.", "Kontroller planvalgene. Ingen plan ble opprettet.")
             return
         }
@@ -3057,6 +3099,28 @@ struct RecoveryCoachView: View {
             text: recoveryAIText("Your draft is ready. Open it to review the workouts and choose whether to use it.",
                                  "Planutkastet er klart. Åpne det for å gjennomgå øktene og velge om du vil bruke planen."),
             chatPlanDraft: draft))
+        persistConversation()
+    }
+
+    @MainActor
+    private func generateChatWorkout(_ intake: ATHLTHCoachChatWorkoutIntake, messageID: UUID) {
+        guard session.signedIn, conversationOwnerID == session.profile.userID, aiConsentApproved,
+              let index = messages.firstIndex(where: { $0.id == messageID }),
+              messages[index].workoutIntake?.submitted == false else { return }
+        let drafts = ATHLTHCoachChatWorkoutFactory.makeDrafts(intake, library: exerciseLibrary.selectableExercises)
+        guard drafts.count == intake.alternatives else {
+            errorMessage = recoveryAIText("Not enough distinct suitable library workouts. Change the choices and try again.",
+                "Fant ikke nok forskjellige økter med passende bibliotekøvelser. Juster valgene og prøv igjen.")
+            return
+        }
+        var submitted = intake
+        submitted.submitted = true
+        messages[index].workoutIntake = submitted
+        messages.append(RecoveryCoachMessage(role: .assistant,
+            text: recoveryAIText("Open a workout to review it and choose when to add it.",
+                "Åpne en økt for å se detaljene og velge når du vil legge den til."),
+            workoutDrafts: drafts))
+        errorMessage = nil
         persistConversation()
     }
 

@@ -166,8 +166,8 @@ struct ATHLTHCoachChatPlanPreview: View {
         }
         var plan = draft.program.makeTrainingPlan(ownerID: ownerID, startDate: draft.intake.startDate,
             exerciseLibrary: exerciseLibrary.allExercises)
-        let binding = ATHLTHWorkoutExerciseBinding.bind(&plan, library: exerciseLibrary.allExercises)
-        guard binding.isReady else {
+        let binding = ATHLTHWorkoutExerciseBinding.bind(&plan, library: exerciseLibrary.selectableExercises)
+        guard binding.isReady, plan.weeks.allSatisfy({ week in week.days.allSatisfy { day in day.sessions.allSatisfy { ATHLTHCoachLibraryGate.hasOnlyLibraryReferences($0, library: exerciseLibrary.selectableExercises) } } }) else {
             error = planText("Unresolved library exercises: ", "Øvelser som må kobles til biblioteket: ") + binding.unresolved.prefix(6).joined(separator: ", ")
             return
         }
