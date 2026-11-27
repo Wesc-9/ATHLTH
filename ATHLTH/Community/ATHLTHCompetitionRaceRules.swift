@@ -136,7 +136,10 @@ enum ATHLTHCompetitionMeasure: String, Codable, CaseIterable, Identifiable {
         case .routeClosestTime: "Nærmest avtalt sluttid"
         }
     }
-    var lowerIsBetter: Bool { [.fastestDistance, .fastestReps, .sprint, .routeTime].contains(self) }
+    /// Closest-target measures return absolute deviation, not the raw pace/time.
+    var lowerIsBetter: Bool {
+        [.fastestDistance, .fastestReps, .sprint, .routeTime, .closestPace, .routeClosestTime].contains(self)
+    }
     var needsReps: Bool { [.heaviestForReps, .fastestReps].contains(self) }
     var needsWeight: Bool { self == .repsAtWeight }
     var needsDistance: Bool { [.fastestDistance, .closestPace, .sprint].contains(self) }
@@ -194,6 +197,66 @@ struct ATHLTHCompetitionMeasureDraft: Codable, Hashable, Identifiable {
         return (activity == .running || activity == .walking) && libraryID == nil && routeID == nil &&
             ATHLTHCompetitionMeasure.cardio.contains(measure) &&
             (activity == .running || measure != .sprint)
+    }
+}
+
+/// Pure strength measurement primitives. The caller must supply completed,
+/// consecutive sets from the exact library exercise; no planned values or
+/// incomplete attempts may be substituted for recorded measurements.
+/// This does not establish server verification or submit a competition score.
+enum ATHLTHCompetitionMeasureCalculator {
+    struct CompletedSet: Equatable {
+        let repetitions: Int
+        let kilograms: Double?
+        let holdSeconds: Double?
+
+        var isValid: Bool {
+            (0...100_000).contains(repetitions) &&
+                (kilograms.map { $0.isFinite && (0...1_000).contains($0) } ?? true) &&
+                (holdSeconds.map { $0.isFinite && (0...86_400).contains($0) } ?? true)
+        }
+    }
+
+    static func strength(_ rule: ATHLTHCompetitionMeasureDraft, libraryID: UUID,
+                         sets: [CompletedSet], bodyMassKG: Double? = nil) -> Double? {
+        guard rule.isValid, rule.libraryID == libraryID, !sets.isEmpty,
+              sets.allSatisfy(\.isValid) else { return nil }
+        let performed = sets.filter { $0.repetitions > 0 }
+        let result: Double?
+        switch rule.measure {
+        case .heaviest, .heaviestForReps:
+            let required = rule.measure == .heaviest ? 1 : rule.repetitions
+            result = performed.filter { $0.repetitions >= required }.compactMap(\.kilograms).max()
+        case .mostReps:
+            result = performed.map { Double($0.repetitions) }.max()
+        case .repsAtWeight:
+            result = performed.filter { set in
+                guard let weight = set.kilograms else { return false }
+                return abs(weight - rule.kilograms) <= 0.000_001
+            }.map { Double($0.repetitions) }.max()
+        case .volume:
+            guard !performed.isEmpty, performed.allSatisfy({ $0.kilograms != nil }) else { return nil }
+            result = performed.reduce(0) { $0 + Double($1.repetitions) * ($1.kilograms ?? 0) }
+        case .relativeStrength:
+            guard let mass = bodyMassKG, mass.isFinite, (20...500).contains(mass),
+                  let weight = performed.compactMap(\.kilograms).max() else { return nil }
+            result = weight / mass
+        case .holdTime:
+            result = sets.compactMap(\.holdSeconds).max()
+        default:
+            // Timed rep challenges require timestamped evidence, not aggregate sets.
+            return nil
+        }
+        guard let result, result.isFinite, result > 0 else { return nil }
+        return result
+    }
+
+    /// Chooses from independently valid measured attempts only. Missing
+    /// measurements are not treated as zero or as an automatic win.
+    static func bestAttempt(_ rule: ATHLTHCompetitionMeasureDraft, values: [Double]) -> Double? {
+        guard rule.isValid, !values.isEmpty, values.count <= rule.attempts,
+              values.allSatisfy({ $0.isFinite && $0 >= 0 }) else { return nil }
+        return rule.measure.lowerIsBetter ? values.min() : values.max()
     }
 }
 
