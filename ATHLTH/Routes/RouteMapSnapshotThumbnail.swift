@@ -292,6 +292,54 @@ enum RouteMapSnapshotCache {
         } catch { return nil }
     }
 
+    /// Static point preview shares the route thumbnail cache and render budget.
+    /// The caller supplies an explicitly saved meeting coordinate, never GPS.
+    static func meetingPointImage(latitude: Double, longitude: Double) async -> UIImage? {
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        let requestID = "meeting-point-v1:\(latitude.bitPattern):\(longitude.bitPattern)"
+        if let cached = cachedImage(requestID: requestID) { return cached }
+        if let running = pending[requestID] { return await running.task.value }
+        guard scrollingOwners.isEmpty else { return nil }
+        let token = UUID()
+        let task = Task { await renderMeetingPoint(coordinate, requestID: requestID) }
+        pending[requestID] = PendingRender(token: token, task: task)
+        let result = await task.value
+        if pending[requestID]?.token == token { pending.removeValue(forKey: requestID) }
+        return result
+    }
+
+    private static func renderMeetingPoint(
+        _ coordinate: CLLocationCoordinate2D, requestID: String
+    ) async -> UIImage? {
+        while activeRenders >= 2 {
+            guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
+            try? await Task.sleep(nanoseconds: 70_000_000)
+        }
+        guard !Task.isCancelled, scrollingOwners.isEmpty else { return nil }
+        if let cached = cachedImage(requestID: requestID) { return cached }
+        activeRenders += 1
+        defer { activeRenders -= 1 }
+        let requestedGeneration = generation
+        let options = MKMapSnapshotter.Options()
+        options.region = MKCoordinateRegion(center: coordinate,
+            latitudinalMeters: 650, longitudinalMeters: 1_500)
+        options.size = CGSize(width: 420, height: 168)
+        options.scale = thumbnailScale
+        options.mapType = .standard
+        options.showsBuildings = false
+        options.pointOfInterestFilter = .excludingAll
+        do {
+            let snapshot = try await MKMapSnapshotter(options: options).start()
+            guard !Task.isCancelled, requestedGeneration == generation,
+                  scrollingOwners.isEmpty else { return nil }
+            cacheImage(snapshot.image, key: requestID)
+            return snapshot.image
+        } catch {
+            return nil
+        }
+    }
+
     private static func region(
         for coordinates:
             [CLLocationCoordinate2D]
