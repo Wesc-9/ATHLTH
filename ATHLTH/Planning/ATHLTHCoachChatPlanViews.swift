@@ -25,6 +25,47 @@ struct ATHLTHCoachChatPlanIntakeCard: View {
             Picker(planText("Goal", "Mål"), selection: binding(\.goal)) {
                 ForEach(ATHLTHCoachChatPlanIntake.Goal.allCases, id: \.self) { Text($0.title).tag($0) }
             }
+            if intake.supportsMuscleFocus {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(planText("Muscle groups", "Muskelgrupper"))
+                        .font(.subheadline.weight(.semibold))
+                    Menu {
+                        Button {
+                            var updated = intake
+                            updated.muscleFocus = nil
+                            onChange(updated)
+                        } label: {
+                            Label(planText("General / full body", "Generelt / hele kroppen"),
+                                  systemImage: intake.activeMuscleFocus.isEmpty ? "checkmark.circle.fill" : "circle")
+                        }
+                        ForEach(ATHLTHCoachChatPlanIntake.MuscleFocus.allCases, id: \.self) { group in
+                            Button {
+                                var updated = intake
+                                var selected = intake.muscleFocus ?? []
+                                if selected.contains(group) { selected.remove(group) }
+                                else { selected.insert(group) }
+                                updated.muscleFocus = selected.isEmpty ? nil : selected
+                                onChange(updated)
+                            } label: {
+                                Label(group.title, systemImage: intake.activeMuscleFocus.contains(group)
+                                      ? "checkmark.circle.fill" : "circle")
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(intake.muscleFocusTitle)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption)
+                        }
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .padding(10)
+                        .background(ATHLTHTrainDesign.canvas.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .accessibilityLabel(planText("Muscle groups", "Muskelgrupper"))
+                    .accessibilityValue(intake.muscleFocusTitle)
+                }
+            }
             DatePicker(planText("Start date", "Startdato"), selection: binding(\.startDate), displayedComponents: .date)
             Stepper(planText("Weeks", "Uker") + ": \(intake.weeks)", value: binding(\.weeks), in: 2...12)
             Stepper(planText("Workouts per week", "Økter per uke") + ": \(intake.sessionsPerWeek)", value: binding(\.sessionsPerWeek), in: 2...4)
