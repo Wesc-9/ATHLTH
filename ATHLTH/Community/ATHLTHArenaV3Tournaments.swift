@@ -72,6 +72,43 @@ struct ATHLTHTournamentCreator: View {
     }
     @State private var expandedScoringExample = false
     @State private var rulesScrollID: String?
+    @State private var isReviewing = false
+    private static let reviewCheckpointPrefix = "summary:"
+    private var checkpointScrollID: String? {
+        isReviewing ? Self.reviewCheckpointPrefix + (rulesScrollID ?? "") : rulesScrollID
+    }
+
+    /// Review may include a valid draft with an unsupported measurement.
+    /// Publication still requires all of the stricter server-backed rules.
+    private var canReview: Bool {
+        effectiveTitle.count >= 3 &&
+        ATHLTHTournamentActivity.canCreate(with: allowedActivities) &&
+        (isDuel ? athletes.count == 2 : athletes.count >= (isSingleEvent ? 3 : format == .cup ? 4 : 2)) &&
+        (!usesExplicitExercises || totalExerciseCount > 0) &&
+        !publishing
+    }
+
+    private var reviewHint: String {
+        if effectiveTitle.count < 3 { return "Legg til et navn på konkurransen." }
+        if !ATHLTHTournamentActivity.canCreate(with: allowedActivities) { return "Velg minst én tilgjengelig treningsform." }
+        if isDuel && athletes.count != 2 { return "Velg én motstander." }
+        if athletes.count < (isSingleEvent ? 3 : format == .cup ? 4 : 2) && !isDuel { return "Legg til flere deltakere." }
+        if usesExplicitExercises && totalExerciseCount == 0 { return "Legg til minst én konkurranseøvelse." }
+        return "Fullfør konkurranseoppsettet."
+    }
+
+    private func showReview() {
+        guard canReview else { return }
+        errorMessage = nil
+        isReviewing = true
+        checkpoint()
+    }
+
+    private func returnToRules() {
+        guard !publishing else { return }
+        isReviewing = false
+        checkpoint()
+    }
     @State private var draftID: UUID
     @State private var draftCreatedAt: Date
     @State private var rematchNames: [UUID: String] = [:]
@@ -193,7 +230,12 @@ struct ATHLTHTournamentCreator: View {
         self.onBack = onBack
         self.automaticDuelName = automaticDuelName
         self.onCheckpoint = onCheckpoint
-        _rulesScrollID = State(initialValue: restoredScrollID)
+        let restoringReview = restoredScrollID?.hasPrefix(Self.reviewCheckpointPrefix) == true
+        _isReviewing = State(initialValue: restoringReview)
+        let restoredRule = restoringReview
+            ? String((restoredScrollID ?? "").dropFirst(Self.reviewCheckpointPrefix.count))
+            : restoredScrollID
+        _rulesScrollID = State(initialValue: restoredRule == "" || restoredRule == "review" ? nil : restoredRule)
         _draftID = State(initialValue: continuation?.id ?? UUID())
         _draftCreatedAt = State(initialValue: continuation?.createdAt ?? Date())
         self.onSave = onSave
@@ -346,195 +388,31 @@ struct ATHLTHTournamentCreator: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    if fixedInvitees == nil {
-                        titleSection.id("title")
-                        formatSection.id("format")
-                    }
-                    ATHLTHTournamentRuleConfigurationSection(
-                        activities: Binding(
-                            get: {
-                                fixedActivity.map { Set([$0]) } ?? allowedActivities
-                            },
-                            set: { newValue in
-                                if fixedActivity == nil {
-                                    if usesExplicitExercises && newValue != allowedActivities {
-                                        let removed = Set((competitionSettings.selectedExerciseIDs ?? []).filter {
-                                            guard let activity = exerciseActivities[$0] else { return false }
-                                            return !newValue.contains(activity)
-                                        })
-                                        competitionSettings.selectedExerciseIDs?.removeAll { removed.contains($0) }
-                                        for id in removed {
-                                            competitionSettings.exerciseEnvironments.removeValue(forKey: id)
-                                            competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
-                                            competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
-                                        }
-                                        exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
-                                    }
-                                    competitionSettings.activityEnvironments = competitionSettings.activityEnvironments.filter { key, _ in
-                                         newValue.contains { $0.rawValue == key }
-                                     }
-                                     if !plannedMeasures.isEmpty {
-                                        let kept = plannedMeasures.filter { newValue.contains($0.activity) }
-                                        competitionSettings.race.measureDrafts = kept.isEmpty ? nil : kept
-                                        exerciseCount = totalExerciseCount
-                                    }
-                                    allowedActivities = newValue
-                                }
-                            }
-                        ),
-                        authority: $rulesAuthority,
-                        cadenceDays: $cadenceDays,
-                        completionHours: $competitionSettings.completionHours,
-                        showsLegacyRoundTiming: false
-                    ).id("activities")
-                    if isSingleEvent {
-                        Label(competitionSettings.race.discipline == .workout
-                              ? "Hver øvelse får en egen resultatmåling. Plasseringen i hver øvelse gir poeng til sammenlagtlisten."
-                              : "Sprint, distanse, tid og runder krever én gren og én øvelse. Velg Treningsøkt for å kombinere flere øvelser og grener.",
-                              systemImage: "info.circle")
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let fixedActivity {
-                        Label(
-                            "Konkurransen gjelder bare \(fixedActivity.title)",
-                            systemImage: fixedActivity.symbol
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHArenaV3Style.gold)
-                    }
-                    if isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified {
-                        Label("Automatisk kildeverifisering dekker ikke alle øvelser ennå. Velg godkjenning av deltaker eller arrangør for å publisere.", systemImage: "info.circle")
-                            .font(.caption).foregroundStyle(.orange)
-                    }
-                    if !competitionSettings.race.isOperational {
-                        Label(plannedMeasures.isEmpty ? "Dette oppsettet kan lagres som mal, men publisering krever videre støtte i den universelle treningsmotoren." : "Nye resultatmål kan lagres som utkast eller mal, men støtter ikke publisering ennå.",
-                              systemImage: "exclamationmark.triangle")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .padding(13)
-                            .background(ATHLTHArenaV3Style.panel())
-                    }
-                    if competitionSettings.race.discipline == .workout {
-                        rematchExerciseSection.id("exercises")
-                    }
-                    if competitionSettings.race.discipline == .workout { scoringSettingsSection.id("scoring") }
-                    if !(competitionSettings.race.discipline == .workout && usesExplicitExercises) {
-                        coachEntry.id("coach")
-                        templateEntry.id("template")
-                        exerciseRulesSection.id("exercise-rules")
-                    }
-                    ATHLTHTournamentAdvancedRulesSection(
-                        rotation: $rotationMode,
-                        restDays: $restWeekdays,
-                        winPoints: $winPoints,
-                        drawPoints: $drawPoints,
-                        allowExtensions: $allowExtensions,
-                        publicResults: isDuel ? .constant(false) : $publicResults,
-                        proof: $proofMode,
-                        sharedEvent: isSingleEvent,
-                        duel: isDuel
-                    ).id("advanced")
-                    ATHLTHCompetitionRaceRulesSection(
-                        settings: $competitionSettings,
-                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
-                        workoutOnly: isDuel
-                    ).id("capture")
-                    ATHLTHTournamentCompetitionRulesSection(
-                        settings: $competitionSettings,
-                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
-                        showsStartTiming: fixedStartMode == nil,
-                        isDuel: isDuel,
-                        isSharedEvent: isSingleEvent,
-                        usesIndividualExerciseDeadlines: isSingleEvent && competitionSettings.race.discipline == .workout
-                    ).id("timing")
-                    if !isSingleEvent { warmupSection }
-                    if format == .groups { groupsSection.id("groups") }
-                    if fixedInvitees == nil {
-                        inviteSection.id("participants")
-                        if activeClubID != nil { seasonSection.id("season") }
-                    }
-                    preview.id("review")
-                    Text("Invitasjoner og regler godkjennes før start. Konkurransen starter manuelt, automatisk når alle er klare eller på valgt tidspunkt, slik du har valgt.")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let errorMessage {
-                        Text(errorMessage).font(.caption).foregroundStyle(.red)
-                    }
+            Group {
+                if isReviewing {
+                    reviewScreen
+                } else {
+                    rulesScreen
                 }
-                .scrollTargetLayout()
-                .padding(18)
-                .frame(maxWidth: 650)
-                .frame(maxWidth: .infinity)
             }
-            .scrollPosition(id: $rulesScrollID, anchor: .top)
-            .scrollDismissesKeyboard(.interactively)
-            .scrollIndicators(.hidden)
             .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
-            .navigationTitle(fixedInvitees == nil ? "Ny konkurranse" : "Regler")
+            .navigationTitle(isReviewing ? "Sammendrag" : fixedInvitees == nil ? "Ny konkurranse" : "Regler")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(fixedInvitees == nil ? "Avbryt" : "Tilbake") {
-                        onCheckpoint?(makeDraft(forCheckpoint: true), rulesScrollID)
-                        onBack?(makeDraft(forCheckpoint: true))
-                        dismiss()
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 8) {
-                    if !canSave && !publishing {
-                        Text(publishHint).font(.caption)
-                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    Button {
-                        Task { await publishTournament() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if publishing { ProgressView().tint(.white) }
-                            Text(publishing ? "Publiserer…" : "Publiser og inviter")
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(ATHLTHArenaV3Style.ink, in: Capsule())
-                    }
-                    .disabled(!canSave || publishing)
-                    .opacity(canSave ? 1 : 0.5)
-
-                    HStack(spacing: 12) {
-                        Button {
-                            onSave(makeDraft())
+                    Button(isReviewing ? "Tilbake" : fixedInvitees == nil ? "Avbryt" : "Tilbake") {
+                        if isReviewing {
+                            returnToRules()
+                        } else {
+                            onCheckpoint?(makeDraft(forCheckpoint: true), checkpointScrollID)
+                            onBack?(makeDraft(forCheckpoint: true))
                             dismiss()
-                        } label: {
-                            Text("Lagre som utkast")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHArenaV3Style.ink)
-                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .disabled(publishing)
-                        Button {
-                            templateName = effectiveTitle
-                            showingSaveTemplate = true
-                        } label: {
-                            Label("Lagre som mal", systemImage: "square.stack.3d.up")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(ATHLTHArenaV3Style.gold)
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .disabled(!canSaveTemplate)
                     }
+                    .disabled(publishing)
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .background(ATHLTHArenaV3Style.cream)
             }
+            .safeAreaInset(edge: .bottom) { creationFooter }
         }
         .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
@@ -697,6 +575,217 @@ struct ATHLTHTournamentCreator: View {
         }
     }
 
+    private var rulesScreen: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                    if fixedInvitees == nil {
+                        titleSection.id("title")
+                        formatSection.id("format")
+                    }
+                    ATHLTHTournamentRuleConfigurationSection(
+                        activities: Binding(
+                            get: {
+                                fixedActivity.map { Set([$0]) } ?? allowedActivities
+                            },
+                            set: { newValue in
+                                if fixedActivity == nil {
+                                    if usesExplicitExercises && newValue != allowedActivities {
+                                        let removed = Set((competitionSettings.selectedExerciseIDs ?? []).filter {
+                                            guard let activity = exerciseActivities[$0] else { return false }
+                                            return !newValue.contains(activity)
+                                        })
+                                        competitionSettings.selectedExerciseIDs?.removeAll { removed.contains($0) }
+                                        for id in removed {
+                                            competitionSettings.exerciseEnvironments.removeValue(forKey: id)
+                                            competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+                                            competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+                                        }
+                                        exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
+                                    }
+                                    competitionSettings.activityEnvironments = competitionSettings.activityEnvironments.filter { key, _ in
+                                         newValue.contains { $0.rawValue == key }
+                                     }
+                                     if !plannedMeasures.isEmpty {
+                                        let kept = plannedMeasures.filter { newValue.contains($0.activity) }
+                                        competitionSettings.race.measureDrafts = kept.isEmpty ? nil : kept
+                                        exerciseCount = totalExerciseCount
+                                    }
+                                    allowedActivities = newValue
+                                }
+                            }
+                        ),
+                        authority: $rulesAuthority,
+                        cadenceDays: $cadenceDays,
+                        completionHours: $competitionSettings.completionHours,
+                        showsLegacyRoundTiming: false
+                    ).id("activities")
+                    if isSingleEvent {
+                        Label(competitionSettings.race.discipline == .workout
+                              ? "Hver øvelse får en egen resultatmåling. Plasseringen i hver øvelse gir poeng til sammenlagtlisten."
+                              : "Sprint, distanse, tid og runder krever én gren og én øvelse. Velg Treningsøkt for å kombinere flere øvelser og grener.",
+                              systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let fixedActivity {
+                        Label(
+                            "Konkurransen gjelder bare \(fixedActivity.title)",
+                            systemImage: fixedActivity.symbol
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
+                    if isSingleEvent && competitionSettings.race.discipline == .workout && proofMode == .verified {
+                        Label("Automatisk kildeverifisering dekker ikke alle øvelser ennå. Velg godkjenning av deltaker eller arrangør for å publisere.", systemImage: "info.circle")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                    if !competitionSettings.race.isOperational {
+                        Label(plannedMeasures.isEmpty ? "Dette oppsettet kan lagres som mal, men publisering krever videre støtte i den universelle treningsmotoren." : "Nye resultatmål kan lagres som utkast eller mal, men støtter ikke publisering ennå.",
+                              systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .padding(13)
+                            .background(ATHLTHArenaV3Style.panel())
+                    }
+                    if competitionSettings.race.discipline == .workout {
+                        rematchExerciseSection.id("exercises")
+                    }
+                    if competitionSettings.race.discipline == .workout { scoringSettingsSection.id("scoring") }
+                    if !(competitionSettings.race.discipline == .workout && usesExplicitExercises) {
+                        coachEntry.id("coach")
+                        templateEntry.id("template")
+                        exerciseRulesSection.id("exercise-rules")
+                    }
+                    ATHLTHTournamentAdvancedRulesSection(
+                        rotation: $rotationMode,
+                        restDays: $restWeekdays,
+                        winPoints: $winPoints,
+                        drawPoints: $drawPoints,
+                        allowExtensions: $allowExtensions,
+                        publicResults: isDuel ? .constant(false) : $publicResults,
+                        proof: $proofMode,
+                        sharedEvent: isSingleEvent,
+                        duel: isDuel
+                    ).id("advanced")
+                    ATHLTHCompetitionRaceRulesSection(
+                        settings: $competitionSettings,
+                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
+                        workoutOnly: isDuel
+                    ).id("capture")
+                    ATHLTHTournamentCompetitionRulesSection(
+                        settings: $competitionSettings,
+                        activities: fixedActivity.map { Set([$0]) } ?? allowedActivities,
+                        showsStartTiming: fixedStartMode == nil,
+                        isDuel: isDuel,
+                        isSharedEvent: isSingleEvent,
+                        usesIndividualExerciseDeadlines: isSingleEvent && competitionSettings.race.discipline == .workout
+                    ).id("timing")
+                    if !isSingleEvent { warmupSection }
+                    if format == .groups { groupsSection.id("groups") }
+                    if fixedInvitees == nil {
+                        inviteSection.id("participants")
+                        if activeClubID != nil { seasonSection.id("season") }
+                    }
+                    if let errorMessage {
+                        Text(errorMessage).font(.caption).foregroundStyle(.red)
+                    }
+                }
+                .scrollTargetLayout()
+                .padding(18)
+                .frame(maxWidth: 650)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollPosition(id: $rulesScrollID, anchor: .top)
+            .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
+    }
+
+    private var reviewScreen: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                preview
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .padding(15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(ATHLTHArenaV3Style.panel())
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 650)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var creationFooter: some View {
+        let enabled = isReviewing ? canSave : canReview
+        return VStack(spacing: 8) {
+            if !enabled && !publishing {
+                Text(isReviewing ? publishHint : reviewHint)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            Button {
+                if isReviewing {
+                    Task { await publishTournament() }
+                } else {
+                    showReview()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    if publishing { ProgressView().tint(.white) }
+                    Text(isReviewing ? (publishing ? "Sender…" : isDuel ? "Send invitasjon" : "Send invitasjoner") : "Fortsett til sammendrag")
+                    if !isReviewing { Image(systemName: "arrow.right") }
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(ATHLTHArenaV3Style.ink, in: Capsule())
+            }
+            .disabled(!enabled || publishing)
+            .opacity(enabled ? 1 : 0.5)
+            .accessibilityIdentifier(isReviewing ? "athlth-competition-send-invitations" : "athlth-competition-continue-summary")
+
+            if isReviewing {
+                Button("Endre regler") { returnToRules() }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .disabled(publishing)
+            }
+            HStack(spacing: 12) {
+                Button {
+                    onSave(makeDraft())
+                    dismiss()
+                } label: {
+                    Text("Lagre som utkast")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .disabled(publishing)
+                Button {
+                    templateName = effectiveTitle
+                    showingSaveTemplate = true
+                } label: {
+                    Label("Lagre som mal", systemImage: "square.stack.3d.up")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .disabled(!canSaveTemplate)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(ATHLTHArenaV3Style.cream)
+    }
+
     // A cheap value snapshot of the small editable fields not covered by
     // competitionSettings. Scroll movement is saved on lifecycle transitions,
     // not on every frame.
@@ -718,7 +807,7 @@ struct ATHLTHTournamentCreator: View {
 
     private func checkpoint() {
         guard !publishing, let onCheckpoint else { return }
-        onCheckpoint(makeDraft(forCheckpoint: true), rulesScrollID)
+        onCheckpoint(makeDraft(forCheckpoint: true), checkpointScrollID)
     }
 
     private func makeDraft(forCheckpoint: Bool = false) -> ATHLTHTournamentDraft {
@@ -802,7 +891,7 @@ struct ATHLTHTournamentCreator: View {
 
     @MainActor
     private func publishTournament() async {
-        guard canSave, !publishing else { return }
+        guard isReviewing, canSave, !publishing else { return }
         publishing = true
         defer { publishing = false }
         do {
@@ -1689,7 +1778,7 @@ struct ATHLTHTournamentCreator: View {
 
     private var preview: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("KLAR FOR INVITASJON").font(.caption2.weight(.semibold))
+            Text(canSave ? "KLAR FOR INVITASJON" : "GJENNOMGANG AV KONKURRANSEN").font(.caption2.weight(.semibold))
                 .tracking(1.5).foregroundStyle(ATHLTHArenaV3Style.gold)
             Text(effectiveTitle).font(.system(size: 25, weight: .semibold, design: .serif))
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
@@ -1764,7 +1853,7 @@ struct ATHLTHTournamentCreator: View {
                     .font(.caption.weight(.medium)).tint(ATHLTHArenaV3Style.gold)
                 }
             }
-            Text("Alle deltakere må godkjenne reglene før start.")
+            Text("Ingen invitasjon er sendt ennå. Alle deltakere må godkjenne reglene før start.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
