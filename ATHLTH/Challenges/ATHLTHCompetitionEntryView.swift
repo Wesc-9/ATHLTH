@@ -149,11 +149,12 @@ struct ATHLTHCompetitionEntryView: View {
         let formsWidth = max(0, contentWidth - overviewWidth - layout.spacing)
         let accessibilityText = dynamicTypeSize.isAccessibilitySize
 
-        return VStack(alignment: .leading, spacing: 18) {
+        return VStack(alignment: .leading, spacing: 22) {
             ATHLTHTrainPageTitle(title: "Konkurranse")
+            studioDashboard(wide: layout.usesColumns(width: width, accessibilityText: accessibilityText))
             if layout.usesColumns(width: width, accessibilityText: accessibilityText) {
                 HStack(alignment: .top, spacing: layout.spacing) {
-                    hubContent
+                    studioOverview
                         .frame(width: overviewWidth, alignment: .topLeading)
                         .accessibilityIdentifier("athlth-ipad-competition-overview")
                     studioFormats(width: formsWidth)
@@ -161,7 +162,7 @@ struct ATHLTHCompetitionEntryView: View {
                 }
             } else {
                 // Keep both sections on one page in portrait and Stage Manager.
-                hubContent
+                studioOverview
                     .accessibilityIdentifier("athlth-ipad-competition-overview")
                 studioFormats(width: contentWidth)
             }
@@ -169,6 +170,76 @@ struct ATHLTHCompetitionEntryView: View {
         .padding(layout.padding)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("athlth-ipad-competition-workspace")
+    }
+
+    private var studioOverview: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Dine konkurranser")
+                    .font(.system(.title2, design: .serif).weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Følg med på invitasjoner og resultater.")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            hubContent
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func studioDashboard(wide: Bool) -> some View {
+        Group {
+            if wide {
+                HStack(alignment: .center, spacing: 26) {
+                    studioDashboardHeading
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 66)
+                        .accessibilityHidden(true)
+                    studioDashboardMetrics
+                        .frame(maxWidth: 390)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 18) {
+                    studioDashboardHeading
+                    studioDashboardMetrics
+                }
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.ink],
+                           startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
+    }
+
+    private var studioDashboardHeading: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: "trophy")
+                .font(.system(size: 27, weight: .light))
+                .frame(width: 58, height: 58)
+                .background(.white.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("DIN KONKURRANSEARENA")
+                    .font(.caption2.weight(.semibold)).tracking(1.5)
+                    .foregroundStyle(.white.opacity(0.82))
+                Text("Utfordre deg selv. Konkurrer sammen.")
+                    .font(.system(.title2, design: .serif))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var studioDashboardMetrics: some View {
+        HStack(alignment: .top, spacing: 12) {
+            dashboardMetric("Pågår", tournaments.filter { $0.status == "active" }.count)
+            dashboardMetric("Invitasjoner", tabCount(.invitations))
+            dashboardMetric("Fullført", tournaments.filter { $0.status == "completed" }.count)
+        }
     }
 
     private func studioFormats(width: CGFloat) -> some View {
@@ -185,7 +256,7 @@ struct ATHLTHCompetitionEntryView: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 14, alignment: .top), count: count), spacing: 14) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 16, alignment: .top), count: count), spacing: 16) {
                 formatButtons
             }
             // Solo competition gets the full final row, not an empty grid cell.
@@ -219,6 +290,7 @@ struct ATHLTHCompetitionEntryView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Ghost Race, løp alene mot en tidligere økt eller en digital fartsholder.")
         .accessibilityIdentifier("athlth-competition-entry-ghost")
     }
 
@@ -232,7 +304,7 @@ struct ATHLTHCompetitionEntryView: View {
             switch format.title {
             case "Duell": return "StrengthQuickHero"
             case "Enkeltkonkurranse": return "TrainHero"
-            case "Liga": return "GoalRunning"
+            case "Liga": return isStudioHub ? "ATHLTHTrackRace" : "GoalRunning"
             case "Cup": return "GoalAdventure"
             default: return "TrainHero"
             }
@@ -243,6 +315,19 @@ struct ATHLTHCompetitionEntryView: View {
 
     private func competitionArtworkCard(artwork: String, participants: String, symbol: String,
                                         title: String, subtitle: String) -> some View {
+        Group {
+            if isStudioHub {
+                studioArtworkCard(artwork: artwork, participants: participants,
+                                  symbol: symbol, title: title, subtitle: subtitle)
+            } else {
+                compactArtworkCard(artwork: artwork, participants: participants,
+                                   symbol: symbol, title: title, subtitle: subtitle)
+            }
+        }
+    }
+
+    private func compactArtworkCard(artwork: String, participants: String, symbol: String,
+                                   title: String, subtitle: String) -> some View {
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geometry in
                 Image(artwork)
@@ -291,6 +376,67 @@ struct ATHLTHCompetitionEntryView: View {
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
+    /// Studio has space for an editorial image and a separate readable text
+    /// surface. Avoid forcing long Norwegian titles onto dark photographs.
+    private func studioArtworkCard(artwork: String, participants: String, symbol: String,
+                                    title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Color.clear
+                .frame(height: title == "Ghost Race" ? 150 : 142)
+                .overlay {
+                    GeometryReader { geometry in
+                        Image(artwork)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
+                    }
+                }
+                .overlay(alignment: .bottom) {
+                    LinearGradient(colors: [.clear, .black.opacity(0.24)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+                .overlay(alignment: .topLeading) {
+                    Label(participants, systemImage: symbol)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.black.opacity(0.7), in: Capsule())
+                        .padding(12)
+                }
+                .clipped()
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(title)
+                        .font(.system(.title3, design: .serif).weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 34, height: 34)
+                        .background(ATHLTHTrainDesign.canvas, in: Circle())
+                        .accessibilityHidden(true)
+                }
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: title == "Ghost Race" ? 86 : 112, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius, style: .continuous))
+        .athlthTrainEditorialCard()
+        .contentShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius, style: .continuous))
+    }
+
     private var filtered: [ATHLTHTournamentRemote] {
         tournaments.filter { item in
             switch hubTab {
@@ -306,7 +452,7 @@ struct ATHLTHCompetitionEntryView: View {
 
     private var hubContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            competitionDashboard
+            if !isStudioHub { competitionDashboard }
             HStack(spacing: 6) {
                 ForEach(HubTab.allCases) { tab in
                     Button {
@@ -330,7 +476,14 @@ struct ATHLTHCompetitionEntryView: View {
                 }
             }
             .padding(4)
-            .background(ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 18))
+            .background(isStudioHub ? ATHLTHTrainDesign.canvas : ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                if isStudioHub {
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.55), lineWidth: 0.8)
+                        .allowsHitTesting(false)
+                }
+            }
             if loading && tournaments.isEmpty { ProgressView("Henter konkurranser…") }
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
