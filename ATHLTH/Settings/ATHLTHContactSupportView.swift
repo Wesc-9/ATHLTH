@@ -16,6 +16,14 @@ struct ATHLTHContactSupportView: View {
     @State private var sent = false
     @State private var errorMessage: String?
 
+    private let isEquipmentFeedback: Bool
+
+    init(initialSubject: String = "", initialMessage: String = "", isEquipmentFeedback: Bool = false) {
+        _subject = State(initialValue: initialSubject)
+        _message = State(initialValue: initialMessage)
+        self.isEquipmentFeedback = isEquipmentFeedback
+    }
+
     private var cleanSubject: String {
         subject.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -45,6 +53,14 @@ struct ATHLTHContactSupportView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     intro
                     identityCard
+                    if isEquipmentFeedback {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Review the scanner details and describe the error before sending. Your photo stays on this device.",
+                            norwegian: "Se over skannedetaljene og beskriv feilen før du sender. Bildet blir på enheten."
+                        ), systemImage: "lock.shield")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
                     formCard
                     if let email = accountService.currentEmail,
                        !email.isEmpty {
@@ -87,7 +103,8 @@ struct ATHLTHContactSupportView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .navigationTitle(ATHLTHLocalization.choose(
-            english: "Contact us", norwegian: "Kontakt oss"
+            english: isEquipmentFeedback ? "Report recognition error" : "Contact us",
+            norwegian: isEquipmentFeedback ? "Rapporter gjenkjenningsfeil" : "Kontakt oss"
         ))
         .navigationBarTitleDisplayMode(.inline)
         .alert(

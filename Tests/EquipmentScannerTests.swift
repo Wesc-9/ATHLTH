@@ -4,6 +4,49 @@ import XCTest
 @testable import ATHLTH
 
 final class EquipmentScannerTests: XCTestCase {
+    func testEquipmentFeedbackPreservesOriginalGuessAndCorrection() {
+        let report = ATHLTHEquipmentFeedbackDraft(
+            outcome: .match("Cable machine"), selectedEquipment: "Rowing machine",
+            publicExerciseNames: ["Seated row"], privateExerciseCount: 2,
+            hasExerciseResults: true, appVersion: "3.0.6", osVersion: "27.3"
+        )
+        XCTAssertTrue(report.message.contains("Vision suggestion: Cable machine"))
+        XCTAssertTrue(report.message.contains("Selected equipment: Rowing machine"))
+        XCTAssertTrue(report.message.contains("Library suggestions (public): Seated row"))
+        XCTAssertTrue(report.message.contains("Private exercise suggestions omitted: 2"))
+        XCTAssertTrue(report.message.contains("App: 3.0.6"))
+    }
+
+    func testEquipmentFeedbackDistinguishesNoMatchAndManualSelection() {
+        let noMatch = ATHLTHEquipmentFeedbackDraft(
+            outcome: .noMatch, selectedEquipment: "", publicExerciseNames: [],
+            privateExerciseCount: 0, hasExerciseResults: false,
+            appVersion: "", osVersion: ""
+        )
+        XCTAssertTrue(noMatch.message.contains("Vision suggestion: No reliable match"))
+        XCTAssertTrue(noMatch.message.contains("Library suggestions (public): Not requested"))
+        XCTAssertEqual(ATHLTHEquipmentVisionOutcome.unavailable.reportValue, "Recognition unavailable")
+        let manual = ATHLTHEquipmentFeedbackDraft(
+            outcome: nil, selectedEquipment: "Dumbbell", publicExerciseNames: [],
+            privateExerciseCount: 0, hasExerciseResults: true,
+            appVersion: "", osVersion: ""
+        )
+        XCTAssertTrue(manual.message.contains("Vision suggestion: Not scanned (manual selection)"))
+        XCTAssertTrue(manual.message.contains("Library suggestions (public): None"))
+    }
+
+    func testEquipmentFeedbackFitsSupportLimit() {
+        let longName = String(repeating: "x", count: 500)
+        let report = ATHLTHEquipmentFeedbackDraft(
+            outcome: .match(longName), selectedEquipment: longName,
+            publicExerciseNames: Array(repeating: longName, count: 100),
+            privateExerciseCount: 3, hasExerciseResults: true,
+            appVersion: longName, osVersion: longName
+        )
+        XCTAssertLessThanOrEqual(report.message.utf16.count, 5000)
+        XCTAssertLessThanOrEqual(report.subject.count, 120)
+    }
+
     func testLocalEquipmentRequiresSpecificUnambiguousLabel() {
         XCTAssertEqual(ATHLTHLocalEquipmentRecognition.suggestion(observations: [("dumbbell", 0.9)], options: ["Dumbbell"]), "Dumbbell")
         XCTAssertNil(ATHLTHLocalEquipmentRecognition.suggestion(observations: [("gym", 0.9)], options: ["Dumbbell"]))

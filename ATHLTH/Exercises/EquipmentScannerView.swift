@@ -332,6 +332,57 @@ struct ATHLTHEquipmentCameraPicker: UIViewControllerRepresentable {
     }
 }
 
+enum ATHLTHEquipmentVisionOutcome: Equatable {
+    case match(String)
+    case noMatch
+    case unavailable
+
+    var reportValue: String {
+        switch self {
+        case .match(let name): return name
+        case .noMatch: return "No reliable match"
+        case .unavailable: return "Recognition unavailable"
+        }
+    }
+}
+
+/// Text-only, user-reviewable support draft. No photo, location, health data
+/// or private exercise names are included automatically.
+struct ATHLTHEquipmentFeedbackDraft: Identifiable {
+    let id = UUID()
+    let subject = "ATHLTH Vision – equipment feedback"
+    let message: String
+
+    init(outcome: ATHLTHEquipmentVisionOutcome?, selectedEquipment: String,
+         publicExerciseNames: [String], privateExerciseCount: Int,
+         hasExerciseResults: Bool, appVersion: String, osVersion: String) {
+        let names = publicExerciseNames.prefix(40).map { String($0.prefix(60)) }
+        let selected = selectedEquipment.isEmpty ? "Not selected" : String(selectedEquipment.prefix(120))
+        let recognized = String((outcome?.reportValue ?? "Not scanned (manual selection)").prefix(120))
+        let exercises = !hasExerciseResults ? "Not requested" : (names.isEmpty ? "None" : names.joined(separator: ", "))
+        message = [
+            "Apple Vision / ATHLTH equipment scanner",
+            "App: " + String(appVersion.prefix(60)),
+            "OS: " + String(osVersion.prefix(60)),
+            "Vision suggestion: " + recognized,
+            "Selected equipment: " + selected,
+            "Library suggestions (public): " + exercises,
+            "Private exercise suggestions omitted: " + String(privateExerciseCount),
+            "",
+            ATHLTHLocalization.choose(
+                english: "What was wrong? (wrong equipment, wrong exercise, missing exercise or other):",
+                norwegian: "Hva var feil? (feil apparat, feil øvelse, manglende øvelse eller annet):"
+            ),
+            "",
+            ATHLTHLocalization.choose(
+                english: "Correct equipment / exercise (if known):",
+                norwegian: "Riktig apparat / øvelse (hvis kjent):"
+            ),
+            ""
+        ].joined(separator: "\n")
+    }
+}
+
 /// Reuses the authoritative ATHLTH exercise catalogue; results never create
 /// fabricated exercise IDs or modify a workout until the user selects one.
 struct ATHLTHEquipmentScannerView: View {
@@ -349,6 +400,8 @@ struct ATHLTHEquipmentScannerView: View {
     @State private var equipment = ""
     @State private var generation = UUID()
     @State private var analysisTask: Task<Void, Never>?
+    @State private var visionOutcome: ATHLTHEquipmentVisionOutcome?
+    @State private var feedbackDraft: ATHLTHEquipmentFeedbackDraft?
 
     private let scanner = ATHLTHEquipmentVisionService()
 
@@ -502,6 +555,23 @@ struct ATHLTHEquipmentScannerView: View {
                             .foregroundStyle(.orange)
                     }
 
+                    if !isAnalyzing && (visionOutcome != nil || analysis != nil) {
+                        Button {
+                            prepareFeedback()
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Report incorrect recognition",
+                                norwegian: "Rapporter feil gjenkjenning"
+                            ), systemImage: "flag")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     if let analysis {
                         ATHLTHPlanSurface {
                             VStack(alignment: .leading, spacing: 8) {
@@ -588,6 +658,18 @@ struct ATHLTHEquipmentScannerView: View {
                     }
                 }
             }
+            .sheet(item: $feedbackDraft) { draft in
+                NavigationStack {
+                    ATHLTHContactSupportView(initialSubject: draft.subject, initialMessage: draft.message, isEquipmentFeedback: true)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                                    feedbackDraft = nil
+                                }
+                            }
+                        }
+                }
+            }
             .fullScreenCover(isPresented: $isCameraOpen) {
                 ATHLTHEquipmentCameraPicker(
                     onCapture: { captured in
@@ -616,6 +698,19 @@ struct ATHLTHEquipmentScannerView: View {
                 }
             }
         }
+    }
+
+    private func prepareFeedback() {
+        let suggestions = matches
+        feedbackDraft = ATHLTHEquipmentFeedbackDraft(
+            outcome: visionOutcome,
+            selectedEquipment: equipment,
+            publicExerciseNames: suggestions.filter { $0.source != .custom }.map { $0.name },
+            privateExerciseCount: suggestions.filter { $0.source == .custom }.count,
+            hasExerciseResults: analysis != nil,
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown",
+            osVersion: UIDevice.current.systemVersion
+        )
     }
 
     private func exerciseRow(_ entry: ExerciseLibraryEntry) -> some View {
@@ -666,6 +761,7 @@ struct ATHLTHEquipmentScannerView: View {
         generation = UUID()
         isAnalyzing = false
         photo = image
+        visionOutcome = nil
         analysis = nil
         equipment = ""
         message = nil
@@ -685,6 +781,7 @@ struct ATHLTHEquipmentScannerView: View {
         guard let photo, !isAnalyzing else { return }
         let current = generation
         isAnalyzing = true
+        visionOutcome = nil
         analysis = nil
         equipment = ""
         message = nil
@@ -693,14 +790,17 @@ struct ATHLTHEquipmentScannerView: View {
             let guess = try await scanner.analyze(image: photo, options: equipmentOptions)
             guard !Task.isCancelled, generation == current else { return }
             if let guess, equipmentOptions.contains(guess) {
+                visionOutcome = .match(guess)
                 equipment = guess
                 message = ATHLTHLocalization.choose(english: "Possible match. Confirm the equipment below.",
                     norwegian: "Mulig match. Bekreft utstyret nedenfor.")
             } else {
+                visionOutcome = .noMatch
                 message = ATHLTHLocalization.choose(english: "Choose the equipment manually.", norwegian: "Velg utstyr manuelt.")
             }
         } catch {
             guard !Task.isCancelled, generation == current else { return }
+            visionOutcome = .unavailable
             message = ATHLTHLocalization.choose(english: "Local recognition unavailable. Choose equipment manually.",
                 norwegian: "Lokal gjenkjenning utilgjengelig. Velg utstyr manuelt.")
         }
