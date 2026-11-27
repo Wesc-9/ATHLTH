@@ -2508,6 +2508,12 @@ struct WatchActiveWorkoutView: View {
                 .padding(9)
                 .watchSurface(radius: 14)
 
+                if result.healthKitWorkoutUUID != nil {
+                    WatchCompletedEffortRatingView(resultID: result.id)
+                        .environmentObject(workoutManager)
+                        .id(result.id)
+                }
+
                 if let laps =
                         result.lapSummaries,
                    !laps.isEmpty {
@@ -5117,5 +5123,73 @@ private func soloGhostResultTitle(_ outcome: ATHLTHSoloGhostComparison.Outcome) 
     case .behind: return ATHLTHLocalization.choose(english: "The ghost won", norwegian: "Ghosten vant")
     case .tied: return ATHLTHLocalization.choose(english: "Tie", norwegian: "Uavgjort")
     case .incomplete: return ATHLTHLocalization.choose(english: "Goal not completed", norwegian: "Målet ble ikke fullført")
+    }
+}
+
+
+/// Optional post-workout rating. It never blocks Done or workout saving.
+private struct WatchCompletedEffortRatingView: View {
+    @EnvironmentObject private var workoutManager: WatchWorkoutManager
+    let resultID: UUID
+    @State private var savedScore: Int?
+    @State private var saving = false
+    @State private var failed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(ATHLTHLocalization.choose(
+                english: "Workout effort", norwegian: "Anstrengelse"
+            ), systemImage: "gauge.with.dots.needle.50percent")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(WatchTheme.planSecondary)
+
+            if let savedScore {
+                Text("\(savedScore)/10 · " + ATHLTHLocalization.choose(
+                    english: "Saved in Apple Health", norwegian: "Lagret i Apple Helse"
+                ))
+                .font(.caption)
+            } else if saving {
+                ProgressView()
+            } else {
+                Menu {
+                    ForEach(1...10, id: \.self) { score in
+                        Button("\(score)/10") {
+                            saving = true
+                            failed = false
+                            Task { @MainActor in
+                                do {
+                                    savedScore = try await workoutManager.saveCompletedWorkoutEffort(score, resultID: resultID)
+                                } catch {
+                                    failed = true
+                                }
+                                saving = false
+                            }
+                        }
+                    }
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Rate this workout (1–10)", norwegian: "Vurder økten (1–10)"
+                    ))
+                    .font(.caption.weight(.semibold))
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Optional · 1 easy, 10 maximum",
+                    norwegian: "Valgfritt · 1 lett, 10 maksimalt"
+                ))
+                .font(.caption2)
+                .foregroundStyle(WatchTheme.planSecondary)
+                if failed {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Not saved. Check Health permissions.",
+                        norwegian: "Ikke lagret. Sjekk helsetilgang."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(WatchTheme.danger)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .watchSurface(radius: 14)
     }
 }

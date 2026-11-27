@@ -39,6 +39,21 @@ final class ATHLTHWorkoutSummaryEngineTests: XCTestCase {
         XCTAssertNil(ATHLTHWorkoutSummaryEngine.roundedInteger(Double.greatestFiniteMagnitude))
     }
 
+    func testNativeRunningDynamicsStayOptionalAndSportSpecific() throws {
+        let metrics = ATHLTHNativeRunningMetrics(
+            powerWatts: 250, strideMeters: 1.1,
+            verticalCentimeters: nil, groundContactMilliseconds: 240
+        )
+        let run = ATHLTHWorkoutSummaryEngine(duration: 1500, activity: "running", nativeRunningMetrics: metrics)
+        XCTAssertEqual(run.nativeRunningMetrics, metrics)
+        XCTAssertNil(ATHLTHWorkoutSummaryEngine(duration: 600, activity: "strength", nativeRunningMetrics: metrics).nativeRunningMetrics)
+        let empty = ATHLTHNativeRunningMetrics(powerWatts: .nan, strideMeters: -1, verticalCentimeters: 0, groundContactMilliseconds: nil)
+        XCTAssertFalse(empty.hasMeasurements)
+        XCTAssertNil(ATHLTHWorkoutSummaryEngine(duration: 600, activity: "running", nativeRunningMetrics: empty).nativeRunningMetrics)
+        let encoded = try JSONEncoder().encode(metrics)
+        XCTAssertEqual(try JSONDecoder().decode(ATHLTHNativeRunningMetrics.self, from: encoded), metrics)
+    }
+
     func testCyclingAndRowingUseSportSpecificMetrics() {
         let cycle = ATHLTHWorkoutSummaryEngine(duration: 3600, distanceMeters: 30000, activity: "cycling")
         XCTAssertNil(cycle.paceSecondsPerKilometer)

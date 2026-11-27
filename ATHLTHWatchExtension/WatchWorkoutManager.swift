@@ -118,6 +118,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var liveSurfaceContext:
         ATHLTHLiveWorkoutContext = .empty
     @Published private(set) var completedResult: WatchWorkoutResult?
+    private var completedHealthKitWorkout: HKWorkout?
+    private var effortSaveInProgress = false
     @Published private(set) var errorMessage: String?
 
     private let healthStore = HKHealthStore()
@@ -4666,6 +4668,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.strengthActionPending = false
             self.liveSurfaceContext = .empty
             self.completedResult = nil
+            self.completedHealthKitWorkout = nil
             self.errorMessage = nil
         }
 
@@ -5078,6 +5081,51 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             throw WatchWorkoutError
                 .workoutAuthorizationDenied
         }
+    }
+
+    /// Optional subjective effort: associate a rating with the exact saved
+    /// HealthKit workout, never with a strength set or a new workout. No
+    /// permission prompt occurs until the user explicitly chooses a rating.
+    func saveCompletedWorkoutEffort(_ score: Int, resultID: UUID) async throws -> Int {
+        let unavailable = NSError(domain: "ATHLTH.WorkoutEffort", code: 1,
+            userInfo: [NSLocalizedDescriptionKey: ATHLTHLocalization.choose(
+                english: "The rating could not be saved to Apple Health.",
+                norwegian: "Vurderingen kunne ikke lagres i Apple Helse."
+            )])
+        guard (1...10).contains(score), !effortSaveInProgress,
+              state == .completed, completedResult?.id == resultID,
+              let workout = completedHealthKitWorkout,
+              completedResult?.healthKitWorkoutUUID == workout.uuid,
+              let type = HKObjectType.quantityType(forIdentifier: .workoutEffortScore)
+        else { throw unavailable }
+
+        effortSaveInProgress = true
+        defer { effortSaveInProgress = false }
+
+        try await healthStore.requestAuthorization(toShare: [type], read: [type])
+        guard healthStore.authorizationStatus(for: type) == .sharingAuthorized,
+              state == .completed, completedResult?.id == resultID else { throw unavailable }
+
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.quantitySample(type: type, predicate:
+                HKQuery.predicateForWorkoutEffortSamplesRelated(workout: workout, activity: nil))],
+            sortDescriptors: []
+        )
+        let existing = try await descriptor.result(for: healthStore)
+        // Do not replace an existing user rating or silently delete Apple data.
+        if let existingScore = existing.last?.quantity.doubleValue(for: .appleEffortScore()),
+           existingScore.isFinite, (1...10).contains(existingScore) {
+            return Int(existingScore.rounded())
+        }
+
+        guard state == .completed, completedResult?.id == resultID else { throw unavailable }
+        let sample = HKQuantitySample(type: type,
+            quantity: HKQuantity(unit: .appleEffortScore(), doubleValue: Double(score)),
+            start: workout.startDate, end: workout.endDate)
+        guard try await healthStore.relateWorkoutEffortSample(sample, with: workout, activity: nil) else {
+            throw unavailable
+        }
+        return score
     }
 
     /// Watch-owned clock for embedded treadmill phases. The phone can be
@@ -9196,6 +9244,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         sendToPhone(result)
         WatchRouteStore.shared.clearCompletedPetSelection()
 
+        completedHealthKitWorkout = workout
         // HealthKit has saved the workout and the optional route callback
         // has finished. Release the finalization lock BEFORE exposing Done.
         // Reset must still reject genuinely active or unfinished workouts.
