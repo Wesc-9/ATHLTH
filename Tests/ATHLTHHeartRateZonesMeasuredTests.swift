@@ -131,3 +131,29 @@ final class ATHLTHRecordedHeartRateZonesTests: XCTestCase {
         XCTAssertNil(ATHLTHRecordedHeartRateZones.zone(for: .nan, in: zones))
     }
 }
+
+
+final class ATHLTHLiveZonePolicyTests: XCTestCase {
+    func testAuthoredTargetsAndCoachRetainTheirSemantics() {
+        XCTAssertTrue(ATHLTHLiveZonePolicy.prefersApple(hasStructuredWorkout: false, hasTarget: false, coachEnabled: false))
+        XCTAssertFalse(ATHLTHLiveZonePolicy.prefersApple(hasStructuredWorkout: true, hasTarget: false, coachEnabled: false))
+        XCTAssertFalse(ATHLTHLiveZonePolicy.prefersApple(hasStructuredWorkout: false, hasTarget: true, coachEnabled: false))
+        XCTAssertFalse(ATHLTHLiveZonePolicy.prefersApple(hasStructuredWorkout: false, hasTarget: false, coachEnabled: true))
+    }
+
+    func testActualNativeBoundaryAndMissingSensor() throws {
+        let zones = [
+            ATHLTHRecordedHeartRateZone(index: 0, minimumBPM: nil, maximumBPM: 130, durationSeconds: 0),
+            ATHLTHRecordedHeartRateZone(index: 1, minimumBPM: 130, maximumBPM: 170, durationSeconds: 0),
+            ATHLTHRecordedHeartRateZone(index: 2, minimumBPM: 170, maximumBPM: nil, durationSeconds: 0)
+        ]
+        XCTAssertEqual(ATHLTHLiveZonePolicy.measuredZone(bpm: 130, maximumBPM: 200, appleZones: zones), 2)
+        XCTAssertEqual(ATHLTHLiveZonePolicy.measuredZone(bpm: 125, maximumBPM: 200, appleZones: zones), 1)
+        XCTAssertNil(ATHLTHLiveZonePolicy.measuredZone(bpm: nil, maximumBPM: 200, appleZones: zones))
+        XCTAssertEqual(ATHLTHLiveZonePolicy.measuredZone(bpm: 125, maximumBPM: 200, appleZones: nil), 2)
+        XCTAssertEqual(ATHLTHLiveZonePolicy.zoneNumbers(zones), [1, 2, 3])
+        XCTAssertEqual(ATHLTHLiveZonePolicy.zoneNumbers(nil), [1, 2, 3, 4, 5])
+        let decoded = try JSONDecoder().decode([ATHLTHRecordedHeartRateZone].self, from: JSONEncoder().encode(zones))
+        XCTAssertEqual(decoded, zones)
+    }
+}

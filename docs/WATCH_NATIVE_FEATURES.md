@@ -20,3 +20,7 @@ All new API integrations require Xcode 27 build and real Watch verification. The
 - Five watchOS 26+ system controls open the existing planned, daily form, sent, Ghost and favorites destinations via a shared OpenIntent. Active workout presentation is not interrupted.
 - The existing Today widget provides a date-based Smart Stack relevance window around the next cached eligible planned workout. The shared projection contains a date only and clears on account changes. Location and invitation context are future extensions.
 - Corrected the obsolete Community header audit signature to the actual cover(onArtwork:) method, keeping the rest of the layout audit intact.
+
+## Native live heart-rate zones: staged rollout
+- A free Watch workout without an explicit target, structured prescription or active Audio Coach captures the actual HealthKit builder zone configuration. The same thresholds drive the Watch and mirrored phone/iPad gauges. No extra sample query or timer. Older OS and unavailable configurations fall back to ATHLTH.
+- Existing structured and coach workouts retain ATHLTH live-zone semantics pending a complete migration of authored targets and custom coach triggers. Apple recorded duration data stays source-labelled and separate. Explicit user settings and native coach integration remain outstanding.
