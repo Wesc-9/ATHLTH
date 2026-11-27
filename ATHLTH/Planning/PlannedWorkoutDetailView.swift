@@ -339,10 +339,12 @@ struct PlannedWorkoutDetailView: View {
                     }
                 }
             }
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingMovePlannedWorkout) {
                 ATHLTHScheduledPlanWorkoutMoveSheet(planID: planID, workoutID: currentWorkout.id)
                     .presentationDetents([.medium, .large])
             }
+            .athlthStablePresentationBoundary()
             .confirmationDialog(
                 ATHLTHLocalization.choose(english: "Cancel this workout?", norwegian: "Avlyse denne økten?"),
                 isPresented: $showingCancelPlannedWorkout,
@@ -386,6 +388,7 @@ struct PlannedWorkoutDetailView: View {
             } message: {
                 Text(currentWorkout.title)
             }
+            .athlthStablePresentationBoundary()
             .alert(
                 ATHLTHLocalization.choose(
                     english: "Could not remove workout",
@@ -400,6 +403,7 @@ struct PlannedWorkoutDetailView: View {
             } message: {
                 Text(removalError ?? "")
             }
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingTrainingPlacePicker) {
                 ATHLTHPlanTrainingPlacePicker(
                     initial: currentWorkout.plannedTrainingPlace
@@ -410,12 +414,14 @@ struct PlannedWorkoutDetailView: View {
                 }
                 .environmentObject(session)
             }
+            .athlthStablePresentationBoundary()
             .athlthStudioEditor(isPresented: $showingEditor, useFullScreen: studioFullscreenEditing) {
                 SessionEditorView(
                     planID: planID,
                     workout: currentWorkout
                 )
             }
+            .athlthStablePresentationBoundary()
             .sheet(isPresented: $showingHealthLinkPicker) {
                 healthLinkPicker
             }
@@ -436,9 +442,11 @@ struct PlannedWorkoutDetailView: View {
             } message: {
                 Text(shareError ?? "")
             }
+            .athlthStablePresentationBoundary()
             .sheet(item: $selectedLegacyExercise) { block in
                 ATHLTHLinkedExerciseDetailView(block: block)
             }
+            .athlthStablePresentationBoundary()
             .fullScreenCover(
                 isPresented:
                     $showingStructuredWorkout
