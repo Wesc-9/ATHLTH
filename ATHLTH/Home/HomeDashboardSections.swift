@@ -1970,7 +1970,7 @@ struct HomeWeeklyProgressStrip:
             }
         }) {
             selection in
-            HomeWeeklyProgressDaySheet(
+            AnyView(HomeWeeklyProgressDaySheet(
                 selection: selection,
                 plan: plan,
                 recentWorkouts: workouts,
@@ -2002,7 +2002,7 @@ struct HomeWeeklyProgressStrip:
                 onPlanWorkout: { date in
                     openWorkoutComposer(on: date)
                 }
-            )
+            ))
             .presentationDetents(
                 [.fraction(0.78), .large],
                 selection: $daySheetDetent
@@ -2163,6 +2163,7 @@ struct HomeWeeklyProgressStrip:
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-home-week-day-\(calendar.component(.weekday, from: date))")
         .accessibilityHint(
             ATHLTHLocalization.choose(
                 english:
@@ -3510,8 +3511,26 @@ private struct HomeWeeklyProgressDaySheet: View {
         }
     }
 
+    // Keep the navigation root and every presentation layer type-erased.
+    // On iOS the runtime must resolve the concrete SwiftUI generic metadata
+    // during sheet presentation. A single deeply nested modifier chain can
+    // exhaust the main-thread stack before the first frame is displayed.
     var body: some View {
         NavigationStack(path: $completedWorkoutPath) {
+            supplementalLoading(plannedWorkoutPresentation(cancellationPresentation(
+                timePresentation(movePresentation(standaloneTrackingPresentation(
+                    planTrackingPresentation(invitationPresentation(suggestionPresentation(
+                        libraryPresentation(coachPresentation(sceneRecovery(
+                            removalPresentation(dayNavigation)
+                        )))
+                    )))
+                )))
+            )))
+        }
+    }
+
+    private var dayNavigation: AnyView {
+        AnyView(
             ScrollView {
                 VStack(alignment: .leading, spacing: 13) {
                     Text(selection.date.formatted(
@@ -3578,7 +3597,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     persistedCompletedWorkoutID = next.last?.uuidString ?? ""
                 }
             }
+        )
+    }
 
+    private func removalPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(isPresented: $showingRemoveConfirmation, onDismiss: {
                 workoutPendingRemoval = nil
             }) {
@@ -3675,6 +3699,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     norwegian: "Planen er endret, eller økten er allerede fullført. Åpne kalenderen på nytt."
                 ))
             }
+        )
+    }
+
+    private func sceneRecovery(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
                     if let id = completedWorkoutPath.last {
@@ -3684,6 +3714,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     restoreCompletedWorkoutIfNeeded()
                 }
             }
+        )
+    }
+
+    private func coachPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(isPresented: $showingSingleWorkoutCoach, onDismiss: {
                 if let picked = pendingCoachWorkout {
                     pendingCoachWorkout = nil
@@ -3702,6 +3738,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
+        )
+    }
+
+    private func libraryPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(isPresented: $showingWorkoutPicker, onDismiss: {
                 if let pending = pendingPickedWorkout {
                     pendingPickedWorkout = nil
@@ -3712,18 +3754,36 @@ private struct HomeWeeklyProgressDaySheet: View {
                     pendingPickedWorkout = workout
                 }
             }
+        )
+    }
+
+    private func suggestionPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $selectedSuggestion) { workout in
                 suggestionDetail(workout)
                     .presentationDetents([.fraction(0.74), .large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
             }
+        )
+    }
+
+    private func invitationPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $selectedInvitationLobby) { workout in
                 PlannedWorkoutInvitationLobby(workout: workout)
                     .presentationDetents([.medium, .large])
             }
             // A planned workout opens as a card over the calendar rather
             // than pushing another page inside the day sheet.
+        )
+    }
+
+    private func planTrackingPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $selectedPlanTracking) { workout in
                 if let planID = HomeWeeklyProgressCalendar.containingPlanID(
                     for: workout, in: plan
@@ -3736,6 +3796,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     .presentationDetents([.fraction(0.85), .large])
                 }
             }
+        )
+    }
+
+    private func standaloneTrackingPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $selectedStandaloneTracking) { workout in
                 HomeWeeklyStandaloneWorkoutDetailView(
                     workout: workout,
@@ -3743,12 +3809,24 @@ private struct HomeWeeklyProgressDaySheet: View {
                 )
                 .presentationDetents([.fraction(0.85), .large])
             }
+        )
+    }
+
+    private func movePresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $movingPlanWorkout) { workout in
                 if let planID = HomeWeeklyProgressCalendar.containingPlanID(for: workout, in: plan) {
                     ATHLTHScheduledPlanWorkoutMoveSheet(planID: planID, workoutID: workout.id)
                         .presentationDetents([.medium, .large])
                 }
             }
+        )
+    }
+
+    private func timePresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $editingWorkoutTime) { workout in
                 timeOnlyEditor(for: workout)
                     .presentationDetents([.height(420)])
@@ -3768,6 +3846,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     norwegian: "Økten kan være startet, fullført eller endret et annet sted."
                 ))
             }
+        )
+    }
+
+    private func cancellationPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .confirmationDialog(
                 ATHLTHLocalization.choose(
                     english: "Cancel this workout?",
@@ -3803,6 +3887,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                     norwegian: "Økten blir stående som avlyst. Treningshistorikken endres ikke."
                 ))
             }
+        )
+    }
+
+    private func plannedWorkoutPresentation(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .sheet(item: $selectedPlannedWorkout, onDismiss: {
                 selectedPlanTracking = pendingPlanTracking
                 pendingPlanTracking = nil
@@ -3865,7 +3955,12 @@ private struct HomeWeeklyProgressDaySheet: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
+        )
+    }
 
+    private func supplementalLoading(_ content: AnyView) -> AnyView {
+        AnyView(
+            content
             .task {
                 // Allow the sheet presentation and first schedule frame to
                 // finish before constructing hundreds of template records.
@@ -3891,7 +3986,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 suggestionCatalogEntries = catalog.entries
                 session.syncApprovedSharedWorkouts(from: messaging.recentMessages)
             }
-        }
+        )
     }
 
     private func restoreCompletedWorkoutIfNeeded() {
