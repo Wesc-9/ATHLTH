@@ -66,6 +66,19 @@ enum ATHLTHStudioDayCompletionPolicy {
     }
 }
 
+/// Date-dependent behavior without changing the card's normal layout.
+enum ATHLTHStudioDayCardPolicy {
+    static let bodyHeight: CGFloat = 148
+
+    static func isPast(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> Bool {
+        calendar.startOfDay(for: date) < calendar.startOfDay(for: now)
+    }
+
+    static func bodyHeight(accessibilityText: Bool) -> CGFloat? {
+        accessibilityText ? nil : bodyHeight
+    }
+}
+
 enum ATHLTHStudioDayWorkoutLayout {
     static func contentWidth(viewport: CGFloat, accessibilityText: Bool) -> CGFloat {
         let outerInset: CGFloat = viewport >= 730 && !accessibilityText ? 44 : 28
@@ -824,7 +837,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// The day card keeps the same header, surface and body height while
     /// browsing dates. Only its status, actions and workout rows change.
     private func selectedDayCard(_ day: ATHLTHStudioHomeWeek.Day) -> some View {
-        let isPast = Calendar.current.startOfDay(for: day.date) < Calendar.current.startOfDay(for: .now)
+        let isPast = ATHLTHStudioDayCardPolicy.isPast(day.date)
+        let bodyHeight = ATHLTHStudioDayCardPolicy.bodyHeight(accessibilityText: dynamicTypeSize.isAccessibilitySize)
         let canPlan = day.restDays.isEmpty &&
             HomeWeeklyProgressCalendar.canScheduleStandalone(on: day.date)
         let hasWorkouts = !day.planned.isEmpty || !day.recorded.isEmpty
@@ -852,7 +866,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
                         .scrollIndicators(.automatic)
-                        .frame(height: 148)
+                        .frame(height: bodyHeight)
                         .id(Calendar.current.startOfDay(for: day.date))
                     }
                 } else {
@@ -881,7 +895,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 0 : 148, alignment: .topLeading)
+                    .frame(minHeight: bodyHeight ?? 0, alignment: .topLeading)
                     .accessibilityIdentifier("athlth-ipad-week-empty-planning")
                 }
             }
@@ -949,6 +963,19 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     )
                     .accessibilityIdentifier("athlth-ipad-planned-workout-\(entry.id)")
                     .contextMenu { workoutActions(entry) }
+                    if canStart(entry, alreadyCompleted: false) {
+                        Button {
+                            onStartWorkout(entry)
+                        } label: {
+                            Image(systemName: "play.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tr("Start workout", "Start økt"))
+                    }
                     Menu {
                         workoutActions(entry)
                     } label: {
@@ -1084,14 +1111,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
                      "\(day.recorded.count) registrerte økter")
             return plannedLabel + " · " + logged
         }
-        if !day.restDays.isEmpty {
-            return tr("Planned rest day", "Planlagt hviledag")
-        }
         if !day.recorded.isEmpty {
             return day.recorded.count == 1
                 ? tr("1 recorded workout", "1 registrert økt")
                 : tr("\(day.recorded.count) recorded workouts",
                      "\(day.recorded.count) registrerte økter")
+        }
+        if !day.restDays.isEmpty {
+            return tr("Planned rest day", "Planlagt hviledag")
         }
         return isPast ? tr("No recorded workouts", "Ingen registrerte økter")
             : tr("No workout scheduled", "Ingen økt planlagt")
