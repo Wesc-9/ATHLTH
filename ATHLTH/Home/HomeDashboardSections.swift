@@ -1710,6 +1710,18 @@ struct HomeHealthMetricDetailView:
 /// Standalone sessions created from Weekly Progress live outside the active
 /// training plan, so both sources must be merged before limiting visible rows.
 enum HomeTodayCalendarSchedule {
+    // Today plus the next fourteen calendar dates, including the last day.
+    static func upcomingDays(referenceDate: Date = Date(), calendar: Calendar = .current) -> [Date] {
+        let today = calendar.startOfDay(for: referenceDate)
+        return (0...14).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
+    }
+
+    static func upcomingInterval(referenceDate: Date = Date(), calendar: Calendar = .current) -> DateInterval {
+        let today = calendar.startOfDay(for: referenceDate)
+        let end = calendar.date(byAdding: .day, value: 15, to: today) ?? today.addingTimeInterval(15 * 86_400)
+        return DateInterval(start: today, end: end)
+    }
+
     static func workouts(
         plan: TrainingPlan?,
         standalone: [PlannedSession],
