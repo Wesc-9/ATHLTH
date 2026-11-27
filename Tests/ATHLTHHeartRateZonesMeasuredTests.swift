@@ -115,3 +115,19 @@ final class ATHLTHHeartRateZonesMeasuredTests: XCTestCase {
         ))
     }
 }
+
+
+final class ATHLTHRecordedHeartRateZonesTests: XCTestCase {
+    func testNativeBoundsAreNotRecomputedFromMaximumHeartRate() {
+        let zones = [
+            ATHLTHRecordedHeartRateZone(index: 0, minimumBPM: nil, maximumBPM: 120, durationSeconds: 30),
+            ATHLTHRecordedHeartRateZone(index: 1, minimumBPM: 120, maximumBPM: 155, durationSeconds: 60),
+            ATHLTHRecordedHeartRateZone(index: 2, minimumBPM: 155, maximumBPM: nil, durationSeconds: 90)
+        ]
+        XCTAssertEqual(ATHLTHRecordedHeartRateZones.validated(Array(zones.reversed())), zones)
+        XCTAssertEqual(ATHLTHRecordedHeartRateZones.zone(for: 120, in: zones), 2)
+        XCTAssertEqual(ATHLTHRecordedHeartRateZones.zone(for: 180, in: zones), 3)
+        XCTAssertNil(ATHLTHRecordedHeartRateZones.validated(Array(zones.dropLast())))
+        XCTAssertNil(ATHLTHRecordedHeartRateZones.zone(for: .nan, in: zones))
+    }
+}

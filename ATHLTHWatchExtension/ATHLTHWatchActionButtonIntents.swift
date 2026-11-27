@@ -125,3 +125,20 @@ enum ATHLTHWatchActionButtonBridge {
         try? await start.donate(result: .result(actionButtonIntent: ATHLTHWatchNextWorkoutActionIntent()))
     }
 }
+
+
+/// Discoverable Siri phrases for the existing guarded Watch start intent.
+/// Reuses workout permissions and admission rather than creating a recorder.
+struct ATHLTHWatchWorkoutShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(intent: ATHLTHWatchStartWorkoutIntent(style: .running),
+            phrases: ["Start a run with \(.applicationName)"],
+            shortTitle: "Start run", systemImageName: "figure.run")
+        AppShortcut(intent: ATHLTHWatchStartWorkoutIntent(style: .walking),
+            phrases: ["Start a walk with \(.applicationName)"],
+            shortTitle: "Start walk", systemImageName: "figure.walk")
+        AppShortcut(intent: ATHLTHWatchStartWorkoutIntent(style: .strength),
+            phrases: ["Start strength training with \(.applicationName)"],
+            shortTitle: "Start strength", systemImageName: "dumbbell")
+    }
+}

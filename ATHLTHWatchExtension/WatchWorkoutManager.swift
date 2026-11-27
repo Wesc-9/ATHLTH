@@ -9189,6 +9189,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         result.accountOwnerID = workoutOwnerID
+        if #available(watchOS 27.0, *),
+           let group = workout.zoneGroupsByType?[HKQuantityType(.heartRate)] {
+            let unit = HKUnit.count().unitDivided(by: .minute())
+            let zones = group.zoneDurations.map { item in
+                ATHLTHRecordedHeartRateZone(index: item.zone.index,
+                    minimumBPM: item.zone.minimum?.doubleValue(for: unit),
+                    maximumBPM: item.zone.maximum?.doubleValue(for: unit),
+                    durationSeconds: item.duration)
+            }
+            result.nativeHeartRateZones = ATHLTHRecordedHeartRateZones.validated(zones)
+        }
         result.isSports = workout.workoutActivityType == .play ? true : nil
         if workout.workoutActivityType == .running {
             // Read only Apple's actual statistics from this saved workout.

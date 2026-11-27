@@ -103,3 +103,42 @@ enum ATHLTHHeartRateZones {
         return min(5, max(1, Int((fraction - 0.50) / 0.10) + 1))
     }
 }
+
+
+/// Exact per-workout HealthKit zone boundaries; never derive a historical
+/// Apple zone from today's max heart rate or assume every group has five zones.
+struct ATHLTHRecordedHeartRateZone: Codable, Hashable, Identifiable {
+    let index: Int
+    let minimumBPM: Double?
+    let maximumBPM: Double?
+    let durationSeconds: TimeInterval
+    var id: Int { index }
+
+    var isValid: Bool {
+        index >= 0 && durationSeconds.isFinite && durationSeconds >= 0 &&
+        (minimumBPM.map { $0.isFinite && $0 >= 0 } ?? true) &&
+        (maximumBPM.map { $0.isFinite && $0 > (minimumBPM ?? 0) } ?? true)
+    }
+}
+
+enum ATHLTHRecordedHeartRateZones {
+    static func validated(_ zones: [ATHLTHRecordedHeartRateZone]) -> [ATHLTHRecordedHeartRateZone]? {
+        let sorted = zones.sorted { $0.index < $1.index }
+        guard (3...9).contains(sorted.count),
+              sorted.enumerated().allSatisfy({ $0.offset == $0.element.index && $0.element.isValid }),
+              sorted.first?.minimumBPM == nil || sorted.first?.minimumBPM == 0,
+              sorted.last?.maximumBPM == nil
+        else { return nil }
+        for (lower, upper) in zip(sorted, sorted.dropFirst()) {
+            guard let boundary = lower.maximumBPM, upper.minimumBPM == boundary else { return nil }
+        }
+        return sorted
+    }
+
+    static func zone(for bpm: Double, in zones: [ATHLTHRecordedHeartRateZone]) -> Int? {
+        guard bpm.isFinite, bpm > 0, let zones = validated(zones) else { return nil }
+        return zones.first(where: {
+            bpm >= ($0.minimumBPM ?? 0) && bpm < ($0.maximumBPM ?? .infinity)
+        }).map { $0.index + 1 }
+    }
+}

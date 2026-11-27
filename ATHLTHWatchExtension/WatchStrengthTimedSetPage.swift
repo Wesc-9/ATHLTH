@@ -235,6 +235,7 @@ struct WatchStrengthTimedSetPage: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(WatchTheme.accentDeep)
+                                .handGestureShortcut(.primaryAction, isEnabled: finished)
                                     .accessibilityHint(tr(
                                         "Finish this set now, even before or after the time target.",
                                         "Fullfør settet nå, før eller etter tidsmålet."

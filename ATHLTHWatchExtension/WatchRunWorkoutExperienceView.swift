@@ -544,6 +544,7 @@ struct WatchRunWorkoutExperienceView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(WatchTheme.liveAction)
+                    .handGestureShortcut(.primaryAction)
                     .accessibilityIdentifier("athlth-watch-start-main-first-page")
                 }
 
@@ -1647,6 +1648,7 @@ struct WatchRunWorkoutExperienceView: View {
                         icon: "flag.fill",
                         accent: false
                     ) { workoutManager.markLap() }
+                    .handGestureShortcut(.primaryAction, isEnabled: workoutManager.state == .running && workoutManager.currentStructuredRunningStep == nil)
                     .disabled(workoutManager.state != .running)
                 }
 

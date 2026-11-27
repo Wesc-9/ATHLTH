@@ -875,6 +875,7 @@ struct WatchActiveWorkoutView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(WatchTheme.liveStrengthReps)
+                        .handGestureShortcut(.primaryAction, isEnabled: !workoutManager.strengthActionPending)
                         .disabled(workoutManager.strengthActionPending)
                     } else if let started = snapshot.setEffortStartedAt,
                               !snapshot.isResting {
@@ -947,6 +948,10 @@ struct WatchActiveWorkoutView: View {
                     .tint(
                         WatchTheme.liveAction
                     )
+                    .handGestureShortcut(.primaryAction, isEnabled:
+                        snapshot.setEffortStartedAt != nil &&
+                        !snapshot.isResting && !snapshot.currentExerciseComplete &&
+                        !workoutManager.strengthActionPending)
                     .disabled(
                         workoutManager
                             .strengthActionPending
@@ -1984,6 +1989,7 @@ struct WatchActiveWorkoutView: View {
                         .frame(maxWidth: .infinity, minHeight: 38)
                     }
                     .buttonStyle(.bordered)
+                    .handGestureShortcut(.primaryAction, isEnabled: !workoutManager.strengthActionPending)
                     .disabled(workoutManager.strengthActionPending)
                 } else if let started = snapshot.setEffortStartedAt,
                           !snapshot.isResting {
@@ -2031,6 +2037,10 @@ struct WatchActiveWorkoutView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(WatchTheme.green)
+                .handGestureShortcut(.primaryAction, isEnabled:
+                    snapshot.setEffortStartedAt != nil &&
+                    !snapshot.isResting && !snapshot.currentExerciseComplete &&
+                    !workoutManager.strengthActionPending)
                 .disabled(workoutManager.strengthActionPending)
 
                 WatchStrengthCrownControl(
@@ -2507,6 +2517,28 @@ struct WatchActiveWorkoutView: View {
                 }
                 .padding(9)
                 .watchSurface(radius: 14)
+
+                if let zones = result.nativeHeartRateZones,
+                   let valid = ATHLTHRecordedHeartRateZones.validated(zones),
+                   valid.contains(where: { $0.durationSeconds > 0 }) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(english: "Apple Health heart rate zones", norwegian: "Pulssoner fra Apple Helse"))
+                            .font(.caption.weight(.semibold))
+                        ForEach(valid) { zone in
+                            HStack {
+                                Text("Z\(zone.index + 1)")
+                                    .font(.caption2.weight(.semibold))
+                                Spacer()
+                                Text(ATHLTHWorkoutSummaryEngine.durationText(zone.durationSeconds))
+                                    .font(.caption2.monospacedDigit())
+                            }
+                            ProgressView(value: zone.durationSeconds, total: max(1, valid.reduce(0) { $0 + $1.durationSeconds }))
+                                .tint(WatchTheme.premiumGold)
+                        }
+                    }
+                    .padding(9)
+                    .watchSurface(radius: 14)
+                }
 
                 if result.healthKitWorkoutUUID != nil {
                     WatchCompletedEffortRatingView(resultID: result.id)
@@ -3377,6 +3409,8 @@ private struct WatchStrengthRestView: View {
                             .frame(maxWidth: .infinity, minHeight: 32)
                         }
                         .buttonStyle(WatchStrengthRestButtonStyle(primary: true))
+                        // Never shorten a prescribed rest via an accidental gesture.
+                        .handGestureShortcut(.primaryAction, isEnabled: remaining <= 0)
                     }
                 } else {
                     Text(ATHLTHLocalization.choose(
