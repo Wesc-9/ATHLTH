@@ -3,6 +3,7 @@ import SwiftUI
 
 struct WatchRouteDetailView: View {
     let route: WatchRouteTransfer
+    @State private var directionsRequest: WatchWalkingDirectionsRequest?
 
     private var coordinates: [CLLocationCoordinate2D] {
         route.points
@@ -81,6 +82,19 @@ struct WatchRouteDetailView: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
 
+                if #available(watchOS 26.0, *),
+                   let start = coordinates.first,
+                   CLLocationCoordinate2DIsValid(start) {
+                    Button {
+                        directionsRequest = WatchWalkingDirectionsRequest(destination: start, isRecovery: false, workoutRouteID: nil)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Way to start", norwegian: "Veien til start"), systemImage: "location.north.line")
+                            .font(.caption.weight(.medium))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
                 Text("Run or walk this route with live GPS, heart rate and distance.")
                     .font(.system(size: 9))
                     .foregroundStyle(WatchTheme.muted)
@@ -92,6 +106,11 @@ struct WatchRouteDetailView: View {
         }
         .background(WatchTheme.canvas.ignoresSafeArea())
         .navigationTitle("Routes")
+        .sheet(item: $directionsRequest) { request in
+            if #available(watchOS 26.0, *) {
+                WatchWalkingDirectionsView(request: request)
+            }
+        }
     }
 
     @ViewBuilder

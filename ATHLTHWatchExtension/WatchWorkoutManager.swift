@@ -395,6 +395,33 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         locationManager.activityType = .fitness
     }
 
+    /// Only the original recorder's fresh, reliable course position can
+    /// propose a rejoin point. This never changes the planned course.
+    func walkingRecoveryDirectionsRequest() -> WatchWalkingDirectionsRequest? {
+        guard let route = plannedRoute,
+              let location = lastAcceptedOutdoorLocation,
+              let index = routeNavigationNearestPointIndex,
+              plannedRouteLocations.indices.contains(index),
+              isActive, usesOutdoorGPS,
+              state == .running || state == .paused,
+              let deviation = routeDeviationMeters, deviation.isFinite,
+              (0...25).contains(location.horizontalAccuracy),
+              ATHLTHCoachSensorFreshness.isFresh(sampledAt: location.timestamp, maximumAge: 10),
+              max(0, deviation - location.horizontalAccuracy) > routeAlertConfiguration.deviationMeters
+        else { return nil }
+        let request = WatchWalkingDirectionsRequest(destination: plannedRouteLocations[index].coordinate,
+            isRecovery: true, workoutRouteID: route.id)
+        return request.isValid ? request : nil
+    }
+
+    func isWalkingRecoveryRequestRelevant(_ request: WatchWalkingDirectionsRequest) -> Bool {
+        guard let current = walkingRecoveryDirectionsRequest(),
+              current.workoutRouteID == request.workoutRouteID else { return false }
+        let a = CLLocation(latitude: current.destination.latitude, longitude: current.destination.longitude)
+        let b = CLLocation(latitude: request.destination.latitude, longitude: request.destination.longitude)
+        return a.distance(from: b) <= 75
+    }
+
     var routeNavigationCue: ATHLTHRouteNavigationCue.Instruction? {
         guard let index = routeNavigationNearestPointIndex,
               let latitude = routeNavigationLatitude,

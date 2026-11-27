@@ -34,3 +34,6 @@ All new API integrations require Xcode 27 build and real Watch verification. The
 
 ## Experimental rep counting
 - Explicit beta control during an active rep-based set uses Core Motion at 20 Hz only while its sheet is open and the user starts counting. Estimates conservative wrist rotation cycles, not a trained ML model; no raw samples retained or transmitted. User stops and approves a draft count via existing updateStrengthDraft, then completes the set normally. Set identity, pause, input mode and foreground lifecycle are checked; physical exercise validation and exercise-specific ML remain outstanding.
+
+## MapKit walking directions
+- watchOS 26+ route detail offers explicit walking-route preview to the saved course start, and live run controls offer a rejoin preview when the original GPS position is fresh, accurate and reliably off course. MapKit calculates only on a user tap; requests are cancelled on dismissal/background, and a rejoin destination is revalidated before/after calculation. The resulting advisory map and step list never replace the stored course, change Ghost Race progress, or create a second workout. No network request is made by the existing offline guidance engine. Automatic turn-by-turn following of the alternate route and voice/haptic manoeuvres are not implemented. Physical device validation remains required.

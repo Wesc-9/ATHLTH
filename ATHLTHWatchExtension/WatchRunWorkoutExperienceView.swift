@@ -36,6 +36,7 @@ struct WatchRunWorkoutExperienceView: View {
     @State private var coachOutputName: String?
     @State private var confirmingEnd = false
     @State private var showingQuickActions = false
+    @State private var walkingDirectionsRequest: WatchWalkingDirectionsRequest?
     @State private var showingAutomaticIndoorSuggestion = false
     @State private var showingManualIndoorChoice = false
     @State private var ghostMapPosition:
@@ -217,6 +218,13 @@ struct WatchRunWorkoutExperienceView: View {
                     english: "Pause workout", norwegian: "Pause økt"
                 )) { workoutManager.pause() }
             }
+            if #available(watchOS 26.0, *),
+               workoutManager.plannedRoute != nil,
+               let recovery = workoutManager.walkingRecoveryDirectionsRequest() {
+                Button(ATHLTHLocalization.choose(
+                    english: "Find way back to route", norwegian: "Finn tilbake til ruten"
+                )) { walkingDirectionsRequest = recovery }
+            }
             Button(ATHLTHLocalization.choose(
                 english: "Finish workout…", norwegian: "Avslutt økt …"
             ), role: .destructive) {
@@ -230,6 +238,13 @@ struct WatchRunWorkoutExperienceView: View {
                 english: "Finishing always requires a separate confirmation.",
                 norwegian: "Avslutning må alltid bekreftes separat."
             ))
+        }
+        .sheet(item: $walkingDirectionsRequest) { request in
+            if #available(watchOS 26.0, *) {
+                WatchWalkingDirectionsView(request: request, isStillRelevant: {
+                    workoutManager.isWalkingRecoveryRequestRelevant(request)
+                })
+            }
         }
         .confirmationDialog(
             "End workout?",
