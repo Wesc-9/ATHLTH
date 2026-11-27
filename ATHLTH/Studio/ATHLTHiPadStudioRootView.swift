@@ -443,6 +443,22 @@ struct ATHLTHiPadStudioRootView: View {
                 showingTrain = true
             case .plan:
                 openStudio(.planner)
+            case .runSetup:
+                openStudio(.train)
+                trainRequest = .quick(.running)
+                showingTrain = true
+            case .walkSetup:
+                openStudio(.train)
+                trainRequest = .quick(.walking)
+                showingTrain = true
+            case .strengthSetup:
+                openStudio(.train)
+                trainRequest = .quick(.strength)
+                showingTrain = true
+            case .sportSetup:
+                openStudio(.train)
+                trainRequest = .allWorkoutCategories
+                showingTrain = true
             }
         }
         .onAppear {
