@@ -16,9 +16,19 @@ enum ATHLTHWatchNavigationTarget: String, AppEnum {
 /// Included in the Watch app and widget target. Navigation is handled by
 /// the foreground SwiftUI root, never by the widget extension recorder.
 @available(watchOS 26.0, *)
-struct ATHLTHWatchNavigationIntent: OpenIntent, TargetContentProvidingIntent {
+struct ATHLTHWatchNavigationIntent: AppIntent {
     static var title: LocalizedStringResource { "Åpne ATHLTH" }
+    static var openAppWhenRun: Bool { true }
     @Parameter(title: "Visning") var target: ATHLTHWatchNavigationTarget
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        if let defaults = UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite) {
+            defaults.set(["target": target.rawValue, "date": Date().timeIntervalSince1970],
+                         forKey: "athlth.watch.navigation.pending.v1")
+        }
+        return .result()
+    }
 
     init() { target = .today }
     init(target: ATHLTHWatchNavigationTarget) { self.target = target }

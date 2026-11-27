@@ -656,12 +656,27 @@ private struct WatchRoutesListView: View {
 
 private struct ATHLTHWatchNavigationHandler: ViewModifier {
     let navigate: (String) -> Void
+    @Environment(\.scenePhase) private var scenePhase
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(watchOS 26.0, *) {
-            content.onAppIntentExecution(ATHLTHWatchNavigationIntent.self) { intent in
-                navigate(intent.target.rawValue)
+            content.task(id: scenePhase) {
+                guard scenePhase == .active else { return }
+                let key = "athlth.watch.navigation.pending.v1"
+                guard let defaults = UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite) else { return }
+                while !Task.isCancelled {
+                    if let request = defaults.dictionary(forKey: key) {
+                        defaults.removeObject(forKey: key)
+                        if let target = request["target"] as? String,
+                           let date = request["date"] as? Double,
+                           abs(Date().timeIntervalSince1970 - date) < 15 {
+                            navigate(target)
+                        }
+                    }
+                    do { try await Task.sleep(for: .milliseconds(500)) }
+                    catch { return }
+                }
             }
         } else {
             content
