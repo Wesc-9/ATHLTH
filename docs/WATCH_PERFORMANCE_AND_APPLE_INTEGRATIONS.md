@@ -13,10 +13,10 @@
 - Verify effort permission denial, successful relation, existing effort, and leaving the summary while authorization is pending.
 - Measure outdoor route fidelity and battery over a fixed session, with/without Low Power Mode, at least one older and newer Watch model.
 - Instrument SwiftUI view invalidation and the per-second manager loop before larger event-driven refactoring; do not change workout deadlines without device regressions.
-- Inspect full independence separately: current app depends on phone provisioning/ownership and transfer queues; do not flip WKRunsIndependentlyOfCompanionApp without first-run account and identity design.
+- The paired iPhone app is a product requirement; retain WKRunsIndependentlyOfCompanionApp=false. Offline recording after setup is distinct from independent installation or Watch-only account creation.
 - WorkoutKit export is a separate optional interoperability project. Only workouts accurately representable by WorkoutKit should be exported, with explicit user action and duplicate-recording/import protection.
 
-## Standalone follow-up
-- Independent installation enabled in both XcodeGen and Info.plist. Unlinked users can record local HealthKit workouts; ATHLTH account features still require linking via iPhone. Guest results are never silently attached to a later account.
+## Offline companion follow-up
+- Independent installation is disabled in both XcodeGen and Info.plist. Setup and account linking remain on iPhone. The Watch records workouts without a nearby phone after setup, and unowned results are never silently attached to a later account.
 - Owned results are persisted on Watch before WCSession delivery, retried on activation/reconnection/account link, and removed after transport success. The existing iPhone identity/deduplication policy remains authoritative.
-- Deadline clock remains at one second; unrelated sport-specific work is no longer evaluated for every sport. Device testing and full account-independent sign-in remain outstanding.
+- Deadline clock remains at one second; unrelated sport-specific work is no longer evaluated for every sport. Device testing remains outstanding; Watch-only account sign-in is intentionally out of scope.

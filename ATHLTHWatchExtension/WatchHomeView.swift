@@ -464,7 +464,7 @@ struct WatchHomeView: View {
     private var connectionPage: some View {
         page(tr("Connection", "Tilkobling")) {
             if routeStore.companionAccountID == nil {
-                empty(tr("Local mode: record workouts directly to Apple Health without an iPhone app. Connect your ATHLTH account on iPhone for plans and account sync. Local workouts are not automatically assigned to a later account.", "Lokal modus: registrer økter direkte i Apple Helse uten iPhone-appen. Koble til ATHLTH-kontoen på iPhone for planer og kontosynkronisering. Lokale økter knyttes ikke automatisk til en senere konto."))
+                empty(tr("Open ATHLTH on your paired iPhone to finish account setup and sync. Once linked, you can train without your iPhone nearby.", "Åpne ATHLTH på den sammenkoblede iPhonen for å fullføre kontooppsett og synkronisering. Når kontoen er tilkoblet, kan du trene uten telefonen i nærheten."))
             } else {
                 empty(routeStore.companionLinked ? tr("iPhone connected", "iPhone tilkoblet") : tr("Your workouts are saved locally and queued for sync when iPhone is available.", "Øktene lagres lokalt og synkroniseres når iPhone er tilgjengelig."))
             }

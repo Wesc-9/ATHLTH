@@ -9507,8 +9507,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func sendToPhone(_ result: WatchWorkoutResult) {
-        // A Watch installed without an ATHLTH account records to Apple Health
-        // only. Never silently assign that result to a subsequently linked user.
+        // If account setup has not completed, a HealthKit recording must
+        // never be silently assigned to a subsequently linked ATHLTH user.
         guard result.accountOwnerID != nil else { return }
         let existing = pendingCompletedResults()
         let updated = ATHLTHWatchCompletedResultOutbox.enqueue(result, into: existing)

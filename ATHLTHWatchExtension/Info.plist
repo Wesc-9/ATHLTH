@@ -13,7 +13,7 @@
     <key>WKCompanionAppBundleIdentifier</key>
     <string>com.wesc9.athlth</string>
     <key>WKRunsIndependentlyOfCompanionApp</key>
-    <true/>
+    <false/>
     <key>NSHealthShareUsageDescription</key>
     <string>ATHLTH reads live heart rate, energy and distance to show your workout metrics on Apple Watch.</string>
     <key>NSHealthUpdateUsageDescription</key>
