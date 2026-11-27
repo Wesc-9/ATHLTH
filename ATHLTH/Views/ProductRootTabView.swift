@@ -2950,6 +2950,7 @@ struct ATHLTHHomeView: View {
                                     .accessibilityAddTraits(.isHeader)
                             }
                             homeAgendaRow(entry, compact: true)
+                                .athlthStablePresentationBoundary()
                         }
                     }
                 }
@@ -3014,10 +3015,15 @@ struct ATHLTHHomeView: View {
                 NavigationLink {
                     ATHLTHTournamentLiveDetailView(tournament: tournament)
                 } label: {
-                    homeCompactCalendarRow(time: entry.time,
-                        title: item.isDeadline(on: entry.day) ? "Frist · \(item.exerciseTitle)" :
-                            item.isOngoing(on: entry.day) ? "Pågår · \(item.exerciseTitle)" : item.exerciseTitle,
-                        icon: "trophy")
+                    let title = item.isDeadline(on: entry.day) ? "Frist · \(item.exerciseTitle)" :
+                        item.isOngoing(on: entry.day) ? "Pågår · \(item.exerciseTitle)" : item.exerciseTitle
+                    if compact {
+                        homeCompactCalendarRow(time: entry.time, title: title, icon: "trophy")
+                    } else {
+                        homeCalendarEventRow(time: entry.time, title: title, systemImage: "trophy",
+                            detail: "\(item.tournamentTitle) · Frist " +
+                                item.deadlineAt.formatted(date: .abbreviated, time: .shortened))
+                    }
                 }
                 .buttonStyle(.plain)
             }
@@ -3025,8 +3031,15 @@ struct ATHLTHHomeView: View {
             NavigationLink {
                 CommunityEventDetailView(eventID: event.id)
             } label: {
-                homeCompactCalendarRow(time: entry.time, title: event.event.title,
-                                       icon: event.event.activityType.systemImage)
+                if compact {
+                    homeCompactCalendarRow(time: entry.time, title: event.event.title,
+                                           icon: event.event.activityType.systemImage)
+                } else {
+                    homeCalendarEventRow(time: entry.time, title: event.event.title,
+                        systemImage: event.event.activityType.systemImage,
+                        detail: event.event.meetingName.isEmpty
+                            ? event.event.activityType.title : event.event.meetingName)
+                }
             }
             .buttonStyle(.plain)
         case .club(let event):
@@ -3034,8 +3047,15 @@ struct ATHLTHHomeView: View {
                 NavigationLink {
                     CommunityGroupEventDetailView(group: group, event: event)
                 } label: {
-                    homeCompactCalendarRow(time: entry.time, title: event.title,
-                                           icon: homeGroupEventSystemImage(event.activityType))
+                    if compact {
+                        homeCompactCalendarRow(time: entry.time, title: event.title,
+                                               icon: homeGroupEventSystemImage(event.activityType))
+                    } else {
+                        homeCalendarEventRow(time: entry.time, title: event.title,
+                            systemImage: homeGroupEventSystemImage(event.activityType),
+                            detail: event.meetingName.isEmpty
+                                ? homeGroupEventActivityTitle(event.activityType) : event.meetingName)
+                    }
                 }
                 .buttonStyle(.plain)
             }
@@ -3130,6 +3150,7 @@ struct ATHLTHHomeView: View {
                                 .accessibilityAddTraits(.isHeader)
                         }
                         homeAgendaRow(entry, compact: false)
+                            .athlthStablePresentationBoundary()
                             .padding(13)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
