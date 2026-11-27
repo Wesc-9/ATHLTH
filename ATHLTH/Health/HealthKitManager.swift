@@ -1777,16 +1777,13 @@ final class HealthKitManager: ObservableObject {
         recoveryPauseIntervals: [DateInterval] = [],
         sensorOwnerID: UUID? = nil
     ) async -> UUID? {
+        guard manualStrengthWrites.reserve(externalID) else { return nil }
         defer {
+            manualStrengthWrites.release(externalID)
             if let sensorOwnerID { discardStrengthSensorCapture(ownerID: sensorOwnerID, workoutID: externalID) }
         }
-        guard integrationEnabled,
-              healthDataAvailable,
-              canWriteWorkouts,
-              endDate > startDate,
-              manualStrengthWrites.reserve(externalID)
-        else { return nil }
-        defer { manualStrengthWrites.release(externalID) }
+        guard integrationEnabled, healthDataAvailable, canWriteWorkouts,
+              endDate > startDate else { return nil }
 
         let syncIdentifier = "athlth-strength-" + externalID.uuidString
         // Query by stable HealthKit sync identity before constructing a
