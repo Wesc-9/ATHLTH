@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Shared competition entry. Every format publishes through the tournament service.
 enum ATHLTHCompetitionFormat: String, CaseIterable, Identifiable {
@@ -185,6 +186,82 @@ enum ATHLTHCompetitionCreationPolicy {
     }
 }
 
+/// iPad uses a live review alongside the editor; phones retain the review step.
+@MainActor
+enum ATHLTHCompetitionWorkspacePolicy {
+    static var usesLiveSummary: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
+    static func sidebarWidth(available: CGFloat) -> CGFloat? {
+        guard available >= 900 else { return nil }
+        return min(440, max(320, available * 0.33))
+    }
+}
+
+/// One adaptive workspace for both creation stages. Independent scroll
+/// surfaces keep the overview accessible without moving the editor.
+struct ATHLTHCompetitionWorkspace: View {
+    let editor: AnyView
+    let summary: AnyView
+    @State private var compactSummaryExpanded = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            if let width = ATHLTHCompetitionWorkspacePolicy.sidebarWidth(available: geometry.size.width) {
+                HStack(alignment: .top, spacing: 0) {
+                    editor
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Divider()
+                    ScrollView {
+                        summaryContent
+                    }
+                    .scrollIndicators(.hidden)
+                    .frame(width: width)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .background(ATHLTHTrainDesign.canvas)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    Button {
+                        compactSummaryExpanded.toggle()
+                    } label: {
+                        HStack {
+                            Label("Sammendrag", systemImage: "list.bullet.rectangle")
+                            Spacer()
+                            Image(systemName: compactSummaryExpanded ? "chevron.up" : "chevron.down")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityValue(compactSummaryExpanded ? "Utvidet" : "Sammenfoldet")
+                    if compactSummaryExpanded {
+                        ScrollView { summaryContent }
+                            .frame(maxHeight: min(320, geometry.size.height * 0.42))
+                    }
+                    Divider()
+                    editor
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+    }
+
+    private var summaryContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Sammendrag")
+                .font(ATHLTHTrainDesign.cardTitle)
+                .accessibilityAddTraits(.isHeader)
+            summary
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// Shared step one: format, name, participants. Dates and sports are rules.
 /// A local recovery checkpoint, separate from saved/published competitions.
 struct ATHLTHCompetitionCreationCheckpoint: Codable {
@@ -316,48 +393,13 @@ struct ATHLTHCompetitionCreationView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
-                    ATHLTHTrainPageTitle(title: format.title)
-                    Text(format.subtitle).font(ATHLTHTrainDesign.pageSubtitle)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    if initialFormat == nil {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Konkurranseform").font(ATHLTHTrainDesign.sectionHeading)
-                            ForEach(ATHLTHCompetitionFormat.allCases) { item in
-                                Button {
-                                    format = item
-                                    chosenIDs = ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
-                                        chosenIDs, format: item, preferred: preselectedFriend?.userID)
-                                    competitionTitle = item == .duel ? "" : item.title
-                                    ruleDraft = nil
-                                    restoredRuleScrollID = nil
-                                    liveRuleCheckpoint.reset()
-                                } label: {
-                                    HStack {
-                                        Label(item.title, systemImage: item.symbol)
-                                        Spacer()
-                                        Image(systemName: format == item ? "checkmark.circle.fill" : "circle")
-                                    }
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                    .padding(12).athlthTrainEditorialCard(compact: true, selected: format == item)
-                                }.buttonStyle(.plain)
-                            }
-                        }
-                    }
-                    detailsCard
-                    if format == .league { leagueCard }
-                    if preselectedRoute != nil || preselectedDistanceKM != nil {
-                        Text("Velg ønsket distanse eller øvelse i reglene. Ruteverifisering støttes ikke i alle konkurranseformer ennå.")
-                            .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
-                    }
-                    Text("Alle deltakerne må godkjenne de samme reglene før start.")
-                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+            Group {
+                if ATHLTHCompetitionWorkspacePolicy.usesLiveSummary {
+                    ATHLTHCompetitionWorkspace(editor: AnyView(setupEditor), summary: AnyView(setupSummary))
+                } else {
+                    setupEditor
                 }
-                .padding(18).frame(maxWidth: 650).frame(maxWidth: .infinity)
             }
-            .scrollDismissesKeyboard(.interactively)
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
             .navigationTitle("Konkurranse").navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -487,6 +529,104 @@ struct ATHLTHCompetitionCreationView: View {
         }
     }
 
+    private var setupEditor: some View {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: ATHLTHTrainDesign.cardSpacing) {
+                    ATHLTHTrainPageTitle(title: format.title)
+                    Text(format.subtitle).font(ATHLTHTrainDesign.pageSubtitle)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    if initialFormat == nil {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Konkurranseform").font(ATHLTHTrainDesign.sectionHeading)
+                            ForEach(ATHLTHCompetitionFormat.allCases) { item in
+                                Button {
+                                    format = item
+                                    chosenIDs = ATHLTHCompetitionCreationPolicy.opponentsAfterFormatChange(
+                                        chosenIDs, format: item, preferred: preselectedFriend?.userID)
+                                    competitionTitle = item == .duel ? "" : item.title
+                                    ruleDraft = nil
+                                    restoredRuleScrollID = nil
+                                    liveRuleCheckpoint.reset()
+                                } label: {
+                                    HStack {
+                                        Label(item.title, systemImage: item.symbol)
+                                        Spacer()
+                                        Image(systemName: format == item ? "checkmark.circle.fill" : "circle")
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    .padding(12).athlthTrainEditorialCard(compact: true, selected: format == item)
+                                }.buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    detailsCard
+                    if format == .league { leagueCard }
+                    if preselectedRoute != nil || preselectedDistanceKM != nil {
+                        Text("Velg ønsket distanse eller øvelse i reglene. Ruteverifisering støttes ikke i alle konkurranseformer ennå.")
+                            .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                    }
+                    Text("Alle deltakerne må godkjenne de samme reglene før start.")
+                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                .padding(18)
+                .frame(maxWidth: ATHLTHCompetitionWorkspacePolicy.usesLiveSummary ? .infinity : 650)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var setupSummary: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Label(format.title, systemImage: format.symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            Text(effectiveTitle)
+                .font(ATHLTHTrainDesign.cardTitle)
+                .fixedSize(horizontal: false, vertical: true)
+            Divider()
+            HStack {
+                Text("Deltakere").font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(chosenIDs.count + 1)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            Label("Du (arrangør)", systemImage: "person.crop.circle")
+                .font(.subheadline)
+            ForEach(selectedPeople, id: \.userID) { friend in
+                HStack(spacing: 9) {
+                    SocialAvatar(profile: friend, size: 30)
+                    Text(friend.resolvedName).font(.subheadline)
+                }
+            }
+            if format == .league {
+                Divider()
+                Label(leagueStyle == .groups ? "Gruppeliga" : "Stor liga", systemImage: "list.number")
+                    .font(.subheadline)
+            }
+            if let draft = ruleDraft {
+                Divider()
+                Text(draft.allowedActivities.map(\.title).sorted().joined(separator: " · "))
+                    .font(.subheadline)
+                Text("\(draft.exerciseCount) konkurranseøvelser")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            Divider()
+            Label(readyForRules ? "Klar for å velge regler" : "Legg til deltakere for å fortsette",
+                  systemImage: readyForRules ? "checkmark.circle" : "info.circle")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            Text("Ingen invitasjon er sendt.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthTrainEditorialCard()
+    }
+
     private var detailsCard: some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 12) {
@@ -563,7 +703,9 @@ struct ATHLTHCompetitionCreationView: View {
                 "Minst \(ATHLTHCompetitionCreationPolicy.minOpponents(format) + 1) deltakere, inkludert deg.")
                 .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
         }
-        .padding(ATHLTHTrainDesign.cardPadding).athlthTrainEditorialCard()
+        .padding(ATHLTHTrainDesign.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthTrainEditorialCard()
     }
 
     private var leagueCard: some View {
@@ -584,6 +726,8 @@ struct ATHLTHCompetitionCreationView: View {
                 }.buttonStyle(.plain)
             }
         }
-        .padding(ATHLTHTrainDesign.cardPadding).athlthTrainEditorialCard()
+        .padding(ATHLTHTrainDesign.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthTrainEditorialCard()
     }
 }
