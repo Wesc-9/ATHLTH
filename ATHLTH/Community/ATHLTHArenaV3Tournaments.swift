@@ -33,6 +33,8 @@ struct ATHLTHTournamentCreator: View {
     private var isRematch: Bool { isDuel && continuationParentID != nil }
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingExerciseLibrary = false
+    @State private var exerciseTemplatesOnly: Bool? = nil
+    @State private var showingDuelRoute = false
     @State private var expandedScoringExample = false
     @State private var rulesScrollID: String?
     @State private var draftID: UUID
@@ -464,26 +466,28 @@ struct ATHLTHTournamentCreator: View {
                     .disabled(!canSave || publishing)
                     .opacity(canSave ? 1 : 0.5)
 
-                    Button {
-                        onSave(makeDraft())
-                        dismiss()
-                    } label: {
-                        Text("Lagre som utkast")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHArenaV3Style.ink)
-                            .frame(maxWidth: .infinity, minHeight: 35)
+                    HStack(spacing: 12) {
+                        Button {
+                            onSave(makeDraft())
+                            dismiss()
+                        } label: {
+                            Text("Lagre som utkast")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHArenaV3Style.ink)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .disabled(publishing)
+                        Button {
+                            templateName = effectiveTitle
+                            showingSaveTemplate = true
+                        } label: {
+                            Label("Lagre som mal", systemImage: "square.stack.3d.up")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .disabled(!canSaveTemplate)
                     }
-                    .disabled(publishing)
-                    Button {
-                        templateName = effectiveTitle
-                        showingSaveTemplate = true
-                    } label: {
-                        Label("Lagre som mal", systemImage: "square.stack.3d.up")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHArenaV3Style.gold)
-                            .frame(maxWidth: .infinity, minHeight: 29)
-                    }
-                    .disabled(!canSaveTemplate)
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
@@ -492,7 +496,7 @@ struct ATHLTHTournamentCreator: View {
         }
         .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
-                selected: Set(competitionSettings.selectedExerciseIDs ?? [])) { item in
+                selected: Set(competitionSettings.selectedExerciseIDs ?? []), templatesOnly: exerciseTemplatesOnly) { item in
                 var ids = competitionSettings.selectedExerciseIDs ?? []
                 guard ids.count < 12, !ids.contains(item.id), item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
                 exerciseMode = .owner
@@ -503,6 +507,20 @@ struct ATHLTHTournamentCreator: View {
                 exerciseActivities[item.id] = item.activity
                 competitionSettings.selectedExerciseIDs = ids
                 exerciseCount = ids.count
+            }
+        }
+        .fullScreenCover(isPresented: $showingDuelRoute.keepingPresentedWhenInactive(scenePhase)) {
+            NavigationStack {
+                SavedRoutesView(selectionTitle: "Konkurranserute") { route in
+                    competitionSettings.race.routeID = route.id
+                    competitionSettings.race.routeName = String(route.title.prefix(120))
+                    showingDuelRoute = false
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Lukk") { showingDuelRoute = false }
+                    }
+                }
             }
         }
         .task(id: competitionSettings.selectedExerciseIDs ?? []) {
@@ -1015,7 +1033,12 @@ struct ATHLTHTournamentCreator: View {
                     .buttonStyle(.plain)
                 }
                 if let activity = exerciseActivities[id] {
-                    exerciseVenuePicker(id: id, activity: activity)
+                    DisclosureGroup("Eget treningsmiljø (valgfritt)") {
+                        exerciseVenuePicker(id: id, activity: activity)
+                            .padding(.top, 6)
+                    }
+                    .font(.caption.weight(.medium))
+                    .tint(ATHLTHArenaV3Style.gold)
                 } else {
                     Text("Henter treningsform for miljøregel…").font(.caption)
                 }
@@ -1044,10 +1067,27 @@ struct ATHLTHTournamentCreator: View {
                 Divider()
                 }
             }
-            Button {
-                showingExerciseLibrary = true
+            Menu {
+                Button {
+                    exerciseTemplatesOnly = false
+                    showingExerciseLibrary = true
+                } label: {
+                    Label("Øvelser fra bibliotek", systemImage: "books.vertical")
+                }
+                Button {
+                    exerciseTemplatesOnly = true
+                    showingExerciseLibrary = true
+                } label: {
+                    Label("Forhåndsdefinerte øvelser og treningsøkter", systemImage: "list.bullet")
+                }
+                Button {
+                    exerciseTemplatesOnly = nil
+                    showingExerciseLibrary = true
+                } label: {
+                    Label("Søk i alle", systemImage: "magnifyingglass")
+                }
             } label: {
-                Label("Legg til øvelse eller treningsøkt", systemImage: "plus.circle.fill")
+                Label("Legg til konkurranseøvelse", systemImage: "plus.circle.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
                     .frame(maxWidth: .infinity, minHeight: 48)
@@ -1055,6 +1095,36 @@ struct ATHLTHTournamentCreator: View {
             }
             .buttonStyle(.plain)
             .disabled(!ATHLTHTournamentActivity.canCreate(with: allowedActivities) || (competitionSettings.selectedExerciseIDs?.count ?? 0) >= 12)
+            if isDuel && allowedActivities.contains(.running) {
+                Divider()
+                Button {
+                    showingDuelRoute = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Felles løperute").font(.subheadline.weight(.semibold))
+                            Text(competitionSettings.race.routeName.isEmpty ? "Velg lagret rute" : competitionSettings.race.routeName)
+                                .font(.caption)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    .padding(12)
+                    .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                if competitionSettings.race.routeID != nil {
+                    Button("Fjern rute", role: .destructive) {
+                        competitionSettings.race.routeID = nil
+                        competitionSettings.race.routeName = ""
+                    }.font(.caption)
+                    Text("Felles rute for frivillig Live Ghost-deling. Ruten er foreløpig ikke en separat resultatøvelse.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
             if allowedActivities.isEmpty {
                 Text("Velg minst én gren først.").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
@@ -1088,7 +1158,7 @@ struct ATHLTHTournamentCreator: View {
                 get: { competitionSettings.exerciseEnvironments[id] },
                 set: { competitionSettings.exerciseEnvironments[id] = $0 }
             )) {
-                Text("Arv: " + inherited.title).tag(ATHLTHCompetitionEnvironment?.none)
+                Text("Samme som fellesregelen").tag(ATHLTHCompetitionEnvironment?.none)
                 ForEach(ATHLTHCompetitionEnvironment.allCases.filter {
                     ($0 != inherited && options.contains($0)) || $0 == current
                 }) { value in
@@ -1533,6 +1603,9 @@ struct ATHLTHTournamentCreator: View {
             Text("Konkurransen").font(.headline)
             reviewRow("Grener", ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title).joined(separator: " · "))
             reviewRow("Øvelser", exerciseMode == .open ? "Åpen liste" : "\(exerciseCount)")
+            if competitionSettings.race.routeID != nil {
+                reviewRow("Felles løperute", competitionSettings.race.routeName)
+            }
             ForEach(competitionSettings.selectedExerciseIDs ?? [], id: \.self) { id in
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: exerciseActivities[id]?.symbol ?? "figure.mixed.cardio")
