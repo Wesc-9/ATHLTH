@@ -1049,6 +1049,7 @@ struct RecoveryCoachView: View {
     @State private var showingCoachPlanAdaptation = false
     @State private var showingCoachTrainingMemory = false
     @State private var trainingMemoryDraft = ""
+    @State private var structuredMemoryDraft: ATHLTHCoachPreferences?
     @State private var trainingMemoryOwner: UUID?
     @State private var showingCoachWorkoutProfileReview = false
     @State private var pendingWorkoutCreationPrompt = ""
@@ -1306,6 +1307,7 @@ struct RecoveryCoachView: View {
             didLoadConversation = false
             conversationOwnerID = nil
             trainingMemoryDraft = ""
+            structuredMemoryDraft = nil
             trainingMemoryOwner = nil
             showingCoachTrainingMemory = false
             aiConsentApproved = false
@@ -1406,6 +1408,22 @@ struct RecoveryCoachView: View {
                             "Lagres lokalt i treningsprofilen. Du velger selv når notatene skal brukes i et spørsmål. Unngå private medisinske opplysninger."))
                     }
                     Section {
+                        if let preferences = structuredMemoryDraft {
+                            Text(preferences.description).font(.subheadline)
+                            Button(recoveryAIText("Clear remembered preferences", "Slett huskede preferanser"), role: .destructive) {
+                                structuredMemoryDraft = nil
+                            }
+                        } else {
+                            Text(recoveryAIText("No remembered form preferences.", "Ingen huskede skjemapreferanser."))
+                                .foregroundStyle(.secondary)
+                        }
+                    } header: {
+                        Text(recoveryAIText("Remembered form choices", "Huskede skjemavalg"))
+                    } footer: {
+                        Text(recoveryAIText("Only confirmed choices from Coach forms are retained locally. Save to confirm deletion.",
+                                            "Kun bekreftede valg fra Coach-skjemaer lagres lokalt. Lagre for å bekrefte sletting."))
+                    }
+                    Section {
                         Button(recoveryAIText("Add saved notes to my question", "Legg notatene til i spørsmålet")) {
                             guard trainingMemoryOwner == session.profile.userID, session.signedIn else { return }
                             let notes = ATHLTHCoachProfileNotesPolicy.coachContext(
@@ -1428,6 +1446,7 @@ struct RecoveryCoachView: View {
                             guard session.signedIn, trainingMemoryOwner == session.profile.userID else { return }
                             var profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
                             profile.trainingNotes = String(trainingMemoryDraft.prefix(700))
+                            profile.coachPreferences = structuredMemoryDraft
                             profile.updatedAt = Date()
                             profile.save(userID: session.profile.userID)
                             showingCoachTrainingMemory = false
@@ -1937,7 +1956,9 @@ struct RecoveryCoachView: View {
                 Button {
                     guard session.signedIn else { return }
                     trainingMemoryOwner = session.profile.userID
-                    trainingMemoryDraft = ATHLTHTrainingProfile.load(userID: session.profile.userID).trainingNotes
+                    let profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+                    trainingMemoryDraft = profile.trainingNotes
+                    structuredMemoryDraft = profile.coachPreferences
                     showingCoachTrainingMemory = true
                 } label: {
                     Label(recoveryAIText("Coach memory", "Coach-hukommelse"), systemImage: "person.text.rectangle")
@@ -3009,7 +3030,8 @@ struct RecoveryCoachView: View {
                 priorPlanQuestion.map(ATHLTHCoachChatPlanIntake.isCreationRequest) == true
             if ATHLTHCoachChatPlanIntake.isCreationRequest(clean) || continuingPlanQuestion {
                 let intake = ATHLTHCoachChatPlanIntake.prefilled(from:
-                    continuingPlanQuestion ? (priorPlanQuestion ?? "") + "\n" + clean : clean)
+                    continuingPlanQuestion ? (priorPlanQuestion ?? "") + "\n" + clean : clean,
+                    preferences: ATHLTHTrainingProfile.load(userID: requestOwnerID).coachPreferences)
                 messages.append(RecoveryCoachMessage(role: .assistant,
                     text: recoveryAIText(
                         "I'll prepare a real plan for you. Confirm or adjust these details first.",
@@ -3019,7 +3041,8 @@ struct RecoveryCoachView: View {
                 return
             }
             if ATHLTHCoachChatWorkoutIntake.isRequest(clean) {
-                let intake = ATHLTHCoachChatWorkoutIntake.prefilled(from: clean)
+                let intake = ATHLTHCoachChatWorkoutIntake.prefilled(from: clean,
+                    preferences: ATHLTHTrainingProfile.load(userID: requestOwnerID).coachPreferences)
                 messages.append(RecoveryCoachMessage(role: .assistant,
                     text: recoveryAIText("Confirm the workout details. I'll use your available library exercises.",
                                          "Bekreft øktdetaljene. Jeg bruker øvelsene som finnes i biblioteket ditt."),
@@ -3152,6 +3175,14 @@ struct RecoveryCoachView: View {
         var submitted = intake
         submitted.submitted = true
         messages[index].planIntake = submitted
+        if intake.rememberPreferences == true {
+            var profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+            var preferences = profile.coachPreferences ?? ATHLTHCoachPreferences()
+            preferences.remember(intake)
+            profile.coachPreferences = preferences
+            profile.updatedAt = Date()
+            profile.save(userID: session.profile.userID)
+        }
         messages.append(RecoveryCoachMessage(role: .assistant,
             text: recoveryAIText("Your draft is ready. Open it to review the workouts and choose whether to use it.",
                                  "Planutkastet er klart. Åpne det for å gjennomgå øktene og velge om du vil bruke planen."),
@@ -3173,6 +3204,14 @@ struct RecoveryCoachView: View {
         var submitted = intake
         submitted.submitted = true
         messages[index].workoutIntake = submitted
+        if intake.rememberPreferences == true {
+            var profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+            var preferences = profile.coachPreferences ?? ATHLTHCoachPreferences()
+            preferences.remember(intake)
+            profile.coachPreferences = preferences
+            profile.updatedAt = Date()
+            profile.save(userID: session.profile.userID)
+        }
         messages.append(RecoveryCoachMessage(role: .assistant,
             text: recoveryAIText("Open a workout to review it and choose when to add it.",
                 "Åpne en økt for å se detaljene og velge når du vil legge den til."),

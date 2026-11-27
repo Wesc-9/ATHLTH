@@ -4,6 +4,7 @@ import Foundation
 /// public profile or sent to Coach without a separate per-request decision.
 struct ATHLTHTrainingProfile: Codable, Equatable {
     var trainingNotes: String = ""
+    var coachPreferences: ATHLTHCoachPreferences? = nil
     // Historical free-text stays readable after migrating to structured restrictions.
     var injuryAndLimitations: String = ""
     // Optional so existing saved profiles decode without a migration or data loss.

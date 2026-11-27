@@ -31,6 +31,10 @@ struct ATHLTHCoachChatWorkoutIntakeCard: View {
                 ForEach(ATHLTHCoachChatPlanIntake.Experience.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             Toggle(workoutText("Only my exercises", "Kun mine øvelser"), isOn: binding(\.ownOnly))
+            Toggle(workoutText("Remember these preferences", "Husk disse preferansene"), isOn: Binding(
+                get: { intake.rememberPreferences == true },
+                set: { value in var updated = intake; updated.rememberPreferences = value; onChange(updated) }))
+                .font(.subheadline)
             Text(workoutText("Only available library exercises. Nothing is scheduled yet.", "Kun tilgjengelige bibliotekøvelser. Ingenting planlegges ennå."))
                 .font(.caption).foregroundStyle(.secondary)
             Button { onGenerate(intake) } label: {

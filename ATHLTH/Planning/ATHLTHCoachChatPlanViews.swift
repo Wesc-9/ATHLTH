@@ -34,6 +34,12 @@ struct ATHLTHCoachChatPlanIntakeCard: View {
             Picker(planText("Experience", "Erfaring"), selection: binding(\.experience)) {
                 ForEach(ATHLTHCoachChatPlanIntake.Experience.allCases, id: \.self) { Text($0.title).tag($0) }
             }
+            if !intake.submitted {
+                Toggle(planText("Remember these preferences", "Husk disse preferansene"), isOn: Binding(
+                    get: { intake.rememberPreferences == true },
+                    set: { value in var updated = intake; updated.rememberPreferences = value; onChange(updated) }))
+                    .font(.subheadline)
+            }
             if intake.submitted {
                 Label(planText("Draft created", "Utkast opprettet"), systemImage: "checkmark.circle").font(.subheadline)
             } else {

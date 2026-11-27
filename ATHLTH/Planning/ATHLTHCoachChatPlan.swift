@@ -39,6 +39,7 @@ struct ATHLTHCoachChatPlanIntake: Codable, Hashable {
     var weeks = 8
     var sessionsPerWeek = 3
     var submitted = false
+    var rememberPreferences: Bool? = nil
 
     static func isCreationRequest(_ source: String) -> Bool {
         let text = source.lowercased()
@@ -48,8 +49,13 @@ struct ATHLTHCoachChatPlanIntake: Codable, Hashable {
         return plan && creation && !adjustment
     }
 
-    static func prefilled(from source: String) -> Self {
+    static func prefilled(from source: String, preferences: ATHLTHCoachPreferences? = nil) -> Self {
         var result = Self()
+        result.goal = preferences?.planGoal ?? result.goal
+        result.place = preferences?.place ?? result.place
+        result.experience = preferences?.experience ?? result.experience
+        if let weeks = preferences?.weeks, (2...12).contains(weeks) { result.weeks = weeks }
+        if let count = preferences?.sessionsPerWeek, (2...4).contains(count) { result.sessionsPerWeek = count }
         let text = source.lowercased()
         if ["lår", "bein", "benstyrke", "quadriceps", "leg strength", "thigh"].contains(where: { text.contains($0) }) {
             result.goal = .legs
@@ -57,12 +63,15 @@ struct ATHLTHCoachChatPlanIntake: Codable, Hashable {
             result.goal = .hybrid
         } else if text.contains("løp") || text.contains("running") { result.goal = .running }
         else if text.contains("gåtur") || text.contains("walking") { result.goal = .walking }
+        else if text.contains("styrke") || text.contains("strength") { result.goal = .strength }
         if (text.contains("sommer") && text.contains("vinter")) || (text.contains("summer") && text.contains("winter")) {
             result.place = .seasonal
         } else if text.contains("utendørs") || text.contains(" ute") || text.contains("outdoors") {
             result.place = .outdoors
         } else if text.contains("hjemme") || text.contains("at home") { result.place = .home }
+        else if text.contains("treningssenter") || text.contains("gym") { result.place = .gym }
         if text.contains("regelmessig") || text.contains("experienced") { result.experience = .regular }
+        else if text.contains("nybegynner") || text.contains("beginner") { result.experience = .beginner }
         if let range = text.range(of: #"[2-4](?:\s*[-–]\s*[2-4])?\s*(?:ganger|økter|times|sessions)"#, options: .regularExpression),
            let number = text[range].first?.wholeNumberValue { result.sessionsPerWeek = number }
         if let range = text.range(of: #"\b(?:[2-9]|1[0-2])\s*(?:uker|weeks)\b"#, options: .regularExpression),

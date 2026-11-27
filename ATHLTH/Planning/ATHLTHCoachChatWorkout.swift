@@ -39,6 +39,7 @@ struct ATHLTHCoachChatWorkoutIntake: Codable, Hashable {
     var alternatives = 1
     var ownOnly = false
     var submitted = false
+    var rememberPreferences: Bool? = nil
 
     static func isRequest(_ source: String) -> Bool {
         let text = source.lowercased()
@@ -49,10 +50,13 @@ struct ATHLTHCoachChatWorkoutIntake: Codable, Hashable {
              ["planlegg", "planlegge", "gi meg", "foreslå", "forslag", "alternativ", "suggest", "plan a", "give me"].contains { text.contains($0) })
     }
 
-    static func prefilled(from source: String, now: Date = Date(), calendar: Calendar = .current) -> Self {
+    static func prefilled(from source: String, now: Date = Date(), calendar: Calendar = .current,
+                          preferences: ATHLTHCoachPreferences? = nil) -> Self {
         let text = source.lowercased()
         var intake = Self()
-        let plan = ATHLTHCoachChatPlanIntake.prefilled(from: source)
+        intake.focus = preferences?.workoutFocus ?? intake.focus
+        if let minutes = preferences?.minutes, (15...60).contains(minutes) { intake.minutes = minutes }
+        let plan = ATHLTHCoachChatPlanIntake.prefilled(from: source, preferences: preferences)
         intake.place = plan.place == .seasonal ? .gym : plan.place
         intake.experience = plan.experience
         intake.date = calendar.startOfDay(for: now)
@@ -66,9 +70,10 @@ struct ATHLTHCoachChatWorkoutIntake: Codable, Hashable {
         else if text.contains("skuld") || text.contains("shoulder") { intake.focus = .shoulders }
         else if text.contains("arm") || text.contains("biceps") || text.contains("triceps") { intake.focus = .arms }
         else if text.contains("kjerne") || text.contains("core") { intake.focus = .core }
-        else if plan.goal == .legs { intake.focus = .legs }
-        else if plan.goal == .running { intake.focus = .running }
-        else if plan.goal == .walking { intake.focus = .walking }
+        else if ["lår", "bein", "legs", "thigh"].contains(where: { text.contains($0) }) { intake.focus = .legs }
+        else if text.contains("løp") || text.contains("running") { intake.focus = .running }
+        else if text.contains("gåtur") || text.contains("walking") { intake.focus = .walking }
+        else if text.contains("helkropp") || text.contains("full body") { intake.focus = .fullBody }
         if let range = text.range(of: #"\b(?:15|20|25|30|35|40|45|50|55|60)\s*(?:minutter|min|minutes)\b"#, options: .regularExpression),
            let minutes = Int(text[range].prefix(while: { $0.isNumber })) { intake.minutes = minutes }
         if ["tre ", "3 ", "three "].contains(where: { text.contains($0 + "alternativ") || text.contains($0 + "økt") || text.contains($0 + "workout") }) { intake.alternatives = 3 }
