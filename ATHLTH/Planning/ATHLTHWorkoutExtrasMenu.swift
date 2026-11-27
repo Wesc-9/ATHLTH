@@ -13,6 +13,8 @@ struct ATHLTHWorkoutExtrasMenu: View {
     /// Compact bottom-of-Basic menu instead of a competing top-right gear.
     var showsNavigation = true
     var showsExpandedLabel = false
+    var showsPlanWithFriend = true
+    var showsGhostRace = true
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -23,9 +25,11 @@ struct ATHLTHWorkoutExtrasMenu: View {
             Button(action: onGear) {
                 Label(tr("Gear", "Utstyr"), systemImage: "shoeprints.fill")
             }
-            Button(action: onPlanWithFriend) {
-                Label(tr("Plan with a friend", "Planlegg med en venn"),
-                      systemImage: "person.2")
+            if showsPlanWithFriend {
+                Button(action: onPlanWithFriend) {
+                    Label(tr("Plan with a friend", "Planlegg med en venn"),
+                          systemImage: "person.2")
+                }
             }
             Button(action: onSpotify) {
                 Label("Spotify", systemImage: "music.note")
@@ -37,8 +41,10 @@ struct ATHLTHWorkoutExtrasMenu: View {
             Button(action: onAudioCoach) {
                 Label("Audio Coach", systemImage: "waveform")
             }
-            Button(action: onGhostRace) {
-                Label("Ghost Race", systemImage: "figure.run")
+            if showsGhostRace {
+                Button(action: onGhostRace) {
+                    Label("Ghost Race", systemImage: "figure.run")
+                }
             }
             if showsNavigation {
                 Button(action: onNavigation) {
