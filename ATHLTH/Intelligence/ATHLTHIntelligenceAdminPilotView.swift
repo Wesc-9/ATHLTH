@@ -4,6 +4,7 @@ import SwiftUI
 struct ATHLTHIntelligenceAdminPilotView: View {
     let isAdministrator: Bool
     @State private var enabled = false
+    @AppStorage(ATHLTHIntelligenceRoutingPolicy.recommendationPilotKey) private var recommendationPilot = false
     @State private var norwegian = true
     @State private var busy = false
     @State private var result: ATHLTHIntelligenceDiagnosticResult?
@@ -24,6 +25,10 @@ struct ATHLTHIntelligenceAdminPilotView: View {
                     value: tr("Awaiting access", "Avventer tilgang"))
                 Toggle(tr("Enable local test", "Aktiver lokal test"), isOn: $enabled)
                     .disabled(busy)
+                Toggle(tr("Pilot: daily recommendation", "Pilot: dagens anbefaling"), isOn: $recommendationPilot)
+                Text(tr("Only administrators can request a local wording selection from the daily recommendation details. No new training advice is generated.",
+                        "Kun administratorer kan be om et lokalt formuleringvalg i detaljene for dagens anbefaling. Det genereres ingen nye treningsråd."))
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle(tr("Test in Norwegian", "Test på norsk"), isOn: $norwegian)
                     .disabled(busy)
                 Text(tr("Synthetic sample only. No health data or remote fallback.",
@@ -50,10 +55,12 @@ struct ATHLTHIntelligenceAdminPilotView: View {
             Section(tr("Current feature routing", "Dagens leverandørvalg")) {
                 ForEach(ATHLTHIntelligenceFeature.allCases.filter { $0 != .localDiagnostic }, id: \.rawValue) { feature in
                     LabeledContent(feature.title,
-                        value: ATHLTHIntelligenceRoutingPolicy.provider(for: feature)?.title ?? "—")
+                        value: ATHLTHIntelligenceRoutingPolicy.provider(for: feature,
+                            adminPilotEnabled: recommendationPilot, isAdministrator: isAdministrator,
+                            localAvailable: ATHLTHIntelligenceEngine.isLocalAvailable)?.title ?? "—")
                 }
-                Text(tr("Existing backend routes remain unchanged during this pilot.",
-                        "Eksisterende backend-ruter er uendret i denne piloten."))
+                Text(tr("Existing cloud requests retain their original endpoints and consent checks.",
+                        "Eksisterende skyforespørsler beholder endepunkter og samtykkekontroller."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             .onDisappear { task?.cancel(); task = nil; enabled = false; result = nil; busy = false }

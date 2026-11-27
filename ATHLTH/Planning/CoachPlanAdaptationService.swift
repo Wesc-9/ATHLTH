@@ -62,7 +62,7 @@ final class CoachPlanAdaptationService {
         request: CoachPlanAdaptationRequest
     ) async throws -> CoachPlanChangeProposal {
         let draft: CoachPlanAdaptationDraft = try await client.functions.invoke(
-            "generate-plan-adaptation",
+            ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .planAdaptation),
             options: FunctionInvokeOptions(body: request)
         )
 

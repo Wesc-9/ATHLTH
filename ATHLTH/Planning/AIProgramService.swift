@@ -517,7 +517,7 @@ final class AIProgramService {
         for attempt in 0..<2 {
             do {
                 return try await client.functions.invoke(
-                    "generate-training-program",
+                    ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .trainingProgram),
                     options: FunctionInvokeOptions(body: request, timeoutInterval: 120)
                 )
             } catch FunctionsError.httpError(let status, let data) {

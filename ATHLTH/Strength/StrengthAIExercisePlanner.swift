@@ -134,7 +134,7 @@ private final class StrengthAIExerciseService {
         _ request: StrengthAIExerciseRequest
     ) async throws -> StrengthAIExercisePlan {
         try await client.functions.invoke(
-            "generate-strength-session",
+            ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .strengthSession),
             options: FunctionInvokeOptions(
                 body: request
             )

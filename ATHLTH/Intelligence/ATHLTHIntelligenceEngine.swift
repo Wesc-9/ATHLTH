@@ -23,7 +23,7 @@ enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
     case dailyFormCalculation, dailyRecommendation, fixedAudioCoach
     case workoutInsight, recoveryInsight, coachQuestion, trainingProgram
     case strengthSession, planAdaptation, equipmentRecognition, pushToTalk
-    case realtimeConversation, localDiagnostic
+    case realtimeConversation, localDiagnostic, dailyRecommendationExplanation
 
     var title: String {
         switch self {
@@ -40,6 +40,7 @@ enum ATHLTHIntelligenceFeature: String, CaseIterable, Sendable {
         case .pushToTalk: return "Push-to-talk pilot"
         case .realtimeConversation: return "Realtime conversation"
         case .localDiagnostic: return "Local AI diagnostic"
+        case .dailyRecommendationExplanation: return "Daily recommendation explanation (pilot)"
         }
     }
 }
@@ -60,12 +61,31 @@ enum ATHLTHIntelligenceRoutingPolicy {
         case .localDiagnostic:
             // No remote fallback: a local-only request must stay local.
             return adminPilotEnabled && isAdministrator && localAvailable ? .appleLocal : nil
+        case .dailyRecommendationExplanation:
+            return adminPilotEnabled && isAdministrator && localAvailable ? .appleLocal : .rules
         }
     }
 
     // The managed entitlement and a verified release configuration are needed
     // before adding a PCC adapter. An admin toggle cannot grant this access.
     static let cloudEnabled = false
+    static let recommendationPilotKey = "athlth.intelligence.recommendationPilot.v1"
+
+    /// Central endpoint selection for existing authenticated callers. The
+    /// request bodies, SDK, budgets and consent checks remain with the caller.
+    static func groqEndpoint(for feature: ATHLTHIntelligenceFeature) throws -> String {
+        guard provider(for: feature) == .groq else { throw ATHLTHIntelligenceDiagnosticError.unavailable }
+        switch feature {
+        case .workoutInsight: return "workout-insight"
+        case .recoveryInsight, .coachQuestion: return "recovery-sense-v2"
+        case .trainingProgram: return "generate-training-program"
+        case .strengthSession: return "generate-strength-session"
+        case .planAdaptation: return "generate-plan-adaptation"
+        case .equipmentRecognition: return "identify-gym-equipment"
+        case .pushToTalk: return "audio-coach-groq-turn"
+        default: throw ATHLTHIntelligenceDiagnosticError.unavailable
+        }
+    }
 }
 
 enum ATHLTHIntelligenceDiagnosticError: Error {
@@ -122,6 +142,44 @@ enum ATHLTHIntelligenceEngine {
         }
         #endif
         throw ATHLTHIntelligenceDiagnosticError.unavailable
+    }
+
+    /// The pilot selects only preapproved explanatory wording. The model
+    /// cannot invent measurements, change a workout, or produce new advice.
+    /// On failure, return the exact deterministic explanation.
+    static func recommendationExplanation(options: [String], enabled: Bool,
+        isAdministrator: Bool, norwegian: Bool) async throws -> String? {
+        guard options.count == 2, options.allSatisfy({ !$0.isEmpty && $0.count <= 400 }) else { return nil }
+        guard ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyRecommendationExplanation,
+            adminPilotEnabled: enabled, isAdministrator: isAdministrator,
+            localAvailable: isLocalAvailable) == .appleLocal else { return nil }
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            let session = LanguageModelSession(instructions:
+                "Select the clearer of two approved training explanations. Return only A or B. Do not rewrite or add advice.")
+            let prompt = (norwegian ? "Velg tydeligste formulering." : "Choose the clearer wording.")
+                + "\nA: " + options[0] + "\nB: " + options[1]
+            do {
+                let response = try await session.respond(to: prompt)
+                try Task.checkCancellation()
+                return approvedChoice(response.content, options: options)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                return nil
+            }
+        }
+        #endif
+        return nil
+    }
+
+    static func approvedChoice(_ answer: String, options: [String]) -> String? {
+        guard options.count == 2 else { return nil }
+        switch answer.trimmingCharacters(in: .whitespacesAndNewlines) {
+        case "A": return options[0]
+        case "B": return options[1]
+        default: return nil
+        }
     }
 
     static func validatesDiagnostic(_ text: String, norwegian: Bool) -> Bool {

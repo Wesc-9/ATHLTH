@@ -798,7 +798,7 @@ final class RecoveryAIService {
 
         let insight: RecoveryAIInsight =
             try await client.functions.invoke(
-                "recovery-sense-v2",
+                ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .recoveryInsight),
                 options: FunctionInvokeOptions(
                     body: RecoveryAIRequest(
                         mode: "insight",
@@ -935,7 +935,7 @@ final class RecoveryAIService {
 
         let response: RecoveryAIAnswer =
             try await client.functions.invoke(
-                "recovery-sense-v2",
+                ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .coachQuestion),
                 options: FunctionInvokeOptions(
                     body: RecoveryAIRequest(
                         mode: "ask",

@@ -49,7 +49,7 @@ final class WorkoutInsightAIService {
 
         let response: WorkoutAIInsight =
             try await client.functions.invoke(
-                "workout-insight",
+                ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .workoutInsight),
                 options: FunctionInvokeOptions(
                     body:
                         WorkoutAIInsightRequest(

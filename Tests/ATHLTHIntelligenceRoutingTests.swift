@@ -22,6 +22,31 @@ final class ATHLTHIntelligenceRoutingTests: XCTestCase {
         }
     }
 
+    func testExistingCloudEndpointsAndLocalOnlySeparation() throws {
+        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .workoutInsight), "workout-insight")
+        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .recoveryInsight), "recovery-sense-v2")
+        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .coachQuestion), "recovery-sense-v2")
+        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .trainingProgram), "generate-training-program")
+        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .planAdaptation), "generate-plan-adaptation")
+        XCTAssertEqual(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .strengthSession), "generate-strength-session")
+        XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .localDiagnostic))
+        XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .dailyRecommendationExplanation))
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyRecommendationExplanation), .rules)
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyRecommendationExplanation,
+            adminPilotEnabled: true, isAdministrator: true, localAvailable: true), .appleLocal)
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyRecommendationExplanation,
+            adminPilotEnabled: true, isAdministrator: false, localAvailable: true), .rules)
+    }
+
+    @MainActor
+    func testOnlyApprovedLocalWordingCanBeReturned() {
+        let options = ["Original", "Alternative"]
+        XCTAssertEqual(ATHLTHIntelligenceEngine.approvedChoice("A", options: options), "Original")
+        XCTAssertEqual(ATHLTHIntelligenceEngine.approvedChoice(" B\n", options: options), "Alternative")
+        XCTAssertNil(ATHLTHIntelligenceEngine.approvedChoice("B. Extra advice", options: options))
+        XCTAssertNil(ATHLTHIntelligenceEngine.approvedChoice("A", options: []))
+    }
+
     @MainActor
     func testDiagnosticRejectsInventedNumbersAndInvalidFormat() {
         XCTAssertTrue(ATHLTHIntelligenceEngine.validatesDiagnostic("Eksempeløkten var en gåtur på 30 minutter.", norwegian: true))
