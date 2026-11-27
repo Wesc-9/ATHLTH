@@ -18,6 +18,29 @@ final class ATHLTHCoachChatWorkoutTests: XCTestCase {
         intake.alternatives = 3
         XCTAssertTrue(ATHLTHCoachChatWorkoutFactory.makeDrafts(intake, library: []).isEmpty)
     }
+    @MainActor func testAlternativesUseOnlyAvailableDistinctLibraryIDs() {
+        let entries = (1...5).map { number -> ExerciseLibraryEntry in
+            let exercise = Exercise(id: UUID(), origin: .publicCatalog, ownerID: nil,
+                name: "Back movement \(number)", instructions: [], primaryMuscles: ["Back"],
+                secondaryMuscles: [], equipment: ["Dumbbell"], imageURL: nil,
+                isVisibleOutsideOwnerLibrary: true)
+            return ExerciseLibraryEntry(id: exercise.id, exercise: exercise,
+                source: number == 1 ? .custom : .athlthCatalog, sourceIdentifier: nil,
+                summary: nil, tips: [], category: "Strength", difficulty: nil,
+                bodyPart: "Back", imageStartURL: nil, imagePeakURL: nil)
+        }
+        var intake = ATHLTHCoachChatWorkoutIntake()
+        intake.focus = .back
+        intake.alternatives = 3
+        let drafts = ATHLTHCoachChatWorkoutFactory.makeDrafts(intake, library: entries)
+        XCTAssertEqual(drafts.count, 3)
+        let ids = drafts.map { Set($0.workout.resolvedWorkoutBlocks.compactMap(\.exerciseID)) }
+        XCTAssertEqual(Set(ids).count, 3)
+        XCTAssertTrue(ids.first?.contains(entries[0].id) == true)
+        XCTAssertTrue(drafts.allSatisfy { ATHLTHCoachLibraryGate.hasOnlyLibraryReferences($0.workout, library: entries) })
+        XCTAssertFalse(drafts.contains { ATHLTHCoachLibraryGate.hasOnlyLibraryReferences($0.workout, library: []) })
+    }
+
     func testSubmittedIntakePersists() throws {
         var intake = ATHLTHCoachChatWorkoutIntake()
         intake.submitted = true

@@ -87,8 +87,11 @@ struct ATHLTHCoachChatWorkoutDraft: Codable, Hashable, Identifiable {
 
 enum ATHLTHCoachLibraryGate {
     static func hasOnlyLibraryReferences(_ workout: PlannedSession, library: [ExerciseLibraryEntry]) -> Bool {
-        let ids = Set(library.map(\.id))
-        return workout.exercises.allSatisfy { $0.exerciseID.map(ids.contains) == true } &&
+        hasOnlyLibraryReferences(workout, ids: Set(library.map(\.id)))
+    }
+
+    static func hasOnlyLibraryReferences(_ workout: PlannedSession, ids: Set<UUID>) -> Bool {
+        workout.exercises.allSatisfy { $0.exerciseID.map(ids.contains) == true } &&
             workout.resolvedWorkoutBlocks.allSatisfy { block in
                 if block.kind == .exercise || block.exerciseID != nil || block.exerciseSlug != nil {
                     return block.exerciseID.map(ids.contains) == true
@@ -131,7 +134,7 @@ enum ATHLTHCoachChatWorkoutFactory {
         guard candidates.count >= count + intake.alternatives - 1 else { return [] }
         var drafts: [ATHLTHCoachChatWorkoutDraft] = []
         for variant in 0..<intake.alternatives {
-            let start = min(variant * count, candidates.count - count)
+            let start = min(variant * count, candidates.count - count - (intake.alternatives - 1 - variant))
             let entries = Array(candidates[start..<(start + count)])
             let exercises = entries.map { entry in
                 PlannedExercise(id: UUID(), exerciseID: entry.id, embeddedExercise: entry.exercise.snapshot,

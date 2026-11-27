@@ -96,6 +96,8 @@ enum ATHLTHCoachChatPlanFactory {
         guard let entry = ATHLTHCuratedTrainingPlans.entries.first(where: { $0.slug == slug }),
               let homeEntry = ATHLTHCuratedTrainingPlans.entries.first(where: { $0.slug == "home-bodyweight-8w" }) else { return nil }
         let weekdays = intake.sessionsPerWeek == 2 ? [1, 4] : intake.sessionsPerWeek == 3 ? [1, 3, 5] : [1, 3, 5, 7]
+        let allowedIDs = library.map { Set($0.map(\.id)) }
+        let custom = library?.filter { $0.source == .custom } ?? []
         let names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         let norwegian = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
         var weeks: [AIProgramDraftWeek] = []
@@ -142,9 +144,40 @@ enum ATHLTHCoachChatPlanFactory {
                             english: "Bodyweight session; focus on controlled lower-body movements.",
                             norwegian: "Kroppsvektøkt; fokuser på kontrollerte beinøvelser.")
                     }
-                    if let library {
-                        guard ATHLTHWorkoutExerciseBinding.bind(&workout, library: library).isReady,
-                              ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(workout, library: library) else { return nil }
+                    if let library, let allowedIDs {
+                        guard ATHLTHWorkoutExerciseBinding.bind(&workout, library: library).isReady else { return nil }
+                        // A custom movement can replace a matching catalog movement
+                        // only when its primary-muscle and equipment metadata agree.
+                        // Preserve the schedule and conservative progression; never
+                        // invent identities or carry over movement-specific cues.
+                        if workout.kind == .strength, var blocks = workout.workoutBlocks {
+                            var used = Set(blocks.compactMap(\.exerciseID))
+                            for index in blocks.indices where blocks[index].kind == .exercise {
+                                guard let snapshot = blocks[index].exerciseSnapshot,
+                                      !snapshot.primaryMuscles.isEmpty, !snapshot.equipment.isEmpty,
+                                      (blocks[index].repetitions ?? 0) > 0,
+                                      blocks[index].durationSeconds == nil,
+                                      blocks[index].targetWeightKilograms == nil else { continue }
+                                let muscleKeys = Set(snapshot.primaryMuscles.map(ATHLTHExerciseReferenceResolver.key))
+                                let equipmentKeys = Set(snapshot.equipment.map(ATHLTHExerciseReferenceResolver.key))
+                                guard let own = custom.first(where: {
+                                    !used.contains($0.id) &&
+                                    $0.exercise.snapshot.defaultStrengthTargetKind == .reps &&
+                                    Set($0.exercise.primaryMuscles.map(ATHLTHExerciseReferenceResolver.key)) == muscleKeys &&
+                                    Set($0.exercise.equipment.map(ATHLTHExerciseReferenceResolver.key)) == equipmentKeys
+                                }) else { continue }
+                                used.insert(own.id)
+                                blocks[index].exerciseID = own.id
+                                blocks[index].exerciseSlug = own.sourceIdentifier
+                                blocks[index].exerciseSnapshot = own.exercise.snapshot
+                                blocks[index].title = own.canonicalName
+                                blocks[index].notes = nil
+                                blocks[index].loadNote = nil
+                                break // at most one compatible substitution per workout
+                            }
+                            workout.workoutBlocks = blocks
+                        }
+                        guard ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(workout, ids: allowedIDs) else { return nil }
                     }
                     workouts = [AIProgramDraftSession(title: workout.title, kind: workout.kind.rawValue,
                         durationMinutes: workout.durationMinutes, targetDistanceKilometers: workout.targetDistanceKilometers,
