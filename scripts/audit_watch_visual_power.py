@@ -55,12 +55,17 @@ def main() -> int:
     check(interval_seconds >= 60, "AOD timeline interval >= 60s", failures)
 
     timeline_occurrences = re.findall(r"TimelineView\s*\(\s*\.periodic\s*\(", aod)
-    policy_occurrences = aod.count(
-        "ATHLTHAlwaysOnRefreshPolicy.loweredWristInterval"
+    countdown_occurrences = aod.count(
+        "ATHLTHAlwaysOnRefreshPolicy.countdownInterval("
+    )
+    ghost_occurrences = aod.count(
+        "ATHLTHAlwaysOnRefreshPolicy.ghostInterval("
     )
     check(
-        len(timeline_occurrences) == 3 and policy_occurrences == 3,
-        "All three AOD countdown/ghost timeline requests use low-power policy",
+        len(timeline_occurrences) == 3
+        and countdown_occurrences == 2 and ghost_occurrences == 1
+        and "criticalCountdownInterval: TimeInterval = 1" in policy,
+        "AOD countdown/ghost timelines use phase-aware policy; maximum 1 Hz",
         failures,
     )
 

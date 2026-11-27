@@ -148,6 +148,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var mirroringRetryPending = false
     private var iPhoneVoiceLease = ATHLTHAudioCoachVoiceLease()
     private var lastMirrorSnapshotSentAt: Date?
+    private var nativeRunningSpeedSampleAt: Date?
     private var lastCoachMirrorInvitationSentAt: Date?
     private var appliedRunningAppendCommands = Set<UUID>()
     private let speechSynthesizer = AVSpeechSynthesizer()
@@ -4614,6 +4615,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         healthKitDistanceLastUpdatedAt = nil
         coachHeartRateSampleAt = nil
         coachPaceSampleAt = nil
+        nativeRunningSpeedSampleAt = nil
         audioCoachRollingKilometer.reset()
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
@@ -4789,6 +4791,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         healthKitDistanceLastUpdatedAt = nil
         coachHeartRateSampleAt = nil
         coachPaceSampleAt = nil
+        nativeRunningSpeedSampleAt = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -5029,7 +5032,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             HKQuantityTypeIdentifier.heartRate,
             .activeEnergyBurned,
             .distanceWalkingRunning,
-            .distanceCycling
+            .distanceCycling,
+            .runningSpeed
         ] {
             if let type = HKObjectType.quantityType(forIdentifier: identifier) {
                 readTypes.insert(type)
@@ -5391,6 +5395,29 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    private var needsLivePrecisionForPowerPolicy: Bool {
+        structuredRunningWorkout != nil ||
+        strengthSession != nil ||
+        plannedRoute != nil ||
+        returningToRouteStart ||
+        ghostRaceTitle != nil ||
+        liveSurfaceContext.liveGhost != nil ||
+        automaticPauseEnabled ||
+        audioCoachConfiguration.enabled
+    }
+
+    private func updateLocationPowerPolicy() {
+        guard usesOutdoorGPS else { return }
+        let filter = ATHLTHWatchPerformancePolicy.locationDistanceFilter(
+            lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            isFreeWalk: kind == .walking,
+            needsLivePrecision: needsLivePrecisionForPowerPolicy
+        )
+        if locationManager.distanceFilter != filter {
+            locationManager.distanceFilter = filter
+        }
+    }
+
     private func startTimer() {
         stopTimer()
 
@@ -5405,19 +5432,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                self.elapsedTime = builder.elapsedTime
-                self.currentLapElapsedTime =
-                    max(
-                        builder.elapsedTime -
-                        self.lastLapElapsedTime,
-                        0
-                    )
-                self.currentLapDistanceMeters =
-                    max(
-                        self.distanceMeters -
-                        self.lastLapDistanceMeters,
-                        0
-                    )
+                let elapsed = builder.elapsedTime
+                let lapElapsed = max(elapsed - self.lastLapElapsedTime, 0)
+                let lapDistance = max(self.distanceMeters - self.lastLapDistanceMeters, 0)
+                if self.elapsedTime != elapsed { self.elapsedTime = elapsed }
+                if self.currentLapElapsedTime != lapElapsed {
+                    self.currentLapElapsedTime = lapElapsed
+                }
+                if self.currentLapDistanceMeters != lapDistance {
+                    self.currentLapDistanceMeters = lapDistance
+                }
+                self.updateLocationPowerPolicy()
 
                 self.evaluateIndoorSuggestion(now: Date())
                 self.evaluateCriticalCountToStrengthRest()
@@ -6527,7 +6552,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        if let rawPace = ATHLTHRunningPace.outdoorGPS(
+        // Keep recording GPS route points even while native pace is fresh.
+        let nativeSpeedFresh = kind == .running &&
+            ATHLTHCoachSensorFreshness.isFresh(
+                sampledAt: nativeRunningSpeedSampleAt,
+                maximumAge: ATHLTHCoachSensorFreshness.maximumPaceAge
+            )
+        if !nativeSpeedFresh, let rawPace = ATHLTHRunningPace.outdoorGPS(
             speedMetersPerSecond: location.speed,
             isOutdoor: usesOutdoorGPS
         ) {
@@ -9409,9 +9440,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let now = Date()
 
-        if !force,
+        let mirrorInterval = ATHLTHWatchPerformancePolicy.mirrorInterval(
+            lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+            needsLivePrecision: needsLivePrecisionForPowerPolicy
+        )
+        if !force, stateOverride == nil,
            let lastMirrorSnapshotSentAt,
-           now.timeIntervalSince(lastMirrorSnapshotSentAt) < 0.85 {
+           now.timeIntervalSince(lastMirrorSnapshotSentAt) < mirrorInterval {
             return
         }
 
@@ -9794,6 +9829,31 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
         }
 
+        if kind == .running, usesOutdoorGPS, state == .running,
+           !automaticPauseActive,
+           let speedType = HKObjectType.quantityType(forIdentifier: .runningSpeed),
+           types.contains(speedType),
+           let statistics = builder.statistics(for: speedType),
+           let quantity = statistics.mostRecentQuantity(),
+           let sampledAt = statistics.mostRecentQuantityDateInterval()?.end,
+           ATHLTHCoachSensorFreshness.isFresh(
+               sampledAt: sampledAt,
+               maximumAge: ATHLTHCoachSensorFreshness.maximumPaceAge
+           ),
+           nativeRunningSpeedSampleAt.map({ sampledAt > $0 }) ?? true,
+           let pace = ATHLTHRunningPace.outdoorGPS(
+               speedMetersPerSecond: quantity.doubleValue(
+                   for: HKUnit.meter().unitDivided(by: .second())
+               ),
+               isOutdoor: true
+           ) {
+            nativeRunningSpeedSampleAt = sampledAt
+            coachPaceSampleAt = sampledAt
+            if currentPaceSecondsPerKilometer != pace {
+                currentPaceSecondsPerKilometer = pace
+            }
+        }
+
         if let energyType, types.contains(energyType),
            let statistics = builder.statistics(for: energyType),
            let quantity = statistics.sumQuantity() {
@@ -9865,6 +9925,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         )
                 }
 
+                if identifier == HKQuantityTypeIdentifier.runningSpeed.rawValue {
+                    return HKObjectType.quantityType(forIdentifier: .runningSpeed)
+                }
                 return nil
             }
         )
