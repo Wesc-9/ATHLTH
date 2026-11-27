@@ -87,6 +87,25 @@ enum ATHLTHIntelligenceRoutingPolicy {
     }
 }
 
+/// Reject explicitly health-derived payloads before they reach Supabase or
+/// Groq. This is not a classifier for arbitrary user-authored free text.
+enum ATHLTHPrivateAITransferPolicy {
+    static func requireNoKnownHealthContext(containsHealthContext: Bool) throws {
+        if containsHealthContext { throw ATHLTHPrivateAITransferError.healthContextRequiresLocalProvider }
+    }
+}
+
+enum ATHLTHPrivateAITransferError: LocalizedError {
+    case healthContextRequiresLocalProvider
+
+    var errorDescription: String? {
+        ATHLTHLocalization.choose(
+            english: "This personalized AI request contains health or training-history information. It has not been sent. Use manual planning until private AI planning is available.",
+            norwegian: "Denne personlige AI-forespørselen inneholder helseopplysninger eller treningshistorikk. Den er ikke sendt. Bruk manuell planlegging til privat AI-planlegging er tilgjengelig."
+        )
+    }
+}
+
 enum ATHLTHIntelligenceDiagnosticError: Error {
     case unavailable, invalidResponse
 }

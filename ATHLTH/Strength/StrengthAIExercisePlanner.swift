@@ -133,7 +133,8 @@ private final class StrengthAIExerciseService {
     func generate(
         _ request: StrengthAIExerciseRequest
     ) async throws -> StrengthAIExercisePlan {
-        try await client.functions.invoke(
+        try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: !request.recentWorkouts.isEmpty)
+        return try await client.functions.invoke(
             ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .strengthSession),
             options: FunctionInvokeOptions(
                 body: request

@@ -39,6 +39,11 @@ final class ATHLTHIntelligenceRoutingTests: XCTestCase {
             adminPilotEnabled: true, isAdministrator: false, localAvailable: true), .rules)
     }
 
+    func testKnownHealthPayloadCannotUseLegacyCloudPlanning() {
+        XCTAssertNoThrow(try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: false))
+        XCTAssertThrowsError(try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: true))
+    }
+
     func testHealthFeaturesNeverSelectExternalProvider() {
         for feature: ATHLTHIntelligenceFeature in [.workoutInsight, .recoveryInsight, .coachQuestion] {
             XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: feature, localAvailable: true), .appleLocal)

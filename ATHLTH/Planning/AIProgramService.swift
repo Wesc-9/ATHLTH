@@ -511,6 +511,10 @@ final class AIProgramService {
     }
 
     func generate(_ request: AIProgramRequest) async throws -> AIProgramDraft {
+        try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(
+            containsHealthContext: request.coachStrengthContext != nil ||
+                request.injurySafetyNotes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
+                !(request.excludedMovements ?? []).isEmpty)
         // Only program *drafts* are generated here; no plan is saved until
         // the athlete accepts it. One automatic retry on temporary 5xx is
         // therefore safe and avoids asking the athlete to re-enter answers.

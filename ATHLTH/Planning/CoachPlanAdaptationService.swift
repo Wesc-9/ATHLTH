@@ -61,6 +61,7 @@ final class CoachPlanAdaptationService {
     func generate(
         request: CoachPlanAdaptationRequest
     ) async throws -> CoachPlanChangeProposal {
+        try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: !request.recentTraining.isEmpty)
         let draft: CoachPlanAdaptationDraft = try await client.functions.invoke(
             ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .planAdaptation),
             options: FunctionInvokeOptions(body: request)
