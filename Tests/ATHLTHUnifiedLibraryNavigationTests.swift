@@ -20,12 +20,12 @@ final class ATHLTHUnifiedLibraryNavigationTests: XCTestCase {
         XCTAssertEqual(ExerciseLibrarySection.section(forSegmentedIndex: 2), .marketplace)
     }
 
-    func testAllWorkoutSheetHasNineActivitiesInRequestedGridOrder() {
+    func testAllWorkoutSheetHasTenActivitiesInRequestedGridOrder() {
         let categories = ATHLTHTrainAllWorkoutCategoriesSheet.Category.allCases
         XCTAssertEqual(categories.map(\.rawValue), [
             "freeTraining", "walking", "running",
             "strength", "cycling", "swimming",
-            "yoga", "meditation", "custom"
+            "yoga", "meditation", "sports", "custom"
         ])
     }
 
@@ -35,7 +35,7 @@ final class ATHLTHUnifiedLibraryNavigationTests: XCTestCase {
         let disabled = categories.filter { !$0.isAvailable }.map(\.rawValue)
 
         XCTAssertEqual(enabled, [
-            "freeTraining", "walking", "running", "strength", "custom"
+            "freeTraining", "walking", "running", "strength", "sports", "custom"
         ])
         XCTAssertEqual(disabled, [
             "cycling", "swimming", "yoga", "meditation"
