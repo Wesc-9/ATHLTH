@@ -2135,7 +2135,7 @@ struct ATHLTHHomeView: View {
         async {
         await groups.refresh()
         guard !Task.isCancelled else { return }
-        await groups.refreshHomeCalendar(in: homeWeekInterval)
+        await groups.refreshHomeCalendar(in: homeGroupCalendarInterval)
     }
 
     @MainActor
@@ -2814,257 +2814,220 @@ struct ATHLTHHomeView: View {
         }
     }
 
-    private var homeTodayCalendarCard:
-        some View {
-        let plan =
-            session.activePlan
-        let todayWorkouts = HomeTodayCalendarSchedule.workouts(
-            plan: plan,
-            standalone: session.standalonePlannedSessions
-        )
+    private enum HomeAgendaPayload {
+        case planned(PlannedSession)
+        case recorded(SocialPublishableWorkout)
+        case tournament(ATHLTHTournamentCalendarItem)
+        case personal(CommunityEventItem)
+        case club(CommunityGroupEventRecord)
+    }
+
+    private struct HomeAgendaEntry: Identifiable {
+        let id: String
+        let day: Date
+        let time: Date?
+        let payload: HomeAgendaPayload
+    }
+
+    private var homeAgendaInterval: DateInterval {
+        HomeTodayCalendarSchedule.upcomingInterval()
+    }
+
+    // Include the current week for the weekly progress strip as well as
+    // the forward window for the calendar. Reuse the existing refresh.
+    private var homeGroupCalendarInterval: DateInterval {
+        DateInterval(start: min(homeWeekInterval.start, homeAgendaInterval.start),
+                     end: max(homeWeekInterval.end, homeAgendaInterval.end))
+    }
+
+    private var homeAgendaEntries: [HomeAgendaEntry] {
+        let calendar = Calendar.current
+        let days = HomeTodayCalendarSchedule.upcomingDays(calendar: calendar)
         let completedToday = homeCompletedWorkoutsToday
-        let personalEvents =
-            homeTodayCommunityEvents
-        let clubEvents =
-            homeTodayGroupEvents
-        let tournamentItems = tournamentCalendar.events(on: Date())
-        // Coaching text is now below Friends, never duplicated here.
-
-        // Prioritize up to two actual workouts even when a tournament
-        // also has an event today; other events use remaining slots.
-        let visibleWorkoutCount = min(todayWorkouts.count, 2)
-        let visibleCompletedCount = min(
-            completedToday.count, max(0, 2 - visibleWorkoutCount)
-        )
-        let visibleTournamentCount = min(
-            tournamentItems.count, max(0, 2 - visibleWorkoutCount - visibleCompletedCount)
-        )
-        let availableAfterPlan =
-            max(2 - visibleWorkoutCount - visibleCompletedCount - visibleTournamentCount, 0)
-        let visiblePersonalCount =
-            min(
-                personalEvents.count,
-                availableAfterPlan
+        let personal = homeUserCommunityEvents
+        let club = homeUserGroupEvents
+        var entries: [HomeAgendaEntry] = []
+        var seenTournamentIDs = Set<UUID>()
+        for day in days {
+            let planned = HomeTodayCalendarSchedule.workouts(
+                plan: session.activePlan, standalone: session.standalonePlannedSessions,
+                on: day, calendar: calendar
             )
-        let availableForClub =
-            max(
-                availableAfterPlan -
-                    visiblePersonalCount,
-                0
-            )
+            for workout in planned where !workout.isExplicitRestDay && workout.cancelledAt == nil {
+                let time = session.recordedTimes(for: workout.id)?.startedAt ?? workout.scheduledStart
+                entries.append(.init(id: "plan-\(workout.id)", day: day, time: time, payload: .planned(workout)))
+            }
+            if calendar.isDateInToday(day) {
+                for workout in completedToday {
+                    entries.append(.init(id: "recorded-\(workout.id)", day: day,
+                                         time: workout.startDate, payload: .recorded(workout)))
+                }
+            }
+            for item in tournamentCalendar.events(on: day) {
+                // An ongoing competition occupies one preview slot, not
+                // a slot for each day of its eligibility window.
+                guard tournamentCalendar.tournament(for: item.tournamentID) != nil,
+                      seenTournamentIDs.insert(item.id).inserted else { continue }
+                entries.append(.init(id: "tournament-\(item.id)", day: day,
+                    time: item.relevantDate(on: day), payload: .tournament(item)))
+            }
+            for event in personal where calendar.isDate(event.event.startsAt, inSameDayAs: day) {
+                entries.append(.init(id: "personal-\(event.id)", day: day,
+                    time: event.event.startsAt, payload: .personal(event)))
+            }
+            for event in club where calendar.isDate(event.startsAt, inSameDayAs: day) {
+                guard groups.group(for: event.groupID) != nil else { continue }
+                entries.append(.init(id: "club-\(event.id)", day: day,
+                    time: event.startsAt, payload: .club(event)))
+            }
+        }
+        return entries.sorted {
+            if $0.day != $1.day { return $0.day < $1.day }
+            let left = $0.time ?? .distantFuture
+            let right = $1.time ?? .distantFuture
+            return left == right ? $0.id < $1.id : left < right
+        }
+    }
 
-        return VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
+    private func homeAgendaDateLabel(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let prefix: String
+        if calendar.isDateInToday(date) {
+            prefix = ATHLTHLocalization.choose(english: "Today", norwegian: "I dag")
+        } else if calendar.isDateInTomorrow(date) {
+            prefix = ATHLTHLocalization.choose(english: "Tomorrow", norwegian: "I morgen")
+        } else {
+            prefix = date.formatted(.dateTime.weekday(.wide)).capitalized
+        }
+        return prefix + " · " + date.formatted(.dateTime.day().month(.abbreviated))
+    }
+
+    private var homeTodayCalendarCard: some View {
+        let entries = Array(homeAgendaEntries.prefix(4))
+        return VStack(alignment: .leading, spacing: 8) {
             Button {
                 showingHomeTodayCalendarAll = true
             } label: {
                 HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Today", norwegian: "Kalender i dag"
-                    ))
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.80)
-
+                    Text(ATHLTHLocalization.choose(english: "Calendar", norwegian: "Kalender"))
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.80)
                     Spacer(minLength: 2)
-
                     Text("Se alle")
                         .lineLimit(1)
                         .fixedSize()
-                        .font(
-                            .system(
-                                size: 9.5,
-                                weight:
-                                    .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                    .font(
-                        .system(
-                            size: 8,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                    )
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
             }
             .buttonStyle(.plain)
 
-            if !todayWorkouts.isEmpty ||
-                !completedToday.isEmpty ||
-                !personalEvents.isEmpty ||
-                !clubEvents.isEmpty ||
-                !tournamentItems.isEmpty {
-                VStack(spacing: 7) {
-                    ForEach(Array(todayWorkouts.prefix(visibleWorkoutCount))) { workout in
-                        HStack(spacing: 5) {
-                            Button {
-                                selectedHomeStandaloneWorkout = workout
-                            } label: {
-                                homeCompactCalendarRow(
-                                    time: session.recordedTimes(for: workout.id)?.startedAt ??
-                                        workout.scheduledStart,
-                                    endTime: session.recordedTimes(for: workout.id)?.endedAt,
-                                    title: workout.title,
-                                    icon: workout.kind.systemImage,
-                                    isTrainTogether: workout.trainTogetherMode != nil,
-                                    trainingPartner: homeTrainTogetherPartner(for: workout)
-                                )
-                            }
-                            .buttonStyle(.plain)
-
-                        }
-                    }
-
-                    ForEach(Array(completedToday.prefix(visibleCompletedCount))) { workout in
-                        Button {
-                            selectedHomeCompletedWorkout = workout
-                        } label: {
-                            homeCompactCalendarRow(
-                                time: workout.startDate,
-                                endTime: workout.endDate,
-                                title: completedWorkoutCalendarTitle(workout),
-                                icon: workout.activity == .strength
-                                    ? "dumbbell.fill" : "checkmark.circle.fill"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("athlth-home-calendar-completed-\(workout.id)")
-                    }
-
-                    ForEach(Array(
-                        tournamentItems.prefix(visibleTournamentCount)
-                    )) { item in
-                        if let tournament = tournamentCalendar.tournament(
-                            for: item.tournamentID
-                        ) {
-                            NavigationLink {
-                                ATHLTHTournamentLiveDetailView(tournament: tournament)
-                            } label: {
-                                homeCompactCalendarRow(
-                                    time: item.relevantDate(on: Date()),
-                                    title: item.isDeadline(on: Date())
-                                        ? "Frist · \(item.exerciseTitle)"
-                                        : item.isOngoing(on: Date())
-                                        ? "Pågår · \(item.exerciseTitle)"
-                                        : item.exerciseTitle,
-                                    icon: "trophy"
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    ForEach(
-                        Array(
-                            personalEvents
-                                .prefix(
-                                    availableAfterPlan
-                                )
-                        )
-                    ) { event in
-                        NavigationLink {
-                            CommunityEventDetailView(
-                                eventID:
-                                    event.id
-                            )
-                        } label: {
-                            homeCompactCalendarRow(
-                                time: event.event.startsAt,
-                                title: event.event.title,
-                                icon: event.event.activityType.systemImage
-                            )
-
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    ForEach(
-                        Array(
-                            clubEvents
-                                .prefix(
-                                    availableForClub
-                                )
-                        )
-                    ) { event in
-                        if let group =
-                                groups.group(
-                                    for:
-                                        event.groupID
-                                ) {
-                            NavigationLink {
-                                CommunityGroupEventDetailView(
-                                    group: group,
-                                    event: event
-                                )
-                            } label: {
-                                homeCompactCalendarRow(
-                                    time: event.startsAt,
-                                    title: event.title,
-                                    icon: homeGroupEventSystemImage(event.activityType)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .frame(
-                    minHeight:
-                        homeCalendarContentMinHeight,
-                    alignment: .top
-                )
-            } else {
-                // Keep the empty calendar quiet; the adjacent shortcut card
-                // is the single Home entry into training.
+            if entries.isEmpty {
                 VStack(alignment: .center, spacing: 8) {
                     Image(systemName: "calendar")
                         .font(.system(size: 19, weight: .light))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                     Text(ATHLTHLocalization.choose(
-                        english: "Nothing on the calendar today",
-                        norwegian: "Ingen aktiviteter i kalenderen"
-                    ))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    .multilineTextAlignment(.center)
+                        english: "Nothing on the calendar", norwegian: "Ingen aktiviteter i kalenderen"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                .frame(
-                    maxWidth: .infinity,
-                    minHeight: homeCalendarContentMinHeight,
-                    maxHeight: .infinity,
-                    alignment: .center
-                )
+                .frame(maxWidth: .infinity, minHeight: homeCalendarContentMinHeight, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                            if index == 0 || entries[index - 1].day != entry.day {
+                                Text(homeAgendaDateLabel(entry.day))
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                                    .accessibilityAddTraits(.isHeader)
+                            }
+                            homeAgendaRow(entry, compact: true)
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
             }
-
-
         }
         .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 175, alignment: .topLeading)
-        .background(
-            ATHLTHTrainDesign.paper,
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
+        .frame(maxWidth: .infinity, minHeight: 175, maxHeight: 175, alignment: .topLeading)
+        .background(ATHLTHTrainDesign.paper,
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34),
-                              lineWidth: 0.8)
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34), lineWidth: 0.8)
+                .allowsHitTesting(false)
         }
     }
 
+    @ViewBuilder
+    private func homeAgendaRow(_ entry: HomeAgendaEntry, compact: Bool) -> some View {
+        switch entry.payload {
+        case .planned(let workout):
+            Button {
+                if compact { selectedHomeStandaloneWorkout = workout }
+                else { selectedHomeAllStandaloneWorkout = workout }
+            } label: {
+                if compact {
+                    let ended = session.recordedTimes(for: workout.id)?.endedAt
+                    homeCompactCalendarRow(time: entry.time, endTime: ended,
+                        title: workout.title, icon: ended == nil ? workout.kind.systemImage : "checkmark.circle.fill",
+                        isTrainTogether: workout.trainTogetherMode != nil,
+                        trainingPartner: homeTrainTogetherPartner(for: workout))
+                } else {
+                    homeCalendarPlanRow(workout)
+                }
+            }
+            .buttonStyle(.plain)
+        case .recorded(let workout):
+            Button {
+                if compact { selectedHomeCompletedWorkout = workout }
+            } label: {
+                homeCompactCalendarRow(time: workout.startDate, endTime: workout.endDate,
+                    title: completedWorkoutCalendarTitle(workout), icon: "checkmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-home-calendar-completed-\(workout.id)")
+        case .tournament(let item):
+            if let tournament = tournamentCalendar.tournament(for: item.tournamentID) {
+                NavigationLink {
+                    ATHLTHTournamentLiveDetailView(tournament: tournament)
+                } label: {
+                    homeCompactCalendarRow(time: entry.time,
+                        title: item.isDeadline(on: entry.day) ? "Frist · \(item.exerciseTitle)" :
+                            item.isOngoing(on: entry.day) ? "Pågår · \(item.exerciseTitle)" : item.exerciseTitle,
+                        icon: "trophy")
+                }
+                .buttonStyle(.plain)
+            }
+        case .personal(let event):
+            NavigationLink {
+                CommunityEventDetailView(eventID: event.id)
+            } label: {
+                homeCompactCalendarRow(time: entry.time, title: event.event.title,
+                                       icon: event.event.activityType.systemImage)
+            }
+            .buttonStyle(.plain)
+        case .club(let event):
+            if let group = groups.group(for: event.groupID) {
+                NavigationLink {
+                    CommunityGroupEventDetailView(group: group, event: event)
+                } label: {
+                    homeCompactCalendarRow(time: entry.time, title: event.title,
+                                           icon: homeGroupEventSystemImage(event.activityType))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
 
     /// A guest's partner is the organizer; an organizer's partner is
     /// the invited athlete. Prefer the public @username if available.
@@ -3723,7 +3686,7 @@ struct ATHLTHHomeView: View {
 
     private var homeUserGroupEvents:
         [CommunityGroupEventRecord] {
-        let snapshot = groups.homeCalendarContent(in: homeWeekInterval)
+        let snapshot = groups.homeCalendarContent(in: homeGroupCalendarInterval)
         let acceptedEventIDs =
             Set(
                 snapshot
