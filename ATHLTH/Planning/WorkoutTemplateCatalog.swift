@@ -4999,6 +4999,7 @@ struct WorkoutTemplateBuilderView: View {
     /// An embedded iPad inspector closes itself, not the surrounding plan.
     /// All iPhone callers keep their existing sheet dismissal.
     private let onCloseInline: (() -> Void)?
+    private let compactPlanWorkoutSettings: Bool
     /// Distinguishes an explicit Save/Cancel from an iOS sheet that vanished
     /// during backgrounding. Only the standalone scratch host supplies it.
     private let onCloseRequested: (() -> Void)?
@@ -5042,6 +5043,7 @@ struct WorkoutTemplateBuilderView: View {
         onValidateSave: ((PlannedSession) -> String?)? = nil,
         saveButtonTitle: String? = nil,
         onCloseInline: (() -> Void)? = nil,
+        compactPlanWorkoutSettings: Bool = false,
         onCloseRequested: (() -> Void)? = nil,
         onDraftDiscarded: (() -> Void)? = nil,
         externalCloseRequest: Int = 0,
@@ -5164,6 +5166,7 @@ struct WorkoutTemplateBuilderView: View {
         self.onValidateSave = onValidateSave
         self.saveButtonTitle = saveButtonTitle
         self.onCloseInline = onCloseInline
+        self.compactPlanWorkoutSettings = compactPlanWorkoutSettings
         self.onCloseRequested = onCloseRequested
         self.onDraftDiscarded = onDraftDiscarded
         self.externalCloseRequest = externalCloseRequest
@@ -5873,8 +5876,11 @@ struct WorkoutTemplateBuilderView: View {
                 selectedWorkoutExtra = .navigation
             },
             showsNavigation: activeRouteID != nil,
-            showsExpandedLabel: isPlannedWorkout &&
-                !studioAdvanced && initialActivity == .running
+            showsExpandedLabel: !compactPlanWorkoutSettings && isPlannedWorkout &&
+                !studioAdvanced && initialActivity == .running,
+            showsPlanWithFriend: !compactPlanWorkoutSettings ||
+                (onSaveSharedRevision == nil && onFinalizeSharedWorkout == nil),
+            showsGhostRace: !compactPlanWorkoutSettings || initialActivity == .running
         )
     }
 
@@ -6489,7 +6495,9 @@ struct WorkoutTemplateBuilderView: View {
                         durationSettings
                         timeline
                     }
-                    workoutSettingsSection
+                    if !compactPlanWorkoutSettings {
+                        AnyView(workoutSettingsSection)
+                    }
                     if draftNotice {
                         Label(tr("Recovered saved draft", "Gjenopprettet lagret utkast"),
                               systemImage: "checkmark.circle.fill")
@@ -6500,7 +6508,8 @@ struct WorkoutTemplateBuilderView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 28)
-                .frame(maxWidth: studioFullscreenEditing && isPlannedWorkout ? 1280 : 720)
+                .frame(maxWidth: compactPlanWorkoutSettings ? .infinity :
+                    (studioFullscreenEditing && isPlannedWorkout ? 1280 : 720))
                 .frame(maxWidth: .infinity)
             }
             .background(studioBackground.ignoresSafeArea())
@@ -6533,6 +6542,10 @@ struct WorkoutTemplateBuilderView: View {
                         Spacer(minLength: 8)
                         ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
                             .accessibilityIdentifier("athlth-ipad-workout-mode")
+                        if compactPlanWorkoutSettings {
+                            AnyView(workoutExtrasMenu)
+                                .accessibilityIdentifier("athlth-ipad-plan-workout-settings")
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 7)
