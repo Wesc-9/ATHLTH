@@ -4,7 +4,7 @@ import WidgetKit
 // Different Watch-face choices, not just alternate artwork for Quick Run.
 // Keep the original Quick Run kind to preserve existing Watch-face placements.
 private enum ATHLTHWatchShortcut: String {
-    case home, run, strength, walk, ghost, today, routes
+    case home, run, strength, walk, ghost, today, routes, sent
 
     var kind: String {
         switch self {
@@ -15,6 +15,7 @@ private enum ATHLTHWatchShortcut: String {
         case .ghost: return "ATHLTHGhostRaceWatchWidget"
         case .today: return "ATHLTHTodayWorkoutWatchWidget"
         case .routes: return "ATHLTHRoutesWatchWidget"
+        case .sent: return "ATHLTHSentWorkoutsWatchWidget"
         }
     }
 
@@ -27,6 +28,7 @@ private enum ATHLTHWatchShortcut: String {
         case .ghost: return "Ghost Race"
         case .today: return "Dagens økt"
         case .routes: return "Ruter"
+        case .sent: return "Sendt til klokken"
         }
     }
 
@@ -41,6 +43,7 @@ private enum ATHLTHWatchShortcut: String {
         case .ghost: return "Konkurrer med Ghost"
         case .today: return "Dagens trening"
         case .routes: return "Velg en rute"
+        case .sent: return "Klargjorte økter"
         }
     }
 
@@ -53,6 +56,7 @@ private enum ATHLTHWatchShortcut: String {
         case .ghost: return "Åpne Ghost Race på klokken. Start bare en Ghost-økt som er klargjort fra iPhone."
         case .today: return "Start dagens planlagte treningsøkt når den er tilgjengelig."
         case .routes: return "Åpne lagrede ATHLTH-ruter på klokken."
+        case .sent: return "Åpne økter sendt til Apple Watch. Starter ingen økt automatisk."
         }
     }
 
@@ -65,6 +69,7 @@ private enum ATHLTHWatchShortcut: String {
         case .ghost: return "scope"
         case .today: return "calendar.badge.clock"
         case .routes: return "map.fill"
+        case .sent: return "applewatch.and.arrow.forward"
         }
     }
 
@@ -77,6 +82,7 @@ private enum ATHLTHWatchShortcut: String {
         case .ghost: return URL(string: "athlth-watch://ghost-race")
         case .today: return URL(string: "athlth-watch://today")
         case .routes: return URL(string: "athlth-watch://routes")
+        case .sent: return URL(string: "athlth-watch://sent")
         }
     }
 }
@@ -230,6 +236,104 @@ private struct ATHLTHWatchShortcutWidget: Widget {
     }
 }
 
+private struct ATHLTHDailyFormEntry: TimelineEntry {
+    let date: Date
+    let score: Int?
+}
+
+private struct ATHLTHDailyFormProvider: TimelineProvider {
+    func placeholder(in context: Context) -> ATHLTHDailyFormEntry {
+        ATHLTHDailyFormEntry(date: Date(), score: nil)
+    }
+
+    private func entry(at date: Date) -> ATHLTHDailyFormEntry {
+        let snapshot = ATHLTHWatchFaceFormSnapshot.read(
+            from: UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite)
+        )
+        return ATHLTHDailyFormEntry(date: date, score: snapshot?.currentScore(at: date))
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (ATHLTHDailyFormEntry) -> Void) {
+        completion(entry(at: Date()))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<ATHLTHDailyFormEntry>) -> Void) {
+        let now = Date()
+        let current = entry(at: now)
+        var entries = [current]
+        if current.score != nil, let midnight = ATHLTHWatchFaceFormSnapshot.nextDay(after: now) {
+            entries.append(ATHLTHDailyFormEntry(date: midnight, score: nil))
+        }
+        // The Watch app invalidates this timeline when a new score arrives.
+        completion(Timeline(entries: entries, policy: .never))
+    }
+}
+
+private struct ATHLTHDailyFormComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: ATHLTHDailyFormEntry
+
+    private var scoreText: String { entry.score.map(String.init) ?? "–" }
+
+    private var ring: some View {
+        ZStack {
+            Circle().stroke(.primary.opacity(0.22), lineWidth: 3)
+            if let score = entry.score {
+                Circle().trim(from: 0, to: CGFloat(score) / 100)
+                    .stroke(.primary, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            Text(scoreText)
+                .font(.system(size: 19, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
+        }
+        .padding(4)
+    }
+
+    var body: some View {
+        Group {
+            switch family {
+            case .accessoryInline:
+                Label("Form \(scoreText)", systemImage: "heart.circle")
+            case .accessoryCircular:
+                ZStack {
+                    AccessoryWidgetBackground()
+                    ring.padding(2)
+                }
+            default:
+                HStack(spacing: 6) {
+                    ring.frame(width: 40, height: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dagens form").font(.headline).lineLimit(1).minimumScaleFactor(0.7)
+                        Text(entry.score == nil ? "Ikke tilgjengelig" : "\(scoreText) / 100")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("ATHLTH · Dagens form")
+        .accessibilityValue(entry.score.map { "\($0) av 100" } ?? "Ikke tilgjengelig")
+        .privacySensitive()
+        .widgetURL(URL(string: "athlth-watch://daily-form"))
+        .containerBackground(.clear, for: .widget)
+    }
+}
+
+private struct ATHLTHDailyFormWatchWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: ATHLTHWatchFaceFormSnapshot.widgetKind,
+                            provider: ATHLTHDailyFormProvider()) { entry in
+            ATHLTHDailyFormComplicationView(entry: entry)
+        }
+        .configurationDisplayName("ATHLTH · Dagens form")
+        .description("Vis dagens synkroniserte formscore. Trykk for å se detaljer.")
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
 @main
 struct ATHLTHWatchWidgetsBundle: WidgetBundle {
     var body: some Widget {
@@ -240,5 +344,7 @@ struct ATHLTHWatchWidgetsBundle: WidgetBundle {
         ATHLTHWatchShortcutWidget(shortcut: .ghost)
         ATHLTHWatchShortcutWidget(shortcut: .today)
         ATHLTHWatchShortcutWidget(shortcut: .routes)
+        ATHLTHWatchShortcutWidget(shortcut: .sent)
+        ATHLTHDailyFormWatchWidget()
     }
 }

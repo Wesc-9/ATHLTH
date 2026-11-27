@@ -91,6 +91,8 @@ struct WatchHomeView: View {
             switch url.host {
             case "home": shortcutPath.removeAll(); routeStore.requestTodayWorkoutSnapshot()
             case "today": shortcutPath = [.planned]
+            case "daily-form": shortcutPath = [.dailyForm]; routeStore.requestTodayWorkoutSnapshot()
+            case "sent": shortcutPath = [.sent]
             case "quick-run": quickStart(.running)
             case "quick-strength": quickStart(.strength)
             case "quick-walk": quickStart(.walking)

@@ -309,8 +309,10 @@ targets:
       - path: ATHLTHWatchWidgets
         excludes:
           - Info.plist
+          - ATHLTHWatchWidgets.entitlements
       # Reuse the same original ATHLTH pulse-A mark as the Watch home.
       - path: Shared/ATHLTHBrandMark.swift
+      - path: Shared/ATHLTHWatchFaceFormSnapshot.swift
     info:
       path: ATHLTHWatchWidgets/Info.plist
       properties:
@@ -324,6 +326,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.wesc9.athlth.watchkitapp.widgets
         PRODUCT_NAME: ATHLTHWatchWidgets
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ATHLTHWatchWidgets/ATHLTHWatchWidgets.entitlements
         CODE_SIGN_STYLE: Automatic
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES

@@ -3,6 +3,7 @@ import Foundation
 import WatchConnectivity
 import WatchKit
 import AVFoundation
+import WidgetKit
 
 // A WatchConnectivity reply block can outlive its caller. Transport it
 // explicitly across the MainActor hop without capturing the delegate closure
@@ -119,9 +120,24 @@ final class WatchRouteStore: NSObject, ObservableObject {
         if let bytes = UserDefaults.standard.data(forKey: homeDashboardDefaultsKey),
            let saved = try? JSONDecoder().decode(WatchHomeDashboardTransfer.self, from: bytes),
            saved.ownerID == companionAccountID { homeDashboard = saved }
+        publishWatchFaceForm()
         loadPreparedWorkout()
         restorePetCatalog()
         activateConnectivity()
+    }
+
+    private func publishWatchFaceForm() {
+        let snapshot: ATHLTHWatchFaceFormSnapshot?
+        if let dashboard = homeDashboard, dashboard.ownerID == companionAccountID,
+           let form = dashboard.dailyForm, form.isCurrent(), let score = form.validScore {
+            snapshot = ATHLTHWatchFaceFormSnapshot(score: score, updatedAt: form.updatedAt)
+        } else {
+            snapshot = nil
+        }
+        if ATHLTHWatchFaceFormSnapshot.write(snapshot,
+            to: UserDefaults(suiteName: ATHLTHWatchFaceFormSnapshot.suite)) {
+            WidgetCenter.shared.reloadTimelines(ofKind: ATHLTHWatchFaceFormSnapshot.widgetKind)
+        }
     }
 
     private func restoreCompanionAccountIdentity() {
@@ -156,6 +172,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
         companionAccountID = transfer.ownerID
         latestCompanionAccountUpdatedAt = transfer.updatedAt
+        publishWatchFaceForm()
         if let data = try? JSONEncoder().encode(transfer) {
             UserDefaults.standard.set(data, forKey: accountIdentityDefaultsKey)
         }
@@ -837,6 +854,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 if let data = try? JSONEncoder().encode(dashboard) {
                     UserDefaults.standard.set(data, forKey: homeDashboardDefaultsKey)
                 }
+                publishWatchFaceForm()
             }
 
         case .strengthSnapshot:
