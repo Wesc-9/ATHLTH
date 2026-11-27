@@ -35,6 +35,41 @@ struct ATHLTHTournamentCreator: View {
     @State private var showingExerciseLibrary = false
     @State private var exerciseTemplatesOnly: Bool? = nil
     @State private var showingDuelRoute = false
+    @State private var addingRouteMeasure = false
+    @State private var routeMeasureActivity: ATHLTHTournamentActivity = .running
+    @State private var editingMeasure: ATHLTHCompetitionMeasureDraft?
+    @State private var convertingLibraryID: UUID?
+    private var plannedMeasures: [ATHLTHCompetitionMeasureDraft] { competitionSettings.race.plannedMeasures }
+    private var totalExerciseCount: Int { (competitionSettings.selectedExerciseIDs?.count ?? 0) + plannedMeasures.count }
+
+    private func saveMeasure(_ value: ATHLTHCompetitionMeasureDraft) {
+        guard value.isValid, allowedActivities.contains(value.activity) else { return }
+        var items = plannedMeasures
+        if let index = items.firstIndex(where: { $0.id == value.id }) {
+            items[index] = value
+        } else {
+            guard totalExerciseCount < 12 || convertingLibraryID != nil else { return }
+            if let id = convertingLibraryID {
+                competitionSettings.selectedExerciseIDs?.removeAll { $0 == id }
+                competitionSettings.exerciseEnvironments.removeValue(forKey: id)
+                competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+                competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
+            }
+            items.append(value)
+        }
+        competitionSettings.race.measureDrafts = items
+        if competitionSettings.selectedExerciseIDs == nil { competitionSettings.selectedExerciseIDs = [] }
+        competitionSettings.coachExerciseIDs = []
+        exerciseMode = .owner
+        exerciseCount = totalExerciseCount
+        convertingLibraryID = nil
+    }
+
+    private func removeMeasure(_ id: UUID) {
+        let remaining = plannedMeasures.filter { $0.id != id }
+        competitionSettings.race.measureDrafts = remaining.isEmpty ? nil : remaining
+        exerciseCount = totalExerciseCount
+    }
     @State private var expandedScoringExample = false
     @State private var rulesScrollID: String?
     @State private var draftID: UUID
@@ -263,6 +298,7 @@ struct ATHLTHTournamentCreator: View {
         if allowedActivities.isEmpty { return "Velg minst én gren." }
         if !ATHLTHTournamentActivity.canCreate(with: allowedActivities) { return "Fjern grener som ikke er tilgjengelige ennå." }
         if isDuel && athletes.count != 2 { return "Velg én motstander." }
+        if !plannedMeasures.isEmpty { return "Nye resultatmål kan foreløpig lagres som utkast eller mal." }
         if usesExplicitExercises && (competitionSettings.selectedExerciseIDs ?? []).isEmpty { return "Legg til minst én konkurranseøvelse." }
         if !scoringValid { return "Kontroller øvelser, mål og resultatgodkjenning." }
         if !competitionSettings.environmentsCanPublish(activities: allowedActivities) {
@@ -274,6 +310,7 @@ struct ATHLTHTournamentCreator: View {
     private var canSaveTemplate: Bool {
         effectiveTitle.count >= 3 &&
         ATHLTHTournamentActivity.canCreate(with: allowedActivities) && competitionSettings.isValid &&
+        plannedMeasures.allSatisfy { allowedActivities.contains($0.activity) } &&
         competitionSettings.environmentsValid(activities: allowedActivities, exerciseActivities: exerciseActivities) &&
         !templateSaving && !publishing
     }
@@ -338,7 +375,12 @@ struct ATHLTHTournamentCreator: View {
                                     competitionSettings.activityEnvironments = competitionSettings.activityEnvironments.filter { key, _ in
                                          newValue.contains { $0.rawValue == key }
                                      }
-                                     allowedActivities = newValue
+                                     if !plannedMeasures.isEmpty {
+                                        let kept = plannedMeasures.filter { newValue.contains($0.activity) }
+                                        competitionSettings.race.measureDrafts = kept.isEmpty ? nil : kept
+                                        exerciseCount = totalExerciseCount
+                                    }
+                                    allowedActivities = newValue
                                 }
                             }
                         ),
@@ -369,7 +411,7 @@ struct ATHLTHTournamentCreator: View {
                             .font(.caption).foregroundStyle(.orange)
                     }
                     if !competitionSettings.race.isOperational {
-                        Label("Dette oppsettet kan lagres som mal, men publisering krever videre støtte i den universelle treningsmotoren for valgt utstyr, rute, lagstart eller GPS-runder.",
+                        Label(plannedMeasures.isEmpty ? "Dette oppsettet kan lagres som mal, men publisering krever videre støtte i den universelle treningsmotoren." : "Nye resultatmål kan lagres som utkast eller mal, men støtter ikke publisering ennå.",
                               systemImage: "exclamationmark.triangle")
                             .font(.caption)
                             .foregroundStyle(.orange)
@@ -498,7 +540,7 @@ struct ATHLTHTournamentCreator: View {
             ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
                 selected: Set(competitionSettings.selectedExerciseIDs ?? []), templatesOnly: exerciseTemplatesOnly) { item in
                 var ids = competitionSettings.selectedExerciseIDs ?? []
-                guard ids.count < 12, !ids.contains(item.id), item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
+                guard totalExerciseCount < 12, !ids.contains(item.id), item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
                 exerciseMode = .owner
                 competitionSettings.coachExerciseIDs = []
                 ids.append(item.id)
@@ -506,14 +548,20 @@ struct ATHLTHTournamentCreator: View {
                 exerciseMetrics[item.id] = item.metric
                 exerciseActivities[item.id] = item.activity
                 competitionSettings.selectedExerciseIDs = ids
-                exerciseCount = ids.count
+                exerciseCount = totalExerciseCount
             }
         }
         .fullScreenCover(isPresented: $showingDuelRoute.keepingPresentedWhenInactive(scenePhase)) {
             NavigationStack {
                 SavedRoutesView(selectionTitle: "Konkurranserute") { route in
-                    competitionSettings.race.routeID = route.id
-                    competitionSettings.race.routeName = String(route.title.prefix(120))
+                    if addingRouteMeasure {
+                        convertingLibraryID = nil
+                        saveMeasure(ATHLTHCompetitionMeasureDraft(activity: routeMeasureActivity,
+                            measure: .routeTime, routeID: route.id, routeName: String(route.title.prefix(120))))
+                    } else {
+                        competitionSettings.race.routeID = route.id
+                        competitionSettings.race.routeName = String(route.title.prefix(120))
+                    }
                     showingDuelRoute = false
                 }
                 .toolbar {
@@ -521,6 +569,11 @@ struct ATHLTHTournamentCreator: View {
                         Button("Lukk") { showingDuelRoute = false }
                     }
                 }
+            }
+        }
+        .sheet(item: $editingMeasure, onDismiss: { convertingLibraryID = nil }) { value in
+            ATHLTHCompetitionMeasureEditor(initial: value) { updated in
+                saveMeasure(updated)
             }
         }
         .task(id: competitionSettings.selectedExerciseIDs ?? []) {
@@ -1028,9 +1081,20 @@ struct ATHLTHTournamentCreator: View {
                         competitionSettings.exerciseEnvironments.removeValue(forKey: id)
                         competitionSettings.race.scoringGoals?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
                         competitionSettings.race.exerciseWeights?.removeValue(forKey: ATHLTHCompetitionRaceRules.key(id))
-                        exerciseCount = competitionSettings.selectedExerciseIDs?.count ?? 0
+                        exerciseCount = totalExerciseCount
                     } label: { Image(systemName: "minus.circle").frame(width: 44, height: 44) }
                     .buttonStyle(.plain)
+                }
+                if exerciseActivities[id] == .strength, let name = rematchNames[id] {
+                    Button {
+                        convertingLibraryID = id
+                        editingMeasure = ATHLTHCompetitionMeasureDraft(activity: .strength,
+                            measure: .heaviest, libraryID: id, libraryName: name)
+                    } label: {
+                        Label("Tilpass resultatmål", systemImage: "slider.horizontal.3")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }.buttonStyle(.plain)
                 }
                 if let activity = exerciseActivities[id] {
                     DisclosureGroup("Eget treningsmiljø (valgfritt)") {
@@ -1067,6 +1131,38 @@ struct ATHLTHTournamentCreator: View {
                 Divider()
                 }
             }
+            ForEach(plannedMeasures) { item in
+                HStack(spacing: 12) {
+                    Button {
+                        convertingLibraryID = nil
+                        editingMeasure = item
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: item.activity.symbol)
+                                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.libraryName ?? item.routeName ?? item.measure.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                                Text(item.measure.title + " · Utkast")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        .frame(minHeight: 44)
+                    }.buttonStyle(.plain)
+                    Button(role: .destructive) {
+                        removeMeasure(item.id)
+                    } label: { Image(systemName: "minus.circle").frame(width: 44, height: 44) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Fjern konkurranseøvelse")
+                }
+                Divider()
+            }
             Menu {
                 Button {
                     exerciseTemplatesOnly = false
@@ -1079,6 +1175,21 @@ struct ATHLTHTournamentCreator: View {
                     showingExerciseLibrary = true
                 } label: {
                     Label("Forhåndsdefinerte øvelser og treningsøkter", systemImage: "list.bullet")
+                }
+                ForEach([ATHLTHTournamentActivity.running, .walking].filter { allowedActivities.contains($0) }) { activity in
+                    Menu(activity.title) {
+                        ForEach(ATHLTHCompetitionMeasure.cardio.filter { activity == .running || $0 != .sprint }) { measure in
+                            Button(measure.title) {
+                                convertingLibraryID = nil
+                                editingMeasure = ATHLTHCompetitionMeasureDraft(activity: activity, measure: measure)
+                            }
+                        }
+                        Button("Rute fra bibliotek") {
+                            routeMeasureActivity = activity
+                            addingRouteMeasure = true
+                            showingDuelRoute = true
+                        }
+                    }
                 }
                 Button {
                     exerciseTemplatesOnly = nil
@@ -1094,10 +1205,11 @@ struct ATHLTHTournamentCreator: View {
                     .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
-            .disabled(!ATHLTHTournamentActivity.canCreate(with: allowedActivities) || (competitionSettings.selectedExerciseIDs?.count ?? 0) >= 12)
+            .disabled(!ATHLTHTournamentActivity.canCreate(with: allowedActivities) || totalExerciseCount >= 12)
             if isDuel && allowedActivities.contains(.running) {
                 Divider()
                 Button {
+                    addingRouteMeasure = false
                     showingDuelRoute = true
                 } label: {
                     HStack(spacing: 10) {
@@ -1130,10 +1242,11 @@ struct ATHLTHTournamentCreator: View {
             }
             if let rematchSearchError { Text(rematchSearchError).font(.caption).foregroundStyle(.red) }
             if usesExplicitExercises {
-                Text("\(competitionSettings.selectedExerciseIDs?.count ?? 0) av 12 valgt").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                Text("\(totalExerciseCount) av 12 valgt").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
                 if !isDuel && !isRematch && !competitionSettings.race.effectiveScoringMode.needsGoal {
                     Button("Velg øvelser senere i stedet") {
                         competitionSettings.selectedExerciseIDs = nil
+                        competitionSettings.race.measureDrafts = nil
                         competitionSettings.exerciseEnvironments = [:]
                         competitionSettings.race.scoringGoals = nil
                         competitionSettings.race.exerciseWeights = nil
@@ -1603,6 +1716,9 @@ struct ATHLTHTournamentCreator: View {
             Text("Konkurransen").font(.headline)
             reviewRow("Grener", ATHLTHTournamentActivity.allCases.filter { allowedActivities.contains($0) }.map(\.title).joined(separator: " · "))
             reviewRow("Øvelser", exerciseMode == .open ? "Åpen liste" : "\(exerciseCount)")
+            ForEach(plannedMeasures) { item in
+                reviewRow(item.libraryName ?? item.routeName ?? item.activity.title, item.measure.title + " · Utkast")
+            }
             if competitionSettings.race.routeID != nil {
                 reviewRow("Felles løperute", competitionSettings.race.routeName)
             }
@@ -1973,6 +2089,108 @@ struct ATHLTHTournamentDraftDetailView: View {
             Text("Kun en forhåndsvisning. Deltakerne trekkes tilfeldig ved start, og frirunder gir ingen poeng.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
+        }
+    }
+}
+
+
+/// One editor for all competition formats; no separate duel-specific model.
+private struct ATHLTHCompetitionMeasureEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: ATHLTHCompetitionMeasureDraft
+    let onSave: (ATHLTHCompetitionMeasureDraft) -> Void
+
+    init(initial: ATHLTHCompetitionMeasureDraft, onSave: @escaping (ATHLTHCompetitionMeasureDraft) -> Void) {
+        _draft = State(initialValue: initial)
+        self.onSave = onSave
+    }
+
+    private var options: [ATHLTHCompetitionMeasure] {
+        if draft.libraryID != nil { return ATHLTHCompetitionMeasure.strength }
+        if draft.routeID != nil { return ATHLTHCompetitionMeasure.route }
+        return ATHLTHCompetitionMeasure.cardio.filter { draft.activity == .running || $0 != .sprint }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(draft.libraryName ?? draft.routeName ?? draft.activity.title)
+                            .font(.system(size: 21, weight: .regular, design: .serif))
+                        Text("Resultatmål").font(.subheadline.weight(.semibold))
+                        Picker("Resultatmål", selection: $draft.measure) {
+                            ForEach(options) { Text($0.title).tag($0) }
+                        }.pickerStyle(.menu)
+                        if draft.measure.needsReps {
+                            Stepper("Repetisjoner: \(draft.repetitions)", value: $draft.repetitions, in: 1...1_000)
+                        }
+                        if draft.measure.needsWeight {
+                            numberField("Vekt (kg)", value: $draft.kilograms)
+                        }
+                        if draft.measure.needsDistance {
+                            integerField("Distanse (meter)", value: $draft.distanceMeters)
+                        }
+                        if draft.measure.needsDuration {
+                            integerField("Tid (sekunder)", value: $draft.durationSeconds)
+                        }
+                        if draft.measure.needsPace {
+                            integerField("Pace (sekunder per km)", value: $draft.paceSecondsPerKM)
+                        }
+                        if draft.measure == .paceEndurance {
+                            Stepper("Toleranse: \(draft.paceToleranceSeconds) sek/km", value: $draft.paceToleranceSeconds, in: 1...120)
+                        }
+                        if draft.measure.needsSpeed {
+                            numberField("Hastighet (km/t)", value: $draft.speedKMH)
+                            numberField("Toleranse (km/t)", value: $draft.speedToleranceKMH)
+                        }
+                        if draft.measure == .intervalDistance {
+                            Stepper("Antall drag: \(draft.intervals)", value: $draft.intervals, in: 1...100)
+                            integerField("Drag (sekunder)", value: $draft.workSeconds)
+                            integerField("Pause (sekunder)", value: $draft.restSeconds)
+                            Text("Kun distansen i dragene inngår i resultatet.").font(.caption)
+                        }
+                    }.padding(15).background(ATHLTHArenaV3Style.panel())
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Forsøk og poeng").font(.system(size: 21, design: .serif))
+                        Stepper("Antall forsøk: \(draft.attempts)", value: $draft.attempts, in: 1...10)
+                        Stepper("Poengvekt: \(draft.pointsWeight)×", value: $draft.pointsWeight, in: 1...5)
+                        Text("Beste gyldige forsøk teller. Resultatmålet kan foreløpig lagres som utkast eller mal.")
+                            .font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }.padding(15).background(ATHLTHArenaV3Style.panel())
+                }
+                .padding(18).frame(maxWidth: 650).frame(maxWidth: .infinity)
+            }
+            .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
+            .foregroundStyle(ATHLTHArenaV3Style.ink)
+            .font(.subheadline)
+            .tint(ATHLTHArenaV3Style.gold)
+            .navigationTitle("Konkurranseøvelse")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Avbryt") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lagre") { onSave(draft); dismiss() }.disabled(!draft.isValid)
+                }
+            }
+        }
+    }
+
+    private func integerField(_ title: String, value: Binding<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.caption.weight(.semibold))
+            TextField(title, value: value, format: .number)
+                .keyboardType(.numberPad).padding(10)
+                .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func numberField(_ title: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.caption.weight(.semibold))
+            TextField(title, value: value, format: .number)
+                .keyboardType(.decimalPad).padding(10)
+                .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 10))
         }
     }
 }
