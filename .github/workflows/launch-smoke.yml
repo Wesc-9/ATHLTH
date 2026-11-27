@@ -650,6 +650,7 @@ jobs:
             HOP_OUTPUT=$(simctl_bounded "launch Home-to-Train $DEVICE_NAME" 75 launch --terminate-running-process "$UDID" com.wesc9.athlth \
               --athlth-compatibility-preview \
               --athlth-compatibility-tab=0 \
+              --athlth-smoke-weekly-day \
               --athlth-smoke-home-train-hop \
               --athlth-smoke-home-train-stress 2>&1)
             HOP_STATUS=$?
@@ -672,6 +673,12 @@ jobs:
             HOP_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-home-train-before-stress.png"
             FINAL_HOP_SCREENSHOT="$RUNNER_TEMP/athlth-$CLASS-home-train-after-stress.png"
             verify_train_dashboard_ready "$UDID" "$HOP_PID" "$DEVICE_NAME Home-to-Train" true
+            # Explicitly verify each actual day sheet, not only the final Train frame.
+            for weekday in 1 2 3 4 5 6 7; do
+              test -s "$APP_DATA_CONTAINER/tmp/athlth-train-$HOP_PID-weekly-day-mounted-$weekday"
+              test -s "$APP_DATA_CONTAINER/tmp/athlth-train-$HOP_PID-weekly-day-verified-$weekday"
+            done
+            test -s "$APP_DATA_CONTAINER/tmp/athlth-train-$HOP_PID-weekly-day-all-verified"
             validate_nonblank_screen "$UDID" "$HOP_SCREENSHOT" "$DEVICE_NAME Home-to-Train after dashboard mount" final "$HOP_PID"
             # Prove all 100 same-process Home -> Train cycles completed.
             STRESS_CONTAINER="$APP_DATA_CONTAINER"
