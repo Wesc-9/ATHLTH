@@ -248,4 +248,38 @@ final class ATHLTHArenaV3TournamentTests: XCTestCase {
         rule.measure = .closestPace
         XCTAssertEqual(ATHLTHCompetitionMeasureCalculator.bestAttempt(rule, values: [12, 0]), 0)
     }
+
+    func testMeetingAddressAndInstructionsPreserveExistingInviteText() throws {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.setMeetingPoint(address: " Testveien 12 ", description: " Ved hovedinngangen ",
+                                 latitude: 63.4, longitude: 10.4)
+        XCTAssertEqual(settings.meetingAddress, "Testveien 12")
+        XCTAssertEqual(settings.meetingDescription, "Ved hovedinngangen")
+        XCTAssertEqual(settings.meetingPlace, "Testveien 12\nVed hovedinngangen")
+        XCTAssertTrue(settings.isValid)
+        let decoded = try JSONDecoder().decode(ATHLTHTournamentCompetitionSettings.self,
+                                               from: JSONEncoder().encode(settings))
+        XCTAssertEqual(decoded, settings)
+        settings.setMeetingPoint(address: "Ny gate 2", description: "", latitude: nil, longitude: nil)
+        XCTAssertEqual(settings.meetingPlace, "Ny gate 2")
+        XCTAssertNil(settings.meetingLat)
+        XCTAssertNil(settings.meetingLon)
+    }
+
+    func testLegacyMeetingPointWithoutSplitFieldsStillDecodes() throws {
+        let legacy = Data(#"{"meetingPlace":"Eksisterende adresse","meetingLat":63.4,"meetingLon":10.4}"#.utf8)
+        let decoded = try JSONDecoder().decode(ATHLTHTournamentCompetitionSettings.self, from: legacy)
+        XCTAssertEqual(decoded.meetingPlace, "Eksisterende adresse")
+        XCTAssertNil(decoded.meetingAddress)
+        XCTAssertNil(decoded.meetingDescription)
+        XCTAssertEqual(decoded.meetingLat, 63.4)
+    }
+
+    func testMeetingTextLimitIsNotSilentlyTruncated() {
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.setMeetingPoint(address: "Testveien 12", description: String(repeating: "a", count: 240),
+                                 latitude: nil, longitude: nil)
+        XCTAssertFalse(settings.isValid)
+        XCTAssertTrue(settings.meetingPlace.count > 240)
+    }
 }
