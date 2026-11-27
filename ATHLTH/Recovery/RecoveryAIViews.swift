@@ -2342,7 +2342,11 @@ struct RecoveryCoachView: View {
         VStack(spacing: 8) {
             // Four quick actions remain visible even with a long chat history.
             ATHLTHCoachStarterActions(
-                onSelect: { activeQuickWizard = $0 },
+                onSelect: { action in
+                    if action == .createPlan {
+                        requestAnswer(recoveryAIText("Create a training plan for me", "Lag en treningsplan til meg"))
+                    } else { activeQuickWizard = action }
+                },
                 isDisabled: isAsking
             )
 

@@ -112,24 +112,30 @@ enum ATHLTHCoachChatPlanFactory {
                     let blueprint: TrainingPlanCatalogSessionBlueprint
                     switch intake.goal {
                     case .legs:
-                        blueprint = outside ? .home : (slot % 2 == 0 ? .quads : .legs)
+                        blueprint = slot < 2 ? (outside ? .home : (slot == 0 ? .quads : .legs)) : (outside ? .walking : .upperBody)
                     case .strength:
                         blueprint = outside ? .home : (slot % 2 == 0 ? .upperBody : .lowerBody)
                     case .running:
                         blueprint = .easyRun
                     case .walking:
-                        blueprint = .walk
+                        blueprint = .walking
                     case .hybrid:
                         blueprint = slot % 2 == 0 ? .easyRun : (outside ? .home : .fullBodyA)
                     }
                     let source = blueprint == .home ? homeEntry : entry
                     var workout = ATHLTHCatalogPlanSessionFactory.session(entry: source, blueprint: blueprint, week: week)
-                    if intake.experience == .beginner && workout.kind == .strength {
-                        for index in workout.workoutBlocks.indices where workout.workoutBlocks[index].kind == .exercise {
-                            if let sets = workout.workoutBlocks[index].setCount {
-                                workout.workoutBlocks[index].setCount = min(sets, 2)
+                    if workout.kind == .strength, var blocks = workout.workoutBlocks {
+                        if intake.goal == .legs && outside {
+                            let names = ["Bodyweight Squat", "Glute Bridge", "Bodyweight Reverse Lunge"]
+                            blocks = blocks.filter { $0.kind != .exercise || names.contains($0.title) }
+                            workout.title = ATHLTHLocalization.choose(english: "Bodyweight leg strength", norwegian: "Beinstyrke uten utstyr")
+                        }
+                        if intake.experience == .beginner {
+                            for index in blocks.indices where blocks[index].kind == .exercise {
+                                if let sets = blocks[index].setCount { blocks[index].setCount = min(sets, 2) }
                             }
                         }
+                        workout.workoutBlocks = ATHLTHCatalogPlanSessionFactory.resequencedBlocks(blocks)
                     }
                     if intake.goal == .legs && outside {
                         workout.notes = (workout.notes ?? "") + "\n" + ATHLTHLocalization.choose(
