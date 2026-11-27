@@ -179,23 +179,23 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 if activities.count > 1 || !settings.activityEnvironments.isEmpty {
                     Divider()
                     DisclosureGroup("Egne miljøregler per treningsform", isExpanded: $expandedEnvironments) {
-                if expandedEnvironments {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Valgfritt. En egen regel kan bare begrense fellesregelen. Egne miljøkrav kan foreløpig bare lagres som mal.")
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                            ForEach(ATHLTHTournamentActivity.allCases.filter { activities.contains($0) && $0.isAvailableForCreation }) { activity in
-                                activityVenuePicker(activity)
+                        if expandedEnvironments {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Valgfritt. En egen regel kan bare begrense fellesregelen. Egne miljøkrav kan foreløpig bare lagres som mal.")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                                ForEach(ATHLTHTournamentActivity.allCases.filter { activities.contains($0) && $0.isAvailableForCreation }) { activity in
+                                    activityVenuePicker(activity)
+                                }
+                                if !settings.activityEnvironments.isEmpty {
+                                    Button("Bruk fellesregelen for alle") {
+                                        settings.activityEnvironments.removeAll()
+                                    }.font(.caption.weight(.medium))
+                                }
                             }
-                            if !settings.activityEnvironments.isEmpty {
-                                Button("Bruk fellesregelen for alle") {
-                                    settings.activityEnvironments.removeAll()
-                                }.font(.caption.weight(.medium))
-                            }
+                            .padding(.top, 10)
                         }
-                        .padding(.top, 10)
-                        }
-}
+                    }
                     .font(.subheadline.weight(.semibold))
                     .tint(ATHLTHArenaV3Style.gold)
                 }
@@ -285,31 +285,31 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 isExpanded: $expandedAccess
             ) {
                 if expandedAccess {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Hvem kan invitere flere?")
-                        .font(.subheadline.weight(.semibold))
-                    Picker("Invitasjonsrett", selection: $settings.invitationPermission) {
-                        ForEach(ATHLTHCompetitionInvitePermission.allCases) { option in
-                            Text(option.title).tag(option)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Hvem kan invitere flere?")
+                            .font(.subheadline.weight(.semibold))
+                        Picker("Invitasjonsrett", selection: $settings.invitationPermission) {
+                            ForEach(ATHLTHCompetitionInvitePermission.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
                         }
-                    }
-                    .pickerStyle(.menu)
-                    Divider()
-                    Text("Hvem godkjenner nye deltakere?")
-                        .font(.subheadline.weight(.semibold))
-                    Picker("Godkjenning", selection: $settings.joinApproval) {
-                        ForEach(ATHLTHCompetitionJoinApproval.allCases) { option in
-                            Text(option.title).tag(option)
+                        .pickerStyle(.menu)
+                        Divider()
+                        Text("Hvem godkjenner nye deltakere?")
+                            .font(.subheadline.weight(.semibold))
+                        Picker("Godkjenning", selection: $settings.joinApproval) {
+                            ForEach(ATHLTHCompetitionJoinApproval.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        Text("Den inviterte må alltid selv godta eller avslå. Andre kan ikke samtykke på vedkommendes vegne.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     }
-                    .pickerStyle(.menu)
-                    Text("Den inviterte må alltid selv godta eller avslå. Andre kan ikke samtykke på vedkommendes vegne.")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .padding(.top, 10)
                 }
-                .padding(.top, 10)
-                }
-}
+            }
             .font(.subheadline.weight(.semibold))
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
@@ -321,31 +321,31 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 isExpanded: $expandedAgreement
             ) {
                 if expandedAgreement {
-                VStack(alignment: .leading, spacing: 12) {
-                    entry("Dette er lov", text: $settings.agreement.allowed,
-                          hint: "F.eks. ute og tredemølle, tillatt utstyr")
-                    entry("Dette er ikke lov", text: $settings.agreement.prohibited,
-                          hint: "F.eks. manuell registrering eller hjelp fra andre")
-                    Divider()
-                    entry("Premie – 1. plass",
-                          text: $settings.agreement.firstPrize,
-                          hint: "Valgfritt")
-                    entry("Premie – 2. plass",
-                          text: $settings.agreement.secondPrize,
-                          hint: "Valgfritt")
-                    entry("Premie – 3. plass",
-                          text: $settings.agreement.thirdPrize,
-                          hint: "Valgfritt")
-                    entry("Frivillig konsekvens for taper",
-                          text: $settings.agreement.loserConsequence,
-                          hint: "Valgfritt – må være trygt og lovlig")
-                    Text("Premier og konsekvenser er kun frivillige avtaler mellom deltakerne. ATHLTH krever ikke inn penger og gjennomfører ingen straff. Alle må godkjenne vilkårene før start.")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    VStack(alignment: .leading, spacing: 12) {
+                        entry("Dette er lov", text: $settings.agreement.allowed,
+                              hint: "F.eks. ute og tredemølle, tillatt utstyr")
+                        entry("Dette er ikke lov", text: $settings.agreement.prohibited,
+                              hint: "F.eks. manuell registrering eller hjelp fra andre")
+                        Divider()
+                        entry("Premie – 1. plass",
+                              text: $settings.agreement.firstPrize,
+                              hint: "Valgfritt")
+                        entry("Premie – 2. plass",
+                              text: $settings.agreement.secondPrize,
+                              hint: "Valgfritt")
+                        entry("Premie – 3. plass",
+                              text: $settings.agreement.thirdPrize,
+                              hint: "Valgfritt")
+                        entry("Frivillig konsekvens for taper",
+                              text: $settings.agreement.loserConsequence,
+                              hint: "Valgfritt – må være trygt og lovlig")
+                        Text("Premier og konsekvenser er kun frivillige avtaler mellom deltakerne. ATHLTH krever ikke inn penger og gjennomfører ingen straff. Alle må godkjenne vilkårene før start.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    .padding(.top, 10)
                 }
-                .padding(.top, 10)
-                }
-}
+            }
             .font(.subheadline.weight(.semibold))
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
