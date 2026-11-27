@@ -151,4 +151,66 @@ final class ATHLTHArenaV3TournamentTests: XCTestCase {
         XCTAssertFalse(ATHLTHChallengeTreadmillReviewPolicy.withinMargin(
             measured: measured, submitted: .infinity))
     }
+
+    func testConfigurableCompetitionMeasuresRoundTripWithoutPublishing() throws {
+        let libraryID = UUID()
+        let routeID = UUID()
+        var strength = ATHLTHCompetitionMeasureDraft(activity: .strength,
+            measure: .heaviestForReps, libraryID: libraryID, libraryName: "Benkpress")
+        strength.repetitions = 10
+        let intervals = ATHLTHCompetitionMeasureDraft(activity: .running, measure: .intervalDistance)
+        let route = ATHLTHCompetitionMeasureDraft(activity: .running,
+            measure: .routeTime, routeID: routeID, routeName: "Testløype")
+        var race = ATHLTHCompetitionRaceRules()
+        race.measureDrafts = [strength, intervals, route]
+        XCTAssertTrue(race.isValid)
+        XCTAssertFalse(race.isOperational)
+        let decoded = try JSONDecoder().decode(ATHLTHCompetitionRaceRules.self,
+            from: JSONEncoder().encode(race))
+        XCTAssertEqual(decoded.plannedMeasures, [strength, intervals, route])
+        XCTAssertEqual(decoded.plannedMeasures.first?.libraryID, libraryID)
+        XCTAssertEqual(decoded.plannedMeasures.last?.routeID, routeID)
+        XCTAssertFalse(decoded.isOperational)
+    }
+
+    func testConfiguredMeasuresRejectInvalidTargetsAndDuplicateEntries() {
+        var strength = ATHLTHCompetitionMeasureDraft(activity: .strength, measure: .heaviestForReps)
+        XCTAssertFalse(strength.isValid)
+        strength.libraryID = UUID()
+        strength.libraryName = "Benkpress"
+        strength.repetitions = 0
+        XCTAssertFalse(strength.isValid)
+        strength.repetitions = 10
+        XCTAssertTrue(strength.isValid)
+        var race = ATHLTHCompetitionRaceRules()
+        race.measureDrafts = [strength, strength]
+        XCTAssertFalse(race.isValid)
+        var wrongActivity = ATHLTHCompetitionMeasureDraft(activity: .walking, measure: .sprint)
+        XCTAssertFalse(wrongActivity.isValid)
+        wrongActivity.measure = .distanceInTime
+        XCTAssertTrue(wrongActivity.isValid)
+        wrongActivity.durationSeconds = 0
+        XCTAssertFalse(wrongActivity.isValid)
+    }
+
+    func testConfiguredRouteDoesNotRequireInventedLibraryID() {
+        var route = ATHLTHCompetitionMeasureDraft(activity: .running, measure: .routeSpeed,
+            routeID: UUID(), routeName: "Runde")
+        XCTAssertTrue(route.isValid)
+        route.libraryID = UUID()
+        XCTAssertFalse(route.isValid)
+        route.libraryID = nil
+        var settings = ATHLTHTournamentCompetitionSettings()
+        settings.selectedExerciseIDs = []
+        settings.race.measureDrafts = [route]
+        XCTAssertTrue(settings.isValid)
+        XCTAssertFalse(settings.race.isOperational)
+    }
+
+    func testOldRaceRulesStillDecodeWithNoConfiguredMeasures() throws {
+        let old = try JSONDecoder().decode(ATHLTHCompetitionRaceRules.self, from: Data("{}".utf8))
+        XCTAssertTrue(old.plannedMeasures.isEmpty)
+        XCTAssertTrue(old.isValid)
+        XCTAssertTrue(old.isOperational)
+    }
 }
