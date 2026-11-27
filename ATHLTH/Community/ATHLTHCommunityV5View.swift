@@ -250,21 +250,6 @@ struct ATHLTHCommunityV5View: View {
         .frame(maxWidth: .infinity)
         .background {
             CommunityWeeklyChallengeHeroBackground(challenge: challenge)
-                .overlay(alignment: .top) {
-                    // ATHLTH uses a light system appearance. Retain readable
-                    // dark status-bar glyphs over the full-bleed photograph.
-                    if topInset > 0 {
-                        LinearGradient(
-                            stops: [
-                                .init(color: CommunityReferenceStyle.canvas.opacity(0.96), location: 0),
-                                .init(color: CommunityReferenceStyle.canvas.opacity(0.90), location: 0.60),
-                                .init(color: .clear, location: 1)
-                            ],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                        .frame(height: topInset + 10)
-                    }
-                }
                 .accessibilityHidden(true)
                 .allowsHitTesting(false)
         }
@@ -454,42 +439,84 @@ struct ATHLTHCommunityV5View: View {
         }
     }
 
+    /// One editorial navigation surface instead of four unrelated tiles.
     private var shortcuts: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
-            NavigationLink {
-                ATHLTHClubsHubView(showsNavigationBack: true)
-            } label: { shortcutTile(tr("Clubs", "Klubber"), "person.3.fill") }
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                NavigationLink {
+                    ATHLTHClubsHubView(showsNavigationBack: true)
+                } label: {
+                    shortcutRow(tr("Clubs", "Klubber"), "person.3")
+                }
                 .buttonStyle(.plain)
-            NavigationLink {
-                ATHLTHCompetitionEntryView()
-            } label: { shortcutTile(tr("Competition", "Konkurranse"), "trophy.fill") }
+
+                shortcutDivider
+
+                NavigationLink {
+                    ATHLTHCompetitionEntryView()
+                } label: {
+                    shortcutRow(tr("Competition", "Konkurranse"), "trophy")
+                }
                 .buttonStyle(.plain)
-            NavigationLink {
-                ChallengeHubView()
-            } label: { shortcutTile(tr("Challenges", "Utfordringer"), "flag.checkered") }
+            }
+
+            Rectangle()
+                .fill(CommunityReferenceStyle.edge.opacity(0.7))
+                .frame(height: 1)
+                .padding(.horizontal, 14)
+                .accessibilityHidden(true)
+
+            HStack(spacing: 0) {
+                NavigationLink {
+                    ChallengeHubView()
+                } label: {
+                    shortcutRow(tr("Challenges", "Utfordringer"), "flag.checkered")
+                }
                 .buttonStyle(.plain)
-            NavigationLink {
-                MessageInboxDestinationView()
-            } label: { shortcutTile(tr("Messages", "Meldinger"), "bubble.left.and.bubble.right.fill") }
+
+                shortcutDivider
+
+                NavigationLink {
+                    MessageInboxDestinationView()
+                } label: {
+                    shortcutRow(tr("Messages", "Meldinger"), "bubble.left.and.bubble.right")
+                }
                 .buttonStyle(.plain)
+            }
         }
+        .padding(.vertical, 3)
+        .communityReferenceCard()
+        .accessibilityIdentifier("athlth-community-shortcuts")
     }
 
-    private func shortcutTile(_ title: String, _ symbol: String) -> some View {
-        VStack(spacing: 8) {
+    private var shortcutDivider: some View {
+        Rectangle()
+            .fill(CommunityReferenceStyle.edge.opacity(0.7))
+            .frame(width: 1, height: 30)
+            .accessibilityHidden(true)
+    }
+
+    private func shortcutRow(_ title: String, _ symbol: String) -> some View {
+        HStack(spacing: 9) {
             Image(systemName: symbol)
-                .font(.system(size: 19, weight: .medium))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(CommunityReferenceStyle.darkGold)
-                .frame(width: 39, height: 39)
-                .background(CommunityReferenceStyle.cream, in: RoundedRectangle(cornerRadius: 12))
+                .frame(width: 25)
+                .accessibilityHidden(true)
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(CommunityReferenceStyle.ink)
-                .lineLimit(1).minimumScaleFactor(0.72)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 2)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .accessibilityHidden(true)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, minHeight: 84)
-        .communityReferenceCard()
+        .padding(.horizontal, 12)
+        .padding(.vertical, 13)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var myClubsSection: some View {
