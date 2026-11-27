@@ -245,7 +245,7 @@ struct ATHLTHTournamentCreator: View {
         _exerciseMode = State(initialValue:
             continuation?.exerciseMode ?? .owner)
         _exerciseCount = State(initialValue:
-            initialSettings.selectedExerciseIDs?.count ?? continuation?.exerciseCount ?? (duelMode ? 0 : 4))
+            (initialSettings.selectedExerciseIDs.map { $0.count + initialSettings.race.plannedMeasures.count }) ?? continuation?.exerciseCount ?? (duelMode ? 0 : 4))
         _approvePlayerChanges = State(initialValue:
             continuation?.approvePlayerChanges ?? false)
         _warmupRounds = State(initialValue:
@@ -538,7 +538,8 @@ struct ATHLTHTournamentCreator: View {
         }
         .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
             ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
-                selected: Set(competitionSettings.selectedExerciseIDs ?? []), templatesOnly: exerciseTemplatesOnly) { item in
+                selected: Set(competitionSettings.selectedExerciseIDs ?? []), templatesOnly: exerciseTemplatesOnly,
+                selectionLimit: max(0, 12 - plannedMeasures.count)) { item in
                 var ids = competitionSettings.selectedExerciseIDs ?? []
                 guard totalExerciseCount < 12, !ids.contains(item.id), item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
                 exerciseMode = .owner
@@ -919,7 +920,8 @@ struct ATHLTHTournamentCreator: View {
             return
         }
         if let fixedActivity,
-           !saved.allowedActivities.contains(fixedActivity) {
+           !saved.allowedActivities.contains(fixedActivity) ||
+           saved.competitionSettings.race.plannedMeasures.contains(where: { $0.activity != fixedActivity }) {
             errorMessage = "Denne malen er ikke laget for \(fixedActivity.title)."
             return
         }
@@ -942,7 +944,9 @@ struct ATHLTHTournamentCreator: View {
         publicResults = saved.publicResults
         proofMode = saved.proofMode
         exerciseMode = saved.exerciseMode
-        exerciseCount = saved.exerciseCount
+        exerciseCount = saved.competitionSettings.selectedExerciseIDs.map {
+            $0.count + saved.competitionSettings.race.plannedMeasures.count
+        } ?? saved.exerciseCount
         proposalsCloseAt = saved.proposalsCloseAt ??
             Date().addingTimeInterval(2 * 86_400)
         votesCloseAt = saved.votesCloseAt ??
@@ -1243,7 +1247,7 @@ struct ATHLTHTournamentCreator: View {
             if let rematchSearchError { Text(rematchSearchError).font(.caption).foregroundStyle(.red) }
             if usesExplicitExercises {
                 Text("\(totalExerciseCount) av 12 valgt").font(.caption).foregroundStyle(ATHLTHArenaV3Style.secondary)
-                if !isDuel && !isRematch && !competitionSettings.race.effectiveScoringMode.needsGoal {
+                if !isDuel && !isRematch && plannedMeasures.isEmpty && !competitionSettings.race.effectiveScoringMode.needsGoal {
                     Button("Velg øvelser senere i stedet") {
                         competitionSettings.selectedExerciseIDs = nil
                         competitionSettings.race.measureDrafts = nil
