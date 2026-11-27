@@ -244,11 +244,8 @@ struct ATHLTHCompetitionRaceRulesSection: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $showingLapPoint, onDismiss: {
-            settings.race.lapCourseLatitude = settings.meetingLat
-            settings.race.lapCourseLongitude = settings.meetingLon
-        }) {
-            ATHLTHCompetitionMeetingPointPicker(settings: $settings)
+        .fullScreenCover(isPresented: $showingLapPoint) {
+            ATHLTHCompetitionMeetingPointPicker(settings: $settings, lapPointOnly: true)
         }
         .onChange(of: activities) { _, current in
             if !current.contains(.running) {
