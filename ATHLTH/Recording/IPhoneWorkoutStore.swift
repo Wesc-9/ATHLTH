@@ -181,6 +181,10 @@ struct PhoneWorkout: Codable, Identifiable {
     /// separate GPS or HealthKit recording. Nil for older workouts.
     var competitionCapture: ATHLTHCompetitionCaptureContext? = nil
     var healthID: UUID?
+    // Private measured workout totals, nil for unavailable or legacy data.
+    var measuredActiveCalories: Double? = nil
+    var measuredAverageHeartRate: Double? = nil
+    var measuredMaximumHeartRate: Double? = nil
     // Explicit plan origin, optional to preserve previous history.
     var plannedPlanID: UUID? = nil
     var plannedSessionID: UUID? = nil
@@ -1948,6 +1952,12 @@ final class IPhoneWorkoutStore:
             startedAt: workout.start,
             finishedAt: finishDate
         )
+        if #available(iOS 26.0, *), let capture = nativeCapture, capture.workoutID == workout.id {
+            let metrics = capture.summary()
+            workout.measuredActiveCalories = metrics.activeCalories
+            workout.measuredAverageHeartRate = metrics.averageHeartRate
+            workout.measuredMaximumHeartRate = metrics.maxHeartRate
+        }
         let minuteSampleEnd = workout.end ?? Date()
         recordRunningMinuteIfDue(&workout, force: true, at: minuteSampleEnd)
         // Keep the final in-progress phase in the durable result as a
@@ -2076,6 +2086,9 @@ final class IPhoneWorkoutStore:
         treadmillTickTask = nil
         structuredTickTask?.cancel()
         structuredTickTask = nil
+        if #available(iOS 26.0, *), let capture = nativeCapture, capture.workoutID == workout.id {
+            capture.requestStop(at: workout.end ?? finishDate)
+        }
         history = completedHistory
         active = nil
         recoveredWorkoutLastCheckpoint = nil

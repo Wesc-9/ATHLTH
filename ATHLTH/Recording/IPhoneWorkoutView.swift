@@ -1582,6 +1582,23 @@ struct IPhoneWorkoutView: View {
                             .hidden
                         )
 
+                    if let workout = recorder.lastCompletedWorkout,
+                       workout.measuredActiveCalories != nil || workout.measuredAverageHeartRate != nil || workout.measuredMaximumHeartRate != nil {
+                        Section(ATHLTHLocalization.choose(english: "Measured workout metrics", norwegian: "Målte treningsdata")) {
+                            HStack {
+                                if let value = workout.measuredActiveCalories {
+                                    completionMetric(title: "KCAL", value: "\(Int(value.rounded()))")
+                                }
+                                if let value = workout.measuredAverageHeartRate {
+                                    completionMetric(title: ATHLTHLocalization.choose(english: "AVG HR", norwegian: "SNITT PULS"), value: "\(Int(value.rounded())) bpm")
+                                }
+                                if let value = workout.measuredMaximumHeartRate {
+                                    completionMetric(title: ATHLTHLocalization.choose(english: "MAX HR", norwegian: "MAKS PULS"), value: "\(Int(value.rounded())) bpm")
+                                }
+                            }
+                        }
+                    }
+
                     if let completion =
                         recorder.lastRouteCompletion {
                         Section("Route complete") {
