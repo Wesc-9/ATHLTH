@@ -4,6 +4,14 @@ import XCTest
 @testable import ATHLTH
 
 final class EquipmentScannerTests: XCTestCase {
+    func testLocalEquipmentRequiresSpecificUnambiguousLabel() {
+        XCTAssertEqual(ATHLTHLocalEquipmentRecognition.suggestion(observations: [("dumbbell", 0.9)], options: ["Dumbbell"]), "Dumbbell")
+        XCTAssertNil(ATHLTHLocalEquipmentRecognition.suggestion(observations: [("gym", 0.9)], options: ["Dumbbell"]))
+        XCTAssertNil(ATHLTHLocalEquipmentRecognition.suggestion(observations: [("dumbbell", 0.9), ("barbell", 0.8)], options: ["Dumbbell", "Barbell"]))
+        XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .equipmentRecognition), .appleVision)
+        XCTAssertThrowsError(try ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .equipmentRecognition))
+    }
+
     @MainActor
     func testOnlyKnownExerciseIDsCanBeSuggested() throws {
         let library = ExerciseLibraryStore()

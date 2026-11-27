@@ -4,13 +4,14 @@ import FoundationModels
 #endif
 
 enum ATHLTHIntelligenceProvider: String, CaseIterable, Sendable {
-    case rules, appleLocal, appleCloud, groq, openAIRealtime
+    case rules, appleLocal, appleCloud, appleVision, groq, openAIRealtime
 
     var title: String {
         switch self {
         case .rules: return "ATHLTH"
         case .appleLocal: return "Apple · On-device"
         case .appleCloud: return "Apple · Private Cloud Compute"
+        case .appleVision: return "Apple · Vision (on-device)"
         case .groq: return "Groq"
         case .openAIRealtime: return "OpenAI Realtime"
         }
@@ -56,7 +57,8 @@ enum ATHLTHIntelligenceRoutingPolicy {
             return .rules
         case .workoutInsight, .recoveryInsight, .coachQuestion, .privateHistorySearch:
             return localAvailable ? .appleLocal : .rules
-        case .trainingProgram, .strengthSession, .planAdaptation, .equipmentRecognition, .pushToTalk:
+        case .equipmentRecognition: return .appleVision
+        case .trainingProgram, .strengthSession, .planAdaptation, .pushToTalk:
             return .groq
         case .realtimeConversation:
             return .openAIRealtime
@@ -81,7 +83,6 @@ enum ATHLTHIntelligenceRoutingPolicy {
         case .trainingProgram: return "generate-training-program"
         case .strengthSession: return "generate-strength-session"
         case .planAdaptation: return "generate-plan-adaptation"
-        case .equipmentRecognition: return "identify-gym-equipment"
         case .pushToTalk: return "audio-coach-groq-turn"
         default: throw ATHLTHIntelligenceDiagnosticError.unavailable
         }

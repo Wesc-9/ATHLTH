@@ -2,26 +2,7 @@ import PhotosUI
 import Supabase
 import SwiftUI
 import UIKit
-
-private struct ATHLTHEquipmentScanCandidate: Encodable {
-    let id: String
-    let name: String
-    let equipment: [String]
-    let primaryMuscles: [String]
-
-    init(_ entry: ExerciseLibraryEntry) {
-        id = entry.id.uuidString
-        name = entry.name
-        equipment = entry.exercise.equipment
-        primaryMuscles = entry.exercise.primaryMuscles
-    }
-}
-
-private struct ATHLTHEquipmentScanRequest: Encodable {
-    let imageBase64: String
-    let language: String
-    let candidates: [ATHLTHEquipmentScanCandidate]
-}
+import Vision
 
 /// Balanced, deterministic shortlist for the vision API's bounded context.
 /// Without this, the first 100 alphabetically sorted exercises can all be
@@ -238,34 +219,73 @@ enum ATHLTHEquipmentPhotoEncoder {
     }
 }
 
-@MainActor
-final class ATHLTHEquipmentVisionService {
-    private let client = SupabaseEnvironment.client
+/// Specific equipment labels only. A generic gym or weights label is
+/// not sufficient to identify an apparatus.
+enum ATHLTHLocalEquipmentRecognition {
+    static func key(_ text: String) -> String {
+        text.lowercased().replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
-    func analyze(
-        image: UIImage,
-        exercises: [ExerciseLibraryEntry]
-    ) async throws -> ATHLTHEquipmentScanResponse {
-        let data = try ATHLTHEquipmentPhotoEncoder.jpegData(for: image)
-        do {
-            return try await client.functions.invoke(
-                "identify-gym-equipment",
-                options: FunctionInvokeOptions(
-                    body: ATHLTHEquipmentScanRequest(
-                        imageBase64: data.base64EncodedString(),
-                        language: ATHLTHLocalization.isNorwegian ? "no" : "en",
-                        candidates: exercises.prefix(100).map(ATHLTHEquipmentScanCandidate.init)
-                    )
-                )
-            )
-        } catch {
-            throw ATHLTHEquipmentScannerError.from(error)
+    static func family(_ text: String) -> String? {
+        let aliases: [String: [String]] = [
+            "dumbbell": ["dumbbell", "dumbbells", "hantel", "manualer"],
+            "barbell": ["barbell", "barbells", "vektstang"],
+            "kettlebell": ["kettlebell", "kettle bell"],
+            "treadmill": ["treadmill", "tredemølle"],
+            "stationary bike": ["stationary bike", "exercise bike", "stationary bicycle", "spinning bike"],
+            "rowing machine": ["rowing machine", "romaskin"],
+            "elliptical": ["elliptical", "elliptical trainer"],
+            "pull up bar": ["pull up bar", "chin up bar"],
+            "resistance band": ["resistance band", "exercise band", "treningsstrikk"],
+            "cable machine": ["cable machine", "cable station", "kabelapparat", "cable"]
+        ]
+        return aliases.first { $0.value.contains(key(text)) }?.key
+    }
+
+    static func suggestion(observations: [(String, Float)], options: [String]) -> String? {
+        let families = Set(observations.filter { $0.1.isFinite && (0.65...1).contains($0.1) }
+            .compactMap { family($0.0) })
+        guard families.count == 1, let match = families.first else { return nil }
+        return options.first { family($0) == match }
+    }
+
+    static func matching(equipment: String, entries: [ExerciseLibraryEntry]) -> [ExerciseLibraryEntry] {
+        guard !key(equipment).isEmpty else { return [] }
+        let category = family(equipment)
+        var seen = Set<UUID>()
+        return entries.filter { entry in
+            entry.exercise.equipment.contains {
+                key($0) == key(equipment) || (category != nil && family($0) == category)
+            } && seen.insert(entry.id).inserted
+        }.sorted {
+            if ($0.source == .custom) != ($1.source == .custom) { return $0.source == .custom }
+            let order = $0.name.localizedStandardCompare($1.name)
+            return order == .orderedSame ? $0.id.uuidString < $1.id.uuidString : order == .orderedAscending
         }
     }
 }
 
-/// Camera stills only. Users actively capture one photo and explicitly choose
-/// whether to send it to ATHLTH AI. No continuous camera stream is uploaded.
+@MainActor
+final class ATHLTHEquipmentVisionService {
+    func analyze(image: UIImage, options: [String]) async throws -> String? {
+        let data = try ATHLTHEquipmentPhotoEncoder.jpegData(for: image)
+        let work = Task.detached(priority: .userInitiated) { () throws -> String? in
+            try Task.checkCancellation()
+            let request = VNClassifyImageRequest()
+            try VNImageRequestHandler(data: data, options: [:]).perform([request])
+            try Task.checkCancellation()
+            let labels = (request.results ?? []).prefix(12).map { ($0.identifier, $0.confidence) }
+            return ATHLTHLocalEquipmentRecognition.suggestion(observations: labels, options: options)
+        }
+        return try await withTaskCancellationHandler {
+            try await work.value
+        } onCancel: { work.cancel() }
+    }
+}
+
+/// Camera stills only; no photo is sent to an AI provider.
 struct ATHLTHEquipmentCameraPicker: UIViewControllerRepresentable {
     let onCapture: (UIImage) -> Void
     let onCancel: () -> Void
@@ -326,6 +346,9 @@ struct ATHLTHEquipmentScannerView: View {
     @State private var isAnalyzing = false
     @State private var analysis: ATHLTHEquipmentScanResponse?
     @State private var message: String?
+    @State private var equipment = ""
+    @State private var generation = UUID()
+    @State private var analysisTask: Task<Void, Never>?
 
     private let scanner = ATHLTHEquipmentVisionService()
 
@@ -333,14 +356,13 @@ struct ATHLTHEquipmentScannerView: View {
         self.onSelect = onSelect
     }
 
-    private var candidates: [ExerciseLibraryEntry] {
-        ATHLTHEquipmentScanCandidateSelector.select(
-            from: library.search(query: "")
-        )
+    private var equipmentOptions: [String] {
+        Array(Set(library.selectableExercises.flatMap { $0.exercise.equipment }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })).sorted()
     }
 
     private var matches: [ExerciseLibraryEntry] {
-        analysis?.matchedExercises(in: candidates) ?? []
+        analysis?.matchedExercises(in: library.selectableExercises) ?? []
     }
 
     var body: some View {
@@ -430,7 +452,8 @@ struct ATHLTHEquipmentScannerView: View {
 
                     if photo != nil {
                         Button {
-                            Task { await analyzePhoto() }
+                            analysisTask?.cancel()
+                            analysisTask = Task { await analyzePhoto() }
                         } label: {
                             HStack(spacing: 8) {
                                 if isAnalyzing {
@@ -439,8 +462,8 @@ struct ATHLTHEquipmentScannerView: View {
                                     Image(systemName: "sparkles")
                                 }
                                 Text(ATHLTHLocalization.choose(
-                                    english: "Find exercises with AI",
-                                    norwegian: "Finn øvelser med AI"
+                                    english: "Identify equipment on device",
+                                    norwegian: "Gjenkjenn utstyr lokalt"
                                 ))
                             }
                             .font(.subheadline.weight(.semibold))
@@ -453,12 +476,25 @@ struct ATHLTHEquipmentScannerView: View {
                         .disabled(isAnalyzing)
                     }
 
+                    ATHLTHPlanSurface {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Picker(ATHLTHLocalization.choose(english: "Confirm equipment", norwegian: "Bekreft utstyr"), selection: $equipment) {
+                                Text(ATHLTHLocalization.choose(english: "Choose equipment", norwegian: "Velg utstyr")).tag("")
+                                ForEach(equipmentOptions, id: \.self) { Text($0).tag($0) }
+                            }
+                            .disabled(isAnalyzing)
+                            .onChange(of: equipment) { _, _ in analysis = nil }
+                            Button(ATHLTHLocalization.choose(english: "Show library exercises", norwegian: "Vis øvelser fra biblioteket")) {
+                                confirmEquipment()
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(equipment.isEmpty || isAnalyzing)
+                        }
+                    }
                     Text(ATHLTHLocalization.choose(
-                        english: "Nothing is uploaded until you tap Find exercises. The resized photo is sent to the AI provider for analysis, but ATHLTH does not store it on its server. Recognition can be wrong; verify the machine instructions.",
-                        norwegian: "Ingenting sendes før du trykker Finn øvelser. Et nedskalert bilde sendes til AI-leverandøren for analyse, men ATHLTH lagrer det ikke på serveren. Gjenkjenningen kan ta feil – kontroller instruksjonene på apparatet."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        english: "Apple Vision analyzes the image on this device. Confirm the equipment yourself and check its instructions. Some machines cannot be identified from a photo.",
+                        norwegian: "Apple Vision analyserer bildet på enheten. Bekreft utstyret selv og kontroller instruksjonene. Ikke alle apparater kan gjenkjennes fra et bilde."
+                    )).font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                     if let message {
                         Label(message, systemImage: "exclamationmark.circle")
@@ -555,15 +591,14 @@ struct ATHLTHEquipmentScannerView: View {
             .fullScreenCover(isPresented: $isCameraOpen) {
                 ATHLTHEquipmentCameraPicker(
                     onCapture: { captured in
-                        photo = captured
-                        analysis = nil
-                        message = nil
+                        replacePhoto(captured)
                         isCameraOpen = false
                     },
                     onCancel: { isCameraOpen = false }
                 )
                 .ignoresSafeArea()
             }
+            .onDisappear { analysisTask?.cancel(); generation = UUID(); isAnalyzing = false }
             .onChange(of: selectedPhoto) { _, selection in
                 guard let selection else { return }
                 Task {
@@ -572,9 +607,8 @@ struct ATHLTHEquipmentScannerView: View {
                               let image = UIImage(data: data) else {
                             throw ATHLTHEquipmentScannerError.invalidPhoto
                         }
-                        photo = image
-                        analysis = nil
-                        message = nil
+                        guard selectedPhoto == selection else { return }
+                        replacePhoto(image)
                     } catch {
                         message = error.localizedDescription
                     }
@@ -626,19 +660,48 @@ struct ATHLTHEquipmentScannerView: View {
         }
     }
 
+    private func replacePhoto(_ image: UIImage) {
+        analysisTask?.cancel()
+        generation = UUID()
+        isAnalyzing = false
+        photo = image
+        analysis = nil
+        equipment = ""
+        message = nil
+    }
+
+    private func confirmEquipment() {
+        guard equipmentOptions.contains(equipment) else { return }
+        let entries = ATHLTHLocalEquipmentRecognition.matching(equipment: equipment, entries: library.selectableExercises)
+        analysis = ATHLTHEquipmentScanResponse(equipmentName: equipment, confidence: "medium",
+            explanation: ATHLTHLocalization.choose(english: "Exercises for the selected equipment. Check any additional equipment requirements.",
+                norwegian: "Øvelser for valgt utstyr. Kontroller eventuelle krav til ekstra utstyr."),
+            exerciseIDs: entries.prefix(40).map { $0.id.uuidString })
+        message = nil
+    }
+
     private func analyzePhoto() async {
         guard let photo, !isAnalyzing else { return }
+        let current = generation
         isAnalyzing = true
         analysis = nil
+        equipment = ""
         message = nil
-        defer { isAnalyzing = false }
+        defer { if generation == current { isAnalyzing = false } }
         do {
-            analysis = try await scanner.analyze(image: photo, exercises: candidates)
+            let guess = try await scanner.analyze(image: photo, options: equipmentOptions)
+            guard !Task.isCancelled, generation == current else { return }
+            if let guess, equipmentOptions.contains(guess) {
+                equipment = guess
+                message = ATHLTHLocalization.choose(english: "Possible match. Confirm the equipment below.",
+                    norwegian: "Mulig match. Bekreft utstyret nedenfor.")
+            } else {
+                message = ATHLTHLocalization.choose(english: "Choose the equipment manually.", norwegian: "Velg utstyr manuelt.")
+            }
         } catch {
-            message = ATHLTHLocalization.choose(
-                english: "ATHLTH AI could not analyze the photo. ",
-                norwegian: "ATHLTH AI klarte ikke å analysere bildet. "
-            ) + error.localizedDescription
+            guard !Task.isCancelled, generation == current else { return }
+            message = ATHLTHLocalization.choose(english: "Local recognition unavailable. Choose equipment manually.",
+                norwegian: "Lokal gjenkjenning utilgjengelig. Velg utstyr manuelt.")
         }
     }
 }
