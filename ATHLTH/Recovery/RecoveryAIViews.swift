@@ -2775,11 +2775,10 @@ struct RecoveryCoachView: View {
                 )
             }
 
-            if message.role ==
-                .assistant {
-                Spacer(
-                    minLength: 54
-                )
+            if message.role == .assistant {
+                // Structured plan forms need more width than ordinary bubbles.
+                // Retain the original breathing room for plain chat messages.
+                Spacer(minLength: message.planIntake != nil || message.chatPlanDraft != nil ? 8 : 54)
             }
         }
         .frame(
