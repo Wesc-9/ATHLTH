@@ -1523,6 +1523,7 @@ struct WatchActiveWorkoutView: View {
             }
 
             if workoutManager.isActive {
+                WatchCoachReflectionView(snapshot: { workoutManager.coachReflectionSnapshot() })
                 Button {
                     workoutManager.requestAIConversationOnIPhone()
                 } label: {
@@ -2539,6 +2540,9 @@ struct WatchActiveWorkoutView: View {
                     .padding(9)
                     .watchSurface(radius: 14)
                 }
+
+                WatchCoachReflectionView(snapshot: { workoutManager.coachReflectionSnapshot() })
+                    .id(result.id)
 
                 if result.healthKitWorkoutUUID != nil {
                     WatchCompletedEffortRatingView(resultID: result.id)
@@ -4118,6 +4122,7 @@ private struct WatchRunWalkWorkoutPager: View {
             }
 
             if workoutManager.isActive {
+                WatchCoachReflectionView(snapshot: { workoutManager.coachReflectionSnapshot() })
                 Button {
                     workoutManager.requestAIConversationOnIPhone()
                 } label: {

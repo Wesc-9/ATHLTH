@@ -3597,6 +3597,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             activity
     }
 
+    /// Snapshot only when the user asks. No model call or recording mutation.
+    func coachReflectionSnapshot() -> ATHLTHCoachReflection? {
+        if state == .completed, let result = completedResult {
+            let summary = ATHLTHWorkoutSummaryEngine(
+                duration: result.duration, distanceMeters: result.distanceMeters,
+                activity: result.isSports == true ? "sports" : result.kind.rawValue,
+                completedSets: result.strengthSnapshot?.completedSets
+            )
+            return ATHLTHCoachReflection(
+                activity: result.isSports == true ? "sports" : result.kind.rawValue,
+                completed: true, elapsedSeconds: summary.durationSeconds,
+                distanceMeters: summary.distanceMeters,
+                paceSecondsPerKilometer: summary.paceSecondsPerKilometer,
+                heartRateBPM: result.averageHeartRate, completedSets: summary.completedSets,
+                planned: result.plannedCalendarSessionID != nil || result.structuredWorkoutSourceID != nil
+            )
+        }
+        guard state == .running || state == .paused else { return nil }
+        let measuredPace = state == .running && ATHLTHCoachSensorFreshness.validPace(
+            currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
+        ) ? currentPaceSecondsPerKilometer : nil
+        return ATHLTHCoachReflection(
+            activity: kind.rawValue, completed: false, elapsedSeconds: elapsedTime,
+            distanceMeters: kind.supportsDistanceMetric ? distanceMeters : nil,
+            paceSecondsPerKilometer: measuredPace,
+            heartRateBPM: hasFreshHeartRate ? heartRate : nil,
+            completedSets: strengthSession?.completedSets,
+            planned: structuredRunningWorkout != nil || plannedCalendarSessionID != nil
+        )
+    }
+
     func requestAIConversationOnIPhone() {
         guard isActive else { return }
         guard WCSession.isSupported(),

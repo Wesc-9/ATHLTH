@@ -28,3 +28,6 @@ All new API integrations require Xcode 27 build and real Watch verification. The
 ## Coach follow-up
 - Free-workout measured-zone speech and periodic readouts use the same native Watch thresholds on both voice owners. Explicit zone-trigger rules, preferred zone targets and structured sessions keep existing authored ATHLTH scale. No language model runs in the live control path.
 - Fixed the ControlWidget initializer conformance reported by CI. New build confirmation remains required.
+
+## Watch AI Coach reflection
+- Existing live Coach menus and completed summary offer an explicit read-only reflection. Measured facts are displayed locally and unavailable values are omitted. Optional Apple PCC selects only an approved focus from coarse activity context after per-request consent; no raw pulse, exact distance, route, identity or history is submitted. No workout mutations, automatic requests, or background polling. Missing model/network/entitlement returns local feedback. The managed entitlement is deliberately not added to signing until Apple grants it. Conversation, comparative history, motion ML and editable adaptation proposals remain separate work.
