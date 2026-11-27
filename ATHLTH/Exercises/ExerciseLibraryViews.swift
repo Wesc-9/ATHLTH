@@ -1374,8 +1374,18 @@ struct ExerciseLibraryView: View {
 
         scannerTask = Task {
             do {
-                let analysis = try await ATHLTHEquipmentVisionService()
-                    .analyze(image: image, exercises: candidates)
+                let options = Array(Set(candidates.flatMap { $0.exercise.equipment })).sorted()
+                let equipment = try await ATHLTHEquipmentVisionService()
+                    .analyze(image: image, options: options)
+                let matches = equipment.map {
+                    ATHLTHLocalEquipmentRecognition.matching(equipment: $0, entries: candidates)
+                } ?? []
+                let analysis = ATHLTHEquipmentScanResponse(
+                    equipmentName: equipment ?? ATHLTHLocalization.choose(english: "Unknown equipment", norwegian: "Ukjent utstyr"),
+                    confidence: equipment == nil ? "low" : "medium",
+                    explanation: "",
+                    exerciseIDs: matches.map { $0.id.uuidString }
+                )
                 guard !Task.isCancelled, scanIdentity == identity else {
                     return
                 }

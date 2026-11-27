@@ -140,7 +140,7 @@ struct ATHLTHCoachLocalPlanReviewView: View {
                 onApplied(tr("Approved change saved to your plan.", "Godkjent endring lagret i treningsplanen."))
                 dismiss()
             } catch is CancellationError {} catch {
-                error = tr("Could not verify workout history. Nothing was saved.",
+                self.error = tr("Could not verify workout history. Nothing was saved.",
                            "Kunne ikke kontrollere treningshistorikken. Ingenting ble lagret.")
             }
         }
