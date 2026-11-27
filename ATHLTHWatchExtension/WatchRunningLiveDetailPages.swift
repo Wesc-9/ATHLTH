@@ -16,9 +16,10 @@ struct WatchRunHeartRateDetailPage: View {
     }
 
     private var liveZone: Int? {
-        ATHLTHHeartRateZones.measuredZone(
-            heartRateBPM: workout.hasFreshHeartRate ? workout.heartRate : nil,
-            maximumBPM: workout.liveZoneMaximumHeartRateBPM
+        ATHLTHLiveZonePolicy.measuredZone(
+            bpm: workout.hasFreshHeartRate ? workout.heartRate : nil,
+            maximumBPM: workout.liveZoneMaximumHeartRateBPM,
+            appleZones: workout.effectiveAppleLiveHeartRateZones
         )
     }
 
@@ -51,7 +52,7 @@ struct WatchRunHeartRateDetailPage: View {
                     .font(.system(size: 13, weight: .bold, design: .rounded))
             }
             HStack(spacing: 3) {
-                ForEach(1...5, id: \.self) { zone in
+                ForEach(ATHLTHLiveZonePolicy.zoneNumbers(workout.effectiveAppleLiveHeartRateZones), id: \.self) { zone in
                     VStack(spacing: 4) {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(highlightedZones.contains(zone)
@@ -74,7 +75,9 @@ struct WatchRunHeartRateDetailPage: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            if let max = workout.liveZoneMaximumHeartRateBPM {
+            if workout.effectiveAppleLiveHeartRateZones != nil {
+                Text("Apple Helse").font(.system(size: 10)).foregroundStyle(WatchTheme.textSecondary)
+            } else if let max = workout.liveZoneMaximumHeartRateBPM {
                 Text(ATHLTHLocalization.choose(
                     english: "Based on HRmax", norwegian: "Fra makspuls"
                 ) + " \(Int(max.rounded())) bpm")
@@ -129,8 +132,12 @@ struct WatchRunHeartRateDetailPage: View {
                 ))
                 .accessibilityIdentifier("athlth-watch-five-zone-live-pulse")
 
+                if workout.effectiveAppleLiveHeartRateZones != nil {
+                    Text(ATHLTHLocalization.choose(english: "Apple Health zones", norwegian: "Apple-pulssoner"))
+                        .font(.system(size: 9)).foregroundStyle(WatchTheme.textSecondary)
+                }
                 HStack(spacing: 3) {
-                    ForEach(1...5, id: \.self) { zone in
+                    ForEach(ATHLTHLiveZonePolicy.zoneNumbers(workout.effectiveAppleLiveHeartRateZones), id: \.self) { zone in
                         VStack(spacing: 3) {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(highlightedZones.contains(zone)

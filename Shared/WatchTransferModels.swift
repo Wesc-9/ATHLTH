@@ -2337,6 +2337,8 @@ enum WatchWorkoutMirrorState: String, Codable, Hashable {
 }
 
 struct WatchWorkoutLiveSnapshot: Codable, Hashable {
+    // Optional recorder-owned zone boundaries; no duration or health history.
+    var appleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]? = nil
     /// Originates on Watch once per actual HKWorkoutSession and survives
     /// recovery. Nil on old Watch builds; iPhone must never invent it.
     var universalWorkoutID: UUID? = nil

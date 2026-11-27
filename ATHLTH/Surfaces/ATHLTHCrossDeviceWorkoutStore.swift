@@ -36,6 +36,7 @@ struct ATHLTHCrossDeviceWorkoutSnapshot: Codable, Equatable, Identifiable {
     // Only shared once this specific session is explicitly approved on iPhone.
     // Values describe the *current* programmed step, not recorded health data.
     var maximumHeartRateBPM: Double? = nil
+    var appleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]? = nil
     var targetHeartRateMinimumBPM: Double? = nil
     var targetHeartRateMaximumBPM: Double? = nil
     var targetHeartRatePercentMin: Double? = nil
@@ -1149,6 +1150,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             snapshot.targetHeartRateZone =
                 watch.runningStepTargetHeartRateZone ?? watch.heartRateTargetZone
             snapshot.maximumHeartRateBPM = watch.coachResolvedMaximumHeartRateBPM
+            snapshot.appleLiveHeartRateZones = watch.appleLiveHeartRateZones.flatMap(ATHLTHRecordedHeartRateZones.validated)
             snapshot.targetHeartRateMinimumBPM = watch.heartRateTargetMinimumBPM
             snapshot.targetHeartRateMaximumBPM = watch.heartRateTargetMaximumBPM
             snapshot.runningStepProgress = watch.runningStepProgress
@@ -1257,6 +1259,7 @@ final class ATHLTHCrossDeviceWorkoutStore: ObservableObject {
             output.distanceMeters = nil
         }
         output.maximumHeartRateBPM = finite(input.maximumHeartRateBPM)
+        output.appleLiveHeartRateZones = input.appleLiveHeartRateZones.flatMap(ATHLTHRecordedHeartRateZones.validated)
         output.targetHeartRateMinimumBPM = finite(
             input.targetHeartRateMinimumBPM
         )

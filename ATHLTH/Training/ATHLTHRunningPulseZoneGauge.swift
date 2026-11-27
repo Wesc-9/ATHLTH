@@ -13,6 +13,7 @@ struct ATHLTHRunningPulseZoneGauge: View {
     var targetPercentMin: Double? = nil
     var targetPercentMax: Double? = nil
     var compact: Bool = false
+    var appleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]? = nil
 
     private var gold: Color { ATHLTHPlanDesign.accentInk }
     private var ink: Color { ATHLTHPlanDesign.ink }
@@ -62,8 +63,8 @@ struct ATHLTHRunningPulseZoneGauge: View {
     }
 
     private var currentZone: Int? {
-        ATHLTHHeartRateZones.measuredZone(
-            heartRateBPM: measured, maximumBPM: maximum
+        ATHLTHLiveZonePolicy.measuredZone(
+            bpm: measured, maximumBPM: maximum, appleZones: appleLiveHeartRateZones
         )
     }
 
@@ -109,7 +110,7 @@ struct ATHLTHRunningPulseZoneGauge: View {
     }
 
     private var positionFraction: CGFloat? {
-        guard let measured, let maximum else { return nil }
+        guard appleLiveHeartRateZones == nil, let measured, let maximum else { return nil }
         return CGFloat(min(max((measured / maximum - 0.5) / 0.5, 0), 1))
     }
 
@@ -161,7 +162,7 @@ struct ATHLTHRunningPulseZoneGauge: View {
             GeometryReader { geometry in
                 ZStack(alignment: .topLeading) {
                     HStack(spacing: 4) {
-                        ForEach(1...5, id: \.self) { zone in
+                        ForEach(ATHLTHLiveZonePolicy.zoneNumbers(appleLiveHeartRateZones), id: \.self) { zone in
                             let selected = highlightedZones.contains(zone)
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(selected
@@ -195,12 +196,12 @@ struct ATHLTHRunningPulseZoneGauge: View {
             .frame(height: compact ? 26 : 30)
 
             HStack(spacing: 4) {
-                ForEach(1...5, id: \.self) { zone in
+                ForEach(ATHLTHLiveZonePolicy.zoneNumbers(appleLiveHeartRateZones), id: \.self) { zone in
                     VStack(spacing: 2) {
                         Text("Z\(zone)")
                             .font(.caption2.weight(currentZone == zone ? .bold : .medium))
                             .foregroundStyle(currentZone == zone ? ink : muted)
-                        if !compact,
+                        if !compact, appleLiveHeartRateZones == nil,
                            let zoneBPM = ATHLTHHeartRateZones.range(
                             for: zone, maximumBPM: maximum
                            ) {
@@ -220,7 +221,9 @@ struct ATHLTHRunningPulseZoneGauge: View {
                 Image(systemName: feedbackSymbol)
                 Text(feedback)
                 Spacer(minLength: 0)
-                if let maximum {
+                if appleLiveHeartRateZones != nil {
+                    Text(tr("Apple Health", "Apple Helse")).foregroundStyle(muted)
+                } else if let maximum {
                     Text("\(tr("HRmax", "Makspuls")) \(Int(maximum.rounded()))")
                         .foregroundStyle(muted)
                 }

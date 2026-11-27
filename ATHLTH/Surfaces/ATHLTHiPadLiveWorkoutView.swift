@@ -70,8 +70,9 @@ struct ATHLTHiPadLiveWorkoutView: View {
     }
 
     private var measuredZone: Int? {
-        ATHLTHHeartRateZones.measuredZone(
-            heartRateBPM: snapshot.heartRateBPM, maximumBPM: liveMaximumBPM
+        ATHLTHLiveZonePolicy.measuredZone(
+            bpm: snapshot.heartRateBPM, maximumBPM: liveMaximumBPM,
+            appleZones: snapshot.appleLiveHeartRateZones
         )
     }
 
@@ -83,7 +84,8 @@ struct ATHLTHiPadLiveWorkoutView: View {
             targetMinimumBPM: snapshot.targetHeartRateMinimumBPM,
             targetMaximumBPM: snapshot.targetHeartRateMaximumBPM,
             targetPercentMin: snapshot.targetHeartRatePercentMin,
-            targetPercentMax: snapshot.targetHeartRatePercentMax
+            targetPercentMax: snapshot.targetHeartRatePercentMax,
+            appleLiveHeartRateZones: snapshot.appleLiveHeartRateZones
         )
     }
 

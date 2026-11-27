@@ -142,3 +142,24 @@ enum ATHLTHRecordedHeartRateZones {
         }).map { $0.index + 1 }
     }
 }
+
+
+/// The recorder supplies the actual Apple boundaries. Existing authored
+/// zone targets and coach rules retain their current semantics.
+enum ATHLTHLiveZonePolicy {
+    static func prefersApple(hasStructuredWorkout: Bool, hasTarget: Bool, coachEnabled: Bool) -> Bool {
+        !hasStructuredWorkout && !hasTarget && !coachEnabled
+    }
+
+    static func measuredZone(bpm: Double?, maximumBPM: Double?, appleZones: [ATHLTHRecordedHeartRateZone]?) -> Int? {
+        if let appleZones, let valid = ATHLTHRecordedHeartRateZones.validated(appleZones) {
+            guard let bpm else { return nil }
+            return ATHLTHRecordedHeartRateZones.zone(for: bpm, in: valid)
+        }
+        return ATHLTHHeartRateZones.measuredZone(heartRateBPM: bpm, maximumBPM: maximumBPM)
+    }
+
+    static func zoneNumbers(_ appleZones: [ATHLTHRecordedHeartRateZone]?) -> [Int] {
+        appleZones.flatMap(ATHLTHRecordedHeartRateZones.validated)?.map { $0.index + 1 } ?? Array(1...5)
+    }
+}

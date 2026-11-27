@@ -49,6 +49,34 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// Read-only HRmax used by all active Watch pulse-zone screens.
     /// The planned transfer or explicit coach value takes precedence; no
     /// arbitrary default BPM is fabricated on the watch.
+    @Published private(set) var appleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]?
+    private var shouldUseAppleLiveZones: Bool {
+        ATHLTHLiveZonePolicy.prefersApple(
+            hasStructuredWorkout: structuredRunningWorkout != nil || strengthSession != nil,
+            hasTarget: targetAlertConfiguration?.heartRateEnabled == true,
+            coachEnabled: audioCoachConfiguration.enabled
+        )
+    }
+
+    var effectiveAppleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]? {
+        shouldUseAppleLiveZones ? appleLiveHeartRateZones : nil
+    }
+
+    private func captureAppleLiveHeartRateZones(from builder: HKLiveWorkoutBuilder) {
+        guard #available(watchOS 27.0, *), appleLiveHeartRateZones == nil,
+              shouldUseAppleLiveZones,
+              let type = HKObjectType.quantityType(forIdentifier: .heartRate),
+              let group = builder.zoneGroup(for: type) else { return }
+        let unit = HKUnit.count().unitDivided(by: .minute())
+        let boundaries = group.configuration.zones.map { zone in
+            ATHLTHRecordedHeartRateZone(index: zone.index,
+                minimumBPM: zone.minimum?.doubleValue(for: unit),
+                maximumBPM: zone.maximum?.doubleValue(for: unit),
+                durationSeconds: 0)
+        }
+        appleLiveHeartRateZones = ATHLTHRecordedHeartRateZones.validated(boundaries)
+    }
+
     var liveZoneMaximumHeartRateBPM: Double? {
         let value = audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM ??
             structuredRunningWorkout?.heartRateZoneMaximumBPM
@@ -3918,6 +3946,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             restorePersistedWorkoutState(
                 expectedKind: recoveredKind
             )
+            appleLiveHeartRateZones = nil
+            captureAppleLiveHeartRateZones(from: builder)
             synchronizeHybridTreadmillSensors()
 
             if usesOutdoorGPS,
@@ -4618,6 +4648,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         coachHeartRateSampleAt = nil
         coachPaceSampleAt = nil
         nativeRunningSpeedSampleAt = nil
+        appleLiveHeartRateZones = nil
         audioCoachRollingKilometer.reset()
         speechSynthesizer.stopSpeaking(at: .immediate)
         deactivateAudioCoachAudioSession()
@@ -4795,6 +4826,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         coachHeartRateSampleAt = nil
         coachPaceSampleAt = nil
         nativeRunningSpeedSampleAt = nil
+        appleLiveHeartRateZones = nil
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
@@ -4893,6 +4925,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
             guard workoutSession === session else { return nil }
+            captureAppleLiveHeartRateZones(from: builder)
             do {
                 try await session.startMirroringToCompanionDevice()
                 guard workoutSession === session else { return nil }
@@ -9781,6 +9814,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             kind == .strength ? strengthSession?.workoutID : nil
         snapshot.universalWorkoutID = universalWorkoutID
         snapshot.accountOwnerID = workoutOwnerID
+        snapshot.appleLiveHeartRateZones = effectiveAppleLiveHeartRateZones
         // Publish only the actual session's original calendar identity.
         snapshot.plannedCalendarSessionID = plannedCalendarSessionID
         // A hybrid is recorded under the original strength HealthKit
@@ -9949,7 +9983,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            let latestQuantity = statistics.mostRecentQuantity() {
             let unit = HKUnit.count().unitDivided(by: .minute())
             let latest = latestQuantity.doubleValue(for: unit)
-            coachHeartRateSampleAt = Date()
+            coachHeartRateSampleAt = statistics.mostRecentQuantityDateInterval()?.end
+            captureAppleLiveHeartRateZones(from: builder)
             let average = statistics.averageQuantity()?.doubleValue(for: unit)
             let maximum = statistics.maximumQuantity()?.doubleValue(for: unit)
 

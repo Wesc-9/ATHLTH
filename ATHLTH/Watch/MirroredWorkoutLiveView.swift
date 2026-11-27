@@ -1632,7 +1632,8 @@ struct MirroredWorkoutLiveView: View {
                     snapshot.heartRateTargetZone,
                 targetMinimumBPM: snapshot.heartRateTargetMinimumBPM,
                 targetMaximumBPM: snapshot.heartRateTargetMaximumBPM,
-                compact: true
+                compact: true,
+                appleLiveHeartRateZones: snapshot.appleLiveHeartRateZones.flatMap(ATHLTHRecordedHeartRateZones.validated)
             )
             .accessibilityIdentifier("athlth-watch-mirrored-running-pulse-zone")
 
