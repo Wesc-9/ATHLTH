@@ -312,9 +312,7 @@ struct ATHLTHCommunityV5View: View {
                     isActive: isActive
                 )
             }
-            HomeActiveFriendsStrip(isActive: isActive)
-                .padding(14)
-                .communityReferenceCard()
+            CommunityFriendsOverviewCard()
             shortcuts
             trainTogetherOverviewCard
             myClubsSection
@@ -706,6 +704,97 @@ struct ATHLTHCommunityV5View: View {
     }
 }
 
+
+/// A compact friends card. Reuse the central mutual-follow presence
+/// avatar rather than inventing a status or adding another polling task.
+private struct CommunityFriendsOverviewCard: View {
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    private var friends: [SocialProfileCard] {
+        social.mutualFollows.filter { $0.userID != session.profile.userID }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(tr("Friends", "Venner"))
+                    .font(.headline)
+                    .foregroundStyle(CommunityReferenceStyle.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                NavigationLink {
+                    ProfileFollowListView(mode: .following)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(tr("See all", "Se alle"))
+                            .font(.subheadline.weight(.medium))
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if friends.isEmpty {
+                NavigationLink {
+                    SocialHubView(initialTab: .discover)
+                } label: {
+                    Label(tr("Find training friends", "Finn treningsvenner"), systemImage: "person.badge.plus")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            } else {
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 14) {
+                        ForEach(friends) { friend in
+                            NavigationLink {
+                                FriendProfileView(userID: friend.userID)
+                            } label: {
+                                VStack(spacing: 5) {
+                                    ATHLTHSocialStatusAvatar(profile: friend, size: 50)
+                                        .frame(width: 60, height: 60)
+                                    Text(friend.resolvedName)
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(CommunityReferenceStyle.ink)
+                                        .lineLimit(1)
+                                    if realtime.isTrainingNow(friend.userID) {
+                                        Text(tr("Training", "Trener"))
+                                            .font(.caption2)
+                                            .foregroundStyle(CommunityReferenceStyle.darkGold)
+                                    } else if realtime.isOnline(friend.userID) {
+                                        Text(tr("Online", "Pålogget"))
+                                            .font(.caption2)
+                                            .foregroundStyle(Color.green.opacity(0.85))
+                                    }
+                                }
+                                .frame(width: 76, alignment: .top)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+        .padding(.bottom, 13)
+        .communityReferenceCard()
+        .accessibilityIdentifier("athlth-community-friends")
+    }
+}
 
 // MARK: - Standalone Clubs hub
 
