@@ -14,6 +14,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
     @State private var expandedAccess = false
     @State private var expandedAgreement = false
     @State private var expandedEnvironments = false
+    @State private var datePickerReference = Date()
 
     private func activityVenuePicker(_ activity: ATHLTHTournamentActivity) -> some View {
         let options = settings.allowedEnvironments(activity: activity)
@@ -61,9 +62,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                         "Dato og klokkeslett",
                         selection: Binding(
                             get: { settings.startsAt ??
-                                Date().addingTimeInterval(86_400) },
+                                datePickerReference.addingTimeInterval(86_400) },
                             set: { settings.startsAt = $0 }
-                        ), in: Date()...,
+                        ), in: datePickerReference...,
                         displayedComponents: [.date, .hourAndMinute]
                     )
                     .font(.subheadline)
@@ -81,9 +82,9 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                     .tint(ATHLTHArenaV3Style.gold)
                 if settings.endsAt != nil {
                     DatePicker("Sluttdato og klokkeslett", selection: Binding(
-                        get: { settings.endsAt ?? Date().addingTimeInterval(7 * 86_400) },
+                        get: { settings.endsAt ?? datePickerReference.addingTimeInterval(7 * 86_400) },
                         set: { settings.endsAt = $0 }),
-                        in: max(Date(), settings.startsAt ?? Date()).addingTimeInterval(60)...,
+                        in: max(datePickerReference, settings.startsAt ?? datePickerReference).addingTimeInterval(60)...,
                         displayedComponents: [.date, .hourAndMinute])
                         .font(.subheadline)
                     Text("Nye resultater kan ikke leveres etter sluttdatoen. Resultater levert innen fristen kan fortsatt godkjennes.")
@@ -178,6 +179,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 if activities.count > 1 || !settings.activityEnvironments.isEmpty {
                     Divider()
                     DisclosureGroup("Egne miljøregler per treningsform", isExpanded: $expandedEnvironments) {
+                if expandedEnvironments {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Valgfritt. En egen regel kan bare begrense fellesregelen. Egne miljøkrav kan foreløpig bare lagres som mal.")
                                 .font(.caption)
@@ -192,7 +194,8 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                             }
                         }
                         .padding(.top, 10)
-                    }
+                        }
+}
                     .font(.subheadline.weight(.semibold))
                     .tint(ATHLTHArenaV3Style.gold)
                 }
@@ -281,6 +284,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 "Invitasjoner og godkjenning",
                 isExpanded: $expandedAccess
             ) {
+                if expandedAccess {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Hvem kan invitere flere?")
                         .font(.subheadline.weight(.semibold))
@@ -304,7 +308,8 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
                 .padding(.top, 10)
-            }
+                }
+}
             .font(.subheadline.weight(.semibold))
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
@@ -315,6 +320,7 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                 "Regler, premier og frivillig straff",
                 isExpanded: $expandedAgreement
             ) {
+                if expandedAgreement {
                 VStack(alignment: .leading, spacing: 12) {
                     entry("Dette er lov", text: $settings.agreement.allowed,
                           hint: "F.eks. ute og tredemølle, tillatt utstyr")
@@ -338,7 +344,8 @@ struct ATHLTHTournamentCompetitionRulesSection: View {
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
                 .padding(.top, 10)
-            }
+                }
+}
             .font(.subheadline.weight(.semibold))
             .tint(ATHLTHArenaV3Style.gold)
             .padding(15)
