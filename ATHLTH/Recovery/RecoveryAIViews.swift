@@ -2940,8 +2940,13 @@ struct RecoveryCoachView: View {
         }
 
         do {
-            if ATHLTHCoachChatPlanIntake.isCreationRequest(clean) {
-                let intake = ATHLTHCoachChatPlanIntake.prefilled(from: clean)
+            let priorPlanQuestion = priorHistory.last(where: { $0.role == .user })?.text
+            let continuingPlanQuestion = priorHistory.last?.role == .assistant &&
+                priorHistory.last?.planIntake == nil && priorHistory.last?.chatPlanDraft == nil &&
+                priorPlanQuestion.map(ATHLTHCoachChatPlanIntake.isCreationRequest) == true
+            if ATHLTHCoachChatPlanIntake.isCreationRequest(clean) || continuingPlanQuestion {
+                let intake = ATHLTHCoachChatPlanIntake.prefilled(from:
+                    continuingPlanQuestion ? (priorPlanQuestion ?? "") + "\n" + clean : clean)
                 messages.append(RecoveryCoachMessage(role: .assistant,
                     text: recoveryAIText(
                         "I'll prepare a real plan for you. Confirm or adjust these details first.",
