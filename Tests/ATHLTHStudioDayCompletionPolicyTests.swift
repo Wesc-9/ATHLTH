@@ -55,4 +55,22 @@ final class ATHLTHStudioDayCompletionPolicyTests: XCTestCase {
             )
         )
     }
+
+    func testSelectedDayUsesCalendarDayNotTimeOfDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 22)))
+        let today = calendar.startOfDay(for: now)
+        let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: today))
+        let tomorrow = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: today))
+        XCTAssertTrue(ATHLTHStudioDayCardPolicy.isPast(yesterday, now: now, calendar: calendar))
+        XCTAssertFalse(ATHLTHStudioDayCardPolicy.isPast(today, now: now, calendar: calendar))
+        XCTAssertFalse(ATHLTHStudioDayCardPolicy.isPast(tomorrow, now: now, calendar: calendar))
+    }
+
+    func testDayCardUsesSharedNormalHeightButAllowsAccessibilityExpansion() {
+        XCTAssertEqual(ATHLTHStudioDayCardPolicy.bodyHeight(accessibilityText: false),
+                       ATHLTHStudioDayCardPolicy.bodyHeight)
+        XCTAssertNil(ATHLTHStudioDayCardPolicy.bodyHeight(accessibilityText: true))
+    }
 }
