@@ -57,7 +57,10 @@ enum ATHLTHCoachRequestParser {
               let amount = number(t) else { return nil }
         let words = t.split(whereSeparator: { !$0.isLetter }).map(String.init)
         let seconds = words.contains { $0 == "s" || $0 == "sek" || $0.hasPrefix("sekund") || $0.hasPrefix("sec") }
-        let minutes = words.contains { $0 == "min" || $0.hasPrefix("minutt") || $0.hasPrefix("minute") }
+        // Norwegian possessive "min" (my) is not a time unit. Only accept
+        // the abbreviation immediately after a numeric interval.
+        let minutes = words.contains { $0.hasPrefix("minutt") || $0.hasPrefix("minute") } ||
+            t.range(of: #"(?<!\d)\d+\.?\s*min(?!\p{L})"#, options: .regularExpression) != nil
         let km = words.contains { $0 == "km" || $0.hasPrefix("kilometer") || $0.hasPrefix("kilometre") }
         let meters = words.contains { $0 == "m" || $0.hasPrefix("meter") || $0.hasPrefix("metre") }
         let trigger: ATHLTHAudioCoachRule.Trigger
