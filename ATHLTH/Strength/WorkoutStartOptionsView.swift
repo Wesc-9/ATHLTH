@@ -1881,7 +1881,7 @@ struct StrengthAudioCoachSettingsView: View {
         ATHLTHCoachRequestView(rules: Binding(
             get: { configuration.customStrengthEventRules ?? [] },
             set: { configuration.customStrengthEventRules = $0 }
-        ), availability: .basicCoach(activity: .strength, hasRoute: false, structured: true))
+        ), availability: .basicCoach(activity: .strength, hasRoute: false, structured: true), showSaved: true)
     }
 
     private var selectedExperience: ATHLTHCoachExperiencePreset? {

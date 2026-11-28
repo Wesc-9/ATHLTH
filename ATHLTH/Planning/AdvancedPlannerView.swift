@@ -11709,6 +11709,7 @@ private struct PlannedAudioCoachEditorView: View {
     @State private var initiallyUsesCustomSettings: Bool
     @State private var initialCoachConfiguration: WatchAudioCoachConfiguration
     @State private var showingExitConfirmation = false
+    @State private var simpleCoachMode = true
 
     private var hasUnsavedChanges: Bool {
         usesCustomSettings != initiallyUsesCustomSettings ||
@@ -11781,12 +11782,20 @@ private struct PlannedAudioCoachEditorView: View {
                             title: "Audio Coach · ATHLTH+",
                             message: "Spoken workout guidance is available with ATHLTH+."
                         ) {
-                            ATHLTHAudioCoachSessionStudio(
-                                draft: $coachDraft,
-                                showRouteOptions: showRouteOptions,
-                                showStructuredOptions: showStructuredOptions,
-                                triggerAvailability: triggerAvailability
-                            )
+                            VStack(spacing: 14) {
+                                Picker(ATHLTHLocalization.choose(english: "Mode", norwegian: "Modus"), selection: $simpleCoachMode) {
+                                    Text(ATHLTHLocalization.choose(english: "Basic", norwegian: "Enkel")).tag(true)
+                                    Text(ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")).tag(false)
+                                }
+                                .pickerStyle(.segmented)
+                                ATHLTHAudioCoachSessionStudio(
+                                    draft: $coachDraft,
+                                    showRouteOptions: showRouteOptions,
+                                    showStructuredOptions: showStructuredOptions,
+                                    triggerAvailability: triggerAvailability,
+                                    simpleMode: simpleCoachMode
+                                )
+                            }
                         }
                     }
                 }

@@ -41,21 +41,25 @@ enum ATHLTHCoachRequestParser {
         let before = t.contains("før") || t.contains("before")
         let every = t.contains("hver") || t.contains("every")
         if before && (t.contains("drag") || t.contains("interval")) { return .beforeEffort }
-        if before && (t.contains("pause") || t.contains("hvile") || t.contains("rest")) { return .beforeRestEnd }
+        if before && (t.contains("pause") || t.contains("hvile") || t.contains("rest")) && restEnds(t) { return .beforeRestEnd }
         if every && (t.contains("sett") || t.contains(" set")) { return .everySets }
         if every && (t.contains("km") || t.contains("kilometer") || t.contains(" meter")) { return .everyDistance }
         if every && (t.contains("sek") || t.contains("min") || t.contains("sec")) { return .everyTime }
         return nil
+    }
+    private static func restEnds(_ text: String) -> Bool {
+        ["ferdig", "slutt", "over", "utløp", "igjen", "end", "remaining"].contains(where: { text.contains($0) })
     }
     static func rule(_ input: String, intent: ATHLTHCoachRequestIntent,
                      availability: ATHLTHCoachTriggerAvailability) -> ATHLTHAudioCoachRule? {
         let t = normalized(input)
         guard !t.contains("ikke"), !t.contains("don't"), !t.contains("do not"),
               let amount = number(t) else { return nil }
-        let seconds = t.contains("sek") || t.contains("sec")
-        let minutes = t.contains("min")
-        let km = t.contains("km") || t.contains("kilometer")
-        let meters = t.contains(" meter")
+        let words = t.split(whereSeparator: { !$0.isLetter }).map(String.init)
+        let seconds = words.contains { $0 == "s" || $0 == "sek" || $0.hasPrefix("sekund") || $0.hasPrefix("sec") }
+        let minutes = words.contains { $0 == "min" || $0.hasPrefix("minutt") || $0.hasPrefix("minute") }
+        let km = words.contains { $0 == "km" || $0.hasPrefix("kilometer") || $0.hasPrefix("kilometre") }
+        let meters = words.contains { $0 == "m" || $0.hasPrefix("meter") || $0.hasPrefix("metre") }
         let trigger: ATHLTHAudioCoachRule.Trigger
         let metric: ATHLTHAudioCoachRule.Metric
         let interval: Int
@@ -64,7 +68,7 @@ enum ATHLTHCoachRequestParser {
             guard seconds, !minutes, (5...60).contains(amount) else { return nil }
             trigger = .beforeEffort; metric = .motivation; interval = amount
         case .beforeRestEnd:
-            guard seconds, !minutes, (5...60).contains(amount) else { return nil }
+            guard seconds, !minutes, restEnds(t), (5...60).contains(amount) else { return nil }
             trigger = .strengthRestEnding; metric = .stepRemainingTime; interval = amount
         case .everySets:
             guard t.contains("sett") || t.contains("set"), (1...10).contains(amount) else { return nil }
@@ -103,6 +107,8 @@ enum ATHLTHCoachRequestParser {
 struct ATHLTHCoachRequestView: View {
     @Binding var rules: [ATHLTHAudioCoachRule]
     let availability: ATHLTHCoachTriggerAvailability
+    var showSaved = false
+    var protectedRuleIDs: Set<UUID> = []
     @State private var request = ""
     @State private var proposal: ATHLTHAudioCoachRule?
     @State private var status: String?
@@ -155,6 +161,30 @@ struct ATHLTHCoachRequestView: View {
                 }.padding(12).background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
             }
             if let status { Text(status).font(.subheadline).foregroundStyle(ATHLTHPlanDesign.secondaryInk) }
+            if showSaved {
+                let standalone = rules.filter { !protectedRuleIDs.contains($0.id) }
+                if !standalone.isEmpty {
+                    Divider()
+                    Text(tr("My reminders", "Mine beskjeder")).font(.subheadline.weight(.semibold))
+                    ForEach(standalone) { rule in
+                        HStack(alignment: .center, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(rule.trigger.summary(interval: rule.validatedInterval)).font(.subheadline.weight(.medium))
+                                Text(rule.metric.title).font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Spacer(minLength: 0)
+                            Menu {
+                                Button(rule.isEnabled ? tr("Turn off", "Slå av") : tr("Turn on", "Slå på")) {
+                                    if let index = rules.firstIndex(where: { $0.id == rule.id }) { rules[index].enabled = !rule.isEnabled }
+                                }
+                                Button(tr("Remove", "Fjern"), role: .destructive) { rules.removeAll { $0.id == rule.id } }
+                            } label: {
+                                Image(systemName: "ellipsis.circle").frame(width: 44, height: 44)
+                            }.accessibilityLabel(tr("Reminder options", "Valg for beskjed"))
+                        }.opacity(rule.isEnabled ? 1 : 0.55)
+                    }
+                }
+            }
         }
         .foregroundStyle(ATHLTHPlanDesign.ink)
         .padding(16)
@@ -195,10 +225,16 @@ struct ATHLTHBasicAudioCoachView: View {
     }
     private var intervalBinding: Binding<Bool> {
         Binding(get: {
-            draft.customRules.contains { ATHLTHCoachRequestParser.same($0, intervalRule) && $0.isEnabled }
+            let grouped = Set(draft.coachGroups.flatMap(\.ruleIDs))
+            return draft.customRules.contains { !grouped.contains($0.id) && ATHLTHCoachRequestParser.same($0, intervalRule) && $0.isEnabled }
         }, set: { value in
             if value {
-                guard draft.customRules.count < 20, !draft.customRules.contains(where: { ATHLTHCoachRequestParser.same($0, intervalRule) && $0.isEnabled }) else { return }
+                let grouped = Set(draft.coachGroups.flatMap(\.ruleIDs))
+                if let index = draft.customRules.firstIndex(where: { !grouped.contains($0.id) && ATHLTHCoachRequestParser.same($0, intervalRule) }) {
+                    draft.customRules[index].enabled = true
+                    return
+                }
+                guard draft.customRules.count < 20 else { return }
                 draft.customRules.append(intervalRule)
             } else {
                 let grouped = Set(draft.coachGroups.flatMap(\.ruleIDs))
@@ -255,7 +291,8 @@ struct ATHLTHBasicAudioCoachView: View {
                 .background(.white, in: RoundedRectangle(cornerRadius: 20))
             if draft.enabled {
                 DisclosureGroup(tr("Want another reminder?", "Ønsker du en annen beskjed?")) {
-                    ATHLTHCoachRequestView(rules: $draft.customRules, availability: availability)
+                    ATHLTHCoachRequestView(rules: $draft.customRules, availability: availability,
+                        showSaved: true, protectedRuleIDs: Set(draft.coachGroups.flatMap(\.ruleIDs)))
                 }.padding(12)
             }
         }

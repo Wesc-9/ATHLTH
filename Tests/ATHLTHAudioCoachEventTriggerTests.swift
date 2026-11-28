@@ -3,6 +3,53 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachEventTriggerTests: XCTestCase {
+    func testPlainLanguageRequestCreatesExactIntervalWarning() {
+        let request = "Jeg ønsker å få beskjed 10 sekunder før hver intervall-drag"
+        let availability = ATHLTHCoachTriggerAvailability.basicCoach(activity: .running, hasRoute: false, structured: true)
+        XCTAssertEqual(ATHLTHCoachRequestParser.intent(request), .beforeEffort)
+        let rule = ATHLTHCoachRequestParser.rule(request, intent: .beforeEffort, availability: availability)
+        XCTAssertEqual(rule?.trigger, .beforeEffort)
+        XCTAssertEqual(rule?.interval, 10)
+        XCTAssertNil(ATHLTHCoachRequestParser.rule(request, intent: .beforeEffort,
+            availability: .basicCoach(activity: .running, hasRoute: false, structured: false)))
+        XCTAssertNil(ATHLTHCoachRequestParser.rule("Ikke si fra 10 sekunder før hvert drag", intent: .beforeEffort, availability: availability))
+        XCTAssertNil(ATHLTHCoachRequestParser.rule("10 sekunder før drag og 20 før pause", intent: .beforeEffort, availability: availability))
+    }
+
+    func testPlainLanguageRequestPreservesUnitsAndRejectsWrongSport() {
+        let running = ATHLTHCoachTriggerAvailability.basicCoach(activity: .running, hasRoute: false, structured: true)
+        let strength = ATHLTHCoachTriggerAvailability.basicCoach(activity: .strength, hasRoute: false, structured: true)
+        XCTAssertEqual(ATHLTHCoachRequestParser.rule("Puls hvert 5. minutt", intent: .everyTime, availability: running)?.interval, 300)
+        XCTAssertEqual(ATHLTHCoachRequestParser.rule("Si min puls hvert 30. sekund", intent: .everyTime, availability: running)?.metric, .heartRate)
+        XCTAssertNil(ATHLTHCoachRequestParser.rule("Varsle 10 sekunder før pausen starter", intent: .beforeRestEnd, availability: strength))
+        XCTAssertEqual(ATHLTHCoachRequestParser.rule("Varsle 10 sekunder før pausen er ferdig", intent: .beforeRestEnd, availability: strength)?.trigger, .strengthRestEnding)
+        XCTAssertNil(ATHLTHCoachRequestParser.rule("Varsle hver 2 km", intent: .everyDistance, availability: strength))
+    }
+
+    func testBeforeEffortNeverSpeaksForRecoveryOrLateBoundary() {
+        let rule = ATHLTHAudioCoachRule(trigger: .beforeEffort, metric: .motivation, interval: 10)
+        var context = ATHLTHCoachReadoutContext()
+        context.stepIndex = 0
+        context.stepCount = 5
+        context.hasNextStep = true
+        context.stepPhase = "warmup"
+        context.nextStepPhase = "work"
+        var slots: [UUID: Int] = [:]
+        context.stepRemainingSeconds = 11
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+        context.stepRemainingSeconds = 10
+        XCTAssertEqual(speak(rule, slots: &slots, context: context).count, 1)
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+        slots.removeAll()
+        context.nextStepPhase = "recovery"
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+        context.nextStepPhase = "cooldown"
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+        context.nextStepPhase = "work"
+        context.stepRemainingSeconds = 2
+        XCTAssertTrue(speak(rule, slots: &slots, context: context).isEmpty)
+    }
+
     func testPreparationTargetsUpcomingEffortAndDoesNotInterruptCountdown() {
         var rule = ATHLTHAudioCoachRule(trigger: .beforeNextStep, metric: .motivation,
                                        interval: 15, eventSelection: .withoutRest)

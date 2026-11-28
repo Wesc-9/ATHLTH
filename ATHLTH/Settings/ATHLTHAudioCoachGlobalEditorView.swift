@@ -9,6 +9,7 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
     @State private var outputPreference: ATHLTHAudioCoachOutputPreference = .automatic
     @State private var loaded = false
     @State private var showingExitConfirmation = false
+    @State private var simpleMode = true
 
     private var outputPreferenceCard: some View {
         VStack(alignment: .leading, spacing: 11) {
@@ -83,13 +84,23 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
         ScrollView {
             if loaded {
                 VStack(spacing: 12) {
-                    outputPreferenceCard
-                    ATHLTHAudioCoachActiveListView(
-                        draft: liveDraft,
-                        showRouteOptions: true,
-                        showStructuredOptions: true,
-                        globalScope: true
-                    )
+                    Picker(ATHLTHLocalization.choose(english: "Mode", norwegian: "Modus"), selection: $simpleMode) {
+                        Text(ATHLTHLocalization.choose(english: "Basic", norwegian: "Enkel")).tag(true)
+                        Text(ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")).tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("athlth-coach-editor-mode")
+                    if simpleMode {
+                        ATHLTHBasicAudioCoachView(draft: liveDraft, availability: .global)
+                    } else {
+                        outputPreferenceCard
+                        ATHLTHAudioCoachActiveListView(
+                            draft: liveDraft,
+                            showRouteOptions: true,
+                            showStructuredOptions: true,
+                            globalScope: true
+                        )
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -100,6 +111,15 @@ struct ATHLTHAudioCoachGlobalEditorView: View {
         .scrollIndicators(.hidden)
         .navigationBarBackButtonHidden(true)
         .toolbar {
+            if simpleMode && loaded {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
+                        settings.updateAudioCoachDefaults(from: draft)
+                        settings.audioCoachOutputPreference = outputPreference
+                        dismiss()
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: requestExit) {
                     Image(systemName: "chevron.left")
