@@ -91,7 +91,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            if widthClass == .regular && !showingStructure {
+            if widthClass == .regular && !showingStructure && selectedDay != nil {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 24) {
                         overview.frame(minWidth: 290, maxWidth: 440)
@@ -195,8 +195,12 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                     Text(tr("Switch to daily plan", "Bytt til dagsplan"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(gold)
+                        .padding(.horizontal, 8)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-plan-switch-to-day")
             }
             scenicHeader
             HStack {
@@ -224,8 +228,16 @@ struct ATHLTHAdvancedWeekBuilderView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(gold)
-            ForEach(orderedDays) { day in
-                dayRow(day)
+            if widthClass == .regular && selectedDay == nil {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 10) {
+                    ForEach(orderedDays) { day in
+                        dayRow(day)
+                    }
+                }
+            } else {
+                ForEach(orderedDays) { day in
+                    dayRow(day)
+                }
             }
             HStack(spacing: 9) {
                 Menu {
