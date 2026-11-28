@@ -2638,7 +2638,9 @@ struct ExerciseDetailView: View {
 
     private func peakExerciseArtwork(_ url: URL, size: CGFloat = 160) -> some View {
         Group {
-            if url.isFileURL, let image = UIImage(contentsOfFile: url.path) {
+            if url.isFileURL, currentEntry.sourceIdentifier == "athlth-native-weighted-plank" {
+                ATHLTHLocalExerciseThumbnailView(url: url, size: size, fallbackSymbol: "dumbbell.fill")
+            } else if url.isFileURL, let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()

@@ -592,6 +592,9 @@ final class ExerciseLibraryStore: ObservableObject {
         )?.summary, !reviewed.isEmpty {
             return reviewed
         }
+        if entry.sourceIdentifier == "athlth-native-weighted-plank" {
+            return "En planke med ekstra belastning fra en vektskive som utfordrer kjernestyrke og stabilitet."
+        }
         if let id = entry.sourceIdentifier,
            let native = Self.nativeNorwegianInstructions[id] {
             return native.first
@@ -1001,7 +1004,8 @@ final class ExerciseLibraryStore: ObservableObject {
         "athlth-native-leg-curl",
         "athlth-native-lateral-raise-unspecified",
         "athlth-native-power-clean",
-        "athlth-native-skullcrusher"
+        "athlth-native-skullcrusher",
+        "athlth-native-weighted-plank"
     ]
 
     /// Older workout plans may still reference these stable ATHLTH-native
@@ -1794,7 +1798,23 @@ final class ExerciseLibraryStore: ObservableObject {
         let norwegianInstruction: String
     }
 
+    private static let weightedPlankEnglishInstructions = [
+        "Place your forearms on the floor with your elbows directly under your shoulders.",
+        "Extend your legs into a straight forearm plank. Have a partner place a light weight plate securely on your upper to mid-back, away from your neck and lower back.",
+        "Brace your abdomen and glutes, keep your neck neutral and breathe steadily while holding your body in a straight line.",
+        "Have your partner remove the plate before lowering your knees to the floor."
+    ]
+    private static let weightedPlankNorwegianInstructions = [
+        "Plasser underarmene i gulvet med albuene rett under skuldrene.",
+        "Strekk beina ut i en strak planke. Be en treningspartner plassere en lett vektskive stabilt på øvre til midtre del av ryggen, unna nakken og korsryggen.",
+        "Stram magen og setet, hold nakken nøytral og pust rolig mens kroppen holdes i en rett linje.",
+        "Be treningspartneren fjerne vektskiven før du senker knærne i gulvet."
+    ]
     private static let nativeSeeds: [NativeExerciseSeed] = [
+            .init(slug: "weighted-plank", name: "Weighted Plank", norwegianName: "Planke med vekt",
+                  primary: "Core", secondary: ["Shoulders", "Glutes"], equipment: ["Weight Plate"],
+                  englishInstruction: "A forearm plank with extra resistance from a weight plate that challenges core strength and stability.",
+                  norwegianInstruction: "En planke med ekstra belastning fra en vektskive som utfordrer kjernestyrke og stabilitet."),
             .init(slug: "bench-press", name: "Bench Press", norwegianName: "Benkpress",
                   primary: "Chest", secondary: ["Triceps", "Shoulders"], equipment: ["Barbell", "Bench"],
                   englishInstruction: "Lower the bar under control to your chest and press up with steady feet.",
@@ -2089,7 +2109,8 @@ final class ExerciseLibraryStore: ObservableObject {
 
     private static let nativeNorwegianInstructions: [String: [String]] =
         Dictionary(uniqueKeysWithValues: nativeSeeds.map {
-            ("athlth-native-" + $0.slug, [$0.norwegianInstruction])
+            ("athlth-native-" + $0.slug, $0.slug == "weighted-plank"
+                ? weightedPlankNorwegianInstructions : [$0.norwegianInstruction])
         })
 
     /// Restore legacy identities solely for old plans and workout history.
@@ -2121,16 +2142,19 @@ final class ExerciseLibraryStore: ObservableObject {
     private static var nativeATHLTHExercises: [ExerciseLibraryEntry] {
         nativeSeeds.map { seed in
             let id = stableUUID(for: "athlth-native:" + seed.slug)
+            let isWeightedPlank = seed.slug == "weighted-plank"
+            let front = isWeightedPlank ? Bundle.main.url(forResource: "athlth-weighted-plank-front", withExtension: "webp") : nil
+            let side = isWeightedPlank ? Bundle.main.url(forResource: "athlth-weighted-plank-side", withExtension: "webp") : nil
             let exercise = Exercise(
                 id: id,
                 origin: .publicCatalog,
                 ownerID: nil,
                 name: seed.name,
-                instructions: [seed.englishInstruction],
+                instructions: isWeightedPlank ? weightedPlankEnglishInstructions : [seed.englishInstruction],
                 primaryMuscles: [seed.primary],
                 secondaryMuscles: seed.secondary,
                 equipment: seed.equipment,
-                imageURL: nil,
+                imageURL: front,
                 isVisibleOutsideOwnerLibrary: true
             )
             return ExerciseLibraryEntry(
@@ -2140,11 +2164,11 @@ final class ExerciseLibraryStore: ObservableObject {
                 sourceIdentifier: "athlth-native-" + seed.slug,
                 summary: seed.englishInstruction,
                 tips: [],
-                category: "strength",
-                difficulty: "All levels",
+                category: isWeightedPlank ? "core" : "strength",
+                difficulty: isWeightedPlank ? "Intermediate" : "All levels",
                 bodyPart: seed.primary,
-                imageStartURL: nil,
-                imagePeakURL: nil
+                imageStartURL: front,
+                imagePeakURL: side
             )
         }
     }

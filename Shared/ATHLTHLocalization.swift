@@ -268,6 +268,7 @@ enum ATHLTHExerciseNameLocalization {
         "dip": "Dips",
         "dips": "Dips",
         "plank": "Planke",
+        "weighted plank": "Planke med vekt",
         "side plank": "Sideplanke",
         "hanging leg raise": "Hengende beinhev",
         "leg raise": "Beinhev",

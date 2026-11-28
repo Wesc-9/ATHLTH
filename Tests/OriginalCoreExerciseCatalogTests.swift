@@ -77,6 +77,28 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testWeightedPlankIsDistinctLocalizedAndHasBundledArtwork() throws {
+        let library = ExerciseLibraryStore()
+        let slug = "athlth-native-weighted-plank"
+        let entry = try XCTUnwrap(library.selectableExercises.first { $0.sourceIdentifier == slug })
+        XCTAssertEqual(entry.name, "Weighted Plank")
+        XCTAssertEqual(ATHLTHExerciseNameLocalization.norwegianName(for: entry.name), "Planke med vekt")
+        XCTAssertEqual(entry.exercise.primaryMuscles, ["Core"])
+        XCTAssertEqual(entry.exercise.equipment, ["Weight Plate"])
+        XCTAssertEqual(entry.exercise.instructions.count, 4)
+        XCTAssertTrue(library.search(query: "Weighted Plank").contains { $0.id == entry.id })
+        XCTAssertTrue(library.search(query: "Planke med vekt").contains { $0.id == entry.id })
+        let front = try XCTUnwrap(entry.imageStartURL)
+        let side = try XCTUnwrap(entry.imagePeakURL)
+        XCTAssertTrue(front.isFileURL && side.isFileURL)
+        XCTAssertNotEqual(front, side)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: front.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: side.path))
+        XCTAssertEqual(ExerciseLibraryStore().selectableExercises.first { $0.sourceIdentifier == slug }?.id, entry.id)
+        XCTAssertNotEqual(library.selectableExercises.first { $0.sourceIdentifier == "plank" }?.id, entry.id)
+    }
+
+    @MainActor
     func testHistoricalOriginalCoreUUIDResolvesButCannotBeSelectedAgain() throws {
         let library = ExerciseLibraryStore()
         let source = try XCTUnwrap(library.athlthCatalogExercises.first {
