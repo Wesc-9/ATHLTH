@@ -61,6 +61,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     @State private var phasePendingDeletion: WorkoutPhaseKind?
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
+    @State private var phaseProjectionMemo = ATHLTHBoundedProjectionMemo<
+        ATHLTHStudioPhaseRenderRows.ProjectionKey, ATHLTHStudioPhaseRenderRows.Projection
+    >(capacity: 4)
     @State private var expandedIntervalGroups: Set<UUID> = []
     @State private var collapsedSupersetGroups: Set<UUID> = []
     @State private var intervalToAdjust: IntervalSelection?
@@ -708,16 +711,21 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     private func phaseCard(_ phase: WorkoutPhaseKind) -> some View {
-        let rows = entries(in: phase)
         let expanded = advanced && !collapsedPhases.contains(phase)
-        let durationSeconds = ATHLTHWorkoutDurationEstimator.previewSeconds(
-            for: rows,
-            defaultActivity: activity == .walking ? .walking : .running
+        let key = ATHLTHStudioPhaseRenderRows.ProjectionKey(
+            blocks: blocks, visiblePhases: visiblePhases, phase: phase,
+            expanded: expanded, walking: activity == .walking
         )
-        // Collapse group membership once, not inside every row. Hidden
-        // phases don't build a presentation plan at all.
-        let displayRows = expanded
-            ? ATHLTHStudioPhaseRenderRows.make(from: rows) : []
+        // Background store publications must not recalculate every phase,
+        // interval summary and estimated duration of an unchanged recipe.
+        let projection = phaseProjectionMemo.value(for: key) {
+            let signpost = ATHLTHPerformance.begin("WorkoutStudioPhaseProjection")
+            defer { ATHLTHPerformance.end("WorkoutStudioPhaseProjection", id: signpost) }
+            return ATHLTHStudioPhaseRenderRows.projection(for: key)
+        }
+        let rows = projection.rows
+        let durationSeconds = projection.durationSeconds
+        let displayRows = projection.displayRows
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 11) {
                 Image(systemName: "line.3.horizontal")

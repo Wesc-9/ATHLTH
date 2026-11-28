@@ -21,6 +21,49 @@ enum ATHLTHStudioPhaseRenderRows {
         var id: UUID { block.editorDragID }
     }
 
+    // Recipe equality deliberately excludes editorDragID. The presentation
+    // cache must include it so restored or replaced equal recipes never
+    // leave rows with stale edit/delete/reorder identities.
+    struct ProjectionKey: Equatable {
+        let blocks: [WorkoutTemplateBlock]
+        let dragIDs: [UUID]
+        let visiblePhases: Set<WorkoutPhaseKind>
+        let phase: WorkoutPhaseKind
+        let expanded: Bool
+        let walking: Bool
+
+        init(blocks: [WorkoutTemplateBlock], visiblePhases: Set<WorkoutPhaseKind>,
+             phase: WorkoutPhaseKind, expanded: Bool, walking: Bool) {
+            self.blocks = blocks
+            self.dragIDs = blocks.map(\.editorDragID)
+            self.visiblePhases = visiblePhases
+            self.phase = phase
+            self.expanded = expanded
+            self.walking = walking
+        }
+    }
+
+    struct Projection {
+        let rows: [WorkoutTemplateBlock]
+        let durationSeconds: TimeInterval?
+        let displayRows: [Item]
+    }
+
+    static func projection(for key: ProjectionKey) -> Projection {
+        let rows = key.blocks.enumerated().compactMap { index, step in
+            ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+                at: index, in: key.blocks, visiblePhases: key.visiblePhases
+            ) == key.phase ? step : nil
+        }
+        return Projection(
+            rows: rows,
+            durationSeconds: ATHLTHWorkoutDurationEstimator.previewSeconds(
+                for: rows, defaultActivity: key.walking ? .walking : .running
+            ),
+            displayRows: key.expanded ? make(from: rows) : []
+        )
+    }
+
     static func make(from blocks: [WorkoutTemplateBlock]) -> [Item] {
         var result: [Item] = []
         result.reserveCapacity(blocks.count)

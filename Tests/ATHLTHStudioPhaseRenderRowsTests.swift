@@ -78,6 +78,41 @@ final class ATHLTHStudioPhaseRenderRowsTests: XCTestCase {
         XCTAssertEqual(rows[0].block.setCount, 3)
     }
 
+    func testPhaseProjectionInvalidatesOnTargetAndIdentityChanges() {
+        var source = block("Plank")
+        source.setCount = 3
+        source.repetitions = nil
+        let original = ATHLTHStudioPhaseRenderRows.ProjectionKey(
+            blocks: [source], visiblePhases: [.main], phase: .main,
+            expanded: true, walking: false
+        )
+        let rendered = ATHLTHStudioPhaseRenderRows.projection(for: original)
+        XCTAssertEqual(rendered.displayRows.map(\.id), [source.editorDragID])
+        XCTAssertEqual(rendered.displayRows.first?.kind, .strengthSets)
+        var replacement = source
+        replacement.editorDragID = UUID()
+        XCTAssertEqual(source, replacement)
+        let newIdentity = ATHLTHStudioPhaseRenderRows.ProjectionKey(
+            blocks: [replacement], visiblePhases: [.main], phase: .main,
+            expanded: true, walking: false
+        )
+        XCTAssertNotEqual(original, newIdentity)
+        XCTAssertEqual(ATHLTHStudioPhaseRenderRows.projection(for: newIdentity).displayRows.map(\.id),
+                       [replacement.editorDragID])
+        source.durationSeconds = 60
+        let edited = ATHLTHStudioPhaseRenderRows.ProjectionKey(
+            blocks: [source], visiblePhases: [.main], phase: .main,
+            expanded: true, walking: false
+        )
+        XCTAssertNotEqual(original, edited)
+        let collapsed = ATHLTHStudioPhaseRenderRows.ProjectionKey(
+            blocks: [source], visiblePhases: [.main], phase: .main,
+            expanded: false, walking: false
+        )
+        XCTAssertTrue(ATHLTHStudioPhaseRenderRows.projection(for: collapsed).displayRows.isEmpty)
+        XCTAssertEqual(ATHLTHStudioPhaseRenderRows.projection(for: collapsed).rows.count, 1)
+    }
+
     func testIncompleteIntervalKeepsAllIndividuallyEditableSteps() {
         let group = UUID()
         let steps = [

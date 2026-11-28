@@ -13,6 +13,22 @@ final class ATHLTHWorkoutLibrarySourceFilterTests: XCTestCase {
         XCTAssertFalse(ATHLTHWorkoutLibraryActivityScope.other.includesRunningTemplates)
     }
 
+    func testAdvancedPlanPickerStartsWithAllActivitiesButBasicKeepsScope() {
+        for activity in [ATHLTHPlannedWorkoutType.running, .walking, .strength] {
+            XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.editorSelection(
+                requested: .primary(for: activity), activity: activity,
+                advanced: true, planned: true
+            ), .all)
+            XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.editorSelection(
+                requested: .all, activity: activity, advanced: false, planned: true
+            ), .primary(for: activity))
+        }
+        XCTAssertEqual(ATHLTHWorkoutLibraryActivityScope.editorSelection(
+            requested: .nonStrength, activity: .strength,
+            advanced: false, planned: true
+        ), .nonStrength)
+    }
+
     func testFavoritesOnlyExcludesUnstarredWorkoutsFromEverySource() {
         let filter = ATHLTHWorkoutLibrarySourceFilter(
             favoritesOnly: true, mineOnly: false

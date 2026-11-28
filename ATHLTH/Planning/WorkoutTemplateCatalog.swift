@@ -1096,6 +1096,12 @@ enum ATHLTHWorkoutLibraryActivityScope: String {
         activity == .strength ? .nonStrength : .other
     }
 
+    static func editorSelection(requested: Self, activity: ATHLTHPlannedWorkoutType?,
+                                advanced: Bool, planned: Bool) -> Self {
+        if advanced && planned { return .all }
+        return requested == .all ? .primary(for: activity) : requested
+    }
+
     var includesRunningTemplates: Bool {
         self == .all || self == .runningOnly || self == .nonStrength
     }
@@ -5518,9 +5524,10 @@ struct WorkoutTemplateBuilderView: View {
     // Advanced planned sessions support mixed recipes. Do not silently
     // turn the All filter into the launch activity's primary filter.
     private var effectiveSavedWorkoutScope: ATHLTHWorkoutLibraryActivityScope {
-        if studioAdvanced && isPlannedWorkout { return .all }
-        return savedWorkoutActivityScope == .all
-            ? .primary(for: initialActivity) : savedWorkoutActivityScope
+        ATHLTHWorkoutLibraryActivityScope.editorSelection(
+            requested: savedWorkoutActivityScope, activity: initialActivity,
+            advanced: studioAdvanced, planned: isPlannedWorkout
+        )
     }
     private var studioInk: Color {
         isPlannedWorkout ? ATHLTHTrainDesign.ink
@@ -6768,7 +6775,8 @@ struct WorkoutTemplateBuilderView: View {
                                         if wasBlank && !blocks.isEmpty { title = workout.title }
                                     }
                                 },
-                                initialCategory: studioAdvanced ? nil : effectiveSavedWorkoutScope.initialCategory,
+                                initialCategory: studioAdvanced ? nil : (savedWorkoutActivityScope.initialCategory ??
+                                    (savedWorkoutActivityScope == .all ? initialActivity : nil)),
                                 activityScope: effectiveSavedWorkoutScope
                             )
                             .navigationTitle(tr("Add workout", "Legg til treningsøkt"))
