@@ -164,6 +164,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var editingWorkoutIndex = 0
     @State private var editingFocusedBlockIndex: Int?
     @State private var previousGuidedEdits: [Int: ATHLTHPlanWeekDayEdit]?
+    @State private var planDragScope = UUID().uuidString
+    @State private var pendingClearDay: Int?
     @State private var selectingExtraFromLibrary = false
 
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
@@ -1000,6 +1002,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             )
         }
+        .alert(ATHLTHLocalization.choose(english: "Clear planned day?", norwegian: "Slette planleggingen for dagen?"),
+               isPresented: Binding(get: { pendingClearDay != nil }, set: { if !$0 { pendingClearDay = nil } })) {
+            Button(ATHLTHLocalization.choose(english: "Delete", norwegian: "Slett"), role: .destructive) {
+                if let key = pendingClearDay { writePlanWorkouts([], key: key); saveResumableDraft() }
+                pendingClearDay = nil
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) { pendingClearDay = nil }
+        } message: {
+            Text(ATHLTHLocalization.choose(english: "The date stays in the plan. Its workouts and rest-day designation are removed.", norwegian: "Datoen beholdes i planen, men øktene og eventuell hviledag fjernes."))
+        }
         .confirmationDialog(ATHLTHLocalization.choose(english: "Unfinished weeks", norwegian: "Uker som ikke er ferdig"), isPresented: $showingGuidedFinishOptions, titleVisibility: .visible) {
             if firstCompletedGuidedWeek != nil {
                 Button(ATHLTHLocalization.choose(english: "Copy first completed week", norwegian: "Kopier første utfylte uke")) { copyFirstGuidedWeekAndReview() }
@@ -1445,6 +1457,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             AnyView(weekStep)
                         case .some(.quick):
                             AnyView(advancedWeekBuilderStep)
+                                .id("advanced-week-overview")
                         case .some(.guided):
                             AnyView(guidedWeekStep)
                         }
@@ -3408,6 +3421,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(alignment: .leading, spacing: 12) {
             AnyView(sourceChoiceHeader)
             AnyView(guidedWeekStep)
+                .id("advanced-guided-day")
                 .frame(maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(.horizontal, 18)
@@ -3486,6 +3500,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(guidedDayCursor == position ? .isSelected : [])
+                .contextMenu {
+                    if isRest || !dayWorkouts.isEmpty {
+                        Button(role: .destructive) {
+                            pendingClearDay = guidedDateKey(at: position)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(english: "Clear day", norwegian: "Slett planlegging for dagen"), systemImage: "trash")
+                        }
+                    }
+                }
+                .dropDestination(for: String.self) { items, _ in
+                    guard let item = items.first else { return false }
+                    return movePlanDrag(item, to: guidedDateKey(at: position), workout: nil, phase: nil, before: nil)
+                }
             }
         }
     }
@@ -3504,10 +3531,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     selectedAdvancedWeekDay = nil
                     // Reuse the same mode transition as the setup selector.
                     // Switching views must not reset the saved dated workouts.
-                    selectBuildMethod(.weekByWeek)
+                    guidedWeekAwaitingDecision = nil
+                    prefersAIPlanBuild = false
+                    weekPlanningApproach = .quick
                     saveResumableDraft()
                 }
                 .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-plan-switch-to-week")
                 }
             }
             if guidedDayCursor >= weekCount * 7 {
@@ -3821,6 +3855,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ]?.isRestDay == true,
             suggestedTraining: isSuggestedTrainingDay(guidedCurrentWeekday, week: guidedCurrentWeek),
             pinsDayActions: usesPinnedGuidedDayLayout,
+            dragScope: planDragScope,
+            dateKey: guidedDateKey(at: guidedDayCursor),
+            onDropItem: { item, workout, phase, before in
+                movePlanDrag(item, to: guidedDateKey(at: guidedDayCursor), workout: workout, phase: phase, before: before)
+            },
+            onDeleteBlock: { workout, block in
+                deletePlanBlock(key: guidedDateKey(at: guidedDayCursor), workout: workout, block: block)
+            },
+            onClearDay: { pendingClearDay = guidedDateKey(at: guidedDayCursor) },
             onSelectDay: { absoluteDay in
                 // The grouped menu spans all plan weeks, not just this week.
                 guidedDayCursor = min(max(0, absoluteDay), weekCount * 7 - 1)
@@ -4198,6 +4241,126 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         selectedDays.insert(day)
         sessionsPerWeek = selectedDays.count
         saveResumableDraft()
+    }
+
+    private func planWorkouts(key: Int) -> [ATHLTHPlanStructuredWorkoutBlueprint] {
+        guard (1...weekCount * 7).contains(key) else { return [] }
+        return advancedWeekItems(for: (key - 1) / 7)
+            .first { $0.weekday == (key - 1) % 7 + 1 }?.workouts ?? []
+    }
+
+    private func writePlanWorkouts(_ workouts: [ATHLTHPlanStructuredWorkoutBlueprint], key: Int) {
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        edit.detailedWorkout = workouts.first
+        edit.additionalDetailedWorkouts = Array(workouts.dropFirst())
+        edit.title = workouts.first?.title
+        edit.kind = workouts.first?.kind
+        edit.durationMinutes = workouts.first?.durationMinutes
+        edit.isRestDay = false
+        edit.removeTemplateDetail = true
+        edit.removeAllWorkouts = workouts.isEmpty
+        weekDayEdits[key] = edit
+    }
+
+    private func revisedPlanWorkout(_ workout: ATHLTHPlanStructuredWorkoutBlueprint,
+                                    blocks: [WorkoutTemplateBlock]) -> ATHLTHPlanStructuredWorkoutBlueprint {
+        var result = workout
+        result.blocks = blocks.enumerated().map {
+            ATHLTHWorkoutPhasePlacement.renumbered($0.element, sequence: $0.offset + 1)
+        }
+        result.kind = workoutKind(for: result.blocks)
+        if result.kind != .running { result.routeID = nil }
+        if let duration = ATHLTHWorkoutDurationEstimator.minutes(for: result.blocks) {
+            result.durationMinutes = duration
+        }
+        return result
+    }
+
+    private func deletePlanBlock(key: Int, workout: Int, block: UUID) {
+        var workouts = planWorkouts(key: key)
+        guard workouts.indices.contains(workout),
+              let selected = workouts[workout].blocks.first(where: { $0.editorDragID == block }) else { return }
+        let remaining = workouts[workout].blocks.filter {
+            if let group = selected.groupID { return $0.groupID != group }
+            return $0.editorDragID != block
+        }
+        if remaining.isEmpty { workouts.remove(at: workout) }
+        else {
+            let updated = revisedPlanWorkout(workouts[workout], blocks: remaining)
+            guard updated.isValid else { return }
+            workouts[workout] = updated
+        }
+        previousGuidedEdits = weekDayEdits
+        writePlanWorkouts(workouts, key: key)
+        saveResumableDraft()
+    }
+
+    private func movePlanDrag(_ item: String, to targetKey: Int, workout targetIndex: Int?,
+                              phase: WorkoutPhaseKind?, before: UUID?) -> Bool {
+        guard let drag = ATHLTHPlanDragPayload.decode(item, scope: planDragScope),
+              (1...weekCount * 7).contains(drag.dateKey),
+              (1...weekCount * 7).contains(targetKey) else { return false }
+        var source = planWorkouts(key: drag.dateKey)
+        guard source.indices.contains(drag.workout) else { return false }
+        var target = drag.dateKey == targetKey ? source : planWorkouts(key: targetKey)
+        if let id = drag.block {
+            guard let targetIndex, target.indices.contains(targetIndex), let phase,
+                  let selected = source[drag.workout].blocks.first(where: { $0.editorDragID == id }) else { return false }
+            let original = source[drag.workout].blocks
+            func belongs(_ block: WorkoutTemplateBlock) -> Bool {
+                if let group = selected.groupID { return block.groupID == group }
+                return block.editorDragID == id
+            }
+            let moving = original.filter(belongs)
+            let remaining = original.filter { !belongs($0) }
+            if let before, moving.contains(where: { $0.editorDragID == before }),
+               drag.dateKey == targetKey && drag.workout == targetIndex { return false }
+            let sameWorkout = drag.dateKey == targetKey && drag.workout == targetIndex
+            let destination = sameWorkout ? remaining : target[targetIndex].blocks
+            var inserted = destination
+            if let before, let position = inserted.firstIndex(where: { $0.editorDragID == before }) {
+                var boundary = position
+                if let group = inserted[position].groupID {
+                    while boundary > 0 && inserted[boundary - 1].groupID == group { boundary -= 1 }
+                }
+                let members = ATHLTHWorkoutPhasePlacement.insertingRecipe(moving, into: [], destination: phase)
+                inserted.insert(contentsOf: members, at: boundary)
+            } else {
+                inserted = ATHLTHWorkoutPhasePlacement.insertingRecipe(moving, into: destination, destination: phase)
+            }
+            let revisedTarget = revisedPlanWorkout(target[targetIndex], blocks: inserted)
+            guard revisedTarget.isValid else { return false }
+            if sameWorkout {
+                source[drag.workout] = revisedTarget
+            } else {
+                // Moving the last block transfers the entire remaining content;
+                // remove the emptied workout rather than leave a phantom session.
+                if !remaining.isEmpty {
+                    let revisedSource = revisedPlanWorkout(source[drag.workout], blocks: remaining)
+                    guard revisedSource.isValid else { return false }
+                    source[drag.workout] = revisedSource
+                }
+                if drag.dateKey == targetKey {
+                    source[targetIndex] = revisedTarget
+                } else {
+                    target[targetIndex] = revisedTarget
+                }
+                if remaining.isEmpty { source.remove(at: drag.workout) }
+            }
+        } else {
+            let moving = source.remove(at: drag.workout)
+            if drag.dateKey == targetKey {
+                guard let targetIndex, targetIndex != drag.workout else { return false }
+                source.insert(moving, at: min(targetIndex, source.count))
+            } else {
+                target.insert(moving, at: min(targetIndex ?? target.count, target.count))
+            }
+        }
+        previousGuidedEdits = weekDayEdits
+        writePlanWorkouts(source, key: drag.dateKey)
+        if drag.dateKey != targetKey { writePlanWorkouts(target, key: targetKey) }
+        saveResumableDraft()
+        return true
     }
 
     /// Delete by the position in the visible day's workout list. Promoting
@@ -5072,13 +5235,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 for day in 1...7 { setRestDay(day) }
                 selectedPlanWeekIndex = current
             },
+            dragScope: planDragScope,
+            onDropItem: { item, day, workout, phase, before in
+                movePlanDrag(item, to: weekDayKey(day), workout: workout, phase: phase, before: before)
+            },
+            onDeleteWorkout: { day, index in
+                removeGuidedWorkout(day: day, week: selectedPlanWeekIndex, index: index)
+            },
+            onDeleteBlock: { day, workout, block in
+                deletePlanBlock(key: weekDayKey(day), workout: workout, block: block)
+            },
+            onClearDay: { day in pendingClearDay = weekDayKey(day) },
             onSwitchToDayView: {
                 let chosen = selectedAdvancedWeekDay ?? advancedWeekItems(for: selectedPlanWeekIndex).sorted { $0.date < $1.date }.first?.weekday ?? 1
                 let date = dateForWeekDay(chosen, weekIndex: selectedPlanWeekIndex)
                 guidedDayCursor = max(0, Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: startDate), to: date).day ?? 0)
                 guidedWeekAwaitingDecision = nil
                 selectedAdvancedWeekDay = nil
-                selectBuildMethod(.dayByDay)
+                prefersAIPlanBuild = false
+                weekPlanningApproach = .guided
                 saveResumableDraft()
             }
         )
