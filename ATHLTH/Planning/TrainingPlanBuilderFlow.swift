@@ -668,8 +668,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 if step != .source && step != .mode && step != .goal &&
                     step != .goalDetails && step != .basics && step != .approach && step != .week {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(backButtonTitle) {
-                            goBack()
+                        Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                            requestClosePlanCreation()
                         }
                     }
                 }
@@ -1960,7 +1960,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .padding(.horizontal, 4)
                 .accessibilityElement(children: .combine)
             }
-            Button {
+            HStack(spacing: 10) {
+                if step != .mode { planBackButton }
+                Button {
                 guard canContinue else { return }
                 goForward()
             } label: {
@@ -1987,6 +1989,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .buttonStyle(.plain)
             .disabled(!canContinue)
             .opacity(canContinue ? 1 : 0.50)
+        }
         }
         .padding(.horizontal, 18)
         .padding(.top, 10)
@@ -2044,7 +2047,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var buildApproachContinueBar: some View {
-        Button {
+        HStack(spacing: 10) {
+                planBackButton
+                Button {
             guard mode == .advanced, canContinue else { return }
             switch selectedBuildMethod {
             case .ai:
@@ -2087,6 +2092,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .buttonStyle(.plain)
         .disabled(mode != .advanced || !canContinue)
+        }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
         .background(ATHLTHTrainDesign.canvas.opacity(0.98))
@@ -2153,42 +2159,24 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var sourceChoiceHeader: some View {
         VStack(spacing: step == .mode ? 12 : 22) {
             HStack(spacing: 8) {
-                Button {
-                    if step == .mode { requestClosePlanCreation() }
-                    else { goBackInPlanBuilder() }
-                } label: {
-                    Text(
-                        reviewingGuidedDay && step == .week
-                        ? ATHLTHLocalization.choose(english: "Summary", norwegian: "Sammendrag")
-                        : step == .mode
-                        ? ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")
-                        : (step == .week && weekPlanningApproach == .quick &&
-                           selectedAdvancedWeekDay != nil
-                           ? ATHLTHLocalization.choose(english: "To week", norwegian: "Til uken")
-                           : ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake"))
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(sourceInk)
-                    .padding(.horizontal, 15)
-                    .frame(height: 40)
-                    .background(
-                        Color.white.opacity(0.85),
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(Color.black.opacity(0.08), lineWidth: 0.8)
-                    }
+                Button(action: requestClosePlanCreation) {
+                    Text(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"))
+                        .font(.subheadline)
+                        .foregroundStyle(sourceInk)
+                        .padding(.horizontal, 15)
+                        .frame(minHeight: 44)
+                        .background(Color.white.opacity(0.85), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Color.black.opacity(0.08), lineWidth: 0.8)
+                                .allowsHitTesting(false)
+                        }
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(
-                    step == .mode
-                    ? ATHLTHLocalization.choose(english: "Close plan builder", norwegian: "Lukk planbygger")
-                    : (step == .week && weekPlanningApproach == .quick &&
-                       selectedAdvancedWeekDay != nil
-                       ? ATHLTHLocalization.choose(english: "Back to week", norwegian: "Til ukeoversikten")
-                       : ATHLTHLocalization.choose(english: "Previous step", norwegian: "Forrige steg"))
-                )
+                .accessibilityIdentifier("athlth-plan-cancel")
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Cancel plan creation", norwegian: "Avbryt planopprettelse"))
 
                 Spacer(minLength: 0)
 
@@ -2226,7 +2214,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var sourceContinueBar: some View {
         VStack(spacing: 0) {
-            Button {
+            HStack(spacing: 10) {
+                planBackButton
+                Button {
                 switch selectedSource {
                 case .scratch:
                     goForward()
@@ -2261,7 +2251,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 16)
+            }
+        .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 10)
         }
@@ -2434,7 +2425,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
 
         private var simpleContinueBar: some View {
-        Button {
+        HStack(spacing: 10) {
+                planBackButton
+                Button {
             guard canCreatePlan, !isCreatingPlan, !isGuidedAIFilling, !completedPlanCreation else { return }
             createPlan(seedSuggestedWeek: true)
         } label: {
@@ -2463,6 +2456,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .buttonStyle(.plain)
         .disabled(!canCreatePlan)
         .opacity(canCreatePlan ? 1 : 0.45)
+        }
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 9)
@@ -7098,45 +7092,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
     }
 
+    /// Internal navigation only. Cancel is deliberately owned by the top bar.
+    private var planBackButton: some View {
+        Button {
+            goBackInPlanBuilder()
+            saveResumableDraft()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.subheadline.bold())
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 48, height: 48)
+                .background(ATHLTHTrainDesign.paleGold,
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-plan-previous")
+        .accessibilityLabel(
+            reviewingGuidedDay && step == .week
+                ? ATHLTHLocalization.choose(english: "Back to summary", norwegian: "Til sammendraget")
+                : step == .week && mode == .advanced && weekPlanningApproach == .guided && guidedDayCursor > 0
+                    ? ATHLTHLocalization.choose(english: "Previous day", norwegian: "Forrige dag")
+                    : ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")
+        )
+    }
+
     private var bottomActionBar: some View {
         VStack(spacing: 0) {
             Divider()
                 .opacity(0.35)
 
             HStack(spacing: 10) {
-                if step != .mode &&
-                    !(step == .week && mode == .advanced) {
-                    Button {
-                        if step == .week && mode == .advanced &&
-                           weekPlanningApproach == .guided && guidedDayCursor > 0 {
-                            if let pending = guidedWeekDecisionSource {
-                                guidedWeekAwaitingDecision = nil
-                                guidedDayCursor = pending * 7 + 6
-                            } else {
-                                guidedDayCursor -= 1
-                            }
-                        } else {
-                            goBack()
-                        }
-                    } label: {
-                        Image(
-                            systemName:
-                                "chevron.left"
-                        )
-                        .font(.subheadline.bold())
-                        .foregroundStyle(
-                            ATHLTHTrainDesign.bronze
-                        )
-                        .frame(width: 48, height: 48)
-                        .background(
-                            ATHLTHTrainDesign.paleGold,
-                            in: RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                        )
-                    }
-                    .buttonStyle(.plain)
+                if step != .mode {
+                    planBackButton
                 }
 
                 if step != .review {
@@ -7615,6 +7603,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 guidedDayCursor -= 1
                 return
             }
+        }
+        if step == .source || step == .profile {
+            // Legacy checkpoints have no canonical predecessor; return to setup,
+            // not the exit dialog.
+            step = .basics
+            return
         }
         goBack()
     }
