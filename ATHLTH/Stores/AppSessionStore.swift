@@ -60,6 +60,7 @@ struct AccountTrainingContent: Codable {
     var savedWorkoutTemplates: [PlannedSession]
     var standalonePlannedSessions: [PlannedSession]? = nil
     var standaloneWorkoutTombstones: Set<UUID>? = nil
+    var pendingAccountPlanDeletions: Set<UUID>? = nil
     // Optional for previously saved accounts.
     var recordedPlannedWorkoutTimes: [String: ATHLTHPlannedWorkoutRecordedTimes]? = nil
     var manuallyCompletedPlanSessions: Set<String>
@@ -148,6 +149,7 @@ final class AppSessionStore: ObservableObject {
 
     @Published private(set) var standalonePlannedSessions: [PlannedSession]
     private var standaloneWorkoutTombstones: Set<UUID> = []
+    private var pendingAccountPlanDeletions: Set<UUID> = []
     @Published private(set) var recordedPlannedWorkoutTimes:
         [String: ATHLTHPlannedWorkoutRecordedTimes]
     @Published private(set) var manuallyCompletedPlanSessions: Set<String>
@@ -823,6 +825,7 @@ final class AppSessionStore: ObservableObject {
         savedWorkoutTemplates = []
         standalonePlannedSessions = []
         standaloneWorkoutTombstones = []
+        pendingAccountPlanDeletions = []
         recordedPlannedWorkoutTimes = [:]
         manuallyCompletedPlanSessions = []
         skippedPlanSessions = []
@@ -1912,6 +1915,7 @@ final class AppSessionStore: ObservableObject {
             scheduledPlans.append(plan)
         }
 
+        pendingAccountPlanDeletions.remove(plan.id)
         persistScheduledPlans()
         refreshActivePlanForToday()
         if isNew && saveToLibrary { savePlanToLibrary(plan) }
@@ -2039,8 +2043,11 @@ final class AppSessionStore: ObservableObject {
     }
 
     func deleteTrainingPlan(
-        _ planID: UUID
+        _ planID: UUID, recordSyncDeletion: Bool = true
     ) {
+        if recordSyncDeletion && trainingPlan(withID: planID) != nil {
+            pendingAccountPlanDeletions.insert(planID)
+        }
         pausedTrainingPlanIDs.remove(planID)
         deactivatedTrainingPlanIDs.remove(planID)
         if let plan = trainingPlan(withID: planID) {
@@ -5628,7 +5635,8 @@ final class AppSessionStore: ObservableObject {
 
     @discardableResult
     func importAccountPlanDocument(_ source: TrainingPlan) -> Bool {
-        guard source.ownerID == profile.userID else { return false }
+        guard source.ownerID == profile.userID, localAccountID == source.ownerID,
+              !trainingStorageRequiresRecovery else { return false }
         var plan = source
         if ATHLTHWorkoutExerciseBinding.needsDuplicateMigration(plan) {
             let index = ATHLTHWorkoutExerciseBinding.DuplicateIndex(library: ExerciseLibraryStore().allExercises)
@@ -5638,27 +5646,75 @@ final class AppSessionStore: ObservableObject {
         let paused = plan.tags.contains("sync:paused")
         let inactive = plan.tags.contains("sync:inactive")
         plan.tags.removeAll { ["sync:template", "sync:paused", "sync:inactive"].contains($0) }
+        let oldActive = activePlan
+        let oldScheduled = scheduledPlans
+        let oldTemplates = planTemplates
+        let oldPaused = pausedTrainingPlanIDs
+        let oldInactive = deactivatedTrainingPlanIDs
+        let oldDeletions = pendingAccountPlanDeletions
+        func rollback() {
+            activePlan = oldActive
+            scheduledPlans = oldScheduled
+            planTemplates = oldTemplates
+            pausedTrainingPlanIDs = oldPaused
+            deactivatedTrainingPlanIDs = oldInactive
+            pendingAccountPlanDeletions = oldDeletions
+        }
         if template {
             planTemplates.removeAll { $0.id == plan.id }
             planTemplates.append(plan)
-            persistPlanTemplates()
-            return true
+        } else {
+            if paused { pausedTrainingPlanIDs.insert(plan.id) } else { pausedTrainingPlanIDs.remove(plan.id) }
+            if inactive { deactivatedTrainingPlanIDs.insert(plan.id) } else { deactivatedTrainingPlanIDs.remove(plan.id) }
+            // Concurrently created overlapping programs must not prevent
+            // either document from reaching the device. Keep both in Mine;
+            // the same deterministic priority decides which is inactive.
+            if !paused && !inactive, let start = plan.startDate,
+               let end = trainingPlanEndDate(plan) {
+                let calendar = Calendar.current
+                let overlaps = trainingPlans.filter { other in
+                    guard other.id != plan.id, !isTrainingPlanPaused(other.id),
+                          !isTrainingPlanDeactivated(other.id),
+                          let otherStart = other.startDate, let otherEnd = trainingPlanEndDate(other)
+                    else { return false }
+                    return calendar.startOfDay(for: start) <= calendar.startOfDay(for: otherEnd) &&
+                        calendar.startOfDay(for: end) >= calendar.startOfDay(for: otherStart)
+                }
+                if overlaps.contains(where: { ATHLTHStudioPlanSyncDecision.prefers($0, over: plan) }) {
+                    deactivatedTrainingPlanIDs.insert(plan.id)
+                } else {
+                    for other in overlaps {
+                        deactivatedTrainingPlanIDs.insert(other.id)
+                        if activePlan?.id == other.id {
+                            activePlan = nil
+                            scheduledPlans.removeAll { $0.id == other.id }
+                            scheduledPlans.append(other)
+                        }
+                    }
+                }
+            }
+            guard addTrainingPlan(plan, saveToLibrary: false) else { rollback(); return false }
         }
-        let oldPaused = pausedTrainingPlanIDs.contains(plan.id)
-        let oldInactive = deactivatedTrainingPlanIDs.contains(plan.id)
-        if paused { pausedTrainingPlanIDs.insert(plan.id) } else { pausedTrainingPlanIDs.remove(plan.id) }
-        if inactive { deactivatedTrainingPlanIDs.insert(plan.id) } else { deactivatedTrainingPlanIDs.remove(plan.id) }
-        guard addTrainingPlan(plan, saveToLibrary: false) else {
-            if oldPaused { pausedTrainingPlanIDs.insert(plan.id) } else { pausedTrainingPlanIDs.remove(plan.id) }
-            if oldInactive { deactivatedTrainingPlanIDs.insert(plan.id) } else { deactivatedTrainingPlanIDs.remove(plan.id) }
+        pendingAccountPlanDeletions.remove(plan.id)
+        guard persistAccountContent(immediate: true) else {
+            rollback()
             return false
         }
         return true
     }
 
+    func hasExplicitAccountPlanDeletion(_ id: UUID) -> Bool {
+        pendingAccountPlanDeletions.contains(id)
+    }
+
+    func acknowledgeAccountPlanDeletion(_ id: UUID) {
+        if pendingAccountPlanDeletions.remove(id) != nil { persistAccountContent(immediate: true) }
+    }
+
     func deleteAccountPlanDocument(_ id: UUID) {
-        if planTemplates.contains(where: { $0.id == id }) { deletePlanTemplate(id) }
-        else { deleteTrainingPlan(id) }
+        if planTemplates.contains(where: { $0.id == id }) {
+            deletePlanTemplate(id, recordSyncDeletion: false)
+        } else { deleteTrainingPlan(id, recordSyncDeletion: false) }
     }
 
     func saveActivePlanAsTemplate() {
@@ -5744,7 +5800,10 @@ final class AppSessionStore: ObservableObject {
         return plan
     }
 
-    func deletePlanTemplate(_ templateID: UUID) {
+    func deletePlanTemplate(_ templateID: UUID, recordSyncDeletion: Bool = true) {
+        if recordSyncDeletion && planTemplates.contains(where: { $0.id == templateID }) {
+            pendingAccountPlanDeletions.insert(templateID)
+        }
         planTemplates.removeAll { $0.id == templateID }
         persistPlanTemplates()
     }
@@ -6291,6 +6350,7 @@ final class AppSessionStore: ObservableObject {
             savedWorkoutTemplates: savedWorkoutTemplates,
             standalonePlannedSessions: standalonePlannedSessions,
             standaloneWorkoutTombstones: standaloneWorkoutTombstones,
+            pendingAccountPlanDeletions: pendingAccountPlanDeletions,
             recordedPlannedWorkoutTimes: recordedPlannedWorkoutTimes,
             manuallyCompletedPlanSessions: manuallyCompletedPlanSessions,
             skippedPlanSessions: skippedPlanSessions,
@@ -6479,6 +6539,8 @@ final class AppSessionStore: ObservableObject {
             savedWorkoutTemplates = savedWorkoutTemplates.map { index.migrate($0) }
             standalonePlannedSessions = standalonePlannedSessions.map { index.migrate($0) }
         }
+        pendingAccountPlanDeletions = stored?.pendingAccountPlanDeletions ?? []
+        pendingAccountPlanDeletions.subtract(accountPlanDocuments.map(\.id))
         standaloneWorkoutTombstones = stored?.standaloneWorkoutTombstones ?? []
         standaloneWorkoutTombstones.subtract(standalonePlannedSessions.map(\.id))
         recordedPlannedWorkoutTimes = stored?.recordedPlannedWorkoutTimes ?? [:]

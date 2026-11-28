@@ -23,13 +23,15 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         )
     }
 
-    func testBothUnsynchronizedVersionsRequireExplicitConflictResolution() {
+    func testBothUnsynchronizedVersionsConvergeWithoutUserChoice() {
         XCTAssertEqual(
             Decision.choose(
                 localFingerprint: "local", remoteFingerprint: "remote",
                 remoteRevision: 1, acknowledged: nil
-            ), .conflict
+            ), .download
         )
+        XCTAssertEqual(Decision.choose(localFingerprint: "local", remoteFingerprint: "remote",
+            remoteRevision: 1, acknowledged: nil, localIsNewer: true), .upload(expectedRevision: 1))
     }
 
     func testLocalOnlyChangesUploadWithExpectedRevision() {
@@ -50,13 +52,15 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         )
     }
 
-    func testConcurrentChangesNeverAutoOverwrite() {
+    func testConcurrentChangesUseNewestOrServerOnTie() {
         XCTAssertEqual(
             Decision.choose(
                 localFingerprint: "local", remoteFingerprint: "remote",
                 remoteRevision: 5, acknowledged: acknowledgement
-            ), .conflict
+            ), .download
         )
+        XCTAssertEqual(Decision.choose(localFingerprint: "local", remoteFingerprint: "remote",
+            remoteRevision: 5, acknowledged: acknowledgement, localIsNewer: true), .upload(expectedRevision: 5))
     }
 
     func testRemoteDeletionPropagatesToUnchangedLocalPlan() {
@@ -67,18 +71,20 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         XCTAssertEqual(Decision.choose(
             localFingerprint: "edited", remoteFingerprint: nil,
             remoteRevision: nil, acknowledged: acknowledgement
-        ), .conflict)
+        ), .deleteLocal)
     }
 
     func testLocalDeletionPropagatesOnlyToAcknowledgedRemoteRevision() {
         XCTAssertEqual(Decision.choose(
             localFingerprint: nil, remoteFingerprint: "initial",
-            remoteRevision: 4, acknowledged: acknowledgement
+            remoteRevision: 4, acknowledged: acknowledgement, explicitLocalDeletion: true
         ), .deleteRemote(expectedRevision: 4))
+        XCTAssertEqual(Decision.choose(localFingerprint: nil, remoteFingerprint: "initial",
+            remoteRevision: 4, acknowledged: acknowledgement), .download)
         XCTAssertEqual(Decision.choose(
             localFingerprint: nil, remoteFingerprint: "edited",
-            remoteRevision: 5, acknowledged: acknowledgement
-        ), .conflict)
+            remoteRevision: 5, acknowledged: acknowledgement, explicitLocalDeletion: true
+        ), .download)
     }
 
     @MainActor

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Deterministic three-way plan reconciliation.
-/// No last-writer-wins overwrite: without a common acknowledged revision,
-/// two different documents always require an explicit athlete decision.
+/// Three-way reconciliation. A missing cache entry is not a deletion.
+/// Concurrent edits converge on the newest shared plan; ties use the
+/// acknowledged server document. The store archives displaced local edits.
 enum ATHLTHStudioPlanSyncDecision {
     struct Acknowledgement: Codable, Hashable {
         let revision: Int64
@@ -22,29 +22,38 @@ enum ATHLTHStudioPlanSyncDecision {
         localFingerprint: String?,
         remoteFingerprint: String?,
         remoteRevision: Int64?,
-        acknowledged: Acknowledgement?
+        acknowledged: Acknowledgement?,
+        explicitLocalDeletion: Bool = false,
+        localIsNewer: Bool = false
     ) -> Action {
         switch (localFingerprint, remoteFingerprint) {
         case (nil, nil):
             return .unchanged
         case (nil, .some(let remote)):
-            guard let acknowledged else { return .download }
-            guard let remoteRevision, remoteRevision == acknowledged.revision,
-                  remote == acknowledged.fingerprint else { return .conflict }
+            guard explicitLocalDeletion, let acknowledged, let remoteRevision,
+                  remoteRevision == acknowledged.revision, remote == acknowledged.fingerprint
+            else { return .download }
             return .deleteRemote(expectedRevision: remoteRevision)
-        case (.some(let local), nil):
-            guard let acknowledged else { return .upload(expectedRevision: 0) }
-            return local == acknowledged.fingerprint ? .deleteLocal : .conflict
+        case (.some, nil):
+            // A previously acknowledged server document has been removed.
+            // Archive an edited local copy before accepting that deletion.
+            return acknowledged == nil ? .upload(expectedRevision: 0) : .deleteLocal
         case let (.some(local), .some(remote)):
             if local == remote { return .unchanged }
-            guard let acknowledged, let remoteRevision else { return .conflict }
-            let localChanged = local != acknowledged.fingerprint
-            let remoteChanged = remoteRevision != acknowledged.revision
-            if localChanged && !remoteChanged {
-                return .upload(expectedRevision: remoteRevision)
+            guard let remoteRevision else { return .conflict }
+            if let acknowledged {
+                let localChanged = local != acknowledged.fingerprint
+                let remoteChanged = remote != acknowledged.fingerprint || remoteRevision != acknowledged.revision
+                if localChanged && !remoteChanged { return .upload(expectedRevision: remoteRevision) }
+                if remoteChanged && !localChanged { return .download }
             }
-            if remoteChanged && !localChanged { return .download }
-            return .conflict
+            return localIsNewer ? .upload(expectedRevision: remoteRevision) : .download
         }
+    }
+
+    static func prefers(_ lhs: TrainingPlan, over rhs: TrainingPlan) -> Bool {
+        if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+        return lhs.id.uuidString > rhs.id.uuidString
     }
 }

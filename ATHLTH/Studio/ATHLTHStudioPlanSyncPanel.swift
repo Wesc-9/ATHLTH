@@ -8,9 +8,6 @@ struct ATHLTHStudioPlanSyncPanel: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var sync: ATHLTHStudioPlanSyncStore
 
-    @State private var pendingResolution: ATHLTHStudioPlanSyncStore.Conflict?
-    @State private var preferCloud = false
-
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
@@ -104,43 +101,11 @@ struct ATHLTHStudioPlanSyncPanel: View {
                                 in: RoundedRectangle(cornerRadius: 16))
 
                     if !sync.conflicts.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Label(tr("Plans needing your decision",
-                                     "Planer som krever ditt valg"),
-                                  systemImage: "exclamationmark.triangle")
-                                .font(.headline)
-                                .foregroundStyle(ATHLTHStudioStyle.ink)
-
-                            Text(tr("Conflicts are never overwritten automatically. Review each plan before choosing which copy to keep.",
-                                    "Konflikter overskrives aldri automatisk. Gå gjennom hver plan før du velger hvilken kopi som skal beholdes."))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            ForEach(sync.conflicts) { conflict in
-                                VStack(alignment: .leading, spacing: 9) {
-                                    Text(conflict.title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ATHLTHStudioStyle.ink)
-                                    HStack(spacing: 10) {
-                                        Button(tr("Keep this device", "Behold denne enheten")) {
-                                            pendingResolution = conflict
-                                            preferCloud = false
-                                        }
-                                        Button(tr("Use cloud copy", "Bruk skykopien")) {
-                                            pendingResolution = conflict
-                                            preferCloud = true
-                                        }
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .disabled(sync.isBusy)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(15)
-                                .background(.white, in: RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14)
-                                    .stroke(ATHLTHStudioStyle.outline))
-                            }
-                        }
+                        Label(tr("Synchronization will retry automatically. Your local changes are preserved.",
+                                 "Synkroniseringen prøver igjen automatisk. Lokale endringer er bevart."),
+                              systemImage: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: 760, alignment: .leading)
@@ -158,34 +123,5 @@ struct ATHLTHStudioPlanSyncPanel: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .confirmationDialog(
-            tr("Choose which version to keep?", "Velg hvilken versjon du vil beholde?"),
-            isPresented: Binding(
-                get: { pendingResolution != nil },
-                set: { if !$0 { pendingResolution = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(tr("Confirm choice", "Bekreft valget")) {
-                guard let conflict = pendingResolution else { return }
-                let useCloud = preferCloud
-                pendingResolution = nil
-                Task {
-                    await sync.resolve(
-                        planID: conflict.id, preferRemote: useCloud,
-                        session: session
-                    )
-                }
-            }
-            Button(tr("Cancel", "Avbryt"), role: .cancel) {
-                pendingResolution = nil
-            }
-        } message: {
-            Text(preferCloud
-                ? tr("Replace this device's plan with the cloud version.",
-                     "Erstatt planen på denne enheten med skykopien.")
-                : tr("Keep this device's plan instead of the cloud version.",
-                     "Behold planen på denne enheten i stedet for skykopien."))
-        }
     }
 }

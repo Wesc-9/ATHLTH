@@ -249,7 +249,21 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     localFingerprint: localFingerprint,
                     remoteFingerprint: remoteFingerprint,
                     remoteRevision: remote?.revision,
-                    acknowledged: previous
+                    acknowledged: previous,
+                    explicitLocalDeletion: session.hasExplicitAccountPlanDeletion(planID),
+                    localIsNewer: {
+                        guard let local, let remotePlan else { return false }
+                        if local.tags.contains("sync:standalone") {
+                            // Actual recorded execution must not be replaced by
+                            // an unstarted or less complete calendar copy.
+                            let localTiming = local.standaloneCalendarTiming
+                            let remoteTiming = remotePlan.standaloneCalendarTiming
+                            if localTiming?.endedAt != nil && remoteTiming?.endedAt == nil { return true }
+                            if localTiming != nil && remoteTiming == nil { return true }
+                            return false
+                        }
+                        return local.updatedAt > remotePlan.updatedAt
+                    }()
                 )
 
                 switch action {
@@ -284,8 +298,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                 case .download:
                     guard let remote, let remotePlan else { continue }
-                    // Never replace a plan edited while the network call was pending.
+                    // Preserve a divergent local edit before adopting the
+                    // canonical account copy, including device-only notes.
                     guard session.accountSyncDocument(withID: planID) == local,
+                          try archiveIfDiverged(local, fingerprint: localFingerprint,
+                                                acknowledged: previous, owner: userID),
                           session.importAccountSyncDocument(
                               Self.restoringDeviceOnlyFields(
                                   from: local, into: Self.accountCopy(of: remotePlan)
@@ -296,6 +313,11 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                     acknowledge(planID, revision: remote.revision,
                                 fingerprint: remoteFingerprint ?? "", owner: userID)
+                    session.acknowledgeAccountPlanDeletion(planID)
+                    if try Self.needsResyncAfterUpload(uploadedFingerprint: remoteFingerprint ?? "",
+                            currentPlan: session.accountSyncDocument(withID: planID)) {
+                        hasNewLocalEdits = true
+                    }
                 case let .deleteRemote(expected):
                     // The user deleted a previously acknowledged plan; only
                     // remove exactly the unchanged server revision. Standalone
@@ -320,6 +342,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                             continue
                         }
                         remoteIDs.remove(planID)
+                        session.acknowledgeAccountPlanDeletion(planID)
                         if session.accountSyncDocument(withID: planID) != nil {
                             hasNewLocalEdits = true
                         }
@@ -331,11 +354,16 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     // copy that still matches its last acknowledged fingerprint.
                     guard let local, !local.tags.contains("sync:standalone"),
                           session.accountSyncDocument(withID: planID) == local,
-                          session.signedIn, session.profile.userID == userID else {
+                          session.signedIn, session.profile.userID == userID,
+                          try archiveIfDiverged(local, fingerprint: localFingerprint,
+                                                acknowledged: previous, owner: userID) else {
                         unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
                         continue
                     }
                     session.deleteAccountSyncDocument(planID)
+                    if !session.checkpointTrainingContent() {
+                        unresolved.append(Conflict(id: planID, title: local.title))
+                    }
                 case .conflict:
                     unresolved.append(Conflict(
                         id: planID, title: local?.title ?? remotePlan?.title ?? "Training plan"
@@ -366,8 +394,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     norwegian: "Kontoplanene er oppdatert. Private notater beholdes på denne enheten."
                   )
                 : ATHLTHLocalization.choose(
-                    english: "\(unresolved.count) plan conflict(s) need your decision. No changes were overwritten.",
-                    norwegian: "\(unresolved.count) plankonflikt(er) krever et valg. Ingen endringer ble overskrevet."
+                    english: "\(unresolved.count) plan(s) are waiting for synchronization. Local changes remain safe.",
+                    norwegian: "\(unresolved.count) plan(er) venter på synkronisering. Lokale endringer er bevart."
                   )
             }
         } catch {
@@ -380,7 +408,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         }
     }
 
-    /// User-controlled conflict resolution; never auto-select by timestamp.
+    /// Legacy explicit resolution entry point, retained for compatibility.
     func resolve(
         planID: UUID,
         preferRemote: Bool,
@@ -668,6 +696,19 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             return mergedWeek
         }
         return restored
+    }
+
+    /// Local-only recovery journal. Never send private notes or displaced
+    /// versions to the cloud. Verify the write before replacing a local edit.
+    private func archiveIfDiverged(_ local: TrainingPlan?, fingerprint: String?,
+                                   acknowledged: ATHLTHStudioPlanSyncDecision.Acknowledgement?,
+                                   owner: UUID) throws -> Bool {
+        guard let local else { return true }
+        guard local.ownerID == owner, accountID == owner else { return false }
+        guard fingerprint != acknowledged?.fingerprint else { return true }
+        let key = "studioPlanRecovery-" + local.id.uuidString + "-" + (fingerprint ?? "unknown")
+        AccountLocalStorage.write(local, name: key, userID: owner)
+        return AccountLocalStorage.read(TrainingPlan.self, name: key, userID: owner) == local
     }
 
     private func save(_ plan: TrainingPlan, expected: Int64) async throws -> Int64 {
