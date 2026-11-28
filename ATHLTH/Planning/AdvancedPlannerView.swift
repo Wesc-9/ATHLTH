@@ -2868,7 +2868,7 @@ struct TrainingPlanManagerView: View {
                     Text(
                         session.activePlan == nil
                             ? "Create it yourself or let ATHLTH Coach shape a draft around your goals and everyday life."
-                            : "Your active plan stays in focus. Create another plan or ask Coach to help when life changes."
+                            : "Your active plan stays in focus. Create another plan or ask ATHLTH Coach to help when life changes."
                     )
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)

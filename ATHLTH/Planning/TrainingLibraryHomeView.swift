@@ -5580,7 +5580,7 @@ struct MissedWorkoutsReviewView: View {
                                 .buttonStyle(.plain)
 
                                 Text(
-                                    "Coach can review the active plan and suggest broader changes. Nothing changes until you accept the proposal."
+                                    "ATHLTH Coach can review the active plan and suggest broader changes. Nothing changes until you accept the proposal."
                                 )
                                 .font(.caption)
                                 .foregroundStyle(
