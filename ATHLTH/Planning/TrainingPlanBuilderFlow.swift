@@ -29,6 +29,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     let startsAtSourceChoice: Bool
     let initialAdvanced: Bool
@@ -1030,7 +1031,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             }
                             .disabled(remainingGuidedCoachKeys.isEmpty)
                         }
-                        Text(ATHLTHLocalization.choose(english: "Your goal, plan and equipment are shared with Coach. Dates outside the selected scope are protected. Review suggestions before applying. Health history and injury notes are not included.", norwegian: "Mål, plan og utstyr deles med Coach. Datoer utenfor valget beskyttes. Se gjennom forslag før de tas i bruk. Helsehistorikk og skadeopplysninger tas ikke med."))
+                        Text(ATHLTHLocalization.choose(english: "Your goal, plan and equipment are processed on this device. Dates outside the selected scope are protected. Review suggestions before applying.", norwegian: "Mål, plan og utstyr behandles lokalt på enheten. Datoer utenfor valget beskyttes. Se gjennom forslag før de tas i bruk."))
                             .font(.caption).foregroundStyle(.secondary)
                         Button {
                             showingGuidedAIConsent = false
@@ -4282,7 +4283,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
 
         do {
-            let draft = try await guidedAIService.generate(request)
+            if exerciseLibrary.allExercises.isEmpty { await exerciseLibrary.refresh() }
+            let draft = try await guidedAIService.generate(request,
+                library: exerciseLibrary.allExercises,
+                savedWorkouts: session.savedWorkoutTemplates,
+                focus: aiTrainingFocus, gymAvailable: equipment != .home,
+                selectedDateKeys: requestedScope)
             guard !completedPlanCreation, (step == .week || step == .review),
                   session.signedIn, session.profile.userID == athleteID,
                   startDate == requestedStart, weekCount == requestedWeeks,
