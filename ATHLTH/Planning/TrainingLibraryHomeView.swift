@@ -4348,22 +4348,41 @@ struct MyTrainingPlansLibraryView: View {
                 .filter { $0.itemType == .plan }
                 .map(\.itemID))
             : []
+        let allScheduled = session.trainingPlans
+        let scheduledIDs = Set(allScheduled.map(\.id))
+        // A saved-source marker is the only reliable identity link. Never
+        // collapse unrelated plans merely because they share a title.
+        let linkedCopies = session.planTemplates.filter { template in
+            scheduledIDs.contains(where: { template.tags.contains("saved-source:" + $0.uuidString) })
+        }
+        let hiddenCopyIDs = Set(linkedCopies.map(\.id))
+        let matchedFavorites = favoriteIDs.union(allScheduled.compactMap { plan in
+            linkedCopies.contains(where: {
+                $0.tags.contains("saved-source:" + plan.id.uuidString) &&
+                    favoriteIDs.contains($0.id.uuidString)
+            }) ? plan.id.uuidString : nil
+        })
         let templates = session.planTemplates.filter {
-            matchesPlan($0, favoriteIDs: favoriteIDs)
+            !hiddenCopyIDs.contains($0.id) && matchesPlan($0, favoriteIDs: matchedFavorites)
         }
-        let scheduled = session.trainingPlans.filter {
-            matchesPlan($0, favoriteIDs: favoriteIDs)
+        let scheduled = allScheduled.filter { matchesPlan($0, favoriteIDs: matchedFavorites) }
+        let active = scheduled.first {
+            $0.id == session.activePlan?.id &&
+                !session.isTrainingPlanPaused($0.id) && !session.isTrainingPlanDeactivated($0.id)
         }
+        let upcoming = scheduled.filter {
+            $0.id != active?.id && session.trainingPlanStatus($0) == .upcoming &&
+                !session.isTrainingPlanPaused($0.id) && !session.isTrainingPlanDeactivated($0.id)
+        }.sorted { ($0.startDate ?? .distantFuture) < ($1.startDate ?? .distantFuture) }
+        let featuredIDs = Set(upcoming.map(\.id) + (active.map { [$0.id] } ?? []))
+        let remainingScheduled = scheduled.filter { !featuredIDs.contains($0.id) }
         let plans = ATHLTHLibraryAlphabetSort.sorted(
-            templates + scheduled
+            templates + remainingScheduled
         ) { $0.title }
         let visiblePlans = ATHLTHLibraryAlphabetWindow.visible(
             plans, start: visibleStartIndex, limit: visibleLimit
         )
         let templateIDs = Set(templates.map(\.id))
-        let scheduledIDs = Set(scheduled.map(\.id))
-        let visibleTemplates = visiblePlans.filter { templateIDs.contains($0.id) }
-        let visibleScheduled = visiblePlans.filter { scheduledIDs.contains($0.id) }
         let alphabet = ATHLTHLibraryAlphabetLookup(
             items: plans, id: { $0.id }, title: { $0.title }
         )
@@ -4414,158 +4433,43 @@ struct MyTrainingPlansLibraryView: View {
                     )
                 }
 
-                if !visibleTemplates.isEmpty {
-                    planSectionHeader(
-                        ATHLTHLocalization.choose(
-                            english: "Saved Plans", norwegian: "Lagrede planer"
-                        ),
-                        detail: ATHLTHLocalization.choose(
-                            english: "Reusable plans that are not on your calendar yet.",
-                            norwegian: "Planer du har lagret, men ikke lagt i kalenderen."
-                        )
-                    )
-
-                    LazyVGrid(columns: cardColumns, spacing: 10) {
-                        ForEach(visibleTemplates) { template in
-                            if displayMode == .grid {
-                                compactPersonalPlanTile(template, reusable: true)
-                            } else {
-                                templateCard(template)
-                            }
-                        }
-                    }
+                if active != nil || !upcoming.isEmpty {
+                    featuredPlans(active: active, upcoming: upcoming)
                 }
 
-                if !visibleScheduled.isEmpty {
+                if !plans.isEmpty {
                     planSectionHeader(
-                        ATHLTHLocalization.choose(
-                            english: "Scheduled Plans", norwegian: "Planlagte planer"
-                        ),
+                        ATHLTHLocalization.choose(english: "My plans", norwegian: "Mine planer"),
                         detail: ATHLTHLocalization.choose(
-                            english: "Active, upcoming and completed plans.",
-                            norwegian: "Aktive, kommende og fullførte planer."
+                            english: "Saved, paused and previous training plans.",
+                            norwegian: "Lagrede, pauset og tidligere treningsplaner."
                         )
                     )
-
                     LazyVGrid(columns: cardColumns, spacing: 12) {
-                    ForEach(visibleScheduled) { plan in
-                        let progress = planProgress(plan)
-                        if displayMode == .grid {
-                            compactPersonalPlanTile(plan, reusable: false)
-                        } else {
-                        VStack(spacing: 8) {
-                            if let onOpenPlan {
-                                Button {
-                                    onOpenPlan(plan.id)
-                                } label: {
-                                    scheduledPlanCard(
-                                        plan,
-                                        progress: progress
-                                    )
+                        ForEach(visiblePlans) { plan in
+                            if templateIDs.contains(plan.id) {
+                                if displayMode == .grid {
+                                    compactPersonalPlanTile(plan, reusable: true)
+                                } else {
+                                    templateCard(plan)
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityHint(ATHLTHLocalization.choose(
-                                    english: "Opens this program in Train, Plan.",
-                                    norwegian: "Åpner programmet i Tren, Plan."
-                                ))
                             } else {
-                                NavigationLink {
-                                    ScrollView {
-                                        AdvancedPlannerView(
-                                            planID: plan.id
-                                        )
-                                        .padding()
-                                    }
-                                    .background(
-                                        ATHLTHPremiumCanvas(
-                                            accent:
-                                                ATHLTHTheme.accent
-                                                .opacity(0.35)
-                                        )
-                                    )
-                                    .navigationTitle(plan.title)
-                                    .navigationBarTitleDisplayMode(.inline)
-                                } label: {
-                                    scheduledPlanCard(
-                                        plan,
-                                        progress: progress
-                                    )
+                                if displayMode == .grid {
+                                    compactPersonalPlanTile(plan, reusable: false)
+                                } else {
+                                    featuredPlanTile(plan, active: false)
                                 }
-                                .buttonStyle(.plain)
-                            }
-
-                            HStack {
-                                LibraryFavoriteButton(kind: .plan,
-                                    itemID: plan.id.uuidString, title: plan.title,
-                                    subtitle: "", icon: "calendar")
-                                Spacer()
-                            }
-                            Button {
-                                preparePlanShare(plan)
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Share plan", norwegian: "Del plan"
-                                    ),
-                                    systemImage: "square.and.arrow.up"
-                                )
-                                .font(.caption.weight(.semibold))
-                            }
-                            .buttonStyle(.bordered)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-
-                            if !progress.missed.isEmpty {
-                                Button {
-                                    reviewingPlan = plan
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(
-                                            systemName:
-                                                "clock.arrow.circlepath"
-                                        )
-
-                                        Text(
-                                            missedWorkoutReviewTitle(
-                                                progress.missed.count
-                                            )
-                                        )
-                                        .font(
-                                            .caption.weight(.semibold)
-                                        )
-
-                                        Spacer()
-
-                                        Image(
-                                            systemName: "chevron.right"
-                                        )
-                                        .font(.caption2.bold())
-                                    }
-                                    .foregroundStyle(Color.orange)
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 38)
-                                    .background(
-                                        Color.orange.opacity(0.08),
-                                        in: RoundedRectangle(
-                                            cornerRadius: 12,
-                                            style: .continuous
-                                        )
-                                    )
-                                }
-                                .buttonStyle(.plain)
                             }
                         }
-                        }
                     }
+                    ATHLTHLibraryLoadMoreButton(
+                        shown: visiblePlans.count,
+                        total: ATHLTHLibraryAlphabetWindow.remaining(
+                            total: plans.count, start: visibleStartIndex
+                        )
+                    ) {
+                        visibleLimit += ATHLTHLibraryPagination.pageSize
                     }
-                }
-
-                ATHLTHLibraryLoadMoreButton(
-                    shown: visibleTemplates.count + visibleScheduled.count,
-                    total: ATHLTHLibraryAlphabetWindow.remaining(
-                        total: plans.count, start: visibleStartIndex
-                    )
-                ) {
-                    visibleLimit += ATHLTHLibraryPagination.pageSize
                 }
 
                 if templates.isEmpty && scheduled.isEmpty {
@@ -4597,13 +4501,13 @@ struct MyTrainingPlansLibraryView: View {
                 }
             }
             .padding(.leading, 18)
-            .padding(.trailing, alphabet.targets.isEmpty ? 18 : 42)
+            .padding(.trailing, plans.count > ATHLTHLibraryPagination.pageSize && !alphabet.targets.isEmpty ? 42 : 18)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity)
         }
         .id(alphabetJumpRevision)
         .overlay(alignment: .trailing) {
-            if !alphabet.targets.isEmpty {
+            if plans.count > ATHLTHLibraryPagination.pageSize && !alphabet.targets.isEmpty {
                 ATHLTHExerciseAlphabetIndex(targets: alphabet.targets) { target in
                     guard let index = alphabet.index(for: target) else { return }
                     visibleStartIndex = index
@@ -4709,6 +4613,154 @@ struct MyTrainingPlansLibraryView: View {
         }
     }
 
+    private func featuredPlans(active: TrainingPlan?, upcoming: [TrainingPlan]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if libraryWidth >= 700, active != nil, !upcoming.isEmpty {
+                HStack(alignment: .top, spacing: 16) {
+                    activePlanSection(active)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    upcomingPlanSection(upcoming)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                if active != nil { activePlanSection(active) }
+                if !upcoming.isEmpty { upcomingPlanSection(upcoming) }
+            }
+        }
+    }
+
+    private func activePlanSection(_ plan: TrainingPlan?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ATHLTHLocalization.choose(english: "Active plan", norwegian: "Aktiv plan"))
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            if let plan {
+                featuredPlanTile(plan, active: true)
+            }
+        }
+    }
+
+    private func upcomingPlanSection(_ plans: [TrainingPlan]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ATHLTHLocalization.choose(english: "Upcoming plans", norwegian: "Kommende planer"))
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            ForEach(plans) { plan in
+                featuredPlanTile(plan, active: false)
+            }
+        }
+    }
+
+    private func linkedTemplate(for plan: TrainingPlan) -> TrainingPlan? {
+        session.planTemplates.first { $0.tags.contains("saved-source:" + plan.id.uuidString) }
+    }
+
+    private func featuredPlanTile(_ plan: TrainingPlan, active: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Group {
+                if let onOpenPlan {
+                    Button { onOpenPlan(plan.id) } label: { featuredPlanContent(plan, active: active) }
+                } else {
+                    NavigationLink {
+                        ScrollView {
+                            AdvancedPlannerView(planID: plan.id).padding()
+                        }
+                        .navigationTitle(plan.title)
+                    } label: { featuredPlanContent(plan, active: active) }
+                }
+            }
+            .buttonStyle(.plain)
+            HStack {
+                LibraryFavoriteButton(kind: .plan, itemID: (linkedTemplate(for: plan)?.id ?? plan.id).uuidString,
+                                      title: plan.title, subtitle: "", icon: "calendar")
+                Spacer()
+                Menu {
+                    Button { preparePlanShare(plan) } label: {
+                        Label(ATHLTHLocalization.choose(english: "Share plan", norwegian: "Del plan"),
+                              systemImage: "square.and.arrow.up")
+                    }
+                    if let template = linkedTemplate(for: plan) {
+                        Button { scheduleCompactTemplate(template) } label: {
+                            Label(ATHLTHLocalization.choose(english: "Use again", norwegian: "Bruk planen på nytt"),
+                                  systemImage: "calendar.badge.plus")
+                        }
+                    }
+                    if active && !planProgress(plan).missed.isEmpty {
+                        Button { reviewingPlan = plan } label: {
+                            Label(ATHLTHLocalization.choose(english: "Review missed workouts", norwegian: "Gjennomgå manglende økter"),
+                                  systemImage: "clock.arrow.circlepath")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 38, height: 38)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                }
+            }
+        }
+        .padding(active ? 18 : 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(active ? ATHLTHPlanDesign.selectedSurface : Color.white,
+                    in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.65), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func featuredPlanContent(_ plan: TrainingPlan, active: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: active ? "calendar.badge.checkmark" : "calendar.badge.clock")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .font(.title2)
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            Text(plan.title)
+                .font(.system(active ? .title2 : .headline, design: .serif, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(ATHLTHLocalization.format(english: "%d weeks", norwegian: "%d uker", plan.weeks.count)
+                 + (plan.startDate.map { " · " + $0.formatted(date: .abbreviated, time: .omitted) } ?? ""))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            if active {
+                let progress = planProgress(plan)
+                Text(ATHLTHLocalization.choose(
+                    english: "Week \(max(1, progress.currentWeek)) of \(max(1, progress.totalWeeks))",
+                    norwegian: "Uke \(max(1, progress.currentWeek)) av \(max(1, progress.totalWeeks))"))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                if progress.totalSessions > 0 {
+                    ProgressView(value: progress.completionFraction)
+                        .tint(ATHLTHPlanDesign.accentInk)
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(progress.completedSessions) of \(progress.totalSessions) workouts completed",
+                        norwegian: "\(progress.completedSessions) av \(progress.totalSessions) økter gjennomført"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            } else if session.isTrainingPlanPaused(plan.id) || session.isTrainingPlanDeactivated(plan.id) {
+                Text(session.isTrainingPlanPaused(plan.id)
+                     ? ATHLTHLocalization.choose(english: "Paused", norwegian: "Pauset")
+                     : ATHLTHLocalization.choose(english: "Inactive", norwegian: "Inaktiv"))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else if session.trainingPlanStatus(plan) == .completed {
+                Text(ATHLTHLocalization.choose(english: "Ended", norwegian: "Avsluttet"))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
     private func preparePlanShare(_ plan: TrainingPlan) {
         do {
             preparedShare = try ATHLTHShareDraftFactory.plan(
@@ -4805,7 +4857,7 @@ struct MyTrainingPlansLibraryView: View {
             HStack(spacing: 4) {
                 LibraryFavoriteButton(
                     kind: .plan,
-                    itemID: plan.id.uuidString,
+                    itemID: (reusable ? plan.id : (linkedTemplate(for: plan)?.id ?? plan.id)).uuidString,
                     title: plan.title,
                     subtitle: "",
                     icon: "calendar"
@@ -4831,6 +4883,12 @@ struct MyTrainingPlansLibraryView: View {
                             ),
                             systemImage: "square.and.arrow.up"
                         )
+                    }
+                    if !reusable, let template = linkedTemplate(for: plan) {
+                        Button { scheduleCompactTemplate(template) } label: {
+                            Label(ATHLTHLocalization.choose(english: "Use again", norwegian: "Bruk planen på nytt"),
+                                  systemImage: "calendar.badge.plus")
+                        }
                     }
                     if !reusable && !planProgress(plan).missed.isEmpty {
                         Button { reviewingPlan = plan } label: {
