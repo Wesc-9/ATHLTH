@@ -12,6 +12,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let workouts: [ATHLTHPlanStructuredWorkoutBlueprint]
     let isRestDay: Bool
     var suggestedTraining: Bool? = nil
+    var pinsDayActions = false
     let onSelectDay: (Int) -> Void
     let onAddExercise: (WorkoutPhaseKind, Int) -> Void
     let onAddWorkout: () -> Void
@@ -38,52 +39,27 @@ struct ATHLTHAdvancedGuidedDayView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            header
-            if isRestDay {
-                restDayCard
-            } else if workouts.isEmpty {
-                emptyDayCard
+        Group {
+            if pinsDayActions {
+                VStack(alignment: .leading, spacing: 10) {
+                    ScrollView {
+                        dayContent
+                            .padding(.bottom, 4)
+                    }
+                    .scrollIndicators(.hidden)
+                    if !isRestDay {
+                        Divider().opacity(0.4)
+                        AnyView(dayActions)
+                            .padding(.vertical, 4)
+                            .background(canvas)
+                    }
+                }
+                .frame(maxHeight: .infinity)
             } else {
-                ForEach(Array(workouts.enumerated()), id: \.offset) { pair in
-                    workoutCard(pair.element, index: pair.offset)
+                VStack(alignment: .leading, spacing: 13) {
+                    dayContent
+                    if !isRestDay { AnyView(dayActions) }
                 }
-            }
-            if !isRestDay {
-                quickActions
-                VStack(spacing: 9) {
-                    goldAction(
-                        tr("Add workout", "Legg til treningsøkt"),
-                        symbol: "plus"
-                    ) {
-                        onAddWorkout()
-                    }
-                    goldAction(
-                        tr("Ask Coach to fill empty days", "Be Coach fylle ut"),
-                        symbol: "sparkles"
-                    ) {
-                        onCoachFill()
-                    }
-                }
-                Button {
-                    if workouts.isEmpty {
-                        onRestDay()
-                    } else {
-                        confirmingRestReplacement = true
-                    }
-                } label: {
-                    Label(tr("Set as rest day", "Sett som hviledag"), systemImage: "moon.stars")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(gold)
-                        .frame(maxWidth: .infinity, minHeight: widthClass == .regular ? 54 : 46)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 15))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 15)
-                                .strokeBorder(gold.opacity(0.35), lineWidth: 1)
-                        }
-                        .contentShape(RoundedRectangle(cornerRadius: 15))
-                }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
@@ -114,6 +90,109 @@ struct ATHLTHAdvancedGuidedDayView: View {
             Text(tr("The planned workouts for this date will be removed.",
                     "Planlagte økter på denne datoen blir fjernet."))
         }
+    }
+
+    private var dayContent: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            header
+            if pinsDayActions { dayDetails }
+            if isRestDay {
+                restDayCard
+            } else if workouts.isEmpty {
+                emptyDayCard
+            } else {
+                ForEach(Array(workouts.enumerated()), id: \.offset) { pair in
+                    workoutCard(pair.element, index: pair.offset)
+                }
+            }
+        }
+    }
+
+    private var dayDetails: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(tr("Workout details", "Øktdetaljer"), systemImage: "list.bullet.rectangle")
+                .font(.system(size: 18, weight: .semibold, design: .serif))
+                .foregroundStyle(ink)
+            HStack(alignment: .top, spacing: 12) {
+                detailMetric(tr("Workouts", "Økter"), value: String(workouts.count), symbol: "calendar")
+                detailMetric(tr("Duration", "Varighet"),
+                             value: workouts.isEmpty ? "–" : "\(workouts.reduce(0) { $0 + $1.durationMinutes }) min",
+                             symbol: "clock")
+                detailMetric(tr("Day type", "Dagtype"),
+                             value: isRestDay ? tr("Rest", "Hvile") :
+                                !workouts.isEmpty ? tr("Training", "Trening") :
+                                suggestedTraining == true ? tr("Suggested training", "Foreslått trening") :
+                                suggestedTraining == false ? tr("Suggested rest", "Foreslått hvile") : "–",
+                             symbol: isRestDay || (workouts.isEmpty && suggestedTraining == false) ? "moon.stars" : "figure.run")
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .strokeBorder(rule.opacity(0.38), lineWidth: 0.7)
+        }
+    }
+
+    private func detailMetric(_ title: String, value: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: symbol)
+                .font(.caption)
+                .foregroundStyle(secondary)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var dayActions: some View {
+        VStack(spacing: 8) {
+            restDayAction
+            quickActions
+            if pinsDayActions {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { mainActions }
+                    VStack(spacing: 8) { mainActions }
+                }
+            } else {
+                VStack(spacing: 8) { mainActions }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var mainActions: some View {
+        goldAction(tr("Add exercise", "Legg til øvelse"), symbol: "dumbbell") {
+            onQuick("exercise")
+        }
+        goldAction(tr("Add workout", "Legg til treningsøkt"), symbol: "plus") {
+            onAddWorkout()
+        }
+        goldAction(tr("Ask Coach to fill empty days", "Be Coach fylle ut"), symbol: "sparkles") {
+            onCoachFill()
+        }
+    }
+
+    private var restDayAction: some View {
+        Button {
+            if workouts.isEmpty { onRestDay() }
+            else { confirmingRestReplacement = true }
+        } label: {
+            Label(tr("Set as rest day", "Sett som hviledag"), systemImage: "moon.stars")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(gold)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15)
+                        .strokeBorder(gold.opacity(0.35), lineWidth: 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -247,7 +326,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
             Label(tr("No workouts planned", "Ingen økter planlagt"),
                   systemImage: "calendar.badge.plus")
                 .font(.system(size: 16, weight: .semibold, design: .serif))
-            if let suggestedTraining {
+            if !pinsDayActions, let suggestedTraining {
                 Label(
                     suggestedTraining
                         ? tr("Suggested training day", "Foreslått treningsdag")
@@ -464,18 +543,15 @@ struct ATHLTHAdvancedGuidedDayView: View {
     // One consistent two-row action palette across empty and populated dates.
     // Choices append directly to the current workout when one exists.
     private var quickActions: some View {
-        VStack(alignment: .leading, spacing: widthClass == .regular ? 10 : 7) {
+        VStack(alignment: .leading, spacing: 4) {
             quickRow {
                 quick("walking", "figure.walk", tr("Walk", "Gå"))
                 quick("running", "figure.run", tr("Running", "Løping"))
                 quick("strength", "dumbbell", tr("Strength", "Styrke"))
                 quick("cycling", "bicycle", tr("Cycling", "Sykling"))
-                quick("yoga", "figure.yoga", "Yoga")
-                quick("meditation", "leaf", tr("Meditation", "Meditasjon"))
+                moreActivities
             }
             quickRow {
-                quick("workout", "list.bullet", tr("Workout", "Treningsøkt"))
-                quick("exercise", "dumbbell", tr("Exercise", "Øvelse"))
                 quick("rest", "pause.fill", tr("Rest", "Pause"))
                 quick("active-rest", "figure.walk", tr("Active rest", "Aktiv pause"))
                 quick("stretching", "figure.cooldown", tr("Stretching", "Uttøying"))
@@ -483,18 +559,32 @@ struct ATHLTHAdvancedGuidedDayView: View {
         }
     }
 
-    @ViewBuilder
     private func quickRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        if widthClass == .regular {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 8)], spacing: 8) {
-                content()
-            }
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) { content() }
-                    .frame(minHeight: 35)
-            }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) { content() }
+                .frame(minHeight: 44)
         }
+    }
+
+    private var moreActivities: some View {
+        Menu {
+            Button { onQuick("yoga") } label: {
+                Label("Yoga", systemImage: "figure.yoga")
+            }
+            Button { onQuick("meditation") } label: {
+                Label(tr("Meditation", "Meditasjon"), systemImage: "leaf")
+            }
+        } label: {
+            Label(tr("More", "Flere"), systemImage: "ellipsis")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ink)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
+                .background(.white, in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(tr("More activities", "Flere treningsmoduser"))
     }
 
     private func quick(_ id: String, _ symbol: String, _ text: String) -> some View {
@@ -502,12 +592,13 @@ struct ATHLTHAdvancedGuidedDayView: View {
             onQuick(id)
         } label: {
             Label(text, systemImage: symbol)
-                .font(.system(size: widthClass == .regular ? 14 : 11, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ink)
-                .padding(.horizontal, widthClass == .regular ? 8 : 12)
-                .frame(maxWidth: widthClass == .regular ? .infinity : nil,
-                       minHeight: widthClass == .regular ? 52 : 34)
-                .background(.white, in: RoundedRectangle(cornerRadius: widthClass == .regular ? 14 : 17))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)
+                .background(.white, in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
