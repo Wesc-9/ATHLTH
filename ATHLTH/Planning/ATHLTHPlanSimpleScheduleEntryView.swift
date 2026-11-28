@@ -7,6 +7,7 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
     @Binding var title: String
     @Binding var startDate: Date
     @Binding var weekCount: Int
+    @Binding var durationUnspecified: Bool
     let selectedDays: Set<Int>
     let suggestedName: String
     let onToggleDay: (Int) -> Void
@@ -15,6 +16,7 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
     var body: some View {
         ATHLTHPlanSetupFields(
             title: $title, startDate: $startDate, weekCount: $weekCount,
+            durationUnspecified: $durationUnspecified,
             selectedDays: selectedDays,
             suggestedName: suggestedName, advanced: false,
             buildWithCoach: false,
@@ -35,6 +37,7 @@ struct ATHLTHPlanSetupFields: View {
     @Binding var title: String
     @Binding var startDate: Date
     @Binding var weekCount: Int
+    @Binding var durationUnspecified: Bool
     let selectedDays: Set<Int>
     let suggestedName: String
     let advanced: Bool
@@ -88,7 +91,15 @@ struct ATHLTHPlanSetupFields: View {
                 planningApproachCard
             } else {
                 daysCard
-                startCard
+                if widthClass == .regular && !typeSize.isAccessibilitySize {
+                    HStack(alignment: .top, spacing: 9) {
+                        startCard
+                        simpleDurationCard
+                    }
+                } else {
+                    startCard
+                    simpleDurationCard
+                }
             }
         }
         .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
@@ -362,46 +373,19 @@ struct ATHLTHPlanSetupFields: View {
                         detail: advanced
                             ? tr("Other days are suggested rest days", "Resterende dager foreslås som hviledager")
                             : tr("Other days are rest days", "Resterende dager blir hviledager"))
-            if advanced {
-                // The approved circular weekday selector: a full 44-point
-                // touch target, gold ring and a visible check on chosen days.
-                // Scroll horizontally if seven circles cannot fit a narrow
-                // iPhone or an accessibility-size window.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 3) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 3) {
+                    ForEach(weekdays, id: \.index) { day in
+                        circularWeekday(day)
+                    }
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 9) {
                         ForEach(weekdays, id: \.index) { day in
                             circularWeekday(day)
                         }
                     }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 9) {
-                            ForEach(weekdays, id: \.index) { day in
-                                circularWeekday(day)
-                            }
-                        }
-                        .padding(.vertical, 3)
-                    }
-                }
-            } else {
-                HStack(spacing: 4) {
-                    ForEach(weekdays, id: \.index) { day in
-                        let chosen = selectedDays.contains(day.index)
-                        Button { onToggleDay(day.index) } label: {
-                            Text(tr(day.en, day.no))
-                                .font(.system(size: 10, weight: chosen ? .semibold : .medium))
-                                .foregroundStyle(chosen ? .white : ink)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                                .background(chosen ? bronze : canvas, in: Capsule())
-                                .overlay {
-                                    Capsule().strokeBorder(border.opacity(chosen ? 0 : 0.42),
-                                                           lineWidth: 0.6)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(chosen ? .isSelected : [])
-                    }
+                    .padding(.vertical, 3)
                 }
             }
             if advanced {
@@ -428,7 +412,7 @@ struct ATHLTHPlanSetupFields: View {
         }
     }
 
-    /// Reusable day button for Advanced. Both its visual state and the
+    /// Reusable day button for both planning modes. Both its visual state and the
     /// saved plan's weekdays read from the same selectedDays source.
     private func circularWeekday(
         _ day: (index: Int, en: String, no: String)
@@ -513,6 +497,45 @@ struct ATHLTHPlanSetupFields: View {
                         .foregroundStyle(muted)
                 }
                 .padding(.vertical, 6)
+            }
+        }
+    }
+
+    private var simpleDurationCard: some View {
+        card {
+            cardHeading("hourglass", tr("Duration", "Varighet"))
+            Menu {
+                Button(tr("Not decided", "Ikke bestemt")) {
+                    durationUnspecified = true
+                    weekCount = 4
+                }
+                ForEach(1...52, id: \.self) { count in
+                    Button(tr("\(count) weeks", "\(count) uker")) {
+                        weekCount = count
+                        durationUnspecified = false
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(durationUnspecified
+                         ? tr("Not decided", "Ikke bestemt")
+                         : tr("\(weekCount) weeks", "\(weekCount) uker"))
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(ink)
+                .padding(.horizontal, 10)
+                .frame(minHeight: 44)
+                .background(canvas, in: RoundedRectangle(cornerRadius: 10))
+            }
+            if durationUnspecified {
+                Text(tr("Starts with four weeks. Extend the plan later.",
+                        "Starter med fire uker. Planen kan forlenges senere."))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
