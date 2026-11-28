@@ -143,7 +143,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case activeRecoveryStart, activeRecoveryEnd
         case warmupStart, warmupEnd, mainStart, mainEnd
         case cooldownStart, cooldownEnd
-        case stepStart, stepEnd, beforeNextStep, beforeMain, beforeCooldown
+        case stepStart, stepEnd, beforeNextStep, beforeMain, beforeCooldown, beforeEffort
 
         var id: String { rawValue }
         var isPeriodic: Bool {
@@ -218,7 +218,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .heartRateAbove, .heartRateBelow: value = min(max(interval, 40), 220)
             case .paceFasterOverall, .paceFasterLastKilometer: value = min(max(interval, 120), 1_800)
             case .zoneEnter, .zoneExit, .zoneBelow: value = min(max(interval, 1), 5)
-            case .beforeNextStep, .beforeMain, .beforeCooldown:
+            case .beforeNextStep, .beforeMain, .beforeCooldown, .beforeEffort:
                 value = min(max(interval, 5), 60)
             default: return title
             }
@@ -241,7 +241,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 return title + " · " + String(format: "%d:%02d min/km", value / 60, value % 60)
             case .zoneEnter, .zoneExit, .zoneBelow:
                 return title + " · S" + String(value)
-            case .beforeNextStep, .beforeMain, .beforeCooldown:
+            case .beforeNextStep, .beforeMain, .beforeCooldown, .beforeEffort:
                 return title + " · " + String(value) + " s"
             default: return title
             }
@@ -305,6 +305,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .stepStart: return tr("Each workout step starts", "Hver deløkt starter")
             case .stepEnd: return tr("Each workout step ends", "Hver deløkt avsluttes")
             case .beforeNextStep: return tr("Before next step", "Før neste deløkt")
+            case .beforeEffort: return tr("Before each interval effort", "Før hvert intervalldrag")
             case .beforeMain: return tr("Before main part", "Før hoveddelen")
             case .beforeCooldown: return tr("Before cool-down", "Før nedjogging")
             }
@@ -524,7 +525,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case .heartRateAbove, .heartRateBelow: return min(max(interval, 40), 220)
         case .paceFasterOverall, .paceFasterLastKilometer: return min(max(interval, 120), 1_800)
         case .zoneEnter, .zoneExit, .zoneBelow: return min(max(interval, 1), 5)
-        case .beforeNextStep, .beforeMain, .beforeCooldown:
+        case .beforeNextStep, .beforeMain, .beforeCooldown, .beforeEffort:
             return min(max(interval, 5), 60)
         default: return 1
         }
@@ -806,6 +807,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 return ATHLTHAudioCoachScheduledMotivation.finish(
                     byDistance: trigger == .nearFinishDistance,
                     style: encouragementStyle ?? .encouragement, norwegian: norwegian)
+            }
+            if trigger == .beforeEffort {
+                return norwegian ? "Gjør deg klar. Neste drag starter snart." : "Get ready. Your next interval starts soon."
             }
             if trigger == .beforeNextStep || trigger == .beforeMain || trigger == .beforeCooldown {
                 return norwegian ? "Gjør deg klar. Neste deløkt starter snart."
@@ -1516,6 +1520,13 @@ enum ATHLTHAudioCoachRuleDelivery {
         case .cooldownEnd:
             return phase == "cooldown" &&
                 index == (context.stepCount ?? 0) - 1 && nearEnd ? index + 1 : nil
+        case .beforeEffort:
+            // A warning is only possible when an actual upcoming work step
+            // has a reliable time-to-start. Never announce a rest or cooldown.
+            guard context.hasNextStep == true, next == "work", beforeBoundary,
+                  let remaining, remaining > 0,
+                  remaining >= Double(rule.validatedInterval - 2) else { return nil }
+            return index + 1
         case .beforeNextStep:
             guard context.hasNextStep == true && beforeBoundary else { return nil }
             if let length = rule.linkedCountdownSeconds {

@@ -216,7 +216,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             guard trigger != item else { return }
             trigger = item
             switch item {
-            case .beforeNextStep, .beforeMain, .beforeCooldown:
+            case .beforeNextStep, .beforeMain, .beforeCooldown, .beforeEffort:
                 interval = 15
                 eventSelection = item == .beforeNextStep ? .withoutRest : .every
                 phases = nil
@@ -486,7 +486,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 choice(.effortStart)
                 choice(.effortEnd)
                 choice(.beforeNextStep)
-                if trigger == .beforeNextStep { boundaryLeadPicker }
+                choice(.beforeEffort)
+                if trigger == .beforeNextStep || trigger == .beforeEffort { boundaryLeadPicker }
                 if trigger == .stepStart || trigger == .stepEnd || trigger == .beforeNextStep {
                     eventPicker([.every, .first, .last, .mainOnly, .withoutRest])
                 }

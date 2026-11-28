@@ -1094,7 +1094,7 @@ struct ATHLTHCoachRuleComposer: View {
                 case .zoneEnter, .zoneExit, .zoneBelow,
                      .plannedZoneBelow, .plannedZoneOutside:
                     metrics = [.heartRateZone]
-                case .beforeNextStep, .beforeMain, .beforeCooldown,
+                case .beforeNextStep, .beforeMain, .beforeCooldown, .beforeEffort,
                      .randomMotivation, .nearFinishTime, .nearFinishDistance,
                      .elevationGain, .uphillDetected,
                      .paceFasterThanTarget, .paceSlowerThanTarget,

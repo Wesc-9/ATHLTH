@@ -163,7 +163,7 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
              .effortStart, .effortEnd, .recoveryStart, .recoveryEnd,
              .activeRecoveryStart, .activeRecoveryEnd,
              .warmupStart, .warmupEnd, .mainStart, .mainEnd,
-             .cooldownStart, .cooldownEnd, .beforeMain, .beforeCooldown:
+              .cooldownStart, .cooldownEnd, .beforeMain, .beforeCooldown, .beforeEffort:
             return hasStructuredSteps
         default: return true
         }
