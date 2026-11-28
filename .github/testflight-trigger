@@ -387,3 +387,5 @@ ATHLTH 3.0.7 — authorized retry 2026-11-28 after advanced plan layout XCTest i
 ATHLTH 3.0.7 — authorized TestFlight retry after fresh hybrid iPhone simulator recovery and corrected exact-commit iPad 11/13 independent matrix and screenshot gate. All five release workflows remain required; no XCTest exclusions, version bump, signing changes, or rejected exercise artwork.
 
 ATHLTH 3.0.7 — authorized retry after sole failed XCTest in both main and hybrid suites: distinguish possessive Norwegian min from numeric minute abbreviation (8f3da6c), add exact duration regression assertions (c55c146). Preserve all five same-commit gates including both iPad sizes, signatures, artwork and version. No bypass.
+
+ATHLTH 3.0.7 — authorized retry after all five same-commit gates passed on 32109ea. Archive validation now requires the approved exact-ID ATHLTH image pairs, byte-for-byte, and all remaining RepDB fallback assets, including shared references. No rejected images, gate bypass, signing change or version bump.
