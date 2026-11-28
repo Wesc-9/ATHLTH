@@ -4303,10 +4303,13 @@ struct MyTrainingPlansLibraryView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     @State private var showingCreatePlan = false
     @State private var scheduleError: String?
     @State private var reviewingPlan: TrainingPlan?
+    @State private var editingScheduledPlan: TrainingPlan?
+    @State private var pendingPlanAction: PersonalPlanAction?
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
     @State private var libraryWidth: CGFloat = 390
@@ -4318,6 +4321,13 @@ struct MyTrainingPlansLibraryView: View {
     @State private var visibleLimit = ATHLTHLibraryPagination.pageSize
     @State private var visibleStartIndex = 0
     @State private var alphabetJumpRevision = 0
+
+    private struct PersonalPlanAction: Identifiable {
+        enum Kind { case deactivate, deleteScheduled, deleteTemplate }
+        let plan: TrainingPlan
+        let kind: Kind
+        var id: UUID { plan.id }
+    }
 
     private var normalizedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -4577,6 +4587,46 @@ struct MyTrainingPlansLibraryView: View {
         .sheet(isPresented: $showingCreatePlan) {
             TrainingPlanCreationView()
         }
+        .sheet(item: $editingScheduledPlan) { plan in
+            NavigationStack {
+                ScrollView {
+                    AdvancedPlannerView(planID: plan.id).padding()
+                }
+                .navigationTitle(plan.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                            editingScheduledPlan = nil
+                        }
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            pendingPlanAction?.plan.title ?? "",
+            isPresented: Binding(
+                get: { pendingPlanAction != nil },
+                set: { if !$0 { pendingPlanAction = nil } }
+            ), titleVisibility: .visible, presenting: pendingPlanAction
+        ) { action in
+            Button(action.kind == .deactivate
+                   ? ATHLTHLocalization.choose(english: "Deactivate plan", norwegian: "Deaktiver plan")
+                   : ATHLTHLocalization.choose(english: "Delete plan", norwegian: "Slett plan"),
+                   role: .destructive) {
+                performPlanAction(action)
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
+        } message: { action in
+            switch action.kind {
+            case .deactivate:
+                Text(ATHLTHLocalization.choose(english: "The plan is kept in My Plans and can be reactivated later.", norwegian: "Planen beholdes i Mine planer og kan aktiveres på nytt senere."))
+            case .deleteScheduled:
+                Text(ATHLTHLocalization.choose(english: "The plan, its remaining schedule and its linked saved copy are removed. Recorded workout history is kept.", norwegian: "Planen, resterende planlegging og den tilknyttede lagrede kopien fjernes. Registrert treningshistorikk beholdes."))
+            case .deleteTemplate:
+                Text(ATHLTHLocalization.choose(english: "The saved plan is removed from My Plans.", norwegian: "Den lagrede planen fjernes fra Mine planer."))
+            }
+        }
         .sheet(item: $preparedShare) { draft in
             ATHLTHDirectShareSheet(draft: draft)
         }
@@ -4599,7 +4649,7 @@ struct MyTrainingPlansLibraryView: View {
             )
         }
         .alert(
-            "Could not schedule plan",
+            ATHLTHLocalization.choose(english: "Could not update plan", norwegian: "Kunne ikke oppdatere planen"),
             isPresented: Binding(
                 get: { scheduleError != nil },
                 set: { shown in
@@ -4610,6 +4660,59 @@ struct MyTrainingPlansLibraryView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(scheduleError ?? "")
+        }
+    }
+
+    private func performPlanAction(_ action: PersonalPlanAction) {
+        switch action.kind {
+        case .deactivate:
+            if !session.deactivateTrainingPlan(action.plan.id) {
+                scheduleError = ATHLTHLocalization.choose(english: "Could not deactivate the plan.", norwegian: "Kunne ikke deaktivere planen.")
+            }
+        case .deleteScheduled:
+            let linkedIDs = session.planTemplates.filter {
+                $0.tags.contains("saved-source:" + action.plan.id.uuidString)
+            }.map(\.id)
+            goalStore.setLinkedPlan(action.plan.id, goalIDs: [])
+            session.deleteTrainingPlan(action.plan.id)
+            for id in linkedIDs { session.deletePlanTemplate(id) }
+        case .deleteTemplate:
+            session.deletePlanTemplate(action.plan.id)
+        }
+        pendingPlanAction = nil
+        visibleStartIndex = 0
+        visibleLimit = ATHLTHLibraryPagination.pageSize
+    }
+
+    @ViewBuilder
+    private func scheduledPlanManagementActions(_ plan: TrainingPlan) -> some View {
+        Button {
+            editingScheduledPlan = plan
+        } label: {
+            Label(ATHLTHLocalization.choose(english: "Edit plan", norwegian: "Rediger plan"), systemImage: "pencil")
+        }
+        if session.isTrainingPlanPaused(plan.id) || session.isTrainingPlanDeactivated(plan.id) {
+            Button {
+                if !session.resumeTrainingPlan(plan.id) {
+                    scheduleError = ATHLTHLocalization.choose(english: "The plan overlaps another scheduled plan. Adjust its dates before reactivating.", norwegian: "Planen overlapper en annen plan. Endre datoene før du aktiverer den på nytt.")
+                }
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Reactivate plan", norwegian: "Aktiver plan"), systemImage: "play.circle")
+            }
+        } else if session.trainingPlanStatus(plan) != .completed {
+            Button {
+                pendingPlanAction = PersonalPlanAction(plan: plan, kind: .deactivate)
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Deactivate plan", norwegian: "Deaktiver plan"), systemImage: "pause.circle")
+            }
+        }
+    }
+
+    private func deletePlanAction(_ plan: TrainingPlan, reusable: Bool) -> some View {
+        Button(role: .destructive) {
+            pendingPlanAction = PersonalPlanAction(plan: plan, kind: reusable ? .deleteTemplate : .deleteScheduled)
+        } label: {
+            Label(ATHLTHLocalization.choose(english: "Delete plan", norwegian: "Slett plan"), systemImage: "trash")
         }
     }
 
@@ -4688,6 +4791,7 @@ struct MyTrainingPlansLibraryView: View {
                                       title: plan.title, subtitle: "", icon: "calendar")
                 Spacer()
                 Menu {
+                    scheduledPlanManagementActions(plan)
                     Button { preparePlanShare(plan) } label: {
                         Label(ATHLTHLocalization.choose(english: "Share plan", norwegian: "Del plan"),
                               systemImage: "square.and.arrow.up")
@@ -4704,6 +4808,8 @@ struct MyTrainingPlansLibraryView: View {
                                   systemImage: "clock.arrow.circlepath")
                         }
                     }
+                    Divider()
+                    deletePlanAction(plan, reusable: false)
                 } label: {
                     Image(systemName: "ellipsis")
                         .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -4888,6 +4994,7 @@ struct MyTrainingPlansLibraryView: View {
                 )
                 Spacer(minLength: 4)
                 Menu {
+                    if !reusable { scheduledPlanManagementActions(plan) }
                     if reusable {
                         Button {
                             scheduleCompactTemplate(plan)
@@ -4925,18 +5032,8 @@ struct MyTrainingPlansLibraryView: View {
                             )
                         }
                     }
-                    if reusable {
-                        Button(role: .destructive) {
-                            session.deletePlanTemplate(plan.id)
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Delete plan", norwegian: "Slett plan"
-                                ),
-                                systemImage: "trash"
-                            )
-                        }
-                    }
+                    Divider()
+                    deletePlanAction(plan, reusable: reusable)
                 } label: {
                     Image(systemName: "ellipsis")
                         .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -5002,19 +5099,14 @@ struct MyTrainingPlansLibraryView: View {
                     itemID: template.id.uuidString, title: template.title,
                     subtitle: "", icon: "calendar")
 
-                Button(role: .destructive) {
-                    session.deletePlanTemplate(template.id)
+                Menu {
+                    deletePlanAction(template, reusable: true)
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "ellipsis")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText.opacity(0.72)
-                        )
-                        .frame(width: 34, height: 34)
-                        .background(
-                            Color.white.opacity(0.68),
-                            in: Circle()
-                        )
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 38, height: 38)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
                 }
                 .buttonStyle(.plain)
             }
