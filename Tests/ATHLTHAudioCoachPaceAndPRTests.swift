@@ -98,6 +98,40 @@ final class ATHLTHAudioCoachPaceAndPRTests: XCTestCase {
         XCTAssertFalse(ATHLTHAudioCoachRule.Metric.personalRecord.requiresInternet)
     }
 
+    func testStrengthCompletedSetsAreCountedOnlyOnce() {
+        let rule = ATHLTHAudioCoachRule(trigger: .strengthSetCompleted, metric: .remainingSets, interval: 2)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.remainingSetCount = 8
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 10, journal: &journal).isEmpty)
+        ctx.completedStrengthSetCount = 1
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 20, journal: &journal).isEmpty)
+        ctx.completedStrengthSetCount = 2
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 30, journal: &journal).count, 1)
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 31, journal: &journal).isEmpty)
+        ctx.completedStrengthSetCount = 4
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 40, journal: &journal).count, 1)
+    }
+
+    func testLastExerciseSetAndRestRequireExplicitState() {
+        let final = ATHLTHAudioCoachRule(trigger: .lastExerciseSet, metric: .remainingSets, interval: 1)
+        let rest = ATHLTHAudioCoachRule(trigger: .strengthRestEnding, metric: .remainingSets, interval: 15)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.stepIndex = 0
+        ctx.remainingSetCount = 4
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: final, context: ctx, elapsed: 20, journal: &journal).isEmpty)
+        ctx.isFinalExerciseSet = true
+        XCTAssertEqual(due(rule: final, context: ctx, elapsed: 21, journal: &journal).count, 1)
+        ctx.stepPhase = "recovery"
+        ctx.completedStrengthSetCount = 3
+        ctx.strengthRestRemainingSeconds = 16
+        XCTAssertTrue(due(rule: rest, context: ctx, elapsed: 22, journal: &journal).isEmpty)
+        ctx.strengthRestRemainingSeconds = 15
+        XCTAssertEqual(due(rule: rest, context: ctx, elapsed: 23, journal: &journal).count, 1)
+        XCTAssertTrue(due(rule: rest, context: ctx, elapsed: 24, journal: &journal).isEmpty)
+    }
+
     func testProgressNeedsKnownGoalAndFiresOnce() {
         let rule = ATHLTHAudioCoachRule(trigger: .workoutTimeProgress, metric: .elapsedTime, interval: 50)
         var ctx = ATHLTHCoachReadoutContext()

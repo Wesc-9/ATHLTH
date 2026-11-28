@@ -127,6 +127,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case randomMotivation, nearFinishTime, nearFinishDistance
         case workoutTimeProgress, workoutDistanceProgress, stepTimeProgress
         case ghostAhead, ghostBehind, lastStrengthSet
+        case strengthSetCompleted, lastExerciseSet, strengthRestEnding
         case slowerThanPreviousWorkout
         case elevationGain, uphillDetected
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
@@ -152,7 +153,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .nearFinishTime, .nearFinishDistance, .elevationGain,
                  .uphillDetected, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget,
                  .slowerThanPreviousWorkout, .workoutTimeProgress, .workoutDistanceProgress,
-                 .stepTimeProgress, .ghostAhead, .ghostBehind, .lastStrengthSet: return true
+                 .stepTimeProgress, .ghostAhead, .ghostBehind, .lastStrengthSet,
+                 .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: return true
             default: return false
             }
         }
@@ -185,13 +187,17 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         }
         var isGhostCondition: Bool { self == .ghostAhead || self == .ghostBehind }
         var isProgress: Bool { self == .workoutTimeProgress || self == .workoutDistanceProgress || self == .stepTimeProgress }
+        var isStrengthEvent: Bool {
+            self == .lastStrengthSet || self == .strengthSetCompleted ||
+                self == .lastExerciseSet || self == .strengthRestEnding
+        }
         var needsStructuredStep: Bool {
             !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
                 self != .personalRecordConfirmed && self != .workoutStart &&
                 self != .randomMotivation && self != .nearFinishTime &&
                 self != .nearFinishDistance && self != .uphillDetected &&
                 self != .slowerThanPreviousWorkout && !isGhostCondition &&
-                !isProgress && self != .lastStrengthSet
+                !isProgress && !isStrengthEvent
         }
         func summary(interval: Int) -> String {
             let value: Int
@@ -200,6 +206,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .distance: value = min(max(interval, 100), 42_000)
             case .randomMotivation: value = min(max(interval, 120), 900)
             case .nearFinishTime: value = min(max(interval, 10), 1_800)
+            case .strengthSetCompleted: value = min(max(interval, 1), 10)
+            case .strengthRestEnding: value = min(max(interval, 5), 60)
             case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: value = min(max(interval, 1), 99)
             case .nearFinishDistance: value = min(max(interval, 25), 5_000)
             case .elevationGain: value = min(max(interval, 10), 5_000)
@@ -211,6 +219,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             default: return title
             }
             switch self {
+            case .strengthSetCompleted:
+                return title + " · " + String(value)
+            case .strengthRestEnding:
+                return title + " · " + String(value) + " s"
             case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress:
                 return title + " · " + String(value) + " %"
             case .time, .randomMotivation, .nearFinishTime:
@@ -249,6 +261,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .ghostAhead: return tr("Move ahead of Ghost", "Kommer foran Ghost")
             case .ghostBehind: return tr("Fall behind Ghost", "Faller bak Ghost")
             case .lastStrengthSet: return tr("Last set of workout", "Siste sett i økten")
+            case .strengthSetCompleted: return tr("Every completed set(s)", "Hvert fullførte sett")
+            case .lastExerciseSet: return tr("Last set of exercise", "Siste sett i øvelsen")
+            case .strengthRestEnding: return tr("Before rest ends", "Før hvilepausen er ferdig")
             case .elevationGain: return tr("Elevation gained", "Høydemeter")
             case .uphillDetected: return tr("When climbing", "Når du løper oppover")
             case .zoneBelow: return tr("Below heart-rate zone", "Under pulssone")
@@ -491,6 +506,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case .time: return min(max(interval, 15), 7_200)
         case .randomMotivation: return min(max(interval, 120), 900)
         case .nearFinishTime: return min(max(interval, 10), 1_800)
+        case .strengthSetCompleted: return min(max(interval, 1), 10)
+        case .strengthRestEnding: return min(max(interval, 5), 60)
         case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: return min(max(interval, 1), 99)
         case .nearFinishDistance: return min(max(interval, 25), 5_000)
         case .elevationGain: return min(max(interval, 10), 5_000)
@@ -1130,6 +1147,21 @@ enum ATHLTHAudioCoachRuleDelivery {
                     guard let index = context.stepIndex, index >= 0 else { continue }
                     milestone = index + 1
                 } else { milestone = 1 }
+            } else if rule.trigger == .strengthSetCompleted {
+                guard let count = context.completedStrengthSetCount, count > 0,
+                      count % rule.validatedInterval == 0 else { continue }
+                milestone = count / rule.validatedInterval
+            } else if rule.trigger == .lastExerciseSet {
+                guard context.isFinalExerciseSet == true,
+                      context.stepPhase != "recovery",
+                      let index = context.stepIndex, index >= 0 else { continue }
+                milestone = index + 1
+            } else if rule.trigger == .strengthRestEnding {
+                guard let remaining = context.strengthRestRemainingSeconds,
+                      remaining.isFinite, remaining > 0,
+                      remaining <= Double(rule.validatedInterval),
+                      let count = context.completedStrengthSetCount, count > 0 else { continue }
+                milestone = count
             } else if rule.trigger == .lastStrengthSet {
                 guard context.currentSetNumber != nil, context.remainingSetCount == 1,
                       context.stepPhase != "recovery" else { continue }
@@ -1708,6 +1740,9 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var nextEffortName: String? = nil
     var currentSetNumber: Int? = nil
     var remainingSetCount: Int? = nil
+    var completedStrengthSetCount: Int? = nil
+    var isFinalExerciseSet: Bool? = nil
+    var strengthRestRemainingSeconds: Double? = nil
     var ghostTimeDifferenceSeconds: Double? = nil
     var ghostDistanceDifferenceMeters: Double? = nil
     var stepName: String?
@@ -1798,6 +1833,18 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
             context.currentSetNumber = snapshot.setNumber ?? (snapshot.setIndex + 1)
         }
         context.remainingSetCount = max(0, snapshot.totalSets - snapshot.completedSets - (snapshot.skippedSets ?? 0))
+        context.completedStrengthSetCount = max(0, snapshot.completedSets)
+        if !snapshot.isResting && !snapshot.allExercisesComplete && !snapshot.currentExerciseComplete,
+           snapshot.setCount > 0, snapshot.setIndex >= 0 {
+            context.isFinalExerciseSet = snapshot.setIndex == snapshot.setCount - 1
+        }
+        if snapshot.isResting, let end = snapshot.restEndsAt {
+            let remaining = end.timeIntervalSinceNow
+            if remaining.isFinite, remaining > 0 {
+                context.strengthRestRemainingSeconds = remaining
+                context.stepRemainingSeconds = remaining
+            }
+        }
         context.stepIndex = snapshot.exerciseIndex
         context.stepCount = max(snapshot.exerciseCount, exercises.count)
         context.stepName = snapshot.exerciseName
@@ -2046,7 +2093,7 @@ enum ATHLTHAudioCoachSportPolicy {
                      .stepName, .elapsedTime, .motivation,
                      .heartRate, .heartRateZone, .hydrationReminder,
                      .clockTime, .date, .workoutRemainingTime, .pushMessage, .praise, .ownMessage,
-                     .averageHeartRate, .currentSet, .remainingSets:
+                     .averageHeartRate, .currentSet, .remainingSets, .stepRemainingTime:
                     return true
                 default: return false
                 }
@@ -2068,7 +2115,7 @@ enum ATHLTHAudioCoachSportPolicy {
         return rules.filter { rule in
             if rule.trigger.needsStructuredStep ||
                 rule.trigger.isPaceCondition || rule.trigger.isGhostCondition ||
-                rule.trigger == .lastStrengthSet || rule.trigger == .stepTimeProgress ||
+                rule.trigger.isStrengthEvent || rule.trigger == .stepTimeProgress ||
                 rule.trigger == .slowerThanPreviousWorkout ||
                 rule.trigger == .personalRecordConfirmed { return false }
             if (rule.trigger == .distance ||

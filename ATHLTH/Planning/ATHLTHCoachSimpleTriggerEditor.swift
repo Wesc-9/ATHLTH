@@ -75,7 +75,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .personalRecordConfirmed: .record
         case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: .progress
         case .ghostAhead, .ghostBehind: .ghost
-        case .lastStrengthSet: .strength
+        case .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: .strength
         case .nearFinishTime: .finish
         case .nearFinishDistance: .finish
         case .slowerThanPreviousWorkout: .history
@@ -153,7 +153,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .record: return available(.personalRecordConfirmed)
         case .progress: return available(.workoutTimeProgress) || available(.workoutDistanceProgress) || available(.stepTimeProgress)
         case .ghost: return available(.ghostAhead)
-        case .strength: return available(.lastStrengthSet)
+        case .strength: return available(.lastStrengthSet) || available(.strengthSetCompleted)
         case .history: return !historicalReferences.isEmpty &&
             available(.slowerThanPreviousWorkout)
         }
@@ -215,6 +215,8 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .nearFinishTime: interval = 30
             case .nearFinishDistance: interval = 100
             case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: interval = 50
+            case .strengthSetCompleted: interval = 1
+            case .strengthRestEnding: interval = 15
             case .distance: interval = 1000
             case .elevationGain: interval = 50
             case .paceFasterOverall, .paceFasterLastKilometer:
@@ -328,7 +330,19 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
             if family == .strength {
-                Text(tr("Announces when the final planned set is active.", "Varsler når siste planlagte sett i økten er aktivt."))
+                choice(.strengthSetCompleted)
+                choice(.lastExerciseSet)
+                choice(.lastStrengthSet)
+                choice(.strengthRestEnding)
+                if trigger == .strengthSetCompleted {
+                    Stepper(tr("Every", "Hvert") + " \(interval) " + tr("completed sets", "fullførte sett"),
+                            value: $interval, in: 1...10)
+                } else if trigger == .strengthRestEnding {
+                    Stepper("\(interval) " + tr("sec before rest ends", "sek før pausen er ferdig"),
+                            value: $interval, in: 5...60, step: 5)
+                }
+                Text(tr("Uses completed, recorded sets and the active rest timer.",
+                        "Bruker registrerte fullførte sett og den aktive hviletiden."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }

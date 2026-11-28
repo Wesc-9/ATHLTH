@@ -99,7 +99,7 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
         // An all-sports selection inside a concrete workout must still obey
         // the actual workout's sport restrictions.
         let effectiveActivity = activity == .all ? (workoutActivity ?? .all) : activity
-        if trigger == .lastStrengthSet {
+        if trigger.isStrengthEvent {
             return effectiveActivity == .strength || effectiveActivity == .all
         }
         if trigger.isGhostCondition {
@@ -145,7 +145,7 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
                 (trigger == .distance || hasDistanceGoal)
         case .nearFinishTime, .workoutTimeProgress: return hasTimeGoal
         case .workoutDistanceProgress: return supportsDistance && hasDistanceGoal
-        case .stepTimeProgress, .lastStrengthSet: return hasStructuredSteps
+        case .stepTimeProgress, .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: return hasStructuredSteps
         case .ghostAhead, .ghostBehind: return supportsDistance
         case .elevationGain, .uphillDetected: return supportsOutdoorElevation
         case .paceFasterOverall, .paceFasterLastKilometer:
