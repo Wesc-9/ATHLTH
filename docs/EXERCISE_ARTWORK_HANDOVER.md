@@ -14,7 +14,7 @@ Gren: release/v3.0.7. HEAD cdb2f574a694bc763074ddcb1c4a815176143ee1.
 - Vanlig planke (plank, kvinne først) og magecrunch (crunches, mann først): fire WebP-filer på gren, commit cdb2f574a694bc763074ddcb1c4a815176143ee1, samlet 84 420 bytes. Seks bilder totalt i repo, tre øvelser. Xcode-test og TestFlight ikke verifisert.
 
 ## Neste steg
-1. Pakke 02 med side-plank og dead-bug er produsert og klargjort lokalt (ATHLTH-core-batch-02.zip), men ikke committet. Kontroller hvert bilde mot den sist godkjente referansen og teknisk utførelse før import. Ikke importer senere forkastede kollasjer.
+1. Pakke 02 er ferdig: side-plank (kvinne først) og dead-bug (mann først), fire WebP-filer på release/v3.0.7, commit c598679b6048fcfe48c4e84e93ce5fd5da0c6dc2. Visuelt kontrollert mot godkjent referanse; 832 × 832 px, 99 382 bytes samlet, alle fire blob-SHA verifisert på grenen. Totalt 10 bilder / 5 øvelser (238 846 bytes inkl. vektplanke). Ikke importer senere forkastede kollasjer. Xcode-test og TestFlight fortsatt ikke verifisert.
 2. Deretter bird-dog og russian-twist (kontroller eksakt variant/utstyr; ikke forveksle med weighted Russian twist), så reverse-crunches, hanging-leg-raise, bicycle-crunch, ab-wheel-rollout. Kontroller eksakte repDB-ID-er mot aktuell katalog.
 3. Fortsett mage/kjerne, deretter bryst, rygg, skuldre, armer, bein/sete og øvrige øvelser. Før status per faktisk committet par, ikke antall utkast.
 4. Kjør relevante regresjons- og Xcode-tester. Ikke påstå at en test er kjørt eller at et bilde er på release uten verifisering.
