@@ -239,7 +239,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             }) {
                 guard enabled, accountID == userID else { return }
 
-                let local = localByID[planID]
+                // Earlier imports in this pass can automatically deactivate
+                // overlapping plans; reconcile their current state.
+                let local = session.accountSyncDocument(withID: planID)
                 let remote = remoteByID[planID]
                 let localFingerprint = try local.map { try fingerprint(for: Self.accountCopy(of: $0)) }
                 let remotePlan = try remote.flatMap { try decode($0.body_base64, owner: userID, id: planID) }
@@ -279,6 +281,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                         continue
                     }
                     do {
+                        // Preserve a concurrently edited server document too,
+                        // before replacing it with a newer local plan.
+                        guard try archiveIfDiverged(remotePlan, fingerprint: remoteFingerprint,
+                            acknowledged: previous, owner: userID) else {
+                            unresolved.append(Conflict(id: planID, title: local.title))
+                            continue
+                        }
                         let revision = try await save(local, expected: expected)
                         guard accountID == userID else { return }
                         remoteIDs.insert(planID)
@@ -350,13 +359,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                         unresolved.append(Conflict(id: planID, title: remotePlan.title))
                     }
                 case .deleteLocal:
-                    // A verified remote absence may remove only the local
-                    // copy that still matches its last acknowledged fingerprint.
+                    // A verified remote deletion wins; retain the local
+                    // document in the recovery journal before removing it.
                     guard let local, !local.tags.contains("sync:standalone"),
                           session.accountSyncDocument(withID: planID) == local,
                           session.signedIn, session.profile.userID == userID,
                           try archiveIfDiverged(local, fingerprint: localFingerprint,
-                                                acknowledged: previous, owner: userID) else {
+                                                acknowledged: nil, owner: userID) else {
                         unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
                         continue
                     }
