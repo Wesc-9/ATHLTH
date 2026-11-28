@@ -2950,7 +2950,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fortell Coach hva som er viktigst"
+            "value": "Fortell ATHLTH Coach hva som er viktigst"
           }
         }
       }
@@ -2960,7 +2960,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach kombinerer dette med målene du velger ovenfor. Du trenger ikke gjenta informasjon som allerede ligger i et mål."
+            "value": "ATHLTH Coach kombinerer dette med målene du velger ovenfor. Du trenger ikke gjenta informasjon som allerede ligger i et mål."
           }
         }
       }
@@ -3050,7 +3050,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ingen aktive mål ennå. Coach bygger rundt treningsfokuset ditt og det du beskriver med egne ord."
+            "value": "Ingen aktive mål ennå. ATHLTH Coach bygger rundt treningsfokuset ditt og det du beskriver med egne ord."
           }
         }
       }
@@ -4500,7 +4500,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach vurderer gjeldende plan, mål og nylig trening og foreslår endringer. Ingenting endres før du godtar."
+            "value": "ATHLTH Coach vurderer gjeldende plan, mål og nylig trening og foreslår endringer. Ingenting endres før du godtar."
           }
         }
       }
@@ -4520,7 +4520,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Valgfritt. Fortell Coach om reise, en travel uke, tapte økter eller endret tilgjengelighet."
+            "value": "Valgfritt. Fortell ATHLTH Coach om reise, en travel uke, tapte økter eller endret tilgjengelighet."
           }
         }
       }
@@ -4610,7 +4610,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach trenger en aktiv plan før den kan foreslå trygge endringer."
+            "value": "ATHLTH Coach trenger en aktiv plan før den kan foreslå trygge endringer."
           }
         }
       }
@@ -11710,7 +11710,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach-analyse"
+            "value": "ATHLTH Coach-analyse"
           }
         }
       }
@@ -11820,7 +11820,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach-innsikt"
+            "value": "ATHLTH Coach-innsikt"
           }
         }
       }
@@ -12990,7 +12990,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tillat at Coach bruker helsedata"
+            "value": "Tillat at ATHLTH Coach bruker helsedata"
           }
         }
       }
@@ -13340,7 +13340,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Del treningshistorikk med Coach"
+            "value": "Del treningshistorikk med ATHLTH Coach"
           }
         }
       }
@@ -13480,7 +13480,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Treningsdata og Coach"
+            "value": "Treningsdata og ATHLTH Coach"
           }
         }
       }
@@ -17130,7 +17130,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Generering av treningsplan og Coach-spørsmål er fortsatt brukerinitiert og blokkeres ikke kunstig."
+            "value": "Generering av treningsplan og ATHLTH Coach-spørsmål er fortsatt brukerinitiert og blokkeres ikke kunstig."
           }
         }
       }
@@ -18350,7 +18350,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach analyserer tempo, rute, høyde og innsats…"
+            "value": "ATHLTH Coach analyserer tempo, rute, høyde og innsats…"
           }
         }
       }
@@ -18410,7 +18410,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach analyserer øvelsesvalg, settvolum og muskelfokus…"
+            "value": "ATHLTH Coach analyserer øvelsesvalg, settvolum og muskelfokus…"
           }
         }
       }
@@ -19050,7 +19050,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach kan vurdere den aktive planen og foreslå større endringer. Ingenting endres før du godtar forslaget."
+            "value": "ATHLTH Coach kan vurdere den aktive planen og foreslå større endringer. Ingenting endres før du godtar forslaget."
           }
         }
       }
@@ -20950,7 +20950,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Coach bruker konteksten som er tilgjengelig i ATHLTH og notatet ditt over. Manglende helsedata tolkes ikke som at du hoppet over trening."
+            "value": "ATHLTH Coach bruker konteksten som er tilgjengelig i ATHLTH og notatet ditt over. Manglende helsedata tolkes ikke som at du hoppet over trening."
           }
         }
       }
@@ -21170,7 +21170,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aktiver bruk av helsedata under Innstillinger → Personvern og data bare hvis du vil at Coach skal bruke søvn, HRV, puls og øktkontekst. Restitusjonsscoren beregnes lokalt uansett."
+            "value": "Aktiver bruk av helsedata under Innstillinger → Personvern og data bare hvis du vil at ATHLTH Coach skal bruke søvn, HRV, puls og øktkontekst. Restitusjonsscoren beregnes lokalt uansett."
           }
         }
       }
@@ -21431,6 +21431,176 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rutedatabase"
+          }
+        }
+      }
+    },
+    "Tell ATHLTH Coach what matters most": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fortell ATHLTH Coach hva som er viktigst"
+          }
+        }
+      }
+    },
+    "ATHLTH Coach combines this with the goals you select above. You do not need to repeat information already stored in a goal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach kombinerer dette med målene du velger ovenfor. Du trenger ikke gjenta informasjon som allerede ligger i et mål."
+          }
+        }
+      }
+    },
+    "No active goals yet. ATHLTH Coach will build around your training focus and free-text direction.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen aktive mål ennå. ATHLTH Coach bygger rundt treningsfokuset ditt og det du beskriver med egne ord."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach reviews your current plan, goals and recent training, then proposes changes. Nothing is changed until you accept.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach vurderer gjeldende plan, mål og nylig trening og foreslår endringer. Ingenting endres før du godtar."
+          }
+        }
+      }
+    },
+    "Optional. Tell ATHLTH Coach about travel, a busy week, missed sessions or a change in availability.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgfritt. Fortell ATHLTH Coach om reise, en travel uke, tapte økter eller endret tilgjengelighet."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach needs an active plan before it can propose safe changes.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach trenger en aktiv plan før den kan foreslå trygge endringer."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach analysis": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach-analyse"
+          }
+        }
+      }
+    },
+    "ATHLTH Coach Insight": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach-innsikt"
+          }
+        }
+      }
+    },
+    "Allow ATHLTH Coach to use health data": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tillat at ATHLTH Coach bruker helsedata"
+          }
+        }
+      }
+    },
+    "Share training history with ATHLTH Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del treningshistorikk med ATHLTH Coach"
+          }
+        }
+      }
+    },
+    "Training data & ATHLTH Coach": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Treningsdata og ATHLTH Coach"
+          }
+        }
+      }
+    },
+    "Training-plan generation and ATHLTH Coach questions remain user initiated and are not artificially blocked.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generering av treningsplan og ATHLTH Coach-spørsmål er fortsatt brukerinitiert og blokkeres ikke kunstig."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach is analyzing pace, route, elevation and effort…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach analyserer tempo, rute, høyde og innsats…"
+          }
+        }
+      }
+    },
+    "ATHLTH Coach is analyzing exercise selection, set volume and muscle focus…": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach analyserer øvelsesvalg, settvolum og muskelfokus…"
+          }
+        }
+      }
+    },
+    "ATHLTH Coach can review the active plan and suggest broader changes. Nothing changes until you accept the proposal.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach kan vurdere den aktive planen og foreslå større endringer. Ingenting endres før du godtar forslaget."
+          }
+        }
+      }
+    },
+    "ATHLTH Coach uses the context available in ATHLTH and your note above. It does not assume missing health data means you skipped training.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATHLTH Coach bruker konteksten som er tilgjengelig i ATHLTH og notatet ditt over. Manglende helsedata tolkes ikke som at du hoppet over trening."
+          }
+        }
+      }
+    },
+    "Enable health-data use in Settings → Privacy & Data only if you want ATHLTH Coach to use sleep, HRV, heart-rate and workout context. Recovery scoring continues locally either way.": {
+      "localizations": {
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiver bruk av helsedata under Innstillinger → Personvern og data bare hvis du vil at ATHLTH Coach skal bruke søvn, HRV, puls og øktkontekst. Restitusjonsscoren beregnes lokalt uansett."
           }
         }
       }

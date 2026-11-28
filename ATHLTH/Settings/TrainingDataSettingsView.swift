@@ -188,7 +188,7 @@ struct TrainingDataSettingsView: View {
                 PremiumSettingsCard {
                     NavigationLink { ATHLTHAccountAIConsentView() } label: {
                         PremiumSettingsRow(icon: "shield.lefthalf.filled", title: tr("AI & data consent", "AI og datasamtykker"),
-                            subtitle: tr("Manage Coach sharing separately", "Administrer deling med Coach separat")) {
+                            subtitle: tr("Manage ATHLTH Coach sharing separately", "Administrer deling med ATHLTH Coach separat")) {
                             Image(systemName: "chevron.right").foregroundStyle(ATHLTHTheme.mutedText)
                         }
                     }.buttonStyle(.plain)
@@ -318,7 +318,7 @@ struct TrainingDataSettingsView: View {
             }
             .disabled(!mayRestoreBackup)
         } message: {
-            Text(tr("Your current data is backed up first, using the same exclusions for recorded GPS traces, imported health readings and local photos. These excluded items cannot be recovered from cloud backup. Account settings and Coach history permission stay unchanged.", "Dagens data sikkerhetskopieres først med samme unntak for GPS-spor, importerte helsemålinger og lokale bilder. Disse kan ikke gjenopprettes fra skybackup. Kontoinnstillinger og Coach-samtykke beholdes."))
+            Text(tr("Your current data is backed up first, using the same exclusions for recorded GPS traces, imported health readings and local photos. These excluded items cannot be recovered from cloud backup. Account settings and ATHLTH Coach history permission stay unchanged.", "Dagens data sikkerhetskopieres først med samme unntak for GPS-spor, importerte helsemålinger og lokale bilder. Disse kan ikke gjenopprettes fra skybackup. Kontoinnstillinger og ATHLTH Coach-samtykke beholdes."))
         }
     }
 }

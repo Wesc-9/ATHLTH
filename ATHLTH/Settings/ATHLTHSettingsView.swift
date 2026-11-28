@@ -1603,7 +1603,7 @@ settingsSection("Account") {
                 } label: {
                     PremiumSettingsRow(
                         icon: "sparkles",
-                        title: ATHLTHLocalization.choose(english: "Coach", norwegian: "Coach"),
+                        title: ATHLTHLocalization.choose(english: "ATHLTH Coach", norwegian: "ATHLTH Coach"),
                         subtitle: ATHLTHLocalization.choose(
                             english: "AI permission and optional health context",
                             norwegian: "AI-tillatelse og valgfri bruk av helsedata"
@@ -3833,8 +3833,8 @@ private struct ATHLTHCoachPrivacySettingsView: View {
                 }
             } footer: {
                 Text(ATHLTHLocalization.choose(
-                    english: "Ordinary Coach chat uses local Apple AI when available, otherwise built-in guidance. Separate plan tools may use an external provider. Health context is optional and requires confirmation per question. Automatic sharing is not enabled. To approve AI chat, open Coach.",
-                    norwegian: "Vanlig Coach-chat bruker lokal Apple AI når tilgjengelig, ellers innebygd veiledning. Separate planverktøy kan bruke en ekstern leverandør. Helsedata er valgfrie og krever bekreftelse per spørsmål. Automatisk deling er ikke aktivert. Åpne Coach for å godkjenne AI-chat."
+                    english: "Ordinary chat with ATHLTH Coach uses local Apple AI when available, otherwise built-in guidance. Separate plan tools may use an external provider. Health context is optional and requires confirmation per question. Automatic sharing is not enabled. To approve AI chat, open ATHLTH Coach.",
+                    norwegian: "Vanlig chat med ATHLTH Coach bruker lokal Apple AI når tilgjengelig, ellers innebygd veiledning. Separate planverktøy kan bruke en ekstern leverandør. Helsedata er valgfrie og krever bekreftelse per spørsmål. Automatisk deling er ikke aktivert. Åpne ATHLTH Coach for å godkjenne AI-chat."
                 ))
             }
             Section {
@@ -3845,7 +3845,7 @@ private struct ATHLTHCoachPrivacySettingsView: View {
                 }
             }
         }
-        .navigationTitle("Coach")
+        .navigationTitle("ATHLTH Coach")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }
         .onChange(of: session.profile.userID) { _, _ in

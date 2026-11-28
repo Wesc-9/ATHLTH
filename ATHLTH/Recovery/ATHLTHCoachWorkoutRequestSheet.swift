@@ -42,8 +42,8 @@ struct ATHLTHCoachWorkoutRequestSheet: View {
                         .foregroundStyle(ATHLTHPlanDesign.ink)
 
                     Text(tr(
-                        "Review the saved information Coach should use for this workout. You can edit or remove anything below without changing your Training Profile.",
-                        "Gjennomgå det Coach skal bruke for denne økten. Du kan endre eller fjerne alt nedenfor uten å endre den lagrede treningsprofilen."
+                        "Review the saved information ATHLTH Coach should use for this workout. You can edit or remove anything below without changing your Training Profile.",
+                        "Gjennomgå det ATHLTH Coach skal bruke for denne økten. Du kan endre eller fjerne alt nedenfor uten å endre den lagrede treningsprofilen."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -111,7 +111,7 @@ struct ATHLTHCoachWorkoutRequestSheet: View {
                         dismiss()
                         onContinue(full, includeInjuryDetails && !limitations.isEmpty)
                     } label: {
-                        Label(tr("Continue to Coach", "Fortsett til Coach"),
+                        Label(tr("Continue to ATHLTH Coach", "Fortsett til ATHLTH Coach"),
                               systemImage: "arrow.right")
                             .frame(maxWidth: .infinity)
                     }

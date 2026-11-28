@@ -248,8 +248,8 @@ struct ATHLTHTrainProgressionCoachView: View {
                 .foregroundStyle(ink)
             if ATHLTHDeviceRole.isIPad && strength.workoutHistory.isEmpty {
                 Label(tr(
-                    "This iPad has no local structured strength history. iPhone/Watch sets are not automatically available here. Coach won't invent progression from an empty history.",
-                    "Denne iPaden har ingen lokal, strukturert styrkehistorikk. Sett fra iPhone/Watch er ikke automatisk tilgjengelige her. Coach gir ikke oppdiktede progresjonsforslag."
+                    "This iPad has no local structured strength history. iPhone/Watch sets are not automatically available here. ATHLTH Coach won't invent progression from an empty history.",
+                    "Denne iPaden har ingen lokal, strukturert styrkehistorikk. Sett fra iPhone/Watch er ikke automatisk tilgjengelige her. ATHLTH Coach gir ikke oppdiktede progresjonsforslag."
                 ), systemImage: "info.circle")
                 .font(.caption)
                 .foregroundStyle(muted)
@@ -344,8 +344,8 @@ struct ATHLTHTrainProgressionCoachView: View {
 
             if repetitionOptionsEnabled {
                 Text(tr(
-                    "Choose the intended range for this review. Coach won't infer it from the goal or change any exercise until you approve.",
-                    "Velg ønsket repetisjonsområde for denne vurderingen. Coach gjetter ikke området fra målet og endrer ingen øvelse uten godkjenning."
+                    "Choose the intended range for this review. ATHLTH Coach won't infer it from the goal or change any exercise until you approve.",
+                    "Velg ønsket repetisjonsområde for denne vurderingen. ATHLTH Coach gjetter ikke området fra målet og endrer ingen øvelse uten godkjenning."
                 ))
                 .font(.caption)
                 .foregroundStyle(muted)

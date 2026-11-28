@@ -1142,7 +1142,7 @@ struct ATHLTHTournamentCreator: View {
                     Image(systemName: "sparkles")
                         .font(.title3)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("La Coach sette opp konkurransen")
+                        Text("La ATHLTH Coach sette opp konkurransen")
                             .font(.subheadline.weight(.semibold))
                         Text("Foreslå øvelser, regler og progresjon")
                             .font(.caption)
@@ -1158,7 +1158,7 @@ struct ATHLTHTournamentCreator: View {
             .buttonStyle(.plain)
             .disabled(allowedActivities.isEmpty)
             if !competitionSettings.coachExerciseIDs.isEmpty {
-                Text("Coach har valgt \(competitionSettings.coachExerciseIDs.count) eksisterende øvelser. Forslaget kan gjennomgås nedenfor før publisering.")
+                Text("ATHLTH Coach har valgt \(competitionSettings.coachExerciseIDs.count) eksisterende øvelser. Forslaget kan gjennomgås nedenfor før publisering.")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 ForEach(coachNames, id: \.self) { name in
@@ -1166,7 +1166,7 @@ struct ATHLTHTournamentCreator: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
-                Button("Fjern Coach-forslaget") {
+                Button("Fjern ATHLTH Coach-forslaget") {
                     competitionSettings.coachExerciseIDs = []
                     coachNames = []
                 }

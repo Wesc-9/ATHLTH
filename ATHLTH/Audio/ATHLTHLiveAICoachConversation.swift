@@ -598,7 +598,7 @@ struct ATHLTHLiveAICoachConversationView: View {
             ScrollView {
                 ATHLTHPlusFeatureGate(
                     feature: .audioCoach,
-                    title: "ATHLTH AI Coach",
+                    title: "ATHLTH Coach",
                     message: ATHLTHLocalization.choose(
                         english: "Private voice conversations are an ATHLTH+ feature.",
                         norwegian: "Private AI-samtaler er en ATHLTH+-funksjon."
@@ -657,8 +657,8 @@ struct ATHLTHLiveAICoachConversationView: View {
                                     norwegian: "La AI lese øktstatus når jeg spør"
                                 ), isOn: $allowLiveWorkoutMetrics)
                                 Toggle(ATHLTHLocalization.choose(
-                                    english: "Allow Coach to access my eight-week strength history during this voice session",
-                                    norwegian: "Gi Coach tilgang til åtte ukers styrkehistorikk i denne talesamtalen"
+                                    english: "Allow ATHLTH Coach to access my eight-week strength history during this voice session",
+                                    norwegian: "Gi ATHLTH Coach tilgang til åtte ukers styrkehistorikk i denne talesamtalen"
                                 ), isOn: $allowLocalStrengthHistory)
                             }
                             Text(ATHLTHLocalization.choose(
@@ -711,7 +711,7 @@ struct ATHLTHLiveAICoachConversationView: View {
                 }
             }
             .background(ATHLTHTheme.canvasBottom.ignoresSafeArea())
-            .navigationTitle("ATHLTH AI Coach")
+            .navigationTitle("ATHLTH Coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -764,7 +764,7 @@ struct ATHLTHLiveAICoachConversationView: View {
             )
         case .responding:
             return ATHLTHLocalization.choose(
-                english: "Coach is replying…",
+                english: "ATHLTH Coach is replying…",
                 norwegian: "Coachen svarer …"
             )
         case .failed(let error):

@@ -291,7 +291,7 @@ struct ATHLTHGroqVoiceCoachView: View {
             ScrollView {
                 ATHLTHPlusFeatureGate(
                     feature: .audioCoach,
-                    title: "ATHLTH AI Coach",
+                    title: "ATHLTH Coach",
                     message: ATHLTHLocalization.choose(
                         english: "Groq voice coaching is an ATHLTH+ feature.",
                         norwegian: "Groq talecoach er en ATHLTH+-funksjon."
@@ -404,7 +404,7 @@ struct ATHLTHGroqVoiceCoachView: View {
                 }
             }
             .background(ATHLTHTheme.canvasBottom.ignoresSafeArea())
-            .navigationTitle("AI Coach · Groq")
+            .navigationTitle("ATHLTH Coach · Groq")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
