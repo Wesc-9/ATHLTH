@@ -18,7 +18,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
 
     private enum Family: String, CaseIterable, Identifiable {
         case distance, time, section, step, pause, heartZone
-        case motivation, finish, elevation, pace, history
+        case motivation, finish, elevation, pace, history, record
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -33,6 +33,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .elevation: return ATHLTHLocalization.choose(english: "Elevation", norwegian: "Høydemeter")
             case .pace: return ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo")
             case .history: return ATHLTHLocalization.choose(english: "Previous workout", norwegian: "Tidligere økt")
+            case .record: return ATHLTHLocalization.choose(english: "Personal record", norwegian: "Personlig rekord")
             }
         }
         var icon: String {
@@ -48,6 +49,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .elevation: "mountain.2"
             case .pace: "speedometer"
             case .history: "clock.arrow.circlepath"
+            case .record: "trophy"
             }
         }
     }
@@ -63,6 +65,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow,
              .zoneBelow, .plannedZoneBelow, .plannedZoneOutside: .heartZone
         case .randomMotivation: .motivation
+        case .personalRecordConfirmed: .record
         case .nearFinishTime: .finish
         case .nearFinishDistance: .finish
         case .slowerThanPreviousWorkout: .history
@@ -135,7 +138,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .finish: return available(.nearFinishTime) ||
             available(.nearFinishDistance)
         case .elevation: return available(.elevationGain)
-        case .pace: return available(.paceSlowerThanTarget)
+        case .pace: return available(.paceSlowerThanTarget) ||
+            available(.paceFasterOverall) || available(.paceFasterLastKilometer)
+        case .record: return available(.personalRecordConfirmed)
         case .history: return !historicalReferences.isEmpty &&
             available(.slowerThanPreviousWorkout)
         }
@@ -146,7 +151,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         switch choice {
         case .distance: trigger = .distance; interval = 1_000
         case .time: trigger = .time; interval = 60
-        case .section: trigger = .warmupStart; interval = 1
+        case .section: trigger = .workoutStart; interval = 1
         case .step: trigger = .stepStart; interval = 1
         case .pause: trigger = .recoveryStart; interval = 1
         case .heartZone: trigger = .zoneEnter; interval = 3
@@ -158,7 +163,13 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 trigger = .nearFinishDistance; interval = 100
             }
         case .elevation: trigger = .elevationGain; interval = 50
-        case .pace: trigger = .paceSlowerThanTarget; interval = 1
+        case .pace:
+            if triggerAvailability.supports(.paceSlowerThanTarget, for: activityFilter) {
+                trigger = .paceSlowerThanTarget; interval = 1
+            } else {
+                trigger = .paceFasterOverall; interval = 300
+            }
+        case .record: trigger = .personalRecordConfirmed; interval = 1
         case .history: trigger = .slowerThanPreviousWorkout; interval = 1
         }
         eventSelection = .every
@@ -184,6 +195,13 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .nearFinishTime: interval = 30
             case .nearFinishDistance: interval = 100
             case .distance: interval = 1000
+            case .elevationGain: interval = 50
+            case .paceFasterOverall, .paceFasterLastKilometer:
+                interval = 300
+            case .heartRateAbove, .heartRateBelow:
+                interval = (40...220).contains(interval) ? interval : 150
+            case .zoneEnter, .zoneExit, .zoneBelow:
+                interval = (1...5).contains(interval) ? interval : 3
             case .stepStart, .stepEnd, .effortStart, .effortEnd,
                  .activeRecoveryStart, .activeRecoveryEnd, .recoveryStart, .recoveryEnd:
                 eventSelection = .every
@@ -247,37 +265,30 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 .font(.caption2.weight(.bold))
                 .tracking(1.5)
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                ForEach(Family.allCases) { item in
-                    Button { choose(item) } label: {
-                        HStack(spacing: 9) {
-                            Image(systemName: item.icon)
-                                .frame(width: 20)
-                            Text(item.label).font(.subheadline.weight(.semibold))
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 12)
-                        .frame(maxWidth: .infinity, minHeight: 50)
-                        .foregroundStyle(family == item ? Color.white : ATHLTHPlanDesign.ink)
-                        .background(family == item
-                            ? ATHLTHPlanDesign.accentInk : Color.white,
-                            in: RoundedRectangle(cornerRadius: 16))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(familyAvailable(item)
-                        ? tr("Open trigger settings", "Åpne triggerinnstillinger")
-                        : tr("Unavailable: required workout data is missing",
-                             "Ikke tilgjengelig: økten mangler nødvendige data"))
-                    .disabled(!familyAvailable(item))
-                    .opacity(familyAvailable(item) ? 1 : 0.42)
-                }
-            }
+            triggerCategory(tr("Time and distance", "Tid og distanse"),
+                            families: [.time, .distance, .finish])
+            triggerCategory(tr("Heart rate and intensity", "Puls og intensitet"),
+                            families: [.heartZone])
+            triggerCategory(tr("Pace and performance", "Tempo og prestasjon"),
+                            families: [.pace, .record, .elevation, .history])
+            triggerCategory(tr("Workout and intervals", "Økt og intervaller"),
+                            families: [.section, .step, .pause])
+            triggerCategory(tr("Smart coaching", "Smart coaching"),
+                            families: [.motivation])
+
+            Text(tr("SETTINGS", "INNSTILLINGER"))
+                .font(.caption2.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Label(family.label, systemImage: family.icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
 
             if family == .finish {
                 choice(.nearFinishTime)
                 choice(.nearFinishDistance)
             }
-            if !triggerAvailability.supports(trigger) {
+            if !triggerAvailability.supports(trigger, for: activityFilter) {
                 Text(tr(
                     "This workout does not have the required measured data or programmed target. Choose another trigger.",
                     "Denne økten mangler nødvendige målinger eller et definert mål. Velg en annen trigger."
@@ -414,7 +425,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 Picker(tr("Type", "Type"), selection: heartType) {
                     Text(tr("BPM", "Puls")).tag(0)
                     Text(tr("Zone", "Pulssone")).tag(1)
-                    Text(tr("Workout target", "Øktens målsone")).tag(2)
+                    if triggerAvailability.supports(.plannedZoneBelow, for: activityFilter) {
+                        Text(tr("Workout target", "Øktens målsone")).tag(2)
+                    }
                 }
                 .pickerStyle(.segmented)
                 if trigger == .heartRateAbove || trigger == .heartRateBelow {
@@ -450,8 +463,22 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             } else if family == .pace {
                 choice(.paceFasterThanTarget)
                 choice(.paceSlowerThanTarget)
-                Text(tr("Only fires when the active exercise has an authored pace target.",
-                        "Varsler bare når den aktive øvelsen har angitt måltempo."))
+                choice(.paceFasterOverall)
+                choice(.paceFasterLastKilometer)
+                if trigger == .paceFasterOverall || trigger == .paceFasterLastKilometer {
+                    Stepper(String(format: "%d:%02d min/km", interval / 60, interval % 60),
+                            value: $interval, in: 120...1800, step: 5)
+                        .padding(12)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                } else {
+                    Text(tr("Only fires when the active exercise has an authored pace target.",
+                            "Varsler bare når den aktive øvelsen har angitt måltempo."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            } else if family == .record {
+                Text(tr("Only announces a verified personal record, never an estimated result.",
+                        "Varsler kun ved en bekreftet personlig rekord, aldri et estimert resultat."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
@@ -470,11 +497,36 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                         Text(tr("Warm-up", "Oppvarming")).tag("warmup")
                         Text(tr("Main section", "Hoveddel")).tag("main")
                         Text(tr("Cool-down", "Avslutning")).tag("cooldown")
+                        Text(tr("Recovery", "Pause")).tag("recovery")
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(tr("PREVIEW", "FORHÅNDSVISNING"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.2)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(trigger.summary(interval: interval))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                if eventSelection != .every {
+                    Text(eventSelection.title)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                if let phases, !phases.isEmpty {
+                    Text(phases.map(\.title).joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(.white, in: RoundedRectangle(cornerRadius: 14))
+            .accessibilityIdentifier("athlth-coach-trigger-preview")
         }
         .padding(16)
         .background(ATHLTHPlanDesign.canvas, in: RoundedRectangle(cornerRadius: 20))
@@ -485,6 +537,41 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             } else if trigger == .time || trigger == .randomMotivation || trigger == .nearFinishTime {
                 timeUnit = interval >= 3_600 && interval % 3_600 == 0 ? 2 :
                     (interval >= 60 && interval % 60 == 0 ? 1 : 0)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func triggerCategory(_ title: String, families: [Family]) -> some View {
+        let available = families.filter { familyAvailable($0) || family == $0 }
+        if !available.isEmpty {
+            VStack(alignment: .leading, spacing: 7) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                ForEach(available) { item in
+                    Button { choose(item) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: item.icon)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 24)
+                            Text(item.label)
+                                .font(.subheadline.weight(.medium))
+                            Spacer(minLength: 0)
+                            Image(systemName: family == item ? "checkmark.circle.fill" : "chevron.right")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .background(family == item ? ATHLTHPlanDesign.selectedSurface : Color.white,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!familyAvailable(item))
+                    .opacity(familyAvailable(item) ? 1 : 0.42)
+                    .accessibilityAddTraits(family == item ? .isSelected : [])
+                }
             }
         }
     }
