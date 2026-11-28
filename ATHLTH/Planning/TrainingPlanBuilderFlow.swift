@@ -302,6 +302,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private let draftStore = ATHLTHPlanCreationDraftStore()
 
+    // Layout preference belongs to this account on this device, not to the
+    // manual/Coach selection. A resumed draft always retains its own layout.
+    private var planLayoutPreferenceKey: String {
+        "athlth.plan.preferredCalendarLayout.\(session.profile.userID)"
+    }
+
+    private func rememberPlanLayout(_ layout: ATHLTHPlanWeekPlanningApproach) {
+        UserDefaults.standard.set(layout.rawValue, forKey: planLayoutPreferenceKey)
+    }
+
     init(
         startsAtSourceChoice: Bool,
         initialAdvanced: Bool,
@@ -712,6 +722,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             guard !didApplySuggestedStartDate else { return }
             didApplySuggestedStartDate = true
 
+            if existing == nil,
+               let stored = UserDefaults.standard.string(forKey: planLayoutPreferenceKey),
+               let layout = ATHLTHPlanWeekPlanningApproach(rawValue: stored) {
+                weekPlanningApproach = layout
+            }
             if !resumesDraftOnAppear && existing == nil {
                 step = .mode
                 sourceRoute.removeAll()
@@ -3362,7 +3377,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     /// variation is enabled. Never create, remove or overwrite an actual edit.
     private func isSuggestedTrainingDay(_ weekday: Int, week: Int) -> Bool {
         ATHLTHGuidedPlanDayPolicy.isSuggestedTraining(
-            weekday: weekday, week: week, selectedDays: guidedTargetDays ?? selectedDays,
+            weekday: weekday, week: week, selectedDays: step == .basics ? selectedDays : (guidedTargetDays ?? selectedDays),
             varyWeekdays: varyWeekdays
         )
     }
@@ -3525,6 +3540,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     // Layout is independent of authorship and never resets the draft.
                     guidedWeekAwaitingDecision = nil
                     weekPlanningApproach = .quick
+                    rememberPlanLayout(.quick)
                     saveResumableDraft()
                 }
                 .font(.caption.weight(.semibold))
@@ -5244,6 +5260,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 guidedWeekAwaitingDecision = nil
                 selectedAdvancedWeekDay = nil
                 weekPlanningApproach = .guided
+                rememberPlanLayout(.guided)
                 saveResumableDraft()
             }
         )
