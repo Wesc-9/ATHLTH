@@ -6,6 +6,40 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
     private let owner = UUID()
     private let rival = UUID()
 
+    func testPredefinedCompetitionExercisesKeepServerMetricAndTarget() {
+        let fixtures: [(ATHLTHTournamentActivity, String, Double?, String)] = [
+            (.strength, "repetitions", nil, "Flest repetisjoner"), // push-ups
+            (.strength, "repetitions", nil, "Flest repetisjoner"), // squats
+            (.strength, "repetitions", nil, "Flest repetisjoner"), // burpees
+            (.strength, "time", nil, "Lengst holdetid"), // plank
+            (.running, "distance", 3000, "Raskest tid"),
+            (.running, "distance", 5000, "Raskest tid"),
+            (.running, "distance", 10000, "Raskest tid"),
+            (.running, "duration", 1800, "Lengst distanse"),
+            (.walking, "distance", 5000, "Raskest tid"),
+            (.walking, "distance", 10000, "Raskest tid")
+        ]
+        for (activity, metric, target, description) in fixtures {
+            let id = UUID()
+            let remote = ATHLTHTournamentActivityTemplateRemote(id: id, title: "Preset",
+                activityType: activity, metric: metric, targetValue: target)
+            let selected = remote.competitionSelection
+            XCTAssertEqual(selected.id, id)
+            XCTAssertEqual(selected.metric, metric)
+            XCTAssertEqual(selected.targetValue, target)
+            XCTAssertTrue(selected.hasSupportedMetric)
+            XCTAssertFalse(selected.canCustomizeMeasure)
+            XCTAssertTrue(selected.resultDescription.hasPrefix(description))
+        }
+        let library = ATHLTHTournamentExerciseSearchResult(id: UUID(), name: "Bench Press", isActivityTemplate: false)
+        XCTAssertTrue(library.canCustomizeMeasure)
+        XCTAssertTrue(library.hasSupportedMetric)
+        let invalid = ATHLTHTournamentExerciseSearchResult(id: UUID(), name: "Invalid", isActivityTemplate: true,
+            metric: "distance", activity: .running)
+        XCTAssertFalse(invalid.hasSupportedMetric)
+        XCTAssertFalse(invalid.canCustomizeMeasure)
+    }
+
     func testUniversalFirstStepOnlyNeedsNameAndValidRoster() {
         let others = [rival, UUID(), UUID(), UUID()]
         for format in ATHLTHCompetitionFormat.allCases {

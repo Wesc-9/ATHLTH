@@ -26,9 +26,17 @@ struct ATHLTHTournamentActivityTemplateRemote: Decodable, Identifiable {
     let title: String
     let activityType: ATHLTHTournamentActivity
     let metric: String?
+    let targetValue: Double?
     enum CodingKeys: String, CodingKey {
         case id,title,metric
         case activityType = "activity_type"
+        case targetValue = "target_value"
+    }
+
+    var competitionSelection: ATHLTHTournamentExerciseSearchResult {
+        ATHLTHTournamentExerciseSearchResult(id: id, name: title,
+            isActivityTemplate: true, metric: metric ?? "", activity: activityType,
+            targetValue: targetValue)
     }
 }
 
@@ -38,6 +46,42 @@ struct ATHLTHTournamentExerciseSearchResult: Identifiable {
     let isActivityTemplate: Bool
     var metric: String = "repetitions"
     var activity: ATHLTHTournamentActivity = .strength
+    var targetValue: Double? = nil
+
+    /// Presets are immutable server-backed entries, not editable measure drafts.
+    var canCustomizeMeasure: Bool { !isActivityTemplate && activity == .strength }
+
+    var hasSupportedMetric: Bool {
+        switch metric {
+        case "distance", "duration":
+            return (activity == .running || activity == .walking) &&
+                targetValue.map { $0.isFinite && $0 > 0 } == true
+        case "repetitions", "time":
+            return activity == .strength
+        default:
+            return false
+        }
+    }
+
+    var resultDescription: String {
+        switch metric {
+        case "distance":
+            guard let targetValue, targetValue.isFinite, targetValue > 0 else { return "Ukjent distansemål" }
+            let distance = targetValue >= 1000
+                ? (targetValue / 1000).formatted(.number.precision(.fractionLength(0...2))) + " km"
+                : targetValue.formatted() + " m"
+            return "Raskest tid · " + distance
+        case "duration":
+            guard let targetValue, targetValue.isFinite, targetValue > 0 else { return "Ukjent tidsmål" }
+            let duration = targetValue.truncatingRemainder(dividingBy: 60) == 0
+                ? (targetValue / 60).formatted() + " min"
+                : targetValue.formatted() + " sek"
+            return "Lengst distanse · " + duration
+        case "repetitions": return "Flest repetisjoner"
+        case "time": return "Lengst holdetid"
+        default: return "Resultatmål ikke tilgjengelig"
+        }
+    }
 }
 
 struct ATHLTHTournamentRuleProposalRemote: Decodable, Identifiable {
@@ -364,15 +408,18 @@ struct ATHLTHTournamentLobbyCloudService {
     func searchCompetitionExercises(
         _ query: String,
         allowed: [ATHLTHTournamentActivity],
-        browse: Bool = false
+        browse: Bool = false,
+        templatesOnly: Bool? = nil
     ) async throws -> [ATHLTHTournamentExerciseSearchResult] {
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let operationalActivities = allowed.filter(\.isAvailableForCreation)
         guard !operationalActivities.isEmpty, clean.count >= 2 || (browse && clean.isEmpty) else { return [] }
         // Browsing is explicit and bounded. The existing lobby's search-only
         // callers retain their previous minimum query length.
+        var result: [ATHLTHTournamentExerciseSearchResult] = []
+        if templatesOnly != false {
         let base = client.from("athlth_tournament_activity_templates")
-            .select("id,title,activity_type,metric")
+            .select("id,title,activity_type,metric,target_value")
             .eq("is_active", value: true)
             .in("activity_type", values: operationalActivities.map(\.rawValue))
         let presets: [ATHLTHTournamentActivityTemplateRemote]
@@ -382,13 +429,9 @@ struct ATHLTHTournamentLobbyCloudService {
             presets = try await base.ilike("title", pattern: "%\(clean)%")
                 .order("title").limit(40).execute().value
         }
-        var result = presets.map {
-            ATHLTHTournamentExerciseSearchResult(
-                id: $0.id, name: $0.title, isActivityTemplate: true,
-                metric: $0.metric ?? "repetitions", activity: $0.activityType
-            )
+        result = presets.map(\.competitionSelection)
         }
-        if operationalActivities.contains(.strength) {
+        if templatesOnly != true && operationalActivities.contains(.strength) {
             let exercises: [ATHLTHTournamentLibraryExerciseRemote]
             if clean.isEmpty {
                 exercises = try await client.from("exercise_catalog").select("id,name")
@@ -409,6 +452,19 @@ struct ATHLTHTournamentLobbyCloudService {
             }
         }
         return result
+    }
+
+    /// Restore identity, fixed result metric and target in one bounded lookup.
+    /// A template ID must never be mistaken for a library exercise ID.
+    func competitionExerciseDetails(ids: [UUID]) async throws -> [ATHLTHTournamentExerciseSearchResult] {
+        guard !ids.isEmpty else { return [] }
+        let templates: [ATHLTHTournamentActivityTemplateRemote] = try await client
+            .from("athlth_tournament_activity_templates").select("id,title,activity_type,metric,target_value")
+            .in("id", values: ids).limit(500).execute().value
+        let catalog = try await exerciseNames(ids: Set(ids).subtracting(templates.map(\.id)))
+        return templates.map(\.competitionSelection) + catalog.map { id, name in
+            ATHLTHTournamentExerciseSearchResult(id: id, name: name, isActivityTemplate: false)
+        }
     }
 
     func exerciseLabels(ids: [UUID]) async throws -> [UUID: String] {

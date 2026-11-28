@@ -8,6 +8,7 @@ struct ATHLTHCompetitionExercisePicker: View {
     let selected: Set<UUID>
     var templatesOnly: Bool? = nil
     var selectionLimit = 12
+    var onCustom: (() -> Void)? = nil
     let onSelect: (ATHLTHTournamentExerciseSearchResult) -> Void
     @State private var query = ""
     @State private var results: [ATHLTHTournamentExerciseSearchResult] = []
@@ -43,6 +44,17 @@ struct ATHLTHCompetitionExercisePicker: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                if let onCustom {
+                    Section {
+                        Button {
+                            onCustom()
+                            dismiss()
+                        } label: {
+                            Label("Egendefinert resultatmål (utkast)", systemImage: "slider.horizontal.3")
+                        }
+                        .disabled(selected.union(added).count >= selectionLimit)
+                    }
+                }
                 if !visible.filter(\.isActivityTemplate).isEmpty {
                     Section("Forhåndsdefinerte konkurranseøvelser og treningsøkter") {
                         ForEach(visible.filter(\.isActivityTemplate)) { item in row(item) }
@@ -71,7 +83,7 @@ struct ATHLTHCompetitionExercisePicker: View {
                     if !query.isEmpty { try await Task.sleep(for: .milliseconds(300)) }
                     let activities = (filter.map { [$0] } ?? Array(allowed)).filter(\.isAvailableForCreation)
                     let fetched = try await ATHLTHTournamentLobbyCloudService()
-                        .searchCompetitionExercises(query, allowed: activities, browse: true)
+                        .searchCompetitionExercises(query, allowed: activities, browse: true, templatesOnly: templatesOnly)
                     guard !Task.isCancelled else { return }
                     results = fetched
                     loading = false
@@ -87,7 +99,7 @@ struct ATHLTHCompetitionExercisePicker: View {
     private func row(_ item: ATHLTHTournamentExerciseSearchResult) -> some View {
         let alreadySelected = selected.contains(item.id) || added.contains(item.id)
         return Button {
-            guard !alreadySelected, selected.union(added).count < selectionLimit else { return }
+            guard !alreadySelected, item.hasSupportedMetric, selected.union(added).count < selectionLimit else { return }
             added.insert(item.id)
             onSelect(item)
         } label: {
@@ -100,7 +112,7 @@ struct ATHLTHCompetitionExercisePicker: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.name).font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
-                    Text(item.activity.title).font(.caption)
+                    Text(item.isActivityTemplate ? item.resultDescription : item.activity.title).font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
                 Spacer()
@@ -110,6 +122,6 @@ struct ATHLTHCompetitionExercisePicker: View {
             .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
-        .disabled(alreadySelected || selected.union(added).count >= selectionLimit)
+        .disabled(alreadySelected || !item.hasSupportedMetric || selected.union(added).count >= selectionLimit)
     }
 }

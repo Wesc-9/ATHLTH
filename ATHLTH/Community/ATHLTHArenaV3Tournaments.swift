@@ -74,6 +74,9 @@ struct ATHLTHTournamentCreator: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingExerciseLibrary = false
     @State private var exerciseTemplatesOnly: Bool? = nil
+    @State private var exercisePickerActivity: ATHLTHTournamentActivity?
+    @State private var pendingCustomActivity: ATHLTHTournamentActivity?
+    @Environment(\.dynamicTypeSize) private var competitionDynamicType
     @State private var showingDuelRoute = false
     @State private var addingRouteMeasure = false
     @State private var routeMeasureActivity: ATHLTHTournamentActivity = .running
@@ -157,6 +160,7 @@ struct ATHLTHTournamentCreator: View {
     @State private var draftCreatedAt: Date
     @State private var rematchNames: [UUID: String] = [:]
     @State private var exerciseMetrics: [UUID: String] = [:]
+    @State private var exerciseDetails: [UUID: ATHLTHTournamentExerciseSearchResult] = [:]
     @State private var exerciseActivities: [UUID: ATHLTHTournamentActivity] = [:]
     private var usesExplicitExercises: Bool { isRematch || competitionSettings.selectedExerciseIDs != nil || competitionSettings.race.effectiveScoringMode.needsGoal }
     private var scoringValid: Bool {
@@ -165,7 +169,8 @@ struct ATHLTHTournamentCreator: View {
         let ids = competitionSettings.selectedExerciseIDs ?? []
         if ids.contains(where: { id in
             guard let activity = exerciseActivities[id] else { return true }
-            return !activity.isAvailableForCreation || !allowedActivities.contains(activity)
+            return !activity.isAvailableForCreation || !allowedActivities.contains(activity) ||
+                exerciseDetails[id]?.hasSupportedMetric != true
         }) { return false }
         if usesExplicitExercises && (ids.isEmpty || exerciseMode != .owner || ids.count != exerciseCount) { return false }
         if competitionSettings.race.effectiveScoringMode.needsGoal {
@@ -466,17 +471,29 @@ struct ATHLTHTournamentCreator: View {
             .safeAreaInset(edge: .bottom) { creationFooter }
         }
         .athlthStablePresentationBoundary()
-        .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase)) {
-            ATHLTHCompetitionExercisePicker(allowed: allowedActivities,
+        .sheet(isPresented: $showingExerciseLibrary.keepingPresentedWhenInactive(scenePhase), onDismiss: {
+            if let activity = pendingCustomActivity {
+                pendingCustomActivity = nil
+                convertingLibraryID = nil
+                editingMeasure = ATHLTHCompetitionMeasureDraft(activity: activity, measure: .fastestDistance)
+            }
+        }) {
+            let pickerActivities = exercisePickerActivity.map { Set([$0]) } ?? allowedActivities
+            ATHLTHCompetitionExercisePicker(allowed: pickerActivities,
                 selected: Set(competitionSettings.selectedExerciseIDs ?? []), templatesOnly: exerciseTemplatesOnly,
-                selectionLimit: max(0, 12 - plannedMeasures.count)) { item in
+                selectionLimit: max(0, 12 - plannedMeasures.count),
+                onCustom: exercisePickerActivity.flatMap { activity in
+                    (activity == .running || activity == .walking) ? { pendingCustomActivity = activity } : nil
+                }) { item in
                 var ids = competitionSettings.selectedExerciseIDs ?? []
-                guard totalExerciseCount < 12, !ids.contains(item.id), item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
+                guard totalExerciseCount < 12, !ids.contains(item.id), item.hasSupportedMetric,
+                      item.activity.isAvailableForCreation, allowedActivities.contains(item.activity) else { return }
                 exerciseMode = .owner
                 competitionSettings.coachExerciseIDs = []
                 ids.append(item.id)
                 rematchNames[item.id] = item.name
                 exerciseMetrics[item.id] = item.metric
+                exerciseDetails[item.id] = item
                 exerciseActivities[item.id] = item.activity
                 competitionSettings.selectedExerciseIDs = ids
                 exerciseCount = totalExerciseCount
@@ -511,23 +528,21 @@ struct ATHLTHTournamentCreator: View {
         }
         .task(id: competitionSettings.selectedExerciseIDs ?? []) {
             let missing = (competitionSettings.selectedExerciseIDs ?? []).filter {
-                rematchNames[$0] == nil || exerciseActivities[$0] == nil || exerciseMetrics[$0] == nil
+                exerciseDetails[$0] == nil
             }
             guard !missing.isEmpty else { return }
             do {
                 let service = ATHLTHTournamentLobbyCloudService()
-                async let labels = service.exerciseLabels(ids: missing)
-                async let metrics = service.exerciseMetrics(ids: missing)
-                async let activities = service.exerciseActivities(ids: missing)
-                let (names, measures, kinds) = try await (labels, metrics, activities)
+                let details = try await service.competitionExerciseDetails(ids: missing)
                 guard !Task.isCancelled else { return }
-                for (id, name) in names { rematchNames[id] = name }
-                for (id, metric) in measures { exerciseMetrics[id] = metric }
-                for (id, activity) in kinds {
-                    exerciseActivities[id] = activity
-                    if exerciseMetrics[id] == nil { exerciseMetrics[id] = "repetitions" }
+                for item in details {
+                    rematchNames[item.id] = item.name
+                    exerciseMetrics[item.id] = item.metric
+                    exerciseActivities[item.id] = item.activity
+                    exerciseDetails[item.id] = item
                 }
-                rematchSearchError = nil
+                rematchSearchError = Set(details.map(\.id)).isSuperset(of: Set(missing)) ? nil :
+                    "Noen konkurranseøvelser er ikke tilgjengelige. Fjern dem eller prøv igjen."
             } catch {
                 if !Task.isCancelled { rematchSearchError = "Kunne ikke hente øvelsesdetaljer. Prøv igjen når du er tilkoblet." }
             }
@@ -1262,11 +1277,16 @@ struct ATHLTHTournamentCreator: View {
                     } label: { Image(systemName: "minus.circle").frame(width: 44, height: 44) }
                     .buttonStyle(.plain)
                 }
-                if exerciseActivities[id] == .strength, let name = rematchNames[id] {
+                if let details = exerciseDetails[id] {
+                    Label(details.resultDescription, systemImage: details.isActivityTemplate ? "checkmark.seal" : "chart.bar")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                if let details = exerciseDetails[id], details.canCustomizeMeasure {
                     Button {
                         convertingLibraryID = id
                         editingMeasure = ATHLTHCompetitionMeasureDraft(activity: .strength,
-                            measure: .heaviest, libraryID: id, libraryName: name)
+                            measure: .mostReps, libraryID: id, libraryName: details.name)
                     } label: {
                         Label("Tilpass resultatmål", systemImage: "slider.horizontal.3")
                             .font(.caption.weight(.medium))
@@ -1340,49 +1360,7 @@ struct ATHLTHTournamentCreator: View {
                 }
                 Divider()
             }
-            Menu {
-                Button {
-                    exerciseTemplatesOnly = false
-                    showingExerciseLibrary = true
-                } label: {
-                    Label("Øvelser fra bibliotek", systemImage: "books.vertical")
-                }
-                Button {
-                    exerciseTemplatesOnly = true
-                    showingExerciseLibrary = true
-                } label: {
-                    Label("Forhåndsdefinerte øvelser og treningsøkter", systemImage: "list.bullet")
-                }
-                ForEach([ATHLTHTournamentActivity.running, .walking].filter { allowedActivities.contains($0) }) { activity in
-                    Menu(activity.title) {
-                        ForEach(ATHLTHCompetitionMeasure.cardio.filter { activity == .running || $0 != .sprint }) { measure in
-                            Button(measure.title) {
-                                convertingLibraryID = nil
-                                editingMeasure = ATHLTHCompetitionMeasureDraft(activity: activity, measure: measure)
-                            }
-                        }
-                        Button("Rute fra bibliotek") {
-                            routeMeasureActivity = activity
-                            addingRouteMeasure = true
-                            showingDuelRoute = true
-                        }
-                    }
-                }
-                Button {
-                    exerciseTemplatesOnly = nil
-                    showingExerciseLibrary = true
-                } label: {
-                    Label("Søk i alle", systemImage: "magnifyingglass")
-                }
-            } label: {
-                Label("Legg til konkurranseøvelse", systemImage: "plus.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHArenaV3Style.gold)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-            .disabled(!ATHLTHTournamentActivity.canCreate(with: allowedActivities) || totalExerciseCount >= 12)
+            competitionAddButtons
             if isDuel && allowedActivities.contains(.running) {
                 Divider()
                 Button {
@@ -1437,6 +1415,67 @@ struct ATHLTHTournamentCreator: View {
         }
         .padding(15).background(ATHLTHArenaV3Style.panel())
 
+    }
+
+    private func openExercisePicker(templates: Bool, activity: ATHLTHTournamentActivity? = nil) {
+        exerciseTemplatesOnly = templates
+        exercisePickerActivity = activity
+        showingExerciseLibrary = true
+    }
+
+    private var competitionAddButtons: some View {
+        let enabled = ATHLTHTournamentActivity.canCreate(with: allowedActivities) && totalExerciseCount < 12
+        let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 8),
+                            count: competitionDynamicType.isAccessibilitySize ? 2 : 3)
+        return LazyVGrid(columns: columns, spacing: 8) {
+            if allowedActivities.contains(.strength) {
+                competitionAddButton("Øvelser", symbol: "dumbbell") {
+                    openExercisePicker(templates: false, activity: .strength)
+                }
+            }
+            competitionAddButton("Forhåndsdef.", symbol: "list.bullet.rectangle", accessibilityTitle: "Forhåndsdefinerte øvelser") {
+                openExercisePicker(templates: true)
+            }
+            ForEach([ATHLTHTournamentActivity.running, .walking].filter { allowedActivities.contains($0) }) { activity in
+                competitionAddButton(activity.title, symbol: activity.symbol) {
+                    openExercisePicker(templates: true, activity: activity)
+                }
+                competitionAddButton(activity == .running ? "Løperute" : "Gårute",
+                                     symbol: "point.topleft.down.curvedto.point.bottomright.up",
+                                     subtitle: "Utkast") {
+                    routeMeasureActivity = activity
+                    addingRouteMeasure = true
+                    showingDuelRoute = true
+                }
+            }
+        }
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.5)
+    }
+
+    private func competitionAddButton(_ title: String, symbol: String,
+                                      accessibilityTitle: String? = nil, subtitle: String? = nil,
+                                      action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 20, weight: .medium))
+                Text(title).font(.caption.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                if let subtitle {
+                    Text(subtitle).font(.caption2)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
+            .foregroundStyle(ATHLTHArenaV3Style.gold)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 76)
+            .background(ATHLTHArenaV3Style.cream, in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityTitle ?? title)
+        .accessibilityHint(subtitle ?? "Legg til konkurranseøvelse")
     }
 
     private func exerciseVenuePicker(id: UUID, activity: ATHLTHTournamentActivity) -> some View {
@@ -1995,6 +2034,9 @@ struct ATHLTHTournamentCreator: View {
                     Label(rematchNames[id] ?? "Valgt øvelse", systemImage: exerciseActivities[id]?.symbol ?? "figure.mixed.cardio")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    if let details = exerciseDetails[id] {
+                        reviewRow("Resultatmål", details.resultDescription)
+                    }
                     if let goal = competitionSettings.race.goal(for: id), competitionSettings.race.effectiveScoringMode.needsGoal {
                         reviewRow("Mål", goal.formatted())
                     }
