@@ -518,16 +518,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     var body: some View {
         // Bound metadata decoding for the full plan wizard; an unbounded
         // SwiftUI generic chain exhausted the iPhone main-thread stack.
-        AnyView(planPresentations)
-            .allowsHitTesting(!showingPlanExitSheet)
-            .accessibilityHidden(showingPlanExitSheet)
-            .overlay {
-                if showingPlanExitSheet {
-                    AnyView(planExitOverlay)
-                }
+        ZStack {
+            AnyView(planPresentations)
+                .allowsHitTesting(!showingPlanExitSheet)
+                .accessibilityHidden(showingPlanExitSheet)
+            if showingPlanExitSheet {
+                AnyView(planExitOverlay)
+                    .zIndex(1)
             }
-            .tint(ATHLTHTrainDesign.bronze)
-            .interactiveDismissDisabled(!completedPlanCreation)
+        }
+        .tint(ATHLTHTrainDesign.bronze)
+        .interactiveDismissDisabled(!completedPlanCreation)
     }
 
     // Footer buttons belong to the *plan* column. The workout editor
@@ -542,6 +543,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             : ATHLTHTrainDesign.bronze
                                 .opacity(0.28)
                 )
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
 
                 AnyView(content)
             }
@@ -1569,10 +1572,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // A dedicated reference-inspired goal screen, kept behind a stable
     // AnyView boundary just like the other stages in this large wizard.
     private var goalChoice: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                referenceGoalProgressHeader
-                ATHLTHPlanGoalEntryView(
+        VStack(spacing: 0) {
+            referenceGoalProgressHeader
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+                .frame(maxWidth: planContentWidth)
+                .frame(maxWidth: .infinity)
+                .background(ATHLTHTrainDesign.canvas)
+                .zIndex(1)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ATHLTHPlanGoalEntryView(
                     area: selectedGoalArea,
                     selectedChoice: selectedGoalChoice,
                     onChooseArea: { newArea in
@@ -1595,16 +1606,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         goal = .improveFitness
                     }
                 )
-                // Direction is selected here. The following standalone
-                // step creates or links the goal before plan setup begins.
+                    // Direction is selected here. The following standalone
+                    // step creates or links the goal before plan setup begins.
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 26)
+                .frame(maxWidth: planContentWidth)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 10)
-            .padding(.bottom, 26)
-            .frame(maxWidth: planContentWidth)
-            .frame(maxWidth: .infinity)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
     }
 
@@ -1681,7 +1692,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .overlay {
                         Capsule()
                             .strokeBorder(sourceGold.opacity(0.12), lineWidth: 0.7)
+                            .allowsHitTesting(false)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("athlth-plan-cancel")
@@ -1720,6 +1733,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
             .accessibilityHidden(true)
+            .allowsHitTesting(false)
         }
         .padding(.top, 4)
     }
