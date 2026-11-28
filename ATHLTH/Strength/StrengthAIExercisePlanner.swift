@@ -164,6 +164,7 @@ private final class StrengthAIExerciseService {
 
 struct StrengthAIExercisePlannerView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary:
         ExerciseLibraryStore
 
@@ -1060,6 +1061,10 @@ struct StrengthAIExercisePlannerView: View {
     }
 
     private func generate() {
+        guard session.signedIn, session.hasPaidAccess else {
+            errorMessage = (session.signedIn ? AIProgramError.premiumRequired : AIProgramError.sessionExpired).localizedDescription
+            return
+        }
         guard !isGenerating else {
             return
         }
