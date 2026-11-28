@@ -346,7 +346,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             initialAdvanced
         // The entry screen always offers three clear starting paths.
         // The existing basics/profile/week/review steps remain intact.
-        _step = State(initialValue: editingPlan == nil ? .mode : .review)
+        _step = State(initialValue: editingPlan == nil ? .mode : .week)
         _entryChoice = State(initialValue: initialAdvanced ? .advanced : .simple)
         _mode = State(
             initialValue:
@@ -1529,9 +1529,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                if step == .week && mode == .advanced {
+                if step == .week && (mode == .advanced || isEditingExisting) {
                     AnyView(sourceChoiceHeader)
-                } else {
+                } else if !isEditingExisting {
                     AnyView(progressHeader)
                 }
                 page
@@ -2201,7 +2201,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var sourceChoiceHeader: some View {
-        VStack(spacing: step == .mode ? 12 : 22) {
+        if isEditingExisting && step == .week {
+            return AnyView(existingPlanDayHeader)
+        }
+        return AnyView(VStack(spacing: step == .mode ? 12 : 22) {
             HStack(spacing: 8) {
                 Button(action: requestClosePlanCreation) {
                     Text(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"))
@@ -2250,11 +2253,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
             .accessibilityHidden(true)
-        }
+        })
     }
 
-
-
+    private var existingPlanDayHeader: some View {
+        HStack(spacing: 10) {
+            Button(action: requestClosePlanCreation) {
+                Text(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"))
+                    .font(.subheadline)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 44)
+                    .background(.white, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-plan-cancel")
+            Spacer(minLength: 0)
+            Text(resolvedPlanTitle)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button {
+                openGuidedSummary()
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(.white, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(english: "Plan settings and overview", norwegian: "Planinnstillinger og oversikt"))
+            .accessibilityIdentifier("athlth-edit-plan-settings")
+        }
+        .foregroundStyle(sourceInk)
+    }
 
     private var sourceContinueBar: some View {
         VStack(spacing: 0) {
@@ -7180,7 +7211,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("athlth-plan-previous")
         .accessibilityLabel(
-            reviewingGuidedDay && step == .week
+            isEditingExisting && step == .review
+                ? ATHLTHLocalization.choose(english: "Back to day editor", norwegian: "Til dagsplanen")
+                : reviewingGuidedDay && step == .week
                 ? ATHLTHLocalization.choose(english: "Back to summary", norwegian: "Til sammendraget")
                 : step == .week && mode == .advanced && weekPlanningApproach == .guided && guidedDayCursor > 0
                     ? ATHLTHLocalization.choose(english: "Previous day", norwegian: "Forrige dag")
@@ -7189,7 +7222,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var bottomActionBar: some View {
-        VStack(spacing: 0) {
+        if isEditingExisting && step == .week {
+            return AnyView(existingPlanDayActions)
+        }
+        return AnyView(VStack(spacing: 0) {
             Divider()
                 .opacity(0.35)
 
@@ -7293,7 +7329,46 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .background(
                 .ultraThinMaterial
             )
+        })
+    }
+
+    private var existingPlanDayActions: some View {
+        HStack(spacing: 10) {
+            Button { guidedDayCursor = max(0, guidedDayCursor - 1) } label: {
+                Image(systemName: "chevron.left")
+                    .font(.subheadline.bold())
+                    .frame(width: 48, height: 48)
+                    .background(ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 15))
+            }
+            .buttonStyle(.plain)
+            .disabled(guidedDayCursor == 0)
+            .accessibilityLabel(ATHLTHLocalization.choose(english: "Previous day", norwegian: "Forrige dag"))
+
+            Button { createPlan(seedSuggestedWeek: false) } label: {
+                Label(ATHLTHLocalization.choose(english: "Save changes", norwegian: "Lagre endringer"), systemImage: "checkmark")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(ATHLTHTrainDesign.bronze.gradient, in: RoundedRectangle(cornerRadius: 15))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canCreatePlan || isCreatingPlan || isGuidedAIFilling)
+            .accessibilityIdentifier("athlth-edit-plan-save")
+
+            Button { guidedDayCursor = min(weekCount * 7 - 1, guidedDayCursor + 1) } label: {
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.bold())
+                    .frame(width: 48, height: 48)
+                    .background(ATHLTHTrainDesign.paleGold, in: RoundedRectangle(cornerRadius: 15))
+            }
+            .buttonStyle(.plain)
+            .disabled(guidedDayCursor >= weekCount * 7 - 1)
+            .accessibilityLabel(ATHLTHLocalization.choose(english: "Next day", norwegian: "Neste dag"))
         }
+        .foregroundStyle(ATHLTHTrainDesign.bronze)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
     }
 
     private var backButtonTitle: String {
@@ -7490,7 +7565,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         weekDayEdits = edits
         weekPlanningApproach = .guided
         firstGuidedWeekDecisionMade = true
-        step = .review
+        reviewingGuidedDay = true
+        // Existing schedules open on today when it is inside the plan.
+        // Reusable, future and ended plans start on their first date.
+        let offset = calendar.dateComponents([.day], from: originalEditAnchor, to: today).day ?? 0
+        let withinPlan = !editingReusablePlan && offset >= 0 && offset < weekCount * 7 &&
+            (plan.endDate.map { today <= calendar.startOfDay(for: $0) } ?? true)
+        guidedDayCursor = withinPlan ? offset : 0
+        selectedPlanWeekIndex = guidedDayCursor / 7
+        step = .week
         Task { @MainActor in
             await Task.yield()
             isHydratingPlanDraft = false
@@ -7746,7 +7829,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     /// Day detail is an internal route, not an instruction to leave the plan.
     private func goBackInPlanBuilder() {
-        if isEditingExisting && step == .review { requestClosePlanCreation(); return }
+        if isEditingExisting && step == .review {
+            guidedDayCursor = min(max(0, guidedDayCursor), weekCount * 7 - 1)
+            selectedPlanWeekIndex = guidedDayCursor / 7
+            reviewingGuidedDay = true
+            weekPlanningApproach = .guided
+            step = .week
+            return
+        }
         if reviewingGuidedDay && step == .week {
             openGuidedSummary()
             return
