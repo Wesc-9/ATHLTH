@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// Local, draft-scoped drag identity. Never accepts a foreign plan's payload.
+struct ATHLTHPlanDragPayload {
+    let dateKey: Int
+    let workout: Int
+    let block: UUID?
+
+    static func encode(scope: String, key: Int, workout: Int, block: UUID? = nil) -> String {
+        "\(scope)|\(key)|\(workout)|\(block?.uuidString ?? "-")"
+    }
+
+    static func decode(_ value: String, scope: String) -> Self? {
+        let fields = value.split(separator: "|")
+        guard fields.count == 4, fields[0] == scope,
+              let key = Int(fields[1]), let workout = Int(fields[2]), workout >= 0 else { return nil }
+        let block = UUID(uuidString: String(fields[3]))
+        guard fields[3] == "-" || block != nil else { return nil }
+        return Self(dateKey: key, workout: workout, block: block)
+    }
+}
+
 /// New presentation for the existing dated ATHLTHPlanWeekDayEdit engine.
 /// Never owns a separate draft: every action updates the parent wizard.
 struct ATHLTHAdvancedGuidedDayView: View {
@@ -13,6 +33,11 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let isRestDay: Bool
     var suggestedTraining: Bool? = nil
     var pinsDayActions = false
+    var dragScope = ""
+    var dateKey = 0
+    var onDropItem: (String, Int?, WorkoutPhaseKind?, UUID?) -> Bool = { _, _, _, _ in false }
+    var onDeleteBlock: (Int, UUID) -> Void = { _, _ in }
+    var onClearDay: () -> Void = {}
     let onSelectDay: (Int) -> Void
     let onAddExercise: (WorkoutPhaseKind, Int) -> Void
     let onAddWorkout: () -> Void
@@ -28,6 +53,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
     @State private var pendingWorkoutDeletion: Int?
     @State private var confirmingWorkoutDeletion = false
     @State private var showingDayPicker = false
+    @State private var pendingBlockDeletion: (Int, UUID)?
+    @State private var confirmingBlockDeletion = false
     private let ink = ATHLTHTrainDesign.ink
     private let secondary = ATHLTHTrainDesign.secondary
     private let gold = ATHLTHTrainDesign.bronze
@@ -80,6 +107,14 @@ struct ATHLTHAdvancedGuidedDayView: View {
             Text(tr("Only this workout will be removed from the day.",
                     "Kun denne treningsøkten fjernes fra dagen."))
         }
+        .alert(tr("Delete step or linked group?", "Slette deløkten eller tilhørende gruppe?"),
+               isPresented: $confirmingBlockDeletion) {
+            Button(tr("Delete", "Slett"), role: .destructive) {
+                if let item = pendingBlockDeletion { onDeleteBlock(item.0, item.1) }
+                pendingBlockDeletion = nil
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) { pendingBlockDeletion = nil }
+        }
         .confirmationDialog(
             tr("Replace workouts with a rest day?", "Erstatte øktene med en hviledag?"),
             isPresented: $confirmingRestReplacement, titleVisibility: .visible
@@ -96,6 +131,18 @@ struct ATHLTHAdvancedGuidedDayView: View {
         VStack(alignment: .leading, spacing: 13) {
             header
             if pinsDayActions { dayDetails }
+            if isRestDay || !workouts.isEmpty {
+                HStack {
+                    Spacer()
+                    Button(role: .destructive, action: onClearDay) {
+                        Label(tr("Clear day", "Slett planlegging for dagen"), systemImage: "trash")
+                            .font(.caption.weight(.medium))
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(secondary)
+                }
+            }
             if isRestDay {
                 restDayCard
             } else if workouts.isEmpty {
@@ -378,6 +425,13 @@ struct ATHLTHAdvancedGuidedDayView: View {
         _ workout: ATHLTHPlanStructuredWorkoutBlueprint, index: Int
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(secondary)
+                .frame(width: 30, height: 44)
+                .contentShape(Rectangle())
+                .draggable(ATHLTHPlanDragPayload.encode(scope: dragScope, key: dateKey, workout: index))
+                .accessibilityLabel(tr("Drag workout", "Dra treningsøkt"))
             Button { onEditWorkout(index) } label: {
                 HStack(spacing: 9) {
                     Image(systemName: workout.kind.systemImage)
@@ -400,6 +454,10 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 }
             }
             .buttonStyle(.plain)
+            }
+            .dropDestination(for: String.self) { items, _ in
+                items.first.map { onDropItem($0, index, .main, nil) } ?? false
+            }
             HStack {
                 Spacer(minLength: 0)
                 Button(role: .destructive) {
@@ -417,6 +475,19 @@ struct ATHLTHAdvancedGuidedDayView: View {
             }
             ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
                 phaseSection(section, workoutIndex: index, workout: workout)
+            }
+            // Empty phases are also valid drop targets.
+            let existingPhases = Set(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks).map(\.phase))
+            ForEach([WorkoutPhaseKind.warmup, .main, .cooldown].filter { !existingPhases.contains($0) }, id: \.self) { phase in
+                Label(phase.title, systemImage: phase.symbol)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(secondary)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .background(canvas, in: RoundedRectangle(cornerRadius: 9))
+                    .dropDestination(for: String.self) { items, _ in
+                        items.first.map { onDropItem($0, index, phase, nil) } ?? false
+                    }
             }
             // Additional workouts are inserted by the common gold action
             // below every day, not by a second control inside the first card.
@@ -455,6 +526,10 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 }
                 .accessibilityLabel(tr("Add to", "Legg til i") + " " + phase.title)
             }
+            .contentShape(Rectangle())
+            .dropDestination(for: String.self) { items, _ in
+                items.first.map { onDropItem($0, workoutIndex, phase, nil) } ?? false
+            }
             ForEach(Array(blocks.enumerated()), id: \.element.editorDragID) { pair in
                 if let groupID = pair.element.groupID,
                    let groupKind = pair.element.groupKind {
@@ -474,6 +549,16 @@ struct ATHLTHAdvancedGuidedDayView: View {
                                 }
                             }
                         )
+                        .draggable(ATHLTHPlanDragPayload.encode(scope: dragScope, key: dateKey, workout: workoutIndex, block: pair.element.editorDragID))
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                pendingBlockDeletion = (workoutIndex, pair.element.editorDragID)
+                                confirmingBlockDeletion = true
+                            } label: { Label(tr("Delete group", "Slett gruppe"), systemImage: "trash") }
+                        }
+                        .dropDestination(for: String.self) { items, _ in
+                            items.first.map { onDropItem($0, workoutIndex, phase, pair.element.editorDragID) } ?? false
+                        }
                     }
                 } else {
                 Button {
@@ -517,6 +602,16 @@ struct ATHLTHAdvancedGuidedDayView: View {
                         in: RoundedRectangle(cornerRadius: 9))
                 }
                 .buttonStyle(.plain)
+                .draggable(ATHLTHPlanDragPayload.encode(scope: dragScope, key: dateKey, workout: workoutIndex, block: pair.element.editorDragID))
+                .dropDestination(for: String.self) { items, _ in
+                    items.first.map { onDropItem($0, workoutIndex, phase, pair.element.editorDragID) } ?? false
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        pendingBlockDeletion = (workoutIndex, pair.element.editorDragID)
+                        confirmingBlockDeletion = true
+                    } label: { Label(tr("Delete step", "Slett deløkt"), systemImage: "trash") }
+                }
                 .accessibilityHint(tr(
                     "Edit the duration, pace, intensity or recovery for this step.",
                     "Rediger varighet, tempo, intensitet eller pause for denne deløkten."
