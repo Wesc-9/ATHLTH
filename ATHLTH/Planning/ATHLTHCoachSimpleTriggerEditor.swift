@@ -273,10 +273,6 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 }
             }
 
-            if family == .distance {
-                choice(.distance, title: tr("From start", "Fra start"))
-                choice(.nearFinishDistance, title: tr("To goal", "Til mål"))
-            }
             if family == .finish {
                 choice(.nearFinishTime)
                 choice(.nearFinishDistance)
