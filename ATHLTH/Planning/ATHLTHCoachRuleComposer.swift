@@ -152,7 +152,7 @@ struct ATHLTHCoachRuleComposer: View {
     var onCheckpoint: ((ATHLTHCoachComposerCheckpoint) -> Void)? = nil
 
     private enum Stage: String {
-        case name, trigger, commands
+        case trigger, commands
     }
 
     @State private var stage: Stage
@@ -228,9 +228,9 @@ struct ATHLTHCoachRuleComposer: View {
 
         _stage = State(initialValue:
             checkpoint.flatMap { Stage(rawValue: $0.stage) } ??
-            (target.startAtTrigger ? .trigger :
-                (target.groupID != nil || target.ruleID != nil) ? .commands :
-                (target.isGroup ? .name : .trigger)))
+            (checkpoint?.stage == "name" || target.startAtTrigger
+                ? .trigger
+                : (target.groupID != nil || target.ruleID != nil) ? .commands : .trigger))
         _groupName = State(initialValue:
             checkpoint?.groupName ?? group?.name ?? "")
         _trigger = State(initialValue: checkpoint?.trigger ??
@@ -383,8 +383,6 @@ struct ATHLTHCoachRuleComposer: View {
                     .padding(.bottom, 4)
 
                     switch stage {
-                    case .name:
-                        nameStep
                     case .trigger:
                         ATHLTHCoachSimpleTriggerEditor(
                             trigger: $trigger,
@@ -414,17 +412,8 @@ struct ATHLTHCoachRuleComposer: View {
                             .background(bronze, in: RoundedRectangle(cornerRadius: 17))
                         }
                         .buttonStyle(.plain)
-                        .disabled(
-                            (stage == .name &&
-                                groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ||
-                            (stage == .trigger && !canAdvanceTrigger)
-                        )
-                        .opacity(
-                            (stage == .name &&
-                                groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ||
-                            (stage == .trigger && !canAdvanceTrigger)
-                            ? 0.45 : 1
-                        )
+                        .disabled(!canAdvanceTrigger)
+                        .opacity(canAdvanceTrigger ? 1 : 0.45)
                     }
                 }
                 .padding(18)
@@ -443,10 +432,9 @@ struct ATHLTHCoachRuleComposer: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(stage == .name || (stage == .trigger && !target.isGroup)
+                    Button(stage == .trigger
                         ? tr("Cancel", "Avbryt") : tr("Back", "Tilbake")) {
                         if stage == .commands { stage = .trigger }
-                        else if stage == .trigger && target.isGroup { stage = .name }
                         else { onClose() }
                     }
                 }
@@ -469,25 +457,18 @@ struct ATHLTHCoachRuleComposer: View {
 
     private var stageLabel: String {
         switch stage {
-        case .name: tr("STEP 1 OF 3", "STEG 1 AV 3")
-        case .trigger: target.isGroup
-            ? tr("STEP 2 OF 3", "STEG 2 AV 3") : tr("STEP 1 OF 2", "STEG 1 AV 2")
-        case .commands: target.isGroup
-            ? tr("STEP 3 OF 3", "STEG 3 AV 3") : tr("STEP 2 OF 2", "STEG 2 AV 2")
+        case .trigger: tr("STEP 1 OF 2", "STEG 1 AV 2")
+        case .commands: tr("STEP 2 OF 2", "STEG 2 AV 2")
         }
     }
     private var stageHeadline: String {
         switch stage {
-        case .name: tr("Name your group", "Gi gruppen et navn")
         case .trigger: tr("When should Coach speak?", "Når skal Coach snakke?")
         case .commands: tr("What should Coach say?", "Hva skal Coach si?")
         }
     }
     private var stageHelp: String {
         switch stage {
-        case .name: tr(
-            "Use a name that describes the announcement.",
-            "Velg et navn som beskriver hva gruppen skal gjøre.")
         case .trigger: tr(
             "Choose one trigger. It controls every command in this group or single command.",
             "Velg én trigger. Den styrer alle kommandoene i gruppen eller enkeltkommandoen.")
@@ -499,20 +480,34 @@ struct ATHLTHCoachRuleComposer: View {
         }
     }
 
-    private var nameStep: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(tr("GROUP NAME", "GRUPPENAVN"))
-                .font(.caption2.weight(.bold))
-                .tracking(1.2)
+    private var groupNameRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "pencil")
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(bronze)
-            TextField(tr("For example: Every kilometre", "F.eks. Hver kilometer"),
-                      text: $groupName)
-                .font(.subheadline)
-                .textInputAutocapitalization(.sentences)
-                .padding(16)
-                .background(.white, in: RoundedRectangle(cornerRadius: 16))
-                .accessibilityIdentifier("athlth-coach-group-name")
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(tr("GROUP NAME", "GRUPPENAVN"))
+                    .font(.caption2.weight(.semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(muted)
+                TextField(tr("Name your group", "Gi gruppen et navn"),
+                          text: $groupName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .textInputAutocapitalization(.sentences)
+                    .submitLabel(.done)
+                    .accessibilityLabel(tr("Group name", "Gruppenavn"))
+                    .accessibilityIdentifier("athlth-coach-group-name")
+                    .onChange(of: groupName) { _, value in
+                        if value.count > 60 { groupName = String(value.prefix(60)) }
+                    }
+            }
+            Spacer(minLength: 0)
         }
+        .padding(10)
+        .frame(minHeight: 44)
+        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // The old duplicated selected/list interface is replaced by one
@@ -554,6 +549,9 @@ struct ATHLTHCoachRuleComposer: View {
 
     private var commandPreview: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if target.isGroup {
+                groupNameRow
+            }
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "waveform")
                     .font(.system(size: 23, weight: .medium))
@@ -866,10 +864,6 @@ struct ATHLTHCoachRuleComposer: View {
 
     private func next() {
         switch stage {
-        case .name:
-            if !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stage = .trigger
-            }
         case .trigger:
             guard canAdvanceTrigger else { return }
             // New triggers should work on first save without searching a
