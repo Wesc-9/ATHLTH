@@ -2864,6 +2864,10 @@ struct AIProgramBuilderView: View {
 
     @MainActor
     private func generatePreview() async {
+        guard session.signedIn, session.hasPaidAccess else {
+            errorMessage = (session.signedIn ? AIProgramError.premiumRequired : AIProgramError.sessionExpired).localizedDescription
+            return
+        }
         guard canGenerate else {
             if let until = coachRetryUntil, Date() < until {
                 let remaining = max(1, Int(ceil(until.timeIntervalSinceNow)))
