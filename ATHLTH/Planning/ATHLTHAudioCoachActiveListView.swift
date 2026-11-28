@@ -91,6 +91,16 @@ struct ATHLTHAudioCoachActiveListView: View {
         return draft.configuration() != baselineConfiguration
     }
 
+    /// Applying an unchanged profile to this workout is different from
+    /// editing a reusable template. Keep the compact toolbar label explicit.
+    private var workoutSaveTitle: String {
+        if !globalScope, draft.enabled, baselineConfiguration != nil,
+           !hasUnsavedTemplateChanges, !isNewEmptyTemplate {
+            return tr("Use profile", "Bruk profil")
+        }
+        return tr("Save", "Lagre")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
@@ -194,12 +204,12 @@ struct ATHLTHAudioCoachActiveListView: View {
                 if let saveAndClose {
                     // Save the latest bound session state and dismiss only
                     // this Audio Coach sheet, restoring its presenting screen.
-                    Button(tr("Save", "Lagre"), action: saveAndClose)
+                    Button(workoutSaveTitle, action: saveAndClose)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(bronze)
                         .accessibilityIdentifier("athlth-coach-save-top")
                 } else if let applySelectionAndClose, !globalScope {
-                    Button(tr("Save", "Lagre")) {
+                    Button(workoutSaveTitle) {
                         // applyTemplateDestination establishes a fresh baseline
                         // after choosing Standard or a saved profile. Its bound
                         // configuration is already the current workout choice.
