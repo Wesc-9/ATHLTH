@@ -19,7 +19,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
 
     private enum Family: String, CaseIterable, Identifiable {
         case distance, time, section, step, pause, heartZone
-        case motivation, finish, elevation, pace, history, record
+        case motivation, finish, elevation, pace, history, record, progress, ghost, strength
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -35,6 +35,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .pace: return ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo")
             case .history: return ATHLTHLocalization.choose(english: "Previous workout", norwegian: "Tidligere økt")
             case .record: return ATHLTHLocalization.choose(english: "Personal record", norwegian: "Personlig rekord")
+            case .progress: return ATHLTHLocalization.choose(english: "Milestone", norwegian: "Milepæl")
+            case .ghost: return "Ghost Race"
+            case .strength: return ATHLTHLocalization.choose(english: "Strength sets", norwegian: "Styrkesett")
             }
         }
         var icon: String {
@@ -51,6 +54,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .pace: "speedometer"
             case .history: "clock.arrow.circlepath"
             case .record: "trophy"
+            case .progress: "flag"
+            case .ghost: "figure.run"
+            case .strength: "dumbbell"
             }
         }
     }
@@ -64,14 +70,17 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .distance: .distance
         case .time: .time
         case .zoneEnter, .zoneExit, .heartRateAbove, .heartRateBelow,
-             .zoneBelow, .plannedZoneBelow, .plannedZoneOutside: .heartZone
+             .zoneBelow, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget: .heartZone
         case .randomMotivation: .motivation
         case .personalRecordConfirmed: .record
+        case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: .progress
+        case .ghostAhead, .ghostBehind: .ghost
+        case .lastStrengthSet: .strength
         case .nearFinishTime: .finish
         case .nearFinishDistance: .finish
         case .slowerThanPreviousWorkout: .history
         case .elevationGain, .uphillDetected: .elevation
-        case .paceFasterThanTarget, .paceSlowerThanTarget,
+        case .paceFasterThanTarget, .paceSlowerThanTarget, .paceBackInTarget,
              .paceFasterOverall, .paceFasterLastKilometer: .pace
         case .workoutStart, .warmupStart, .warmupEnd, .mainStart, .mainEnd,
              .cooldownStart, .cooldownEnd, .beforeMain, .beforeCooldown: .section
@@ -142,6 +151,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .pace: return available(.paceSlowerThanTarget) ||
             available(.paceFasterOverall) || available(.paceFasterLastKilometer)
         case .record: return available(.personalRecordConfirmed)
+        case .progress: return available(.workoutTimeProgress) || available(.workoutDistanceProgress) || available(.stepTimeProgress)
+        case .ghost: return available(.ghostAhead)
+        case .strength: return available(.lastStrengthSet)
         case .history: return !historicalReferences.isEmpty &&
             available(.slowerThanPreviousWorkout)
         }
@@ -171,6 +183,13 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 trigger = .paceFasterOverall; interval = 300
             }
         case .record: trigger = .personalRecordConfirmed; interval = 1
+        case .progress:
+            trigger = [.workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress].first {
+                triggerAvailability.supports($0, for: activityFilter)
+            } ?? .workoutTimeProgress
+            interval = 50
+        case .ghost: trigger = .ghostAhead; interval = 1
+        case .strength: trigger = .lastStrengthSet; interval = 1
         case .history: trigger = .slowerThanPreviousWorkout; interval = 1
         }
         eventSelection = .every
@@ -195,6 +214,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 phases = nil
             case .nearFinishTime: interval = 30
             case .nearFinishDistance: interval = 100
+            case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: interval = 50
             case .distance: interval = 1000
             case .elevationGain: interval = 50
             case .paceFasterOverall, .paceFasterLastKilometer:
@@ -267,13 +287,14 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 .tracking(1.5)
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
             triggerCategory(tr("Time and distance", "Tid og distanse"),
-                            families: [.time, .distance, .finish])
+                            families: [.time, .distance, .finish, .progress])
             triggerCategory(tr("Heart rate and intensity", "Puls og intensitet"),
                             families: [.heartZone])
             triggerCategory(tr("Pace and performance", "Tempo og prestasjon"),
-                            families: [.pace, .record, .elevation, .history])
+                            families: [.pace, .record, .elevation, .history, .ghost])
             triggerCategory(tr("Workout and intervals", "Økt og intervaller"),
                             families: [.section, .step, .pause])
+            triggerCategory(tr("Strength training", "Styrketrening"), families: [.strength])
             triggerCategory(tr("Smart coaching", "Smart coaching"),
                             families: [.motivation])
 
@@ -285,6 +306,32 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
 
+            if family == .progress {
+                choice(.workoutTimeProgress)
+                choice(.workoutDistanceProgress)
+                choice(.stepTimeProgress)
+                Picker(tr("Milestone", "Milepæl"), selection: $interval) {
+                    ForEach([25, 50, 75, 90], id: \.self) { value in
+                        Text("\(value) %").tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(tr("Only fires with a reliable known goal.", "Varsler kun når økten eller deløkten har et kjent mål."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if family == .ghost {
+                choice(.ghostAhead)
+                choice(.ghostBehind)
+                Text(tr("Requires fresh Ghost Race distance data.", "Krever ferske distansedata fra Ghost Race."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if family == .strength {
+                Text(tr("Announces when the final planned set is active.", "Varsler når siste planlagte sett i økten er aktivt."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
             if family == .finish {
                 choice(.nearFinishTime)
                 choice(.nearFinishDistance)
@@ -443,9 +490,10 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 } else if trigger == .plannedZoneBelow ||
-                          trigger == .plannedZoneOutside {
+                          trigger == .plannedZoneOutside || trigger == .plannedZoneBackInTarget {
                     choice(.plannedZoneBelow)
                     choice(.plannedZoneOutside)
+                    choice(.plannedZoneBackInTarget)
                     Text(tr("Uses the current exercise's prescribed zone. Choose below target or outside target.",
                             "Bruker målsone fra den aktive øvelsen. Velg under eller utenfor målsone."))
                         .font(.caption)
@@ -464,6 +512,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             } else if family == .pace {
                 choice(.paceFasterThanTarget)
                 choice(.paceSlowerThanTarget)
+                choice(.paceBackInTarget)
                 choice(.paceFasterOverall)
                 choice(.paceFasterLastKilometer)
                 if trigger == .paceFasterOverall || trigger == .paceFasterLastKilometer {
@@ -667,7 +716,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             get: {
                 switch trigger {
                 case .heartRateAbove, .heartRateBelow: return 0
-                case .plannedZoneBelow, .plannedZoneOutside: return 2
+                case .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget: return 2
                 default: return 1
                 }
             },

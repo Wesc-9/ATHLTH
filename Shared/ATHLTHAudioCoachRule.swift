@@ -125,14 +125,16 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case distance, time
         // New user-configured events are optional for older saved templates.
         case randomMotivation, nearFinishTime, nearFinishDistance
+        case workoutTimeProgress, workoutDistanceProgress, stepTimeProgress
+        case ghostAhead, ghostBehind, lastStrengthSet
         case slowerThanPreviousWorkout
         case elevationGain, uphillDetected
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
-        case zoneBelow, plannedZoneBelow, plannedZoneOutside
+        case zoneBelow, plannedZoneBelow, plannedZoneOutside, plannedZoneBackInTarget
         // Thresholds are expressed in seconds per kilometre (300 = 5:00).
         case paceFasterOverall, paceFasterLastKilometer
         // The currently planned exercise/treadmill pace target is consulted live.
-        case paceFasterThanTarget, paceSlowerThanTarget
+        case paceFasterThanTarget, paceSlowerThanTarget, paceBackInTarget
         case personalRecordConfirmed
         case workoutStart
         case effortStart, effortEnd, recoveryStart, recoveryEnd
@@ -149,21 +151,22 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             switch self {
             case .nearFinishTime, .nearFinishDistance, .elevationGain,
                  .uphillDetected, .plannedZoneBelow, .plannedZoneOutside,
-                 .slowerThanPreviousWorkout: return true
+                 .slowerThanPreviousWorkout, .workoutTimeProgress, .workoutDistanceProgress,
+                 .stepTimeProgress, .ghostAhead, .ghostBehind, .lastStrengthSet: return true
             default: return false
             }
         }
         var isPaceCondition: Bool {
             switch self {
             case .paceFasterOverall, .paceFasterLastKilometer,
-                 .paceFasterThanTarget, .paceSlowerThanTarget: return true
+                 .paceFasterThanTarget, .paceSlowerThanTarget, .paceBackInTarget: return true
             default: return false
             }
         }
         /// Existing zone-trigger rules retain their authored intensity scale.
         var requiresAuthoredZoneScale: Bool {
             switch self {
-            case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow, .plannedZoneOutside:
+            case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget:
                 return true
             default: return false
             }
@@ -171,21 +174,24 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var isHeartRateCondition: Bool {
             switch self {
             case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit,
-                 .zoneBelow, .plannedZoneBelow, .plannedZoneOutside:
+                 .zoneBelow, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget:
                 return true
             default:
                 return false
             }
         }
         var supportsThresholdConditions: Bool {
-            isHeartRateCondition || isPaceCondition || self == .uphillDetected
+            isHeartRateCondition || isPaceCondition || self == .uphillDetected || isGhostCondition
         }
+        var isGhostCondition: Bool { self == .ghostAhead || self == .ghostBehind }
+        var isProgress: Bool { self == .workoutTimeProgress || self == .workoutDistanceProgress || self == .stepTimeProgress }
         var needsStructuredStep: Bool {
             !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
                 self != .personalRecordConfirmed && self != .workoutStart &&
                 self != .randomMotivation && self != .nearFinishTime &&
                 self != .nearFinishDistance && self != .uphillDetected &&
-                self != .slowerThanPreviousWorkout
+                self != .slowerThanPreviousWorkout && !isGhostCondition &&
+                !isProgress && self != .lastStrengthSet
         }
         func summary(interval: Int) -> String {
             let value: Int
@@ -194,6 +200,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .distance: value = min(max(interval, 100), 42_000)
             case .randomMotivation: value = min(max(interval, 120), 900)
             case .nearFinishTime: value = min(max(interval, 10), 1_800)
+            case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: value = min(max(interval, 1), 99)
             case .nearFinishDistance: value = min(max(interval, 25), 5_000)
             case .elevationGain: value = min(max(interval, 10), 5_000)
             case .heartRateAbove, .heartRateBelow: value = min(max(interval, 40), 220)
@@ -204,6 +211,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             default: return title
             }
             switch self {
+            case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress:
+                return title + " · " + String(value) + " %"
             case .time, .randomMotivation, .nearFinishTime:
                 return title + " · " + String(value) + " s"
             case .distance, .nearFinishDistance, .elevationGain:
@@ -234,17 +243,25 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             )
             case .nearFinishTime: return tr("Near time goal", "Nær tidsmålet")
             case .nearFinishDistance: return tr("Near distance goal", "Nær distansemålet")
+            case .workoutTimeProgress: return tr("Workout time progress", "Fremdrift etter tid")
+            case .workoutDistanceProgress: return tr("Workout distance progress", "Fremdrift etter distanse")
+            case .stepTimeProgress: return tr("Step time progress", "Fremdrift i deløkt")
+            case .ghostAhead: return tr("Move ahead of Ghost", "Kommer foran Ghost")
+            case .ghostBehind: return tr("Fall behind Ghost", "Faller bak Ghost")
+            case .lastStrengthSet: return tr("Last set of workout", "Siste sett i økten")
             case .elevationGain: return tr("Elevation gained", "Høydemeter")
             case .uphillDetected: return tr("When climbing", "Når du løper oppover")
             case .zoneBelow: return tr("Below heart-rate zone", "Under pulssone")
             case .plannedZoneBelow: return tr("Below workout target zone", "Under øktens målsone")
             case .plannedZoneOutside: return tr("Outside workout target zone", "Utenfor øktens målsone")
+            case .plannedZoneBackInTarget: return tr("Back in target zone", "Tilbake i målsone")
             case .heartRateAbove: return tr("Heart rate above", "Puls over")
             case .heartRateBelow: return tr("Heart rate below", "Puls under")
             case .paceFasterOverall: return tr("Total pace faster than", "Snittempo raskere enn")
             case .paceFasterLastKilometer: return tr("Last-km pace faster than", "Siste kilometer raskere enn")
             case .paceFasterThanTarget: return tr("Faster than exercise target", "Raskere enn målfart")
             case .paceSlowerThanTarget: return tr("Slower than exercise target", "Saktere enn målfart")
+            case .paceBackInTarget: return tr("Back at target pace", "Tilbake på målfart")
             case .personalRecordConfirmed: return tr("Confirmed personal record", "Bekreftet personlig rekord")
             case .zoneEnter: return tr("Enter HR zone", "Inn i pulssone")
             case .zoneExit: return tr("Leave HR zone", "Ut av pulssone")
@@ -474,6 +491,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case .time: return min(max(interval, 15), 7_200)
         case .randomMotivation: return min(max(interval, 120), 900)
         case .nearFinishTime: return min(max(interval, 10), 1_800)
+        case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: return min(max(interval, 1), 99)
         case .nearFinishDistance: return min(max(interval, 25), 5_000)
         case .elevationGain: return min(max(interval, 10), 5_000)
         case .heartRateAbove, .heartRateBelow: return min(max(interval, 40), 220)
@@ -989,14 +1007,18 @@ enum ATHLTHAudioCoachRuleDelivery {
             let milestone: Int
             var alreadyConsumed = false
 
-            if rule.trigger.isHeartRateCondition || rule.trigger.isPaceCondition ||
-               rule.trigger == .uphillDetected {
+            if rule.trigger.supportsThresholdConditions {
                 // Each threshold crossing is one event, with a new delivery
                 // identity on later re-entry. Invalid HR samples do not reset
                 // the condition or cause spurious zone-exit announcements.
                 let state: Bool?
                 if rule.trigger == .uphillDetected {
                     state = context.isUphill
+                } else if rule.trigger.isGhostCondition {
+                    if let delta = context.ghostDistanceDifferenceMeters, delta.isFinite, abs(delta) <= 1_000_000 {
+                        let signed = rule.trigger == .ghostAhead ? delta : -delta
+                        state = (lastSlots[rule.id] ?? 0) % 2 == 1 ? signed > 3 : signed >= 10
+                    } else { state = nil }
                 } else if rule.trigger.isPaceCondition {
                     state = paceCondition(
                         rule, context: context,
@@ -1022,7 +1044,8 @@ enum ATHLTHAudioCoachRuleDelivery {
                 }
                 let previousState = lastSlots[rule.id] ?? 0
                 let wasActive = previousState % 2 == 1
-                let shouldAnnounce = rule.trigger == .zoneExit
+                let announcesReturn = [.zoneExit, .plannedZoneBackInTarget, .paceBackInTarget].contains(rule.trigger)
+                let shouldAnnounce = announcesReturn
                     ? (wasActive && !active) : (!wasActive && active)
                 if let conditions, !conditions.isEmpty {
                     if !shouldAnnounce || !rule.isEnabled || !rule.matchesPhase(context) {
@@ -1090,6 +1113,26 @@ enum ATHLTHAudioCoachRuleDelivery {
                 lastSlots[rule.id] = 1
                 alreadyConsumed = true
                 guard measured > baseline + 10 else { continue }
+                milestone = 1
+            } else if rule.trigger.isProgress {
+                let completed: Double
+                let remaining: Double?
+                switch rule.trigger {
+                case .workoutTimeProgress: completed = elapsedSeconds; remaining = context.workoutRemainingSeconds
+                case .workoutDistanceProgress: completed = distanceMeters; remaining = context.workoutRemainingMeters ?? context.routeRemainingMeters
+                case .stepTimeProgress: completed = context.stepElapsedSeconds; remaining = context.stepRemainingSeconds
+                default: continue
+                }
+                guard let remaining, completed.isFinite, remaining.isFinite,
+                      completed >= 0, remaining >= 0, completed + remaining > 0,
+                      completed / (completed + remaining) >= Double(rule.validatedInterval) / 100 else { continue }
+                if rule.trigger == .stepTimeProgress {
+                    guard let index = context.stepIndex, index >= 0 else { continue }
+                    milestone = index + 1
+                } else { milestone = 1 }
+            } else if rule.trigger == .lastStrengthSet {
+                guard context.currentSetNumber != nil, context.remainingSetCount == 1,
+                      context.stepPhase != "recovery" else { continue }
                 milestone = 1
             } else if rule.trigger == .nearFinishTime {
                 guard let remaining = context.workoutRemainingSeconds,
@@ -1241,6 +1284,14 @@ enum ATHLTHAudioCoachRuleDelivery {
         measuredPace: Double?,
         previousActive: Bool
     ) -> Bool? {
+        if rule.trigger == .paceBackInTarget {
+            guard let pace = measuredPace, pace.isFinite, (120...1_800).contains(pace),
+                  let first = context.targetPaceSecondsPerKilometer ?? context.targetSlowestPaceSecondsPerKilometer,
+                  let second = context.targetSlowestPaceSecondsPerKilometer ?? context.targetPaceSecondsPerKilometer,
+                  first.isFinite, second.isFinite, (120...1_800).contains(first), (120...1_800).contains(second) else { return nil }
+            let margin: Double = previousActive ? 5 : 10
+            return pace < min(first, second) - margin || pace > max(first, second) + margin
+        }
         let pace: Double?
         let threshold: Double?
         let slowerThan: Bool
@@ -1293,12 +1344,13 @@ enum ATHLTHAudioCoachRuleDelivery {
             let threshold = Double(rule.validatedInterval)
             return bpm <= (previousActive ? threshold + 3 : threshold)
         case .zoneEnter, .zoneExit, .zoneBelow, .plannedZoneBelow,
-             .plannedZoneOutside:
+             .plannedZoneOutside, .plannedZoneBackInTarget:
             guard let zone = ATHLTHHeartRateZones.measuredZone(
                 heartRateBPM: bpm, maximumBPM: maximumBPM
             ) else { return nil }
             if rule.trigger == .plannedZoneBelow ||
-               rule.trigger == .plannedZoneOutside {
+               rule.trigger == .plannedZoneOutside ||
+               rule.trigger == .plannedZoneBackInTarget {
                 guard let target = context.plannedHeartRateZone,
                       (1...5).contains(target) else { return nil }
                 return rule.trigger == .plannedZoneBelow
@@ -1979,6 +2031,7 @@ enum ATHLTHAudioCoachSportPolicy {
         rules.filter { rule in
             guard rule.trigger != .distance,
                   rule.trigger != .nearFinishDistance,
+                  rule.trigger != .workoutDistanceProgress, !rule.trigger.isGhostCondition,
                   rule.trigger != .slowerThanPreviousWorkout,
                   rule.trigger != .elevationGain,
                   rule.trigger != .uphillDetected,
@@ -2014,11 +2067,12 @@ enum ATHLTHAudioCoachSportPolicy {
             measuredDistanceSupported
         return rules.filter { rule in
             if rule.trigger.needsStructuredStep ||
-                rule.trigger.isPaceCondition ||
+                rule.trigger.isPaceCondition || rule.trigger.isGhostCondition ||
+                rule.trigger == .lastStrengthSet || rule.trigger == .stepTimeProgress ||
                 rule.trigger == .slowerThanPreviousWorkout ||
                 rule.trigger == .personalRecordConfirmed { return false }
             if (rule.trigger == .distance ||
-                rule.trigger == .nearFinishDistance) && !distanceAvailable {
+                rule.trigger == .nearFinishDistance || rule.trigger == .workoutDistanceProgress) && !distanceAvailable {
                 return false
             }
             if rule.trigger == .elevationGain ||

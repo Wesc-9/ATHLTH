@@ -98,6 +98,38 @@ final class ATHLTHAudioCoachPaceAndPRTests: XCTestCase {
         XCTAssertFalse(ATHLTHAudioCoachRule.Metric.personalRecord.requiresInternet)
     }
 
+    func testProgressNeedsKnownGoalAndFiresOnce() {
+        let rule = ATHLTHAudioCoachRule(trigger: .workoutTimeProgress, metric: .elapsedTime, interval: 50)
+        var ctx = ATHLTHCoachReadoutContext()
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 100, journal: &journal).isEmpty)
+        ctx.workoutRemainingSeconds = 101
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 100, journal: &journal).isEmpty)
+        ctx.workoutRemainingSeconds = 100
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 100, journal: &journal).count, 1)
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 105, journal: &journal).isEmpty)
+    }
+
+    func testBackAtPaceRequiresPriorDeviation() {
+        let rule = ATHLTHAudioCoachRule(trigger: .paceBackInTarget, metric: .pace, interval: 1)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.targetPaceSecondsPerKilometer = 300
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 60, currentPace: 300, journal: &journal).isEmpty)
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 70, currentPace: 330, journal: &journal).isEmpty)
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 80, currentPace: 300, journal: &journal).count, 1)
+    }
+
+    func testGhostRequiresMeasuredDifference() {
+        let rule = ATHLTHAudioCoachRule(trigger: .ghostAhead, metric: .ghostDistanceDifference, interval: 1)
+        var ctx = ATHLTHCoachReadoutContext()
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 60, journal: &journal).isEmpty)
+        ctx.ghostDistanceDifferenceMeters = 12
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 65, journal: &journal).count, 1)
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 70, journal: &journal).isEmpty)
+    }
+
     func testSustainedPaceAndRepeatDelay() {
         var rule = ATHLTHAudioCoachRule(trigger: .paceFasterOverall, metric: .averagePace, interval: 300)
         rule.triggerConditions = .init(sustainedSeconds: 20, repeatDelaySeconds: 120)

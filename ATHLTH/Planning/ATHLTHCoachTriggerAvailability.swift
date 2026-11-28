@@ -99,13 +99,19 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
         // An all-sports selection inside a concrete workout must still obey
         // the actual workout's sport restrictions.
         let effectiveActivity = activity == .all ? (workoutActivity ?? .all) : activity
+        if trigger == .lastStrengthSet {
+            return effectiveActivity == .strength || effectiveActivity == .all
+        }
+        if trigger.isGhostCondition {
+            return [.all, .running, .walking, .intervals].contains(effectiveActivity) && supportsDistance
+        }
         switch effectiveActivity {
         case .strength, .functional:
             switch trigger {
-            case .distance, .nearFinishDistance, .elevationGain,
+            case .distance, .nearFinishDistance, .workoutDistanceProgress, .elevationGain,
                  .uphillDetected, .slowerThanPreviousWorkout,
                  .paceFasterOverall, .paceFasterLastKilometer,
-                 .paceFasterThanTarget, .paceSlowerThanTarget, .personalRecordConfirmed:
+                 .paceFasterThanTarget, .paceSlowerThanTarget, .paceBackInTarget, .personalRecordConfirmed:
                 return false
             default: return true
             }
@@ -114,14 +120,14 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
             case .elevationGain, .uphillDetected,
                  .slowerThanPreviousWorkout,
                  .paceFasterOverall, .paceFasterLastKilometer,
-                 .paceFasterThanTarget, .paceSlowerThanTarget:
+                 .paceFasterThanTarget, .paceSlowerThanTarget, .paceBackInTarget:
                 return false
             default: return true
             }
         case .cycling:
             return trigger != .slowerThanPreviousWorkout &&
                 trigger != .paceFasterThanTarget &&
-                trigger != .paceSlowerThanTarget &&
+                trigger != .paceSlowerThanTarget && trigger != .paceBackInTarget &&
                 trigger != .personalRecordConfirmed
         case .walking:
             return trigger != .slowerThanPreviousWorkout &&
@@ -137,13 +143,16 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
         case .distance, .nearFinishDistance:
             return supportsDistance &&
                 (trigger == .distance || hasDistanceGoal)
-        case .nearFinishTime: return hasTimeGoal
+        case .nearFinishTime, .workoutTimeProgress: return hasTimeGoal
+        case .workoutDistanceProgress: return supportsDistance && hasDistanceGoal
+        case .stepTimeProgress, .lastStrengthSet: return hasStructuredSteps
+        case .ghostAhead, .ghostBehind: return supportsDistance
         case .elevationGain, .uphillDetected: return supportsOutdoorElevation
         case .paceFasterOverall, .paceFasterLastKilometer:
             return supportsDistance
-        case .paceFasterThanTarget, .paceSlowerThanTarget:
+        case .paceFasterThanTarget, .paceSlowerThanTarget, .paceBackInTarget:
             return hasPaceGoal
-        case .plannedZoneBelow, .plannedZoneOutside:
+        case .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget:
             return hasZoneGoal
         case .slowerThanPreviousWorkout:
             return supportsDistance
