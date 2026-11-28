@@ -70,6 +70,34 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
                        [45, 45, 45])
     }
 
+    func testPlankVariantsDefaultToThirtySecondTimedSets() {
+        for name in ["Plank", "Planke", "Side Plank", "Sideplanke", "Weighted Plank", "Planke med vekt"] {
+            let snapshot = ExerciseSnapshot(name: name, instructions: [],
+                primaryMuscles: ["Core"], secondaryMuscles: [],
+                equipment: [], imageURL: nil)
+            XCTAssertEqual(snapshot.defaultStrengthTargetKind, .time)
+            XCTAssertEqual(snapshot.defaultStrengthTargetDurationSeconds, 30)
+        }
+        XCTAssertEqual(ATHLTHPlankDefaults.duration(name: "Localized", slug: "athlth-native-weighted-plank"), 30)
+        XCTAssertNil(ATHLTHPlankDefaults.duration(name: "Plank Shoulder Taps", slug: "athlth-core-plank-shoulder-tap"))
+        XCTAssertNil(ATHLTHPlankDefaults.duration(name: "Side Plank Hip Dip"))
+        XCTAssertNil(ATHLTHPlankDefaults.duration(name: "Plank Walkout"))
+        XCTAssertFalse(catalogExercise(named: "Weighted Plank").snapshot.isTimeOnlyBodyweightStrength)
+        XCTAssertTrue(ATHLTHPlankDefaults.isWeighted(name: "Planke med vekt"))
+    }
+
+    @MainActor
+    func testWeightedPlankRetainsWeightInTimedLiveSets() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(catalogExercise(named: "Weighted Plank"),
+                             sets: 3, targetWeightKilograms: 5)
+        let sets = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets)
+        XCTAssertEqual(sets.count, 3)
+        XCTAssertTrue(sets.allSatisfy { $0.plannedDurationSeconds == 30 && $0.plannedReps == nil &&
+            $0.plannedWeightKilograms == 5 && $0.recordsWeight == true })
+    }
+
     func testNinetyNinetyHoldIsTimedByDefault() {
         let snapshot = ExerciseSnapshot(
             name: "90/90 hold",

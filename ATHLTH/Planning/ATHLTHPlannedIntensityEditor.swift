@@ -111,6 +111,7 @@ struct ATHLTHPlannedIntensityEditor: View {
                         .accessibilityLabel(tr("Weight for all sets", "Vekt for alle sett"))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    if block.durationSeconds == nil {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(tr("Repetitions", "Repetisjoner"))
                             .font(.subheadline.weight(.semibold))
@@ -121,6 +122,7 @@ struct ATHLTHPlannedIntensityEditor: View {
                         .accessibilityLabel(tr("Repetitions for all sets", "Reps for alle sett"))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
                 if (block.setCount ?? 1) > 1 && block.groupID == nil {
@@ -162,11 +164,13 @@ struct ATHLTHPlannedIntensityEditor: View {
                                             .font(.caption)
                                     }
                                     .frame(maxWidth: .infinity)
-                                    Stepper(value: reps(for: index), in: 1...300) {
-                                        Text("\(reps(for: index).wrappedValue) reps")
-                                            .font(.caption)
+                                    if block.durationSeconds == nil {
+                                        Stepper(value: reps(for: index), in: 1...300) {
+                                            Text("\(reps(for: index).wrappedValue) reps")
+                                                .font(.caption)
+                                        }
+                                        .frame(maxWidth: .infinity)
                                     }
-                                    .frame(maxWidth: .infinity)
                                 }
                             }
                             .padding(11)

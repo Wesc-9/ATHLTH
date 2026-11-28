@@ -461,6 +461,12 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
     @State private var exerciseSets: [EditableSet] = Array(repeating: EditableSet(), count: 4).map { _ in EditableSet() }
     @State private var restSeconds = 120
     @State private var notes = ""
+    @State private var timedOverride: Bool?
+    @State private var holdSeconds = ATHLTHPlankDefaults.seconds
+
+    private var isTimed: Bool {
+        timedOverride ?? (ATHLTHPlankDefaults.duration(name: entry.name, slug: entry.sourceIdentifier) != nil)
+    }
     private let gold = ATHLTHTrainDesign.bronze
     private let secondary = ATHLTHTrainDesign.secondary
 
@@ -501,7 +507,16 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                     .buttonStyle(.plain)
                 }
                 Divider()
-                Text(tr("Sets and reps", "Sett og reps"))
+                Toggle(tr("Timed exercise", "Tidsstyrt øvelse"), isOn: Binding(
+                    get: { isTimed }, set: { timedOverride = $0 }
+                ))
+                .tint(gold)
+                if isTimed {
+                    Stepper(value: $holdSeconds, in: 5...600, step: 5) {
+                        Text(tr("Duration per set", "Tid per sett") + ": \(holdSeconds) " + tr("sec", "sek"))
+                    }
+                }
+                Text(isTimed ? tr("Sets", "Sett") : tr("Sets and reps", "Sett og reps"))
                     .font(.headline)
                 ForEach(exerciseSets.indices, id: \.self) { index in
                     HStack(spacing: 10) {
@@ -516,13 +531,15 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                                 .keyboardType(.decimalPad)
                                 .textFieldStyle(.roundedBorder)
                         }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(tr("Reps", "Reps"))
-                                .font(.system(size: 9)).foregroundStyle(secondary)
-                            TextField("10", value: $exerciseSets[index].repetitions,
-                                      format: .number)
-                                .keyboardType(.numberPad)
-                                .textFieldStyle(.roundedBorder)
+                        if !isTimed {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("Reps", "Reps"))
+                                    .font(.system(size: 9)).foregroundStyle(secondary)
+                                TextField("10", value: $exerciseSets[index].repetitions,
+                                          format: .number)
+                                    .keyboardType(.numberPad)
+                                    .textFieldStyle(.roundedBorder)
+                            }
                         }
                         Button {
                             guard exerciseSets.count > 1 else { return }
@@ -585,8 +602,10 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                     (reps: max(1, min($0.repetitions, 100)),
                      weight: $0.weight.isFinite && $0.weight > 0 ? $0.weight : nil)
                 }
+                let timed = isTimed
+                let duration: Double? = timed ? Double(holdSeconds) : nil
                 let uniform = rows.allSatisfy {
-                    $0.reps == rows[0].reps && $0.weight == rows[0].weight
+                    (timed || $0.reps == rows[0].reps) && $0.weight == rows[0].weight
                 }
                 // Snapshot actor-bound view/state values before entering the
                 // synchronous local builder (Swift 6 concurrency safety).
@@ -605,8 +624,8 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                             sequence: index, kind: .exercise,
                             title: localizedName,
                             exerciseSlug: sourceIdentifier,
-                            distanceMeters: nil, repetitions: row.reps,
-                            durationSeconds: nil,
+                            distanceMeters: nil, repetitions: timed ? nil : row.reps,
+                            durationSeconds: duration,
                             targetWeightKilograms: row.weight,
                             loadNote: nil, notes: savedNotes,
                             phase: configuredPhase

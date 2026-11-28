@@ -311,6 +311,30 @@ enum ATHLTHStrengthLoadBasis: String, Codable, Hashable, CaseIterable {
     }
 }
 
+/// Exact hold identities only: movement variants such as shoulder taps and
+/// plank walkouts continue to use repetition targets. Weighted holds remain
+/// eligible for load recording.
+enum ATHLTHPlankDefaults {
+    static let seconds = 30
+
+    private static func normalized(_ value: String) -> String {
+        value.lowercased().replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func isWeighted(name: String) -> Bool {
+        ["weighted plank", "plank with weight", "planke med vekt"].contains(normalized(name))
+    }
+
+    static func duration(name: String, slug: String? = nil) -> Int? {
+        let names = ["plank", "planke", "side plank", "sideplanke"]
+        let slugs = ["plank", "side plank", "weighted plank",
+                     "athlth native plank", "athlth native side plank", "athlth native weighted plank"]
+        if let slug, slugs.contains(normalized(slug)) { return seconds }
+        return names.contains(normalized(name)) || isWeighted(name: name) ? seconds : nil
+    }
+}
+
 struct ExerciseSnapshot: Codable, Hashable {
     /// Stable library exercise identity where available. Optional so every
     /// previously persisted training plan and strength log remains decodable.
@@ -571,6 +595,7 @@ extension ExerciseSnapshot {
     }
 
     var defaultStrengthTargetKind: StrengthExerciseTargetKind {
+        if ATHLTHPlankDefaults.duration(name: name) != nil { return .time }
         let normalized =
             ([name] + equipment)
                 .joined(separator: " ")
@@ -619,6 +644,7 @@ extension ExerciseSnapshot {
     }
 
     var defaultStrengthTargetDurationSeconds: Int {
+        if let duration = ATHLTHPlankDefaults.duration(name: name) { return duration }
         if isFreeStrengthTimer { return 600 }
         if isTimeOnlyBodyweightStrength { return 30 }
         let normalized =

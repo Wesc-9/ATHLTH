@@ -9084,7 +9084,17 @@ struct WorkoutTemplateBuilderView: View {
                     isOn: Binding(
                         get: { blocks[index].durationSeconds != nil },
                         set: { active in
-                            blocks[index].durationSeconds = active ? 60 : nil
+                            let suggested = ATHLTHPlankDefaults.duration(
+                                name: blocks[index].title, slug: blocks[index].exerciseSlug
+                            ) ?? 60
+                            blocks[index].durationSeconds = active ? Double(suggested) : nil
+                            blocks[index].repetitions = active ? nil : (blocks[index].repetitions ?? 10)
+                            if var targets = blocks[index].individualSetTargets {
+                                for i in targets.indices {
+                                    targets[i].repetitions = active ? nil : (targets[i].repetitions ?? 10)
+                                }
+                                blocks[index].individualSetTargets = targets
+                            }
                         }
                     )
                 )
@@ -9936,12 +9946,13 @@ struct WorkoutTemplateBuilderView: View {
             addFreeStrengthBlock(in: selectedPhase, exerciseID: entry.id)
             return
         }
+        let holdDuration = ATHLTHPlankDefaults.duration(name: entry.name, slug: entry.sourceIdentifier)
         var block = WorkoutTemplateBlock(
             sequence: 0, kind: .exercise,
             title: entry.name,
             exerciseSlug: entry.sourceIdentifier,
-            distanceMeters: nil, repetitions: 10,
-            durationSeconds: nil, targetWeightKilograms: nil,
+            distanceMeters: nil, repetitions: holdDuration == nil ? 10 : nil,
+            durationSeconds: holdDuration.map { Double($0) }, targetWeightKilograms: nil,
             loadNote: nil, notes: nil, phase: selectedPhase
         )
         if let groupID, let pendingNewGroupKind,
@@ -9977,7 +9988,7 @@ struct WorkoutTemplateBuilderView: View {
             // stage is an explicit effort with its own planned reps/load.
             // Values are editable; never fabricate reduced weight in kg.
             block.setCount = nil
-            block.repetitions = 10
+            block.repetitions = holdDuration == nil ? 10 : nil
             insertBlock(block, toGroup: nil)
             for reps in [8, 6] {
                 var stage = block
@@ -9986,7 +9997,7 @@ struct WorkoutTemplateBuilderView: View {
                 stage.groupRounds = nil
                 stage.groupClockSeconds = nil
                 stage.editorDragID = UUID()
-                stage.repetitions = reps
+                stage.repetitions = holdDuration == nil ? reps : nil
                 stage.setCount = nil
                 insertBlock(stage, toGroup: id)
             }

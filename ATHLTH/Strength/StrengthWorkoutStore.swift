@@ -3372,9 +3372,9 @@ final class StrengthWorkoutStore: ObservableObject {
         isFreeTrainingBetweenExercises = false
 
         let snapshot = exercise.snapshot
-        let isHold = StrengthTimedBodyweightDefaults.isBodyweightHold(
-            snapshot.name
-        ) || snapshot.isTimeOnlyBodyweightStrength
+        let isHold = !ATHLTHPlankDefaults.isWeighted(name: snapshot.name) &&
+            (StrengthTimedBodyweightDefaults.isBodyweightHold(snapshot.name) ||
+             snapshot.isTimeOnlyBodyweightStrength)
         let resolvedTargetKind =
             targetKind ?? (isHold ? .time : snapshot.defaultStrengthTargetKind)
         let resolvedLoadKind =
