@@ -64,6 +64,10 @@ struct WorkoutStartOptionsView: View {
     @State private var startType: ATHLTHQuickStartType = .free
     @State private var chosenStrengthTemplate: PlannedSession?
     @State private var showingStrengthWorkoutLibrary = false
+    @State private var showingAllStrengthTypes = false
+    @State private var showingStrengthBuilder = false
+    @State private var customStrength = false
+    @State private var strengthDraftID = UUID()
     @State private var selectedGearIDs: Set<UUID> = []
     @State private var showOnIPad = false
     @StateObject private var registeredIPad = ATHLTHRegisteredIPadAvailability()
@@ -178,26 +182,11 @@ struct WorkoutStartOptionsView: View {
                         )
                     }
 
-                    ATHLTHQuickStartTypeSelector(
-                        activity: .strength,
-                        advanced: trackingMode == .advanced,
-                        selection: Binding(
-                            get: { startType },
-                            set: { _ in }
-                        )
-                    ) { type in
-                        switch type {
-                        case .free:
-                            startType = .free
-                            chosenStrengthTemplate = nil
-                        case .workout:
-                            showingStrengthWorkoutLibrary = true
-                        case .exercises:
-                            startType = .exercises
-                            chosenStrengthTemplate = nil
-                        case .competition, .route:
-                            break
-                        }
+                    strengthTypeSelector
+                    ATHLTHQuickStartBuildButton(title: startType == .free
+                        ? ATHLTHLocalization.choose(english: "Build your own workout", norwegian: "Bygg egen økt")
+                        : ATHLTHLocalization.choose(english: "Customize workout", norwegian: "Tilpass økten")) {
+                        showingStrengthBuilder = true
                     }
 
                     if startType == .exercises {
@@ -221,7 +210,8 @@ struct WorkoutStartOptionsView: View {
                                 Button(ATHLTHLocalization.choose(
                                     english: "Change", norwegian: "Endre"
                                 )) {
-                                    showingStrengthWorkoutLibrary = true
+                                    if customStrength { showingStrengthBuilder = true }
+                                    else { showingStrengthWorkoutLibrary = true }
                                 }
                                 .font(.caption.weight(.semibold))
                             }
@@ -319,6 +309,28 @@ struct WorkoutStartOptionsView: View {
                 await registeredIPad.refresh(for: appSession.profile.userID)
                 await exerciseLibrary.refresh()
             }
+            .sheet(isPresented: $showingStrengthBuilder) {
+                WorkoutTemplateBuilderView(
+                    initialTitle: startType == .free ? "" : configuredSession.title,
+                    initialBlocks: startType == .free ? [] : ATHLTHUnifiedWorkout.editorBlocks(from: configuredSession),
+                    draftContext: "quick-strength-compose-\(strengthDraftID.uuidString)",
+                    initialActivity: .strength,
+                    initialStudioAdvanced: true,
+                    onAddStandalone: { workout in
+                        chosenStrengthTemplate = workout
+                        customStrength = true
+                        startType = .workout
+                        showingAllStrengthTypes = false
+                        return true
+                    },
+                    onValidateSave: { workout in
+                        workout.kind == .strength ? nil : ATHLTHLocalization.choose(
+                            english: "Choose a strength workout.", norwegian: "Velg en styrkeøkt.")
+                    },
+                    saveButtonTitle: ATHLTHLocalization.choose(english: "Use in Quick Train", norwegian: "Bruk i Quick Train")
+                )
+                .presentationDetents([.large])
+            }
             .sheet(isPresented: $showingStrengthWorkoutLibrary) {
                 NavigationStack {
                     List {
@@ -333,6 +345,8 @@ struct WorkoutStartOptionsView: View {
                             }) { template in
                                 Button {
                                     chosenStrengthTemplate = template
+                                    customStrength = false
+                                    showingAllStrengthTypes = false
                                     startType = .workout
                                     showingStrengthWorkoutLibrary = false
                                 } label: {
@@ -352,6 +366,8 @@ struct WorkoutStartOptionsView: View {
                             ) { entry in
                                 Button {
                                     chosenStrengthTemplate = entry.plannedSession()
+                                    customStrength = false
+                                    showingAllStrengthTypes = false
                                     startType = .workout
                                     showingStrengthWorkoutLibrary = false
                                 } label: {
@@ -923,6 +939,47 @@ struct WorkoutStartOptionsView: View {
         }
     }
 
+    @ViewBuilder
+    private var strengthTypeSelector: some View {
+        if startType != .free && !showingAllStrengthTypes {
+            ATHLTHQuickStartChosenTypeRow(
+                title: customStrength
+                    ? ATHLTHLocalization.choose(english: "Custom strength workout", norwegian: "Egen styrkeøkt")
+                    : startType.title(for: .strength),
+                symbol: startType.symbol
+            ) { showingAllStrengthTypes = true }
+        } else {
+            ATHLTHQuickStartTypeSelector(
+                activity: .strength, advanced: trackingMode == .advanced,
+                selection: Binding(get: { startType }, set: { _ in })
+            ) { type in
+                switch type {
+                case .free:
+                    startType = .free
+                    chosenStrengthTemplate = nil
+                    customStrength = false
+                    showingAllStrengthTypes = false
+                case .workout:
+                    showingStrengthWorkoutLibrary = true
+                case .exercises:
+                    startType = .exercises
+                    chosenStrengthTemplate = nil
+                    customStrength = false
+                    showingAllStrengthTypes = false
+                case .competition, .route: break
+                }
+            }
+            if startType != .free {
+                Button(ATHLTHLocalization.choose(english: "Keep current type", norwegian: "Behold valgt type")) {
+                    showingAllStrengthTypes = false
+                }
+                .font(.caption.weight(.semibold))
+                .tint(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+        }
+    }
+
     private var configuredSession:
         PlannedSession {
         var configured = session
@@ -946,7 +1003,7 @@ struct WorkoutStartOptionsView: View {
                 ).blocks
                 configured.exercises = chosenStrengthTemplate.exercises
                 configured.kind = .strength
-                configured.workoutCategory = "strength"
+                configured.workoutCategory = chosenStrengthTemplate.workoutCategory ?? "strength"
                 configured.runningWorkout = nil
                 configured.runningWorkouts = nil
             }

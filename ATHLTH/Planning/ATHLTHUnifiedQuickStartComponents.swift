@@ -218,6 +218,55 @@ struct ATHLTHQuickStartTypeSelector: View {
     }
 }
 
+/// Shared compact choice, with a non-destructive way to reopen the type list.
+struct ATHLTHQuickStartChosenTypeRow: View {
+    let title: String
+    let symbol: String
+    let onChange: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 40, height: 40)
+                .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
+            Text(title).font(.headline).foregroundStyle(ATHLTHPlanDesign.ink)
+            Spacer(minLength: 4)
+            Button(action: onChange) {
+                Label(ATHLTHLocalization.choose(english: "Change type", norwegian: "Bytt type"), systemImage: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .athlthTrainPaper()
+    }
+}
+
+struct ATHLTHQuickStartBuildButton: View {
+    let title: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Label(title, systemImage: "plus.circle")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .padding(12)
+            .frame(minHeight: 48)
+            .athlthTrainPaper()
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// Basic deliberately omits the full editable name, environment and detailed
 /// prescriptions card. Advanced keeps the established workout details view.
 struct ATHLTHQuickStartSimpleDetailsCard: View {

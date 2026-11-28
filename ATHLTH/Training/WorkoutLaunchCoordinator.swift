@@ -1411,6 +1411,11 @@ enum WorkoutLaunchCoordinator {
             expectedKind: .walking,
             device: configuration.captureDevice
         )
+        let walkingRecipe = plannedWalkingWorkout ?? configuration.advancedWorkout
+        if let walkingRecipe {
+            try ATHLTHWorkoutCaptureAdmission.requireSupportedEnduranceCapture(
+                for: walkingRecipe, expectedKind: .walking, device: configuration.captureDevice)
+        }
         let launchID = try ATHLTHWorkoutRecordingArbiter.reserveLaunch()
         defer { ATHLTHWorkoutRecordingArbiter.releaseLaunch(launchID) }
 
@@ -1474,7 +1479,7 @@ enum WorkoutLaunchCoordinator {
         // A manually picked route always takes precedence over the plan.
         let selectedWalkingRoute: TrainingRoute? = configuration.suppressPlannedRoute
             ? nil
-            : (configuration.route ?? plannedWalkingWorkout.flatMap { workout in
+            : (configuration.route ?? walkingRecipe.flatMap { workout in
                 session?.savedRoutes.first { $0.id == workout.routeID }
             })
         var walkingAudioCoach = settings.applyingFuelVoice(
@@ -1496,10 +1501,10 @@ enum WorkoutLaunchCoordinator {
             phoneWorkout.start(
                 walking: true,
                 route: selectedWalkingRoute,
-                title: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
+                title: walkingRecipe?.title ?? selectedWalkingRoute?.title ??
                     ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
                 audioCoach: walkingAudioCoach,
-                structuredWorkout: plannedWalkingWorkout.map {
+                structuredWorkout: walkingRecipe.map {
                     PlannedWorkoutWatchBuilder.runningTransfer(
                         from: $0,
                         routeAlerts: settings.routeAlertConfiguration,
@@ -1559,7 +1564,7 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
-        var watchWorkout = plannedWalkingWorkout.map {
+        var watchWorkout = walkingRecipe.map {
             PlannedWorkoutWatchBuilder.runningTransfer(
                 from: $0,
                 routeAlerts: settings.routeAlertConfiguration,
@@ -1606,11 +1611,11 @@ enum WorkoutLaunchCoordinator {
         // handoff as running, without creating a second activity.
         var preparedWalking = WatchPreparedWorkoutTransfer(
             id: UUID(),
-            title: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
+            title: walkingRecipe?.title ?? selectedWalkingRoute?.title ??
                 ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
             // PlannedSession has a title, but no summary property.
             // Reuse the original card title without inventing another recipe.
-            summary: plannedWalkingWorkout?.title ?? selectedWalkingRoute?.title ??
+            summary: walkingRecipe?.title ?? selectedWalkingRoute?.title ??
                 ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
             kind: .walking,
             routeID: selectedWalkingRoute?.id,

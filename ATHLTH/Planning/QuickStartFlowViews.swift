@@ -683,6 +683,7 @@ struct WalkQuickStartConfiguration {
     /// Explicitly clearing a planned route should not silently restore it
     /// in the launch coordinator.
     var suppressPlannedRoute = false
+    var advancedWorkout: PlannedSession? = nil
 }
 
 extension RunQuickStartConfiguration {
@@ -800,7 +801,9 @@ extension WalkQuickStartConfiguration {
             exercises: [],
             notes: nil
         )
-        if let route {
+        if let advancedWorkout {
+            snapshot = advancedWorkout
+        } else if let route {
             snapshot.title = route.title
             snapshot.targetDistanceKilometers = route.distanceKilometers
         }
@@ -4109,6 +4112,11 @@ struct WalkQuickStartSheet: View {
     @State private var showingWalkingRoutes = false
     @State private var selectedWalkingRoute: TrainingRoute?
     @State private var walkingRouteChoiceTouched = false
+    @State private var showingAllWalkTypes = false
+    @State private var showingWalkBuilder = false
+    @State private var customWalk: PlannedSession?
+    @State private var walkRoutePhase: WorkoutPhaseKind?
+    @State private var walkDraftID = UUID()
     @State private var autoPausePreference:
         WorkoutAutoPausePreference = .appDefault
     @State private var selectedSpotifyPlaylist:
@@ -4160,7 +4168,7 @@ struct WalkQuickStartSheet: View {
                     } else {
                         ATHLTHQuickStartSimpleDetailsCard(
                             activity: .walking,
-                            summary: selectedWalkingRoute?.title ??
+                            summary: customWalk?.title ?? selectedWalkingRoute?.title ??
                                 ATHLTHLocalization.choose(
                                     english: "Ready for a free walk",
                                     norwegian: "Klar for fri gåing"
@@ -4169,10 +4177,21 @@ struct WalkQuickStartSheet: View {
                     }
 
                     walkTypeSelector
+                    if plannedSession == nil, selectedWalkingRoute == nil, customWalk == nil {
+                        ATHLTHQuickStartBuildButton(title: ATHLTHLocalization.choose(english: "Build your own workout", norwegian: "Bygg egen økt")) {
+                            showingWalkBuilder = true
+                        }
+                    }
+                    if let customWalk {
+                        ATHLTHRunQuickStartPlanPreview(workout: nil, plannedSession: customWalk, compactBasic: !isAdvancedSetup)
+                        ATHLTHQuickStartBuildButton(title: ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt")) {
+                            showingWalkBuilder = true
+                        }
+                    }
 
                     if let route = selectedWalkingRoute {
                         ATHLTHPlanSurface(density: .compact) {
-                            if !isAdvancedSetup && route.coordinates.count >= 2 {
+                            if route.coordinates.count >= 2 {
                                 RouteMapSnapshotThumbnail(route: route, height: 152)
                                     .accessibilityIdentifier("athlth-quick-basic-route-map")
                             }
@@ -4189,15 +4208,38 @@ struct WalkQuickStartSheet: View {
                                 }
                                 Spacer()
                                 Button {
-                                    selectedWalkingRoute = nil
-                                    walkingRouteChoiceTouched = true
+                                    showingWalkingRoutes = true
                                 } label: {
-                                    Image(systemName: "xmark.circle")
+                                    Image(systemName: "pencil.circle")
                                 }
                                 .accessibilityLabel(ATHLTHLocalization.choose(
-                                    english: "Remove route", norwegian: "Fjern rute"
+                                    english: "Change route", norwegian: "Endre rute"
                                 ))
                             }
+                        }
+                    }
+
+                    if selectedWalkingRoute != nil, customWalk == nil, plannedSession == nil {
+                        Menu {
+                            ForEach([WorkoutPhaseKind.warmup, .main, .cooldown], id: \.self) { phase in
+                                Button {
+                                    walkRoutePhase = phase
+                                    showingWalkBuilder = true
+                                } label: {
+                                    Text(phase == .warmup
+                                        ? ATHLTHLocalization.choose(english: "Warm-up", norwegian: "Oppvarming")
+                                        : phase == .main
+                                        ? ATHLTHLocalization.choose(english: "Main section", norwegian: "Hoveddel")
+                                        : ATHLTHLocalization.choose(english: "Cool-down", norwegian: "Avslutning"))
+                                }
+                            }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(english: "Build on this route", norwegian: "Bygg videre på ruten"), systemImage: "plus.circle")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .athlthTrainPaper()
                         }
                     }
 
@@ -4277,10 +4319,38 @@ struct WalkQuickStartSheet: View {
                         )
                     ) { route in
                         selectedWalkingRoute = route
+                        customWalk = nil
+                        showingAllWalkTypes = false
                         walkingRouteChoiceTouched = true
                         showingWalkingRoutes = false
                     }
                 }
+            }
+            .sheet(isPresented: $showingWalkBuilder, onDismiss: { walkRoutePhase = nil }) {
+                WorkoutTemplateBuilderView(
+                    initialTitle: customWalk?.title ?? selectedWalkingRoute?.title ?? "",
+                    initialBlocks: walkBuilderBlocks,
+                    initialRouteID: customWalk?.routeID ?? selectedWalkingRoute?.id,
+                    initialPhase: walkRoutePhase == .warmup ? .main : nil,
+                    draftContext: "quick-walk-\(walkDraftID.uuidString)",
+                    initialActivity: .walking,
+                    initialStudioAdvanced: true,
+                    onAddStandalone: { workout in
+                        guard validQuickWalk(workout) else { return false }
+                        customWalk = workout
+                        selectedWalkingRoute = nil
+                        walkingRouteChoiceTouched = true
+                        showingAllWalkTypes = false
+                        return true
+                    },
+                    onValidateSave: { workout in
+                        validQuickWalk(workout) ? nil : ATHLTHLocalization.choose(
+                            english: "Use outdoor walking phases and rests in a walking workout.",
+                            norwegian: "Bruk utendørs gådeler og pauser i en gåøkt.")
+                    },
+                    saveButtonTitle: ATHLTHLocalization.choose(english: "Use in Quick Train", norwegian: "Bruk i Quick Train")
+                )
+                .presentationDetents([.large])
             }
             .sheet(isPresented: $showingSpotifyPicker) {
                 SpotifyPlaylistPickerView(
@@ -4349,27 +4419,59 @@ struct WalkQuickStartSheet: View {
         }
     }
 
+    private var walkBuilderBlocks: [WorkoutTemplateBlock] {
+        if let customWalk { return customWalk.resolvedWorkoutBlocks }
+        if let selectedWalkingRoute, let walkRoutePhase {
+            var block = ATHLTHQuickRunTimelineAdapter.routeBlock(
+                routeID: selectedWalkingRoute.id, title: selectedWalkingRoute.title,
+                distanceMeters: selectedWalkingRoute.distanceKilometers * 1_000,
+                phase: walkRoutePhase)
+            block.cardioActivity = .walking
+            return [block]
+        }
+        return []
+    }
+
+    private func validQuickWalk(_ workout: PlannedSession) -> Bool {
+        let blocks = ATHLTHUniversalWorkoutExecutionRecipe(workout: workout).blocks
+        let walks = blocks.filter { $0.kind == .run }
+        return workout.kind == .walking && !walks.isEmpty &&
+            blocks.allSatisfy { $0.kind == .run || $0.kind == .rest } &&
+            walks.allSatisfy { $0.cardioActivity == .walking && $0.isIndoor != true } &&
+            blocks.expandedForExecution().count <= 1000
+    }
+
+    @ViewBuilder
     private var walkTypeSelector: some View {
-        ATHLTHQuickStartTypeSelector(
-            activity: .walking,
-            advanced: isAdvancedSetup,
-            selection: Binding(
-                get: {
-                    return selectedWalkingRoute == nil ? .free : .route
-                },
-                set: { _ in }
-            )
-        ) { chosen in
-            switch chosen {
-            case .free:
-                selectedWalkingRoute = nil
-                walkingRouteChoiceTouched = true
-            case .route:
-                showingWalkingRoutes = true
-            case .competition:
-                break
-            case .workout, .exercises:
-                break
+        if (selectedWalkingRoute != nil || customWalk != nil) && !showingAllWalkTypes {
+            ATHLTHQuickStartChosenTypeRow(
+                title: customWalk != nil
+                    ? ATHLTHLocalization.choose(english: "Custom walk", norwegian: "Egen gåøkt")
+                    : ATHLTHQuickStartType.route.title(for: .walking),
+                symbol: customWalk != nil ? "slider.horizontal.3" : ATHLTHQuickStartType.route.symbol
+            ) { showingAllWalkTypes = true }
+        } else {
+            ATHLTHQuickStartTypeSelector(
+                activity: .walking, advanced: isAdvancedSetup,
+                selection: Binding(get: { selectedWalkingRoute == nil ? .free : .route }, set: { _ in })
+            ) { chosen in
+                switch chosen {
+                case .free:
+                    selectedWalkingRoute = nil
+                    customWalk = nil
+                    walkingRouteChoiceTouched = true
+                    showingAllWalkTypes = false
+                case .route: showingWalkingRoutes = true
+                case .competition, .workout, .exercises: break
+                }
+            }
+            if selectedWalkingRoute != nil || customWalk != nil {
+                Button(ATHLTHLocalization.choose(english: "Keep current type", norwegian: "Behold valgt type")) {
+                    showingAllWalkTypes = false
+                }
+                .font(.caption.weight(.semibold))
+                .tint(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
     }
@@ -4454,9 +4556,12 @@ struct WalkQuickStartSheet: View {
                 gearIDs: selectedGearIDs
             )
         configuration.petIDs = selectedPetIDs
-        configuration.route = selectedWalkingRoute
+        configuration.advancedWorkout = customWalk
+        configuration.route = selectedWalkingRoute ?? customWalk?.routeID.flatMap { id in
+            session.savedRoutes.first { $0.id == id }
+        }
         configuration.suppressPlannedRoute =
-            walkingRouteChoiceTouched && selectedWalkingRoute == nil
+            walkingRouteChoiceTouched && configuration.route == nil && customWalk == nil
         liveSharing.prepareOneWorkoutSharing(shareThisWorkoutOnIPad)
         launchInProgress = true
         Task { @MainActor in

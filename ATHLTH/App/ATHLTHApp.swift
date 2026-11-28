@@ -1195,7 +1195,7 @@ struct AppRootView: View {
                 )
 
         case .walk:
-            let configuration =
+            var configuration =
                 WalkQuickStartConfiguration(
                     captureDevice:
                         captureDevice,
@@ -1220,6 +1220,11 @@ struct AppRootView: View {
                     gearIDs:
                         Set(envelope.gearIDs)
                 )
+
+            configuration.route = payload.route
+            if payload.workout.isStructuredWorkout {
+                configuration.advancedWorkout = payload.workout
+            }
 
             try await WorkoutLaunchCoordinator
                 .startWalkQuick(
