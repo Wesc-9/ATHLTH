@@ -333,7 +333,7 @@ enum RouteMapSnapshotCache {
             let snapshot = try await MKMapSnapshotter(options: options).start()
             guard !Task.isCancelled, requestedGeneration == generation,
                   scrollingOwners.isEmpty else { return nil }
-            cacheImage(snapshot.image, key: requestID)
+            cacheImage(snapshot.image, key: requestID as NSString)
             return snapshot.image
         } catch {
             return nil
