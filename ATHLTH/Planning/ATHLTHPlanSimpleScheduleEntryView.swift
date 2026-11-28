@@ -17,10 +17,10 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
             title: $title, startDate: $startDate, weekCount: $weekCount,
             selectedDays: selectedDays,
             suggestedName: suggestedName, advanced: false,
-            planningApproach: nil,
+            buildWithCoach: false,
             varyWeekdays: .constant(false),
             onToggleDay: onToggleDay,
-            onChooseApproach: { _ in },
+            onChooseCoach: { _ in },
             onModeChange: { isAdvanced in
                 if isAdvanced { onSelectAdvanced() }
             }
@@ -38,10 +38,10 @@ struct ATHLTHPlanSetupFields: View {
     let selectedDays: Set<Int>
     let suggestedName: String
     let advanced: Bool
-    let planningApproach: ATHLTHPlanWeekPlanningApproach?
+    let buildWithCoach: Bool
     @Binding var varyWeekdays: Bool
     let onToggleDay: (Int) -> Void
-    let onChooseApproach: (ATHLTHPlanWeekPlanningApproach) -> Void
+    let onChooseCoach: (Bool) -> Void
     let onModeChange: (Bool) -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -83,8 +83,8 @@ struct ATHLTHPlanSetupFields: View {
                     }
                 }
                 daysCard
-                // Choose day-by-day or weekly editing last, immediately
-                // before Next leads into the actual week editor.
+                // Choose the author, not the calendar layout. Both manual
+                // views operate on the same dated plan.
                 planningApproachCard
             } else {
                 daysCard
@@ -129,36 +129,36 @@ struct ATHLTHPlanSetupFields: View {
                                    "Velg hvordan du ønsker å sette opp øktene"))
             VStack(spacing: 8) {
                 planningApproachOption(
-                    .guided,
-                    title: tr("Daily plan", "Dagsplan"),
+                    false,
+                    title: tr("Build yourself", "Bygg selv"),
                     detail: tr(
-                        "Build one training day at a time, with exercises, intervals and rest.",
-                        "Sett opp én dag om gangen med økter, intervaller og hvile."
-                    ),
-                    icon: "calendar.day.timeline.left"
-                )
-                planningApproachOption(
-                    .quick,
-                    title: tr("Weekly plan", "Ukeplan"),
-                    detail: tr(
-                        "Build complete weeks and adjust workouts and progression.",
-                        "Sett sammen hele uken og juster økter og progresjon."
+                        "Plan your workouts freely. Switch between daily and weekly views and ask Coach for help.",
+                        "Planlegg øktene fritt. Bytt mellom dagsplan og ukeoversikt, og få hjelp av Coach underveis."
                     ),
                     icon: "calendar"
+                )
+                planningApproachOption(
+                    true,
+                    title: tr("Let Coach build the plan", "La Coach bygge planen"),
+                    detail: tr(
+                        "Get a complete training proposal based on your goals, days and available equipment.",
+                        "Få et komplett treningsforslag basert på mål, treningsdager og tilgjengelig utstyr."
+                    ),
+                    icon: "sparkles"
                 )
             }
         }
     }
 
     private func planningApproachOption(
-        _ choice: ATHLTHPlanWeekPlanningApproach,
+        _ choice: Bool,
         title: String,
         detail: String,
         icon: String
     ) -> some View {
-        let selected = planningApproach == choice
+        let selected = buildWithCoach == choice
         return Button {
-            onChooseApproach(choice)
+            onChooseCoach(choice)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)
@@ -176,32 +176,7 @@ struct ATHLTHPlanSetupFields: View {
                         .font(.caption)
                         .foregroundStyle(muted)
                         .fixedSize(horizontal: false, vertical: true)
-                    if choice == .guided {
-                        VStack(spacing: 4) {
-                            ForEach(1...3, id: \.self) { day in
-                                HStack(spacing: 7) {
-                                    Text(tr("Day", "Dag") + " \(day)")
-                                        .frame(width: 42, alignment: .leading)
-                                    Capsule().fill(day == 1 ? bronze : border.opacity(0.4)).frame(height: 5)
-                                    Image(systemName: day == 1 ? "pencil" : "circle")
-                                }
-                            }
-                        }
-                        .font(.caption2).foregroundStyle(bronze).padding(.top, 6)
-                    } else {
-                        HStack(spacing: 4) {
-                            ForEach(1...7, id: \.self) { day in
-                                VStack(spacing: 4) {
-                                    Text("\(day)")
-                                    Image(systemName: selectedDays.contains(day) ? "figure.run" : "moon.stars")
-                                }
-                                .font(.caption2).foregroundStyle(bronze)
-                                .frame(maxWidth: .infinity, minHeight: 33)
-                                .background(ATHLTHTrainDesign.paleGold.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
-                            }
-                        }
-                        .padding(.top, 6)
-                    }
+
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
@@ -384,8 +359,9 @@ struct ATHLTHPlanSetupFields: View {
         card {
             cardHeading("calendar.badge.checkmark",
                         tr("Training days", "Treningsdager"),
-                        detail: tr("Other days are rest days",
-                                   "Resterende dager blir hviledager"))
+                        detail: advanced
+                            ? tr("Other days are suggested rest days", "Resterende dager foreslås som hviledager")
+                            : tr("Other days are rest days", "Resterende dager blir hviledager"))
             if advanced {
                 // The approved circular weekday selector: a full 44-point
                 // touch target, gold ring and a visible check on chosen days.
@@ -428,9 +404,8 @@ struct ATHLTHPlanSetupFields: View {
                     }
                 }
             }
-            if advanced && planningApproach == .quick {
-                // Dagsplan edits each date directly, so a week variation toggle
-                // would be redundant. Preserve the saved choice for Ukeplan.
+            if advanced {
+                // Suggested training rhythm is independent of the chosen view.
                 HStack(spacing: 8) {
                     Image(systemName: "shuffle")
                         .foregroundStyle(bronze)
