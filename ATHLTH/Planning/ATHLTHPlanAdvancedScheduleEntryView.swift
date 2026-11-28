@@ -20,6 +20,7 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
             title: $title,
             startDate: $startDate,
             weekCount: $weekCount,
+            durationUnspecified: .constant(false),
             selectedDays: selectedDays,
             suggestedName: suggestedName,
             advanced: true,
