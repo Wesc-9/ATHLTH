@@ -84,6 +84,10 @@ enum ATHLTHAudioCoachCommandMoves {
                 draft.customRules[index].additionalMetrics =
                     (draft.customRules[index].additionalMetrics ?? []) + [metric]
             }
+            if metric == .ownMessage {
+                let existing = draft.customRules[index].ownMessages ?? []
+                draft.customRules[index].ownMessages = Array((existing + (source.ownMessages ?? [])).prefix(20))
+            }
             // Preserve an authored motivation sentence when that individual
             // command is dragged into another group's shared spoken cue.
             if metric == .motivation,
@@ -103,6 +107,7 @@ enum ATHLTHAudioCoachCommandMoves {
             newRule.metric = metric
             newRule.additionalMetrics = nil
             if metric != .motivation { newRule.customPhrase = nil }
+            if metric != .ownMessage { newRule.ownMessages = nil }
             draft.customRules.append(newRule)
             if let targetIndex {
                 draft.coachGroups[targetIndex].ruleIDs.append(newRule.id)
@@ -118,7 +123,8 @@ enum ATHLTHAudioCoachCommandMoves {
                 draft.customRules[index].additionalMetrics = Array(
                     remaining.dropFirst()
                 )
-                if next != .motivation {
+                if !remaining.contains(.ownMessage) { draft.customRules[index].ownMessages = nil }
+                if !remaining.contains(.motivation) {
                     draft.customRules[index].customPhrase = nil
                 }
             } else {

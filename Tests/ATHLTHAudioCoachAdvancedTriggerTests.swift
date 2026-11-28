@@ -30,6 +30,34 @@ final class ATHLTHAudioCoachAdvancedTriggerTests: XCTestCase {
         XCTAssertTrue(preview?.hasPrefix("Puls 154. Hold flyten. Hastighet") == true)
     }
 
+    func testSeparateMotivationCommandsAndOwnMessagesRoundTrip() throws {
+        var rule = ATHLTHAudioCoachRule(trigger: .distance, metric: .pushMessage,
+            interval: 1000, additionalMetrics: [.motivation, .praise, .ownMessage])
+        rule.ownMessages = ["Hold flyten", "Du klarer dette"]
+        let restored = try JSONDecoder().decode(ATHLTHAudioCoachRule.self, from: JSONEncoder().encode(rule))
+        XCTAssertEqual(restored.selectedMetrics, [.pushMessage, .motivation, .praise, .ownMessage])
+        XCTAssertEqual(restored.ownMessages, rule.ownMessages)
+        let phrase = restored.phrase(distanceMeters: 1000, elapsedSeconds: 300,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil, norwegian: true)
+        XCTAssertTrue(phrase?.contains("Du klarer dette") == true)
+        XCTAssertEqual(restored.phrase(distanceMeters: 2000, elapsedSeconds: 600,
+            paceSecondsPerKilometer: nil, heartRateBPM: nil, norwegian: true,
+            excluding: [.pushMessage, .motivation, .praise]), "Hold flyten")
+    }
+
+    func testNewReadoutsNeverInventMissingMeasurements() {
+        let rule = ATHLTHAudioCoachRule(trigger: .time, metric: .averageHeartRate, interval: 60,
+            additionalMetrics: [.ghostTimeDifference, .currentSet, .targetPaceDifference])
+        XCTAssertNil(rule.phrase(distanceMeters: 0, elapsedSeconds: 60,
+            paceSecondsPerKilometer: nil, heartRateBPM: 155, norwegian: true))
+        var context = ATHLTHCoachReadoutContext()
+        context.averageHeartRateBPM = 140
+        context.ghostTimeDifferenceSeconds = -12
+        let phrase = rule.phrase(distanceMeters: 0, elapsedSeconds: 60,
+            paceSecondsPerKilometer: nil, heartRateBPM: 155, norwegian: true, context: context)
+        XCTAssertEqual(phrase, "Snittpuls 140. 12 sekunder bak Ghost")
+    }
+
     private func due(
         _ rule: ATHLTHAudioCoachRule,
         time: Double = 300,

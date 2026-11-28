@@ -5786,7 +5786,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// these with basic distance/time updates before speaking.
     private var coachReadoutContext: ATHLTHCoachReadoutContext {
         if kind == .strength, let strengthSession {
-            return ATHLTHCoachReadoutContext.make(strength: strengthSession)
+            var context = ATHLTHCoachReadoutContext.make(strength: strengthSession)
+            context.averageHeartRateBPM = averageHeartRate
+            return context
         }
         let rules = audioCoachConfiguration.activeCustomRules
         var context = ATHLTHCoachReadoutContext.make(
@@ -5797,6 +5799,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             recorded: recordedStructuredRunSteps,
             routeRemainingMeters: routeRemainingMeters
         )
+        context.averageHeartRateBPM = averageHeartRate
+        context.ghostTimeDifferenceSeconds = ghostTimeDeltaSeconds
+        context.ghostDistanceDifferenceMeters = ghostDistanceDeltaMeters
         if kind == .running || kind == .walking {
             // Only the active exercise's prescribed zone may trigger a
             // target-zone alert. No inferred zone when not configured.

@@ -47,6 +47,7 @@ struct ATHLTHCoachComposerCheckpoint: Equatable {
     let historicalWorkoutID: UUID?
     let activityFilter: ATHLTHCoachActivityFilter
     var linkedCountdownSeconds: Int? = nil
+    var ownMessageText: String? = nil
 }
 
 /// Presentation policy only. Keep the persisted rule and its speech formatter
@@ -62,14 +63,17 @@ enum ATHLTHCoachCommandSelection {
             switch metric {
             case .stepName, .stepRemainingTime, .groupRemainingTime,
                  .remainingExercises, .nextExercise, .previousExerciseSummary,
-                 .previousMainSectionSummary:
+                 .previousMainSectionSummary, .currentEffort, .remainingEfforts, .nextEffort,
+                 .currentSet, .remainingSets:
                 guard structured else { return false }
             case .routeRemainingDistance, .estimatedRouteTime:
                 guard routes else { return false }
-            case .distance:
+            case .distance, .workoutRemainingDistance, .ghostDistanceDifference, .ghostTimeDifference:
                 guard distance else { return false }
             default: break
             }
+            if [.currentSet, .remainingSets].contains(metric) && activity != .strength && activity != .all { return false }
+            if [.currentEffort, .remainingEfforts, .nextEffort, .averageSpeed, .targetPaceDifference, .ghostTimeDifference, .ghostDistanceDifference].contains(metric) && ![.running, .walking, .intervals, .all].contains(activity) { return false }
             switch activity {
             case .strength:
                 let probe = ATHLTHAudioCoachRule(trigger: .time, metric: metric, interval: 60)
@@ -117,6 +121,16 @@ enum ATHLTHCoachCommandSelection {
         context.groupRemainingSeconds = 240
         context.workoutRemainingSeconds = 900
         context.routeRemainingMeters = 2400
+        context.workoutRemainingMeters = 2400
+        context.averageHeartRateBPM = 142
+        context.targetPaceSecondsPerKilometer = 310
+        context.currentEffortNumber = 2
+        context.remainingEffortCount = 2
+        context.nextEffortName = norwegian ? "Intervall" : "Interval"
+        context.currentSetNumber = 2
+        context.remainingSetCount = 4
+        context.ghostTimeDifferenceSeconds = 12
+        context.ghostDistanceDifferenceMeters = 40
         context.lastKilometerPaceSecondsPerKilometer = walking ? 600 : 330
         context.overallPaceSecondsPerKilometer = walking ? 600 : 330
         context.remainingExerciseCount = 3
@@ -164,6 +178,8 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var metrics: [ATHLTHAudioCoachRule.Metric]
     @State private var motivationPhrase: String
     @State private var motivationStyle: ATHLTHCoachEncouragementStyle
+    @State private var ownMessageText: String
+    @State private var showingOwnMessages = false
     @State private var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @State private var historicalWorkoutID: UUID?
     @State private var activityFilter: ATHLTHCoachActivityFilter
@@ -178,7 +194,8 @@ struct ATHLTHCoachRuleComposer: View {
             motivationStyle: motivationStyle,
             historicalWorkoutID: historicalWorkoutID,
             activityFilter: activityFilter,
-            linkedCountdownSeconds: linkedCountdownSeconds
+            linkedCountdownSeconds: linkedCountdownSeconds,
+            ownMessageText: ownMessageText
         )
     }
 
@@ -244,11 +261,30 @@ struct ATHLTHCoachRuleComposer: View {
             original?.eventSelection ?? .every)
         _allowedPhases = State(initialValue:
             checkpoint?.allowedPhases ?? group?.phases ?? original?.allowedPhases)
+        let authoredRules = group?.ruleIDs.compactMap { id in
+            value.customRules.first { $0.id == id }
+        } ?? [original].compactMap { $0 }
+        let originalMotivation = authoredRules.first { $0.selectedMetrics.contains(.motivation) }
+        let originalOwn = authoredRules.first { $0.selectedMetrics.contains(.ownMessage) }
+        let legacyPhrase = originalMotivation?.customPhrase?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let migratedMetrics = uniqueMetrics.map { metric -> ATHLTHAudioCoachRule.Metric in
+            guard metric == .motivation else { return metric }
+            if !legacyPhrase.isEmpty { return .ownMessage }
+            switch originalMotivation?.encouragementStyle ?? .encouragement {
+            case .push: return .pushMessage
+            case .praise: return .praise
+            default: return .motivation
+            }
+        }
+        var restoredMetrics: [ATHLTHAudioCoachRule.Metric] = []
+        for metric in migratedMetrics where !restoredMetrics.contains(metric) { restoredMetrics.append(metric) }
         _metrics = State(initialValue: checkpoint?.metrics ??
-            (target.isGroup ? uniqueMetrics :
-            Array((uniqueMetrics.isEmpty
+            (target.isGroup ? restoredMetrics :
+            Array((restoredMetrics.isEmpty
                 ? target.legacyOption.map { [Self.legacyMetric($0)] } ?? []
-                : uniqueMetrics).prefix(1))))
+                : restoredMetrics).prefix(1))))
+        _ownMessageText = State(initialValue: checkpoint?.ownMessageText ??
+            (originalOwn?.ownMessages ?? (legacyPhrase.isEmpty ? [] : [legacyPhrase])).joined(separator: "\n"))
         _motivationPhrase = State(initialValue:
             checkpoint?.motivationPhrase ?? original?.customPhrase ?? "")
         _motivationStyle = State(initialValue:
@@ -345,6 +381,7 @@ struct ATHLTHCoachRuleComposer: View {
 
     private var canSave: Bool {
         canAdvanceTrigger && !metrics.isEmpty && unavailableSelected.isEmpty &&
+            (!metrics.contains(.ownMessage) || !ownMessageLines.isEmpty) &&
             (isEditing || draft.customRules.count < 20)
     }
 
@@ -440,6 +477,7 @@ struct ATHLTHCoachRuleComposer: View {
             }
         }
         .presentationDetents([.large])
+        .sheet(isPresented: $showingOwnMessages) { ownMessagesEditor }
         .task(id: session.profile.userID) {
             historicalReferences = ATHLTHCoachHistoricalRunEvidence.available(
                 userID: session.profile.userID
@@ -515,7 +553,6 @@ struct ATHLTHCoachRuleComposer: View {
         VStack(alignment: .leading, spacing: 22) {
             commandPreview
             selectedCommandCard
-            if metrics.contains(.motivation) { motivationEditor }
             if canLinkCountdown { linkedCountdownEditor }
             commandCatalogue
             if draft.customRules.count >= 20 && !isEditing {
@@ -534,9 +571,8 @@ struct ATHLTHCoachRuleComposer: View {
             trigger: trigger, metric: first, interval: interval,
             additionalMetrics: Array(metrics.dropFirst())
         )
-        rule.encouragementStyle = motivationStyle
-        let phrase = motivationPhrase.trimmingCharacters(in: .whitespacesAndNewlines)
-        rule.customPhrase = phrase.isEmpty ? nil : String(phrase.prefix(180))
+        rule.encouragementStyle = .encouragement
+        rule.ownMessages = metrics.contains(.ownMessage) ? ownMessageLines : nil
         if let reference = selectedHistory {
             rule.historicalWorkoutFirstKilometerSeconds = reference.firstKilometerSeconds
         }
@@ -676,11 +712,27 @@ struct ATHLTHCoachRuleComposer: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(bronze)
-            Label(metric.title, systemImage: commandSymbol(metric))
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
+            if metric == .ownMessage {
+                Button { showingOwnMessages = true } label: {
+                    HStack {
+                        Label(metric.title, systemImage: commandSymbol(metric))
+                        Spacer(minLength: 0)
+                        Image(systemName: "pencil")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ink)
+                    .padding(.bottom, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Label(metric.title, systemImage: commandSymbol(metric))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 8)
+            }
             if unavailableSelected.contains(metric) {
                 Text(tr("Unavailable", "Ikke tilgjengelig"))
                     .font(.caption2)
@@ -732,6 +784,7 @@ struct ATHLTHCoachRuleComposer: View {
     private func commandTile(_ metric: ATHLTHAudioCoachRule.Metric) -> some View {
         Button {
             metrics = ATHLTHCoachCommandSelection.adding(metric, to: metrics, multiple: target.isGroup)
+            if metric == .ownMessage { showingOwnMessages = true }
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
@@ -766,7 +819,15 @@ struct ATHLTHCoachRuleComposer: View {
         case .distance, .routeRemainingDistance: return "point.topleft.down.to.point.bottomright.curvepath"
         case .heartRate: return "heart.fill"
         case .heartRateZone: return "heart.text.square"
-        case .motivation: return "quote.bubble"
+        case .motivation: return "sparkles"
+        case .pushMessage: return "flame"
+        case .praise: return "trophy"
+        case .ownMessage: return "text.bubble"
+        case .averageHeartRate: return "heart.text.square"
+        case .averageSpeed, .targetPaceDifference: return "speedometer"
+        case .workoutRemainingDistance, .ghostDistanceDifference: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .currentEffort, .remainingEfforts, .nextEffort, .currentSet, .remainingSets: return "list.number"
+        case .ghostTimeDifference: return "timer"
         case .hydrationReminder: return "drop"
         case .clockTime, .estimatedFinishTime: return "clock"
         case .date: return "calendar"
@@ -806,23 +867,37 @@ struct ATHLTHCoachRuleComposer: View {
         .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    private var motivationEditor: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(tr("Make it personal", "Gjør meldingen personlig"))
-                .font(.headline)
-                .foregroundStyle(ink)
-            Picker(tr("Style", "Stil"), selection: $motivationStyle) {
-                Text(tr("Encourage", "Motiver")).tag(ATHLTHCoachEncouragementStyle.encouragement)
-                Text(tr("Push", "Push-beskjed")).tag(ATHLTHCoachEncouragementStyle.push)
-                Text(tr("Praise", "Ros")).tag(ATHLTHCoachEncouragementStyle.praise)
+    private var ownMessageLines: [String] {
+        Array(ownMessageText.split(whereSeparator: \.isNewline).map {
+            String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(180))
+        }.filter { !$0.isEmpty }.prefix(20))
+    }
+
+    private var ownMessagesEditor: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(tr("Write one message per line. Audio Coach rotates between them.", "Skriv én melding per linje. Audio Coach varierer mellom dem."))
+                        .font(.subheadline)
+                        .foregroundStyle(muted)
+                    TextEditor(text: $ownMessageText)
+                        .frame(minHeight: 180)
+                        .padding(8)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityIdentifier("athlth-coach-own-messages")
+                }
+                .padding(18)
             }
-            .pickerStyle(.segmented)
-            TextField(tr("Your own message (optional)", "Din egen melding (valgfritt)"),
-                      text: $motivationPhrase, axis: .vertical)
-                .lineLimit(2...5)
-                .padding(13)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+            .background(ATHLTHPlanDesign.canvas)
+            .navigationTitle(tr("Own message", "Egen melding"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Done", "Ferdig")) { showingOwnMessages = false }
+                }
+            }
         }
+        .presentationDetents([.medium, .large])
     }
 
     private var commandFooter: some View {
@@ -892,8 +967,6 @@ struct ATHLTHCoachRuleComposer: View {
         guard canSave, let primary = metrics.first else { return }
         let enteredName = String(groupName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
         let name = enteredName.isEmpty ? tr("My choices", "Mine valg") : enteredName
-        let phrase = String(motivationPhrase.trimmingCharacters(
-            in: .whitespacesAndNewlines).prefix(180))
         let oldGroup = draft.coachGroups.first { $0.id == target.groupID }
         let oldRuleIDs = oldGroup?.ruleIDs ?? []
         let previous = target.ruleID.flatMap { id in
@@ -920,12 +993,8 @@ struct ATHLTHCoachRuleComposer: View {
                 reference.firstKilometerSeconds
             rule.historicalWorkoutTitle = reference.title
         }
-        if metrics.contains(.motivation) {
-            rule.encouragementStyle = motivationStyle
-        }
-        if metrics.contains(.motivation), !phrase.isEmpty {
-            rule.customPhrase = phrase
-        }
+        if metrics.contains(.motivation) { rule.encouragementStyle = .encouragement }
+        if metrics.contains(.ownMessage) { rule.ownMessages = ownMessageLines }
 
         // Old standard commands are replaced, not layered on top of the
         // newly authored rule; this prevents duplicate speech.

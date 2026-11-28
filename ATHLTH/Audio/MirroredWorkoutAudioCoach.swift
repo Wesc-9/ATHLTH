@@ -773,6 +773,9 @@ final class MirroredWorkoutAudioCoach:
             ? (snapshot.coachReadoutContext ?? .init(routeRemainingMeters: snapshot.routeRemainingMeters))
             : .init()
         readout.appleLiveHeartRateZones = snapshot.appleLiveHeartRateZones
+        readout.averageHeartRateBPM = snapshot.averageHeartRate
+        readout.ghostTimeDifferenceSeconds = snapshot.ghostTimeDeltaSeconds
+        readout.ghostDistanceDifferenceMeters = snapshot.ghostDistanceDeltaMeters
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: ATHLTHAudioCoachSportPolicy.eligibleRules(
                 configuration.activeCustomRules, sport: sport,

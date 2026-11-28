@@ -5489,6 +5489,9 @@ final class IPhoneWorkoutStore:
             recorded: workout.recordedRunningSteps ?? [],
             routeRemainingMeters: workout.routeRemainingMeters
         )
+        context.averageHeartRateBPM = workout.measuredAverageHeartRate
+        context.ghostTimeDifferenceSeconds = workout.ghostTimeDeltaSeconds
+        context.ghostDistanceDifferenceMeters = workout.ghostDistanceDeltaMeters
         context.overallPaceSecondsPerKilometer =
             workout.runEnvironment == .outdoor && workout.distanceMeters >= 1_000
             ? ATHLTHRunningPace.average(

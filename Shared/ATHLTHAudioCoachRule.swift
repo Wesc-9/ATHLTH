@@ -272,6 +272,10 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case nextExercise
         case previousExerciseSummary
         case previousMainSectionSummary
+        case pushMessage, praise, ownMessage
+        case averageHeartRate, averageSpeed, targetPaceDifference, workoutRemainingDistance
+        case currentEffort, remainingEfforts, nextEffort, currentSet, remainingSets
+        case ghostTimeDifference, ghostDistanceDifference
         var id: String { rawValue }
         /// Sensor readings, measured pace and device-verified records do not
         /// require connectivity. When online commands are introduced, flag
@@ -279,11 +283,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var requiresInternet: Bool { false }
         var category: ATHLTHCoachMetricCategory {
             switch self {
-            case .heartRate, .heartRateZone: return .heartRate
+            case .heartRate, .heartRateZone, .averageHeartRate: return .heartRate
             case .stepName, .stepRemainingTime, .groupRemainingTime,
                  .remainingExercises, .nextExercise, .previousExerciseSummary,
-                 .previousMainSectionSummary: return .exercises
-            case .motivation, .hydrationReminder: return .motivation
+                 .previousMainSectionSummary, .currentEffort, .remainingEfforts, .nextEffort, .currentSet, .remainingSets: return .exercises
+            case .motivation, .pushMessage, .praise, .ownMessage, .hydrationReminder: return .motivation
             case .personalRecord: return .workout
             case .routeRemainingDistance, .estimatedRouteTime: return .navigation
             default: return .workout
@@ -291,6 +295,20 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         }
         var title: String {
             switch self {
+            case .pushMessage: return ATHLTHLocalization.choose(english: "Push message", norwegian: "Push-beskjed")
+            case .praise: return ATHLTHLocalization.choose(english: "Praise", norwegian: "Ros")
+            case .ownMessage: return ATHLTHLocalization.choose(english: "Own message", norwegian: "Egen melding")
+            case .averageHeartRate: return ATHLTHLocalization.choose(english: "Average heart rate", norwegian: "Snittpuls")
+            case .averageSpeed: return ATHLTHLocalization.choose(english: "Average speed", norwegian: "Gjennomsnittshastighet")
+            case .targetPaceDifference: return ATHLTHLocalization.choose(english: "Difference from target pace", norwegian: "Avvik fra måltempo")
+            case .workoutRemainingDistance: return ATHLTHLocalization.choose(english: "Workout distance remaining", norwegian: "Gjenstående distanse")
+            case .currentEffort: return ATHLTHLocalization.choose(english: "Current effort", norwegian: "Gjeldende drag")
+            case .remainingEfforts: return ATHLTHLocalization.choose(english: "Remaining efforts", norwegian: "Gjenstående drag")
+            case .nextEffort: return ATHLTHLocalization.choose(english: "Next effort", norwegian: "Neste drag")
+            case .currentSet: return ATHLTHLocalization.choose(english: "Current set", norwegian: "Gjeldende sett")
+            case .remainingSets: return ATHLTHLocalization.choose(english: "Remaining sets", norwegian: "Gjenstående sett")
+            case .ghostTimeDifference: return ATHLTHLocalization.choose(english: "Ghost time difference", norwegian: "Ghost Race · tid foran/bak")
+            case .ghostDistanceDifference: return ATHLTHLocalization.choose(english: "Ghost distance difference", norwegian: "Ghost Race · distanse foran/bak")
             case .pace: return ATHLTHLocalization.choose(
                 english: "Pace", norwegian: "Tempo")
             case .elapsedTime: return ATHLTHLocalization.choose(
@@ -363,6 +381,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     /// Uses the existing deadline-based running countdown, never queued speech.
     var linkedCountdownSeconds: Int? = nil
     var customPhrase: String? = nil
+    /// Optional newline-independent messages; legacy single phrases remain readable.
+    var ownMessages: [String]? = nil
     /// Nil on legacy profiles means all supported workout types.
     var activityFilter: ATHLTHCoachActivityFilter? = nil
     /// A user-selected, recorded workout with a VERIFIED 1-km split.
@@ -466,6 +486,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         let parts = selectedMetrics.filter {
             !excludedMetrics.contains($0)
         }.compactMap { item -> String? in
+            if item == .ownMessage {
+                let choices = (ownMessages ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+                guard !choices.isEmpty else { return nil }
+                return choices[motivationSlot % choices.count]
+            }
             if item == .motivation, let personal, !personal.isEmpty {
                 return personal
             }
@@ -494,6 +519,57 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         now: Date
     ) -> String? {
         switch metric {
+        case .ownMessage: return nil // resolved in phrase(), using the scheduled milestone
+        case .pushMessage, .praise:
+            let style: ATHLTHCoachEncouragementStyle = metric == .pushMessage ? .push : .praise
+            if trigger == .nearFinishTime || trigger == .nearFinishDistance {
+                return ATHLTHAudioCoachScheduledMotivation.finish(byDistance: trigger == .nearFinishDistance, style: style, norwegian: norwegian)
+            }
+            return ATHLTHAudioCoachScheduledMotivation.phrase(slot: motivationSlot, style: style, norwegian: norwegian)
+        case .averageHeartRate:
+            guard let bpm = context.averageHeartRateBPM, bpm.isFinite, (30...230).contains(bpm) else { return nil }
+            return (norwegian ? "Snittpuls " : "Average heart rate ") + String(Int(bpm.rounded()))
+        case .averageSpeed:
+            guard let pace = context.overallPaceSecondsPerKilometer, pace.isFinite, (30...3600).contains(pace) else { return nil }
+            let speed = (3600 / pace).formatted(.number.precision(.fractionLength(1)).locale(Locale(identifier: norwegian ? "nb_NO" : "en_US")))
+            return norwegian ? "Gjennomsnittshastighet \(speed) kilometer i timen" : "Average speed \(speed) kilometers per hour"
+        case .targetPaceDifference:
+            guard let pace = paceSecondsPerKilometer, let target = context.targetPaceSecondsPerKilometer,
+                  pace.isFinite, target.isFinite, (30...3600).contains(pace), (30...3600).contains(target) else { return nil }
+            let slowest = context.targetSlowestPaceSecondsPerKilometer ?? target
+            guard slowest.isFinite, slowest >= target, slowest <= 3600 else { return nil }
+            let difference = pace < target ? pace - target : pace > slowest ? pace - slowest : 0
+            let seconds = Int(abs(difference).rounded())
+            if seconds == 0 { return norwegian ? "Du holder måltempo" : "You are on target pace" }
+            return norwegian
+                ? "\(seconds) sekunder per kilometer \(difference < 0 ? "raskere" : "saktere") enn måltempo"
+                : "\(seconds) seconds per kilometer \(difference < 0 ? "faster" : "slower") than target pace"
+        case .workoutRemainingDistance:
+            guard let meters = context.workoutRemainingMeters ?? context.routeRemainingMeters, meters.isFinite, meters >= 0 else { return nil }
+            let km = (meters / 1000).formatted(.number.precision(.fractionLength(0...2)).locale(Locale(identifier: norwegian ? "nb_NO" : "en_US")))
+            return norwegian ? "\(km) kilometer igjen" : "\(km) kilometers remaining"
+        case .currentEffort:
+            guard let number = context.currentEffortNumber, number > 0 else { return nil }
+            return norwegian ? "Drag \(number)" : "Effort \(number)"
+        case .remainingEfforts:
+            guard let count = context.remainingEffortCount, count >= 0 else { return nil }
+            return norwegian ? "\(count) drag gjenstår" : "\(count) efforts remaining"
+        case .nextEffort:
+            guard let name = context.nextEffortName, !name.isEmpty else { return nil }
+            return (norwegian ? "Neste drag: " : "Next effort: ") + name
+        case .currentSet:
+            guard let number = context.currentSetNumber, number > 0 else { return nil }
+            return norwegian ? "Sett \(number)" : "Set \(number)"
+        case .remainingSets:
+            guard let count = context.remainingSetCount, count >= 0 else { return nil }
+            return norwegian ? "\(count) sett gjenstår i økten" : "\(count) sets remaining in the workout"
+        case .ghostTimeDifference, .ghostDistanceDifference:
+            let delta = metric == .ghostTimeDifference ? context.ghostTimeDifferenceSeconds : context.ghostDistanceDifferenceMeters
+            guard let delta, delta.isFinite, abs(delta) <= 1_000_000 else { return nil }
+            let amount = Int(abs(delta).rounded())
+            if amount == 0 { return norwegian ? "Du er likt med Ghost" : "You are level with Ghost" }
+            let unit = metric == .ghostTimeDifference ? (norwegian ? "sekunder" : "seconds") : (norwegian ? "meter" : "meters")
+            return norwegian ? "\(amount) \(unit) \(delta > 0 ? "foran" : "bak") Ghost" : "\(amount) \(unit) \(delta > 0 ? "ahead of" : "behind") Ghost"
         case .pace:
             guard let pace = paceSecondsPerKilometer, pace.isFinite,
                   pace > 0, pace < 3_600 else { return nil }
@@ -995,6 +1071,18 @@ enum ATHLTHAudioCoachRuleDelivery {
             let available = rule.selectedMetrics.filter { metric in
                 switch metric {
                 case .heartRate: return heartRateBPM != nil
+                case .averageHeartRate: return context.averageHeartRateBPM != nil
+                case .ownMessage: return rule.ownMessages?.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) == true
+                case .ghostTimeDifference: return context.ghostTimeDifferenceSeconds != nil
+                case .ghostDistanceDifference: return context.ghostDistanceDifferenceMeters != nil
+                case .currentSet: return context.currentSetNumber != nil
+                case .remainingSets: return context.remainingSetCount != nil
+                case .currentEffort: return context.currentEffortNumber != nil
+                case .remainingEfforts: return context.remainingEffortCount != nil
+                case .nextEffort: return context.nextEffortName != nil
+                case .averageSpeed: return context.overallPaceSecondsPerKilometer != nil
+                case .targetPaceDifference: return context.targetPaceSecondsPerKilometer != nil && paceSecondsPerKilometer != nil
+                case .workoutRemainingDistance: return context.workoutRemainingMeters != nil || context.routeRemainingMeters != nil
                 case .heartRateZone:
                     return ATHLTHLiveZonePolicy.measuredZone(
                         bpm: heartRateBPM, maximumBPM: maximumHeartRateBPM,
@@ -1448,6 +1536,14 @@ struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
 /// Planned estimates and segment measurements supplied by the recording owner.
 struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var appleLiveHeartRateZones: [ATHLTHRecordedHeartRateZone]? = nil
+    var averageHeartRateBPM: Double? = nil
+    var currentEffortNumber: Int? = nil
+    var remainingEffortCount: Int? = nil
+    var nextEffortName: String? = nil
+    var currentSetNumber: Int? = nil
+    var remainingSetCount: Int? = nil
+    var ghostTimeDifferenceSeconds: Double? = nil
+    var ghostDistanceDifferenceMeters: Double? = nil
     var stepName: String?
     var stepIndex: Int?
     var isEffort = false
@@ -1517,7 +1613,9 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
                     case .stepName, .stepRemainingTime, .groupRemainingTime,
                          .workoutRemainingTime, .estimatedFinishTime,
                          .remainingExercises, .nextExercise, .previousExerciseSummary,
-                         .previousMainSectionSummary, .lastKilometerPace: return true
+                         .previousMainSectionSummary, .lastKilometerPace, .targetPaceDifference,
+                         .workoutRemainingDistance, .currentEffort, .remainingEfforts, .nextEffort,
+                         .currentSet, .remainingSets: return true
                     default: return false
                     }
                 })
@@ -1530,6 +1628,10 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     static func make(strength snapshot: WatchStrengthSessionSnapshot) -> Self {
         var context = Self()
         let exercises = (snapshot.exerciseQueue ?? []).sorted { $0.index < $1.index }
+        if !snapshot.allExercisesComplete && !snapshot.currentExerciseComplete {
+            context.currentSetNumber = snapshot.setNumber ?? (snapshot.setIndex + 1)
+        }
+        context.remainingSetCount = max(0, snapshot.totalSets - snapshot.completedSets - (snapshot.skippedSets ?? 0))
         context.stepIndex = snapshot.exerciseIndex
         context.stepCount = max(snapshot.exerciseCount, exercises.count)
         context.stepName = snapshot.exerciseName
@@ -1604,6 +1706,16 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
             }
             context.workoutRemainingMeters =
                 max(0, (step.distanceMeters ?? 0) - max(0, distance)) + future
+        }
+        let effortIndices = steps.indices.filter { steps[$0].phase == "work" }
+        if let ordinal = effortIndices.firstIndex(of: index) {
+            context.currentEffortNumber = ordinal + 1
+        }
+        if !effortIndices.isEmpty {
+            context.remainingEffortCount = effortIndices.filter { $0 > index }.count
+            if let next = effortIndices.first(where: { $0 > index }) {
+                context.nextEffortName = steps[next].title
+            }
         }
         context.stepCount = steps.count
         context.firstRecoveryStepIndex = steps.firstIndex { $0.phase == "recovery" }
@@ -1766,7 +1878,8 @@ enum ATHLTHAudioCoachSportPolicy {
                      .previousExerciseSummary, .previousMainSectionSummary,
                      .stepName, .elapsedTime, .motivation,
                      .heartRate, .heartRateZone, .hydrationReminder,
-                     .clockTime, .date, .workoutRemainingTime:
+                     .clockTime, .date, .workoutRemainingTime, .pushMessage, .praise, .ownMessage,
+                     .averageHeartRate, .currentSet, .remainingSets:
                     return true
                 default: return false
                 }
@@ -1806,7 +1919,9 @@ enum ATHLTHAudioCoachSportPolicy {
                      .groupRemainingTime, .workoutRemainingTime,
                      .estimatedFinishTime, .remainingExercises, .nextExercise,
                      .previousExerciseSummary, .previousMainSectionSummary,
-                     .speed:
+                     .speed, .averageSpeed, .targetPaceDifference, .workoutRemainingDistance,
+                     .currentEffort, .remainingEfforts, .nextEffort, .currentSet, .remainingSets,
+                     .ghostTimeDifference, .ghostDistanceDifference:
                     return false
                 case .distance:
                     return distanceAvailable
