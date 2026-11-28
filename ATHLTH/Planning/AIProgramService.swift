@@ -527,7 +527,7 @@ final class AIProgramService {
         let unavailable = Set((request.unavailableEquipment ?? []).map(ATHLTHExerciseReferenceResolver.key))
         let bodyweight = Set(["bodyweight", "body weight", "none", "no equipment", "kroppsvekt"].map(ATHLTHExerciseReferenceResolver.key))
         let minutes = min(180, max(5, request.sessionDurationMinutes))
-        let focusKey = String(describing: focus).lowercased()
+        let focusKey = focus.rawValue.lowercased()
         let isRunning = focusKey == "running"
         let isWalking = focusKey == "walking"
         let isStrength = focusKey == "strength"
@@ -653,10 +653,18 @@ final class AIProgramService {
                 var sessions: [AIProgramDraftSession] = []
                 if chosen.contains(weekday) {
                     let offset = request.varyWeeks ? week : 0
-                    var workout = selected[(slot + offset) % selected.count]
+                    let source = selected[(slot + offset) % selected.count]
                     slot += 1
-                    workout.id = UUID()
-                    workout.scheduledStart = nil
+                    // New scheduled identity; preserve the executable recipe,
+                    // not the source's invitation or old calendar metadata.
+                    var workout = PlannedSession(id: UUID(), title: source.title,
+                        kind: source.kind, scheduledStart: nil,
+                        durationMinutes: source.durationMinutes,
+                        targetDistanceKilometers: source.targetDistanceKilometers,
+                        targetPaceSecondsPerKilometer: source.targetPaceSecondsPerKilometer,
+                        routeID: source.routeID, exercises: source.exercises, notes: source.notes)
+                    workout.workoutBlocks = source.resolvedWorkoutBlocks
+                    workout.workoutCategory = source.workoutCategory
                     // Only retime a single continuous cardio block. Preserve
                     // the recipe and duration of intervals and strength.
                     if !request.aiChoosesDuration, var blocks = workout.workoutBlocks,
