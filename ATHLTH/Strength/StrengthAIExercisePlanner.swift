@@ -133,13 +133,32 @@ private final class StrengthAIExerciseService {
     func generate(
         _ request: StrengthAIExerciseRequest
     ) async throws -> StrengthAIExercisePlan {
-        try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: !request.recentWorkouts.isEmpty)
-        return try await client.functions.invoke(
-            ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .strengthSession),
-            options: FunctionInvokeOptions(
-                body: request
-            )
-        )
+        let blocked = Set(request.existingExerciseIDs)
+        let eligible = request.candidates.filter { !blocked.contains($0.exerciseID) }
+        guard request.exerciseCount > 0, eligible.count >= request.exerciseCount else {
+            throw StrengthAIExercisePlannerError.invalidResult
+        }
+        // Limit prompt size without excluding the requested number of choices.
+        let candidates = Array(eligible.prefix(max(24, request.exerciseCount)))
+        let labels = candidates.map { $0.name + " · " + $0.primaryMuscles.joined(separator: ", ") + " · " + $0.equipment.joined(separator: ", ") }
+        let context = "Goal: " + request.goal + ". Focus: " + (request.focusBodyParts ?? []).joined(separator: ", ") +
+            ". Duration: " + String(request.durationMinutes) + " minutes."
+        let ranked = try await ATHLTHIntelligenceEngine.localPlanningOrder(options: labels, context: context)
+        let order = ranked ?? []
+        let used = Set(order)
+        let indices = (order + candidates.indices.filter { !used.contains($0) }).prefix(request.exerciseCount)
+        let reps = request.goal == "strength" ? 6 : request.goal == "endurance" ? 12 : 10
+        let sets = request.durationMinutes / max(1, request.exerciseCount) < 7 ? 2 : 3
+        let suggestions = indices.map { index in
+            StrengthAIExerciseSuggestion(exerciseID: candidates[index].exerciseID,
+                sets: sets, reps: reps, restSeconds: request.goal == "strength" ? 120 : 90,
+                targetRPE: nil, reason: ATHLTHLocalization.choose(
+                    english: "Matches the selected library filters.", norwegian: "Passer de valgte bibliotekfiltrene."))
+        }
+        return StrengthAIExercisePlan(
+            title: ATHLTHLocalization.choose(english: "Strength workout", norwegian: "Styrkeøkt"),
+            summary: ATHLTHLocalization.choose(english: "Selected from your exercise library.", norwegian: "Valgt fra øvelsesbiblioteket ditt."),
+            estimatedMinutes: request.durationMinutes, exercises: suggestions)
     }
 }
 
