@@ -3370,7 +3370,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var dailyDateSidebar: some View {
+    private func dailyDateSidebar(rowHeight: CGFloat? = nil) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Button { guidedDayCursor = max(0, guidedDayCursor - 7) } label: { Image(systemName: "chevron.left") }
@@ -3418,9 +3418,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary)
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, usesPinnedGuidedDayLayout ? 6 : 14)
-                    .frame(maxWidth: .infinity,
-                           maxHeight: usesPinnedGuidedDayLayout ? .infinity : nil,
+                    .padding(.vertical, rowHeight == nil ? 14 : 6)
+                    .frame(maxWidth: .infinity, minHeight: rowHeight,
                            alignment: .leading)
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
                     .background(guidedDayCursor == position ? ATHLTHTrainDesign.paleGold : .white, in: RoundedRectangle(cornerRadius: 14))
@@ -3470,8 +3469,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     GeometryReader { geometry in
                         HStack(alignment: .top, spacing: 24) {
                             ScrollView {
-                                dailyDateSidebar
-                                    .frame(minHeight: geometry.size.height)
+                                dailyDateSidebar(
+                                    rowHeight: max(74, (geometry.size.height - 34 - 70) / 7)
+                                )
                             }
                             .scrollIndicators(.hidden)
                             .frame(width: min(440, max(210, geometry.size.width * 0.33)))
@@ -3481,7 +3481,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else if widthClass == .regular {
-                    adaptivePlanPair(AnyView(dailyDateSidebar), AnyView(guidedCurrentDayCard))
+                    adaptivePlanPair(AnyView(dailyDateSidebar()), AnyView(guidedCurrentDayCard))
                 } else {
                     guidedCurrentDayCard
                 }
