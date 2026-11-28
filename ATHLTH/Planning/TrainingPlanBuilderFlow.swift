@@ -1065,6 +1065,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             // Link the actual newly created goal, not an illustrated preset.
             if let newGoal = goalStore.activeGoals.first(where: {
                 $0.status == .active && !goalIDsBeforeCreation.contains($0.id)
+            }) {
+                selectedGoalIDs = [newGoal.id]
+            }
+            goalIDsBeforeCreation.removeAll()
         case .design:
             showingPlanDesignLab = false
         case .coach:
@@ -1352,17 +1356,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 showingCreatedPlan = true
             }
         }) {
-            AIProgramBuilderView(
-                mode: .generate,
-                // Coach selected on the start screen must collect its own
-                // intake. Seeded AI for legacy drafts keeps its wizard values.
-                seed: entryChoice == .coach ? nil : aiBuilderSeed,
-                onProgramCreatedPlanID: { id in
-                    createdPlanID = id
-                    completedPlanCreation = true
-                    draftStore.clear(userID: session.profile.userID, draftID: draftID)
-                }
-            )
+            studioCoachBuilderSheet
         }
         .alert(ATHLTHLocalization.choose(english: "Clear planned day?", norwegian: "Slette planleggingen for dagen?"),
                isPresented: Binding(get: { pendingClearDay != nil }, set: { if !$0 { pendingClearDay = nil } })) {
@@ -1385,51 +1379,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             Text(ATHLTHLocalization.choose(english: "Some weeks contain fewer planned workouts than your original target.", norwegian: "Noen uker har færre planlagte økter enn du valgte i oppsettet."))
         }
         .sheet(isPresented: $showingGuidedAIConsent.keepingPresentedWhenInactive(scenePhase)) {
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Label("ATHLTH Coach", systemImage: "sparkles")
-                            .font(.title2.weight(.semibold))
-                        Text(ATHLTHLocalization.choose(english: "Use your goal and current plan to prepare changes.", norwegian: "Ta utgangspunkt i målet ditt og planen du har laget."))
-                        Label(ATHLTHLocalization.choose(
-                            english: coachFillScope == nil ? "ATHLTH Coach suggests workouts for empty days only." : "ATHLTH Coach changes only the selected dates.",
-                            norwegian: coachFillScope == nil ? "ATHLTH Coach foreslår økter kun på tomme dager." : "ATHLTH Coach endrer kun de valgte datoene."
-                        ), systemImage: "calendar.badge.plus")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
-                        if step == .week && !coachReturnToReview {
-                            Button {
-                                coachFillScope = remainingGuidedCoachKeys
-                            } label: {
-                                Label(ATHLTHLocalization.choose(english: "Fill the remaining days instead", norwegian: "Fyll ut resten i stedet"), systemImage: "calendar")
-                            }
-                            .disabled(remainingGuidedCoachKeys.isEmpty)
-                        }
-                        Text(ATHLTHLocalization.choose(english: "Your goal, plan and equipment are processed on this device. Dates outside the selected scope are protected. Review suggestions before applying.", norwegian: "Mål, plan og utstyr behandles lokalt på enheten. Datoer utenfor valget beskyttes. Se gjennom forslag før de tas i bruk."))
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button {
-                            showingGuidedAIConsent = false
-                            Task { await generateGuidedAISuggestions() }
-                        } label: {
-                            Label(ATHLTHLocalization.choose(english: "Prepare suggestions", norwegian: "Lag forslag"), systemImage: "sparkles")
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.borderedProminent).tint(ATHLTHPlanDesign.accentInk)
-                        .disabled(isGuidedAIFilling)
-                    }.padding(20)
-                }
-                .background(ATHLTHPlanDesign.canvas)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) { showingGuidedAIConsent = false; coachFillScope = nil; coachReturnToReview = false }
-                    }
-                }
-            }
-            .presentationDetents([.large])
-            .tint(ATHLTHPlanDesign.accentInk)
+            studioCoachConsentSheet
         }
         .sheet(item: $guidedAIFillPreview.keepingPresentedItemWhenInactive(scenePhase)) { preview in
             guidedAIFillReview(preview)
