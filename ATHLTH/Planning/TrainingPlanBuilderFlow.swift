@@ -1059,7 +1059,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             if firstCompletedGuidedWeek != nil {
                 Button(ATHLTHLocalization.choose(english: "Copy first completed week", norwegian: "Kopier første utfylte uke")) { copyFirstGuidedWeekAndReview() }
             }
-            Button(ATHLTHLocalization.choose(english: "Ask Coach to fill remaining dates", norwegian: "Be Coach fylle ut resten")) { startCoachRemaining(returnToReview: true) }
+            Button(ATHLTHLocalization.choose(english: "Ask ATHLTH Coach to fill remaining dates", norwegian: "Be ATHLTH Coach fylle ut resten")) { startCoachRemaining(returnToReview: true) }
             Button(ATHLTHLocalization.choose(english: "Go to summary anyway", norwegian: "Gå til sammendrag")) { openGuidedSummary() }
             Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
         } message: {
@@ -1073,8 +1073,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .font(.title2.weight(.semibold))
                         Text(ATHLTHLocalization.choose(english: "Use your goal and current plan to prepare changes.", norwegian: "Ta utgangspunkt i målet ditt og planen du har laget."))
                         Label(ATHLTHLocalization.choose(
-                            english: coachFillScope == nil ? "Coach suggests workouts for empty days only." : "Coach changes only the selected dates.",
-                            norwegian: coachFillScope == nil ? "Coach foreslår økter kun på tomme dager." : "Coach endrer kun de valgte datoene."
+                            english: coachFillScope == nil ? "ATHLTH Coach suggests workouts for empty days only." : "ATHLTH Coach changes only the selected dates.",
+                            norwegian: coachFillScope == nil ? "ATHLTH Coach foreslår økter kun på tomme dager." : "ATHLTH Coach endrer kun de valgte datoene."
                         ), systemImage: "calendar.badge.plus")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
@@ -1971,7 +1971,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var advancedSetupSummary: String {
         let method = prefersAIPlanBuild
-            ? ATHLTHLocalization.choose(english: "Coach", norwegian: "Coach")
+            ? ATHLTHLocalization.choose(english: "ATHLTH Coach", norwegian: "ATHLTH Coach")
             : ATHLTHLocalization.choose(english: "Build yourself", norwegian: "Bygg selv")
         let weeks = ATHLTHLocalization.choose(
             english: "\(weekCount) weeks", norwegian: "\(weekCount) uker"
@@ -2011,7 +2011,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 HStack(spacing: 12) {
                     Spacer(minLength: 12)
                     Text(step == .basics && mode == .advanced && prefersAIPlanBuild
-                         ? ATHLTHLocalization.choose(english: "Continue with Coach", norwegian: "Fortsett med Coach")
+                         ? ATHLTHLocalization.choose(english: "Continue with ATHLTH Coach", norwegian: "Fortsett med ATHLTH Coach")
                          : ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
                         .font(.subheadline.weight(.semibold))
                     Spacer(minLength: 0)
@@ -4544,8 +4544,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
             guard issues.isEmpty else {
                 guidedAIError = ATHLTHLocalization.choose(
-                    english: "Coach returned an incomplete or incompatible plan. No dates were changed. Please retry.",
-                    norwegian: "Coach leverte en ufullstendig plan eller økter som ikke passer valgene dine. Ingen datoer ble endret. Prøv igjen."
+                    english: "ATHLTH Coach returned an incomplete or incompatible plan. No dates were changed. Please retry.",
+                    norwegian: "ATHLTH Coach leverte en ufullstendig plan eller økter som ikke passer valgene dine. Ingen datoer ble endret. Prøv igjen."
                 )
                 return
             }
@@ -4558,14 +4558,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                      (edit?.additionalDetailedWorkouts ?? []).contains(where: \.isValid))
             }) {
                 guidedAIError = ATHLTHLocalization.choose(
-                    english: "Coach did not provide a workout for every selected date. Your plan is unchanged.",
-                    norwegian: "Coach foreslo ikke en økt på alle valgte datoer. Planen din er uendret.")
+                    english: "ATHLTH Coach did not provide a workout for every selected date. Your plan is unchanged.",
+                    norwegian: "ATHLTH Coach foreslo ikke en økt på alle valgte datoer. Planen din er uendret.")
                 return
             }
             guard proposal.hasChanges else {
                 guidedAIError = ATHLTHLocalization.choose(
-                    english: "Every date is already planned. Coach will not replace workouts or rest days.",
-                    norwegian: "Alle dagene er allerede planlagt. Coach erstatter ikke økter eller hviledager."
+                    english: "Every date is already planned. ATHLTH Coach will not replace workouts or rest days.",
+                    norwegian: "Alle dagene er allerede planlagt. ATHLTH Coach erstatter ikke økter eller hviledager."
                 )
                 return
             }
@@ -4578,8 +4578,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
         } catch {
             guidedAIError = ATHLTHLocalization.choose(
-                english: "Coach could not prepare suggestions. Your plan is unchanged. Please try again shortly.",
-                norwegian: "Coach kunne ikke lage forslag. Planen din er bevart. Prøv igjen om litt."
+                english: "ATHLTH Coach could not prepare suggestions. Your plan is unchanged. Please try again shortly.",
+                norwegian: "ATHLTH Coach kunne ikke lage forslag. Planen din er bevart. Prøv igjen om litt."
             )
         }
     }
@@ -4613,8 +4613,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         } catch {
             guidedAIFillPreview = nil
             guidedAIError = ATHLTHLocalization.choose(
-                english: "Coach could not prepare suggestions. Your plan is unchanged. Please try again shortly.",
-                norwegian: "Coach kunne ikke lage forslag. Planen din er bevart. Prøv igjen om litt."
+                english: "ATHLTH Coach could not prepare suggestions. Your plan is unchanged. Please try again shortly.",
+                norwegian: "ATHLTH Coach kunne ikke lage forslag. Planen din er bevart. Prøv igjen om litt."
             )
         }
     }
@@ -4685,7 +4685,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
             .navigationTitle(ATHLTHLocalization.choose(
-                english: "Coach suggestions", norwegian: "Forslag fra Coach"))
+                english: "ATHLTH Coach suggestions", norwegian: "Forslag fra ATHLTH Coach"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -6829,13 +6829,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 } label: {
                     Label(selectingCoachDays
                           ? ATHLTHLocalization.choose(english: "Cancel selection", norwegian: "Avbryt valg")
-                          : ATHLTHLocalization.choose(english: "Ask Coach", norwegian: "Be Coach hjelpe"),
+                          : ATHLTHLocalization.choose(english: "Ask ATHLTH Coach", norwegian: "Be ATHLTH Coach hjelpe"),
                           systemImage: "sparkles")
                 }
                 .buttonStyle(.bordered)
             }
             if selectingCoachDays {
-                Text(ATHLTHLocalization.choose(english: "Select the days Coach should plan. Existing content on selected dates may be replaced after your approval.", norwegian: "Marker dagene Coach skal planlegge. Innhold på valgte datoer kan erstattes etter godkjenning."))
+                Text(ATHLTHLocalization.choose(english: "Select the days ATHLTH Coach should plan. Existing content on selected dates may be replaced after your approval.", norwegian: "Marker dagene ATHLTH Coach skal planlegge. Innhold på valgte datoer kan erstattes etter godkjenning."))
                     .font(.caption).foregroundStyle(.secondary)
                 Button {
                     coachFillScope = coachSelectedKeys

@@ -143,14 +143,14 @@ struct ATHLTHPlanSetupFields: View {
                     false,
                     title: tr("Build yourself", "Bygg selv"),
                     detail: tr(
-                        "Plan your workouts freely. Switch between daily and weekly views and ask Coach for help.",
-                        "Planlegg øktene fritt. Bytt mellom dagsplan og ukeoversikt, og få hjelp av Coach underveis."
+                        "Plan your workouts freely. Switch between daily and weekly views and ask ATHLTH Coach for help.",
+                        "Planlegg øktene fritt. Bytt mellom dagsplan og ukeoversikt, og få hjelp av ATHLTH Coach underveis."
                     ),
                     icon: "calendar"
                 )
                 planningApproachOption(
                     true,
-                    title: tr("Let Coach build the plan", "La Coach bygge planen"),
+                    title: tr("Let ATHLTH Coach build the plan", "La ATHLTH Coach bygge planen"),
                     detail: tr(
                         "Get a complete training proposal based on your goals, days and available equipment.",
                         "Få et komplett treningsforslag basert på mål, treningsdager og tilgjengelig utstyr."

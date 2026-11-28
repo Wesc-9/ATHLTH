@@ -218,7 +218,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
         goldAction(tr("Add workout", "Legg til treningsøkt"), symbol: "plus") {
             onAddWorkout()
         }
-        goldAction(tr("Ask Coach to fill empty days", "Be Coach fylle ut"), symbol: "sparkles") {
+        goldAction(tr("Ask ATHLTH Coach to fill empty days", "Be ATHLTH Coach fylle ut"), symbol: "sparkles") {
             onCoachFill()
         }
     }

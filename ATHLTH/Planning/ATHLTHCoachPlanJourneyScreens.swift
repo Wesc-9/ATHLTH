@@ -40,8 +40,8 @@ struct ATHLTHCoachPlanWelcomeScreen: View {
                         .foregroundStyle(ink)
                         .accessibilityAddTraits(.isHeader)
                     Text(tr(
-                        singleWorkout ? "Tell Coach about your goals, time and equipment. Review a workout tailored to your choices." : "Tell us about your training, everyday life and preferences. ATHLTH Coach creates a plan you can inspect and change before saving.",
-                        singleWorkout ? "Fortell Coach om mål, tid og utstyr. Gjennomgå en økt tilpasset valgene dine." : "Fortell om dine mål, din hverdag og dine preferanser. ATHLTH Coach lager en plan du kan gjennomgå og endre før lagring."
+                        singleWorkout ? "Tell ATHLTH Coach about your goals, time and equipment. Review a workout tailored to your choices." : "Tell us about your training, everyday life and preferences. ATHLTH Coach creates a plan you can inspect and change before saving.",
+                        singleWorkout ? "Fortell ATHLTH Coach om mål, tid og utstyr. Gjennomgå en økt tilpasset valgene dine." : "Fortell om dine mål, din hverdag og dine preferanser. ATHLTH Coach lager en plan du kan gjennomgå og endre før lagring."
                     ))
                     .font(.system(size: 12.5))
                     .foregroundStyle(muted)
@@ -60,8 +60,8 @@ struct ATHLTHCoachPlanWelcomeScreen: View {
                     tr("An appropriate mix of training and recovery",
                        "En god balanse mellom trening og restitusjon"))
             benefit("slider.horizontal.3", tr(singleWorkout ? "Your workout, your choices" : "Your plan, your choices", "Enkel å justere"),
-                    tr("Edit individual workouts or ask Coach to regenerate",
-                       "Rediger økter selv eller be Coach om et nytt forslag"))
+                    tr("Edit individual workouts or ask ATHLTH Coach to regenerate",
+                       "Rediger økter selv eller be ATHLTH Coach om et nytt forslag"))
 
             bronzeButton(tr("Get started", "Kom i gang"), systemImage: "arrow.right",
                          action: onContinue)
@@ -101,7 +101,7 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
     var body: some View {
         VStack(spacing: 22) {
             Spacer(minLength: 24)
-            Text(singleWorkout ? tr("Coach is finding\nyour workout", "Coach finner\ntreningsøkten din") : tr("Coach is building\nyour plan", "Coach lager\ntreningsplanen din"))
+            Text(singleWorkout ? tr("ATHLTH Coach is finding\nyour workout", "ATHLTH Coach finner\ntreningsøkten din") : tr("ATHLTH Coach is building\nyour plan", "ATHLTH Coach lager\ntreningsplanen din"))
                 .font(.system(size: 32, weight: .regular, design: .serif))
                 .multilineTextAlignment(.center)
             Text(tr(
@@ -145,7 +145,7 @@ struct ATHLTHCoachPlanGeneratingScreen: View {
             }
             .padding(15)
             .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 19))
-            .accessibilityLabel(tr("Coach is preparing the draft", "Coach utarbeider planforslaget"))
+            .accessibilityLabel(tr("ATHLTH Coach is preparing the draft", "ATHLTH Coach utarbeider planforslaget"))
             Spacer(minLength: 10)
         }
         .frame(maxWidth: .infinity)
@@ -245,8 +245,8 @@ struct ATHLTHCoachPlanDraftScreen: View {
                 }
             }
 
-            Text(tr("Check each week and change any workout before approving. Coach never activates a plan without your confirmation.",
-                    "Se gjennom ukene og rediger øktene før du godkjenner. Coach aktiverer aldri en plan uten bekreftelse."))
+            Text(tr("Check each week and change any workout before approving. ATHLTH Coach never activates a plan without your confirmation.",
+                    "Se gjennom ukene og rediger øktene før du godkjenner. ATHLTH Coach aktiverer aldri en plan uten bekreftelse."))
                 .font(.system(size: 10.5))
                 .foregroundStyle(muted)
                 .padding(.vertical, 3)

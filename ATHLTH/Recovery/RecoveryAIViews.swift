@@ -767,8 +767,8 @@ struct RecoveryCoachInboxDestinationView:
                     description:
                         Text(
                             recoveryAIText(
-                                "Coach uses your recovery context to answer training questions.",
-                                "Coach bruker restitusjonsdataene dine til å svare på treningsspørsmål."
+                                "ATHLTH Coach uses your recovery context to answer training questions.",
+                                "ATHLTH Coach bruker restitusjonsdataene dine til å svare på treningsspørsmål."
                             )
                         )
                 )
@@ -1144,8 +1144,8 @@ struct RecoveryCoachView: View {
                             if messages.isEmpty {
                                 Text(
                                     recoveryAIText(
-                                        "Ask a question to start a conversation. Coach remembers what you talk about on this device.",
-                                        "Still et spørsmål for å starte en samtale. Coach husker det dere snakker om på denne enheten."
+                                        "Ask a question to start a conversation. ATHLTH Coach remembers what you talk about on this device.",
+                                        "Still et spørsmål for å starte en samtale. ATHLTH Coach husker det dere snakker om på denne enheten."
                                     )
                                 )
                                 .font(.caption)
@@ -1463,8 +1463,8 @@ struct RecoveryCoachView: View {
                     } header: {
                         Text(recoveryAIText("Remembered form choices", "Huskede skjemavalg"))
                     } footer: {
-                        Text(recoveryAIText("Only confirmed choices from Coach forms are retained locally. Save to confirm deletion.",
-                                            "Kun bekreftede valg fra Coach-skjemaer lagres lokalt. Lagre for å bekrefte sletting."))
+                        Text(recoveryAIText("Only confirmed choices from ATHLTH Coach forms are retained locally. Save to confirm deletion.",
+                                            "Kun bekreftede valg fra ATHLTH Coach-skjemaer lagres lokalt. Lagre for å bekrefte sletting."))
                     }
                     Section {
                         Button(recoveryAIText("Add saved notes to my question", "Legg notatene til i spørsmålet")) {
@@ -1478,7 +1478,7 @@ struct RecoveryCoachView: View {
                         }
                     }
                 }
-                .navigationTitle(recoveryAIText("Coach memory", "Coach-hukommelse"))
+                .navigationTitle(recoveryAIText("ATHLTH Coach memory", "Coach-hukommelse"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -1615,15 +1615,15 @@ struct RecoveryCoachView: View {
                         )
 
                     Text(recoveryAIText(
-                        "Before you chat with Coach",
-                        "Før du chatter med Coach"
+                        "Before you chat with ATHLTH Coach",
+                        "Før du chatter med ATHLTH Coach"
                     ))
                     .font(.system(size: 27, weight: .bold, design: .rounded))
                     .foregroundStyle(ATHLTHTheme.primaryText)
 
                     Text(recoveryAIText(
-                        "Ordinary Coach chat uses local Apple AI when available, with built-in ATHLTH guidance otherwise. Separate plan tools may still use an external provider.",
-                        "Vanlig Coach-chat bruker lokal Apple AI når tilgjengelig, ellers innebygd veiledning fra ATHLTH. Separate planverktøy kan fortsatt bruke en ekstern leverandør."
+                        "Ordinary chat with ATHLTH Coach uses local Apple AI when available, with built-in ATHLTH guidance otherwise. Separate plan tools may still use an external provider.",
+                        "Vanlig chat med ATHLTH Coach bruker lokal Apple AI når tilgjengelig, ellers innebygd veiledning fra ATHLTH. Separate planverktøy kan fortsatt bruke en ekstern leverandør."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1632,8 +1632,8 @@ struct RecoveryCoachView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Label(
                             recoveryAIText(
-                                "AI chat (required to use Coach)",
-                                "AI-chat (nødvendig for å bruke Coach)"
+                                "AI chat (required to use ATHLTH Coach)",
+                                "AI-chat (nødvendig for å bruke ATHLTH Coach)"
                             ),
                             systemImage: "bubble.left.and.bubble.right.fill"
                         )
@@ -1641,8 +1641,8 @@ struct RecoveryCoachView: View {
                         .foregroundStyle(ATHLTHTheme.primaryText)
 
                         Text(recoveryAIText(
-                            "Choose 'Allow AI chat' to use Coach. Ordinary chat is processed on this device. You can decline without affecting other features.",
-                            "Velg «Tillat AI-chat» for å bruke Coach. Vanlig chat behandles på denne enheten. Du kan avslå uten at andre funksjoner påvirkes."
+                            "Choose 'Allow AI chat' to use ATHLTH Coach. Ordinary chat is processed on this device. You can decline without affecting other features.",
+                            "Velg «Tillat AI-chat» for å bruke ATHLTH Coach. Vanlig chat behandles på denne enheten. Du kan avslå uten at andre funksjoner påvirkes."
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1669,8 +1669,8 @@ struct RecoveryCoachView: View {
                         .tint(ATHLTHTheme.accentDeep)
 
                         Text(recoveryAIText(
-                            "This does not send health metrics automatically. Health-related Coach actions require a separate confirmation for each question.",
-                            "Dette sender ikke helsemålinger automatisk. Coach-funksjoner som bruker helseopplysninger krever egen bekreftelse for hvert spørsmål."
+                            "This does not send health metrics automatically. Health-related ATHLTH Coach actions require a separate confirmation for each question.",
+                            "Dette sender ikke helsemålinger automatisk. ATHLTH Coach-funksjoner som bruker helseopplysninger krever egen bekreftelse for hvert spørsmål."
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
@@ -1681,8 +1681,8 @@ struct RecoveryCoachView: View {
                         Toggle(isOn: $draftAutomaticHealthPermission) {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(recoveryAIText(
-                                    "Personal Coach · automatic health access",
-                                    "Personlig Coach · automatisk helsetilgang"
+                                    "ATHLTH Coach · automatic health access",
+                                    "ATHLTH Coach · automatisk helsetilgang"
                                 ))
                                 .font(.subheadline.weight(.semibold))
 
@@ -1986,7 +1986,7 @@ struct RecoveryCoachView: View {
                 "ATHLTH Coach",
             subtitle:
                 recoveryAIText(
-                    "Your personal training coach",
+                    "Your personal ATHLTH Coach",
                     "Din personlige treningscoach"
                 ),
             onBack: {
@@ -2056,7 +2056,7 @@ struct RecoveryCoachView: View {
                     structuredMemoryDraft = profile.coachPreferences
                     showingCoachTrainingMemory = true
                 } label: {
-                    Label(recoveryAIText("Coach memory", "Coach-hukommelse"), systemImage: "person.text.rectangle")
+                    Label(recoveryAIText("ATHLTH Coach memory", "Coach-hukommelse"), systemImage: "person.text.rectangle")
                 }
 
                 Button {

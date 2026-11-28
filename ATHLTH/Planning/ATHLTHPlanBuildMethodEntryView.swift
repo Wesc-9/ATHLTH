@@ -37,20 +37,20 @@ struct ATHLTHPlanBuildMethodEntryView: View {
                 .dayByDay,
                 name: tr("Build yourself", "Bygg selv"),
                 description: tr(
-                    "Plan your workouts freely, switch calendar views and ask Coach for help.",
-                    "Planlegg øktene fritt, bytt mellom dagsplan og ukeoversikt, og få hjelp av Coach."
+                    "Plan your workouts freely, switch calendar views and ask ATHLTH Coach for help.",
+                    "Planlegg øktene fritt, bytt mellom dagsplan og ukeoversikt, og få hjelp av ATHLTH Coach."
                 ),
                 photo: "PlanScheduleHero",
                 symbol: "calendar",
                 qualities: [
                     ("calendar", tr("Daily and weekly", "Dag og uke")),
                     ("square.on.square", tr("Copy week", "Kopier uke")),
-                    ("sparkles", tr("Coach help", "Coach-hjelp"))
+                    ("sparkles", tr("ATHLTH Coach help", "Coach-hjelp"))
                 ]
             )
             methodCard(
                 .ai,
-                name: tr("Let Coach build the plan", "La Coach bygge planen"),
+                name: tr("Let ATHLTH Coach build the plan", "La ATHLTH Coach bygge planen"),
                 description: tr(
                     "Get a complete editable training proposal for your goals and schedule.",
                     "Få et komplett treningsforslag som du kan tilpasse etter mål og treningsdager."
@@ -118,8 +118,8 @@ struct ATHLTHPlanBuildMethodEntryView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Text(tr(
-                    "Build the plan yourself or get a proposal from Coach.",
-                    "Bygg planen selv eller få et forslag fra Coach."
+                    "Build the plan yourself or get a proposal from ATHLTH Coach.",
+                    "Bygg planen selv eller få et forslag fra ATHLTH Coach."
                 ))
                 .font(.system(size: 12))
                 .foregroundStyle(secondary)

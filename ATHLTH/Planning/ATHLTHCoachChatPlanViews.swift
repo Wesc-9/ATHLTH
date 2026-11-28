@@ -63,8 +63,8 @@ struct ATHLTHCoachChatPlanIntakeCard: View {
                     .font(ATHLTHTrainDesign.cardTitle)
                     .foregroundStyle(ATHLTHTrainDesign.ink)
                     .accessibilityAddTraits(.isHeader)
-                Text(planText("Review the choices before Coach creates your plan.",
-                              "Tilpass valgene før Coach lager planen."))
+                Text(planText("Review the choices before ATHLTH Coach creates your plan.",
+                              "Tilpass valgene før ATHLTH Coach lager planen."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
