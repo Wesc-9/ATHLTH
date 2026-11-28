@@ -27,6 +27,11 @@ struct ATHLTHStrengthGroupRow: View {
     }
 
     @State private var expanded = false
+    @State private var editingSet: SetSelection?
+
+    private struct SetSelection: Identifiable {
+        let id: Int
+    }
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
 
@@ -69,6 +74,87 @@ struct ATHLTHStrengthGroupRow: View {
                 block.individualSetTargets = targets
             }
         )
+    }
+
+    private var recoverySeconds: TimeInterval {
+        max(0, block.restBetweenSetsSeconds ?? 0)
+    }
+
+    private var isTimed: Bool { (block.durationSeconds ?? 0) > 0 }
+
+    private func setSummary(at index: Int) -> String {
+        let value = target(at: index)
+        var parts: [String] = []
+        if let seconds = block.durationSeconds, seconds > 0 {
+            parts.append(ATHLTHWorkoutDurationEstimator.conciseDuration(seconds))
+        } else if let repetitions = value.repetitions ?? block.repetitions {
+            parts.append("\(repetitions) reps")
+        }
+        if let weight = value.weightKilograms ?? block.targetWeightKilograms {
+            parts.append(weight.formatted(.number.precision(.fractionLength(0...1))) + " kg")
+        }
+        return parts.isEmpty ? "–" : parts.joined(separator: " · ")
+    }
+
+    private func setRow(_ index: Int) -> some View {
+        ATHLTHPlannedWorkoutStepRow(
+            block: block,
+            position: recoverySeconds > 0 ? index * 2 + 1 : index + 1,
+            canMoveUp: false, canMoveDown: false,
+            onEdit: { editingSet = SetSelection(id: index) },
+            onDelete: {}, onMoveBy: { _ in }, onMoveToPhase: { _ in },
+            onReorderMove: { _ in }, onReorderEnd: {},
+            allowsStructuralEditing: false,
+            titleOverride: ATHLTHWorkoutNameSuggestion.displayStepTitle(block) + " · \(index + 1)/\(setCount)",
+            targetSummaryOverride: setSummary(at: index)
+        )
+    }
+
+    private func restRow(after index: Int) -> some View {
+        // A view-only projection. The actual recovery remains on the parent
+        // exercise and is expanded by the existing workout execution engine.
+        let rest = WorkoutTemplateBlock(
+            sequence: index * 2 + 2, kind: .rest, title: tr("Rest", "Pause"),
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: recoverySeconds, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .recovery
+        )
+        return ATHLTHPlannedWorkoutStepRow(
+            block: rest, position: index * 2 + 2,
+            canMoveUp: false, canMoveDown: false,
+            onEdit: onEdit, onDelete: {}, onMoveBy: { _ in }, onMoveToPhase: { _ in },
+            onReorderMove: { _ in }, onReorderEnd: {},
+            allowsStructuralEditing: false
+        )
+    }
+
+    private func setEditor(_ index: Int) -> some View {
+        NavigationStack {
+            Form {
+                if isTimed, let seconds = block.durationSeconds {
+                    LabeledContent(tr("Duration", "Varighet"),
+                                   value: ATHLTHWorkoutDurationEstimator.conciseDuration(seconds))
+                    Text(tr("Change the shared set duration in the exercise settings.",
+                            "Endre felles varighet i øvelsesinnstillingene."))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Stepper(value: reps(at: index), in: 1...300) {
+                        Text("\(reps(at: index).wrappedValue) reps")
+                    }
+                }
+                Stepper(value: weight(at: index), in: 0...500, step: 2.5) {
+                    Text(weight(at: index).wrappedValue.formatted(.number.precision(.fractionLength(0...1))) + " kg")
+                }
+            }
+            .navigationTitle(tr("Set", "Sett") + " \(index + 1)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Done", "Ferdig")) { editingSet = nil }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     var body: some View {
@@ -181,55 +267,25 @@ struct ATHLTHStrengthGroupRow: View {
             .frame(minHeight: 50)
 
             if expanded {
-                VStack(spacing: 6) {
+                LazyVStack(spacing: 3) {
                     ForEach(0..<setCount, id: \.self) { index in
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(tr("Set", "Sett") + " \(index + 1)")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ink)
-                            HStack(spacing: 10) {
-                                Stepper(value: weight(at: index),
-                                        in: 0...500, step: 2.5) {
-                                    Text(String(format: "%.1f kg",
-                                                weight(at: index).wrappedValue))
-                                        .font(.caption)
-                                }
-                                .frame(maxWidth: .infinity)
-                                Stepper(value: reps(at: index), in: 1...300) {
-                                    Text("\(reps(at: index).wrappedValue) reps")
-                                        .font(.caption)
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .padding(10)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 11))
-
-                        if index < setCount - 1,
-                           let recovery = block.restBetweenSetsSeconds,
-                           recovery > 0 {
-                            HStack(spacing: 8) {
-                                Image(systemName: "pause.fill")
-                                Text(tr("Rest", "Pause"))
-                                Spacer()
-                                Text("\(Int(recovery)) " + tr("sec", "sek"))
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 13)
-                            .frame(minHeight: 30)
+                        setRow(index)
+                        if index < setCount - 1 && recoverySeconds > 0 {
+                            restRow(after: index)
                         }
                     }
                 }
-                .padding(.leading, 13)
             }
         }
         .padding(10)
         .background(ATHLTHPlanDesign.canvas,
-                    in: RoundedRectangle(cornerRadius: 15))
+                    in: RoundedRectangle(cornerRadius: 16))
         .overlay {
-            RoundedRectangle(cornerRadius: 15)
-                .strokeBorder(bronze.opacity(0.20), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(bronze.opacity(0.23), lineWidth: 0.8)
+        }
+        .sheet(item: $editingSet) { selection in
+            setEditor(selection.id)
         }
     }
 }

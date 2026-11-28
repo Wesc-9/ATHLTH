@@ -5514,6 +5514,14 @@ struct WorkoutTemplateBuilderView: View {
     private var isPlannedWorkout: Bool {
         onSaveToPlan != nil || onAddStandalone != nil || onSaveSharedRevision != nil
     }
+
+    // Advanced planned sessions support mixed recipes. Do not silently
+    // turn the All filter into the launch activity's primary filter.
+    private var effectiveSavedWorkoutScope: ATHLTHWorkoutLibraryActivityScope {
+        if studioAdvanced && isPlannedWorkout { return .all }
+        return savedWorkoutActivityScope == .all
+            ? .primary(for: initialActivity) : savedWorkoutActivityScope
+    }
     private var studioInk: Color {
         isPlannedWorkout ? ATHLTHTrainDesign.ink
             : Color(red: 0.17, green: 0.17, blue: 0.18)
@@ -6743,9 +6751,7 @@ struct WorkoutTemplateBuilderView: View {
                             WorkoutTemplateLibraryView(
                                 onSelectPlanned: { workout in
                                     showingSavedWorkoutPicker = false
-                                    let scope = savedWorkoutActivityScope == .all
-                                        ? ATHLTHWorkoutLibraryActivityScope.primary(for: initialActivity) : savedWorkoutActivityScope
-                                    guard scope.includes(workout) else {
+                                    guard effectiveSavedWorkoutScope.includes(workout) else {
                                         actionNotice = tr("Choose a workout matching this activity.", "Velg en økt som passer treningsformen.")
                                         return
                                     }
@@ -6762,9 +6768,8 @@ struct WorkoutTemplateBuilderView: View {
                                         if wasBlank && !blocks.isEmpty { title = workout.title }
                                     }
                                 },
-                                initialCategory: savedWorkoutActivityScope.initialCategory ??
-                                    (savedWorkoutActivityScope == .all ? initialActivity : nil),
-                                activityScope: savedWorkoutActivityScope == .all ? .primary(for: initialActivity) : savedWorkoutActivityScope
+                                initialCategory: studioAdvanced ? nil : effectiveSavedWorkoutScope.initialCategory,
+                                activityScope: effectiveSavedWorkoutScope
                             )
                             .navigationTitle(tr("Add workout", "Legg til treningsøkt"))
                             .navigationBarTitleDisplayMode(.inline)

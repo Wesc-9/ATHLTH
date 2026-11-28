@@ -16,6 +16,11 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     let onMoveToPhase: (WorkoutPhaseKind) -> Void
     let onReorderMove: (CGPoint) -> Void
     let onReorderEnd: () -> Void
+    // A compact set/recovery is edited through its owning exercise, not
+    // dragged or deleted as an independent persisted workout block.
+    var allowsStructuralEditing = true
+    var titleOverride: String? = nil
+    var targetSummaryOverride: String? = nil
 
     @State private var horizontalDrag: CGFloat = 0
     @State private var measuredRowWidth: CGFloat = 320
@@ -38,6 +43,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     private var rowHeight: CGFloat { isPause ? 44 : 58 }
     private var isActivePause: Bool { block.isActiveRecovery }
     private var displayedStepTitle: String {
+        if let titleOverride { return titleOverride }
         if isActivePause {
             return ATHLTHLocalization.choose(
                 english: "Active recovery", norwegian: "Aktiv pause"
@@ -54,6 +60,15 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     }
 
     private var durationSummary: String {
+        if let targetSummaryOverride { return targetSummaryOverride }
+        if block.kind == .exercise, (block.durationSeconds ?? 0) <= 0,
+           let repetitions = block.repetitions {
+            let repetitionsText = "\(repetitions) reps"
+            if let weight = block.targetWeightKilograms {
+                return repetitionsText + " · " + weight.formatted(.number.precision(.fractionLength(0...1)).locale(locale)) + " kg"
+            }
+            return repetitionsText
+        }
         if let seconds = block.durationSeconds, seconds > 0 {
             let value = Int(seconds.rounded())
             let minutes = value / 60
@@ -172,6 +187,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            if allowsStructuralEditing {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.31))
@@ -191,6 +207,10 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                 ))) {
                     if canMoveDown { onMoveBy(1) }
                 }
+            } else {
+                Color.clear.frame(width: 21, height: rowHeight)
+                    .accessibilityHidden(true)
+            }
 
             HStack(spacing: 0) {
                     Button(action: onEdit) {
@@ -251,8 +271,8 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(ATHLTHLocalization.choose(
-                        english: "Edit step details. Swipe fully left to delete, or use options.",
-                        norwegian: "Rediger deløkten. Sveip helt til venstre for å slette, eller bruk menyen."
+                        english: allowsStructuralEditing ? "Edit step details. Swipe fully left to delete, or use options." : "Edit step details.",
+                        norwegian: allowsStructuralEditing ? "Rediger deløkten. Sveip helt til venstre for å slette, eller bruk menyen." : "Rediger deløkten."
                     ))
 
                     Menu {
@@ -261,6 +281,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                 english: "Edit step", norwegian: "Rediger deløkt"
                             ), systemImage: "pencil")
                         }
+                        if allowsStructuralEditing {
                         Menu {
                             ForEach(WorkoutPhaseKind.allCases.filter { $0 != .recovery }) { phase in
                                 Button {
@@ -281,6 +302,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                 english: "Delete step", norwegian: "Slett deløkt"
                             ), systemImage: "trash")
                         }
+                        }
                     } label: {
                         Label(ATHLTHLocalization.choose(
                             english: "Step options", norwegian: "Alternativer for deløkt"
@@ -300,7 +322,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                 )
                 .offset(x: swipeOffset)
                 .contentShape(Rectangle())
-                .simultaneousGesture(swipeGesture)
+                .simultaneousGesture(swipeGesture, including: allowsStructuralEditing ? .all : .none)
             }
             .frame(maxWidth: .infinity, minHeight: rowHeight)
             .clipped()

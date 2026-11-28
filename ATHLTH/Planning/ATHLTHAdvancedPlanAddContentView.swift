@@ -16,7 +16,7 @@ struct ATHLTHAdvancedPlanAddContentView: View {
     @EnvironmentObject private var recents: LibraryRecentsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var running: RunningWorkoutLibraryStore
-    @StateObject private var catalog = WorkoutTemplateCatalogStore()
+    @ObservedObject private var catalog = WorkoutTemplateCatalogStore.shared
 
     let initialKind: Kind
     let phase: WorkoutPhaseKind
