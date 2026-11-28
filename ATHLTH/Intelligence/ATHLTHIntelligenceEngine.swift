@@ -256,6 +256,78 @@ enum ATHLTHIntelligenceEngine {
         return nil
     }
 
+    /// Draft-only Audio Coach wording. A local model never owns the live
+    /// scheduler or speaks an unapproved response. No health or account data,
+    /// network fallback, location, or training history is passed to the model.
+    static func localAudioCoachPhrases(
+        style: ATHLTHCoachEncouragementStyle,
+        activity: ATHLTHCoachActivityFilter,
+        norwegian: Bool
+    ) async throws -> [String]? {
+        guard isLocalAvailable else { return nil }
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            let session = LanguageModelSession(instructions: """
+                Draft four short supportive fitness encouragements for a user to review.
+                One sentence per line, no bullets, numbering, quotes or headings.
+                Do not state facts about the athlete or measured performance.
+                No measurements, medical advice, diagnoses, pain advice, or requests to speed up,
+                increase load, ignore discomfort, or push through fatigue. Encourage controlled effort.
+                The athlete will approve the phrases before any workout.
+                """)
+            let tone: String
+            switch style {
+            case .praise: tone = "warm recognition of effort"
+            case .push: tone = "energetic but controlled focus"
+            case .encouragement: tone = "calm encouragement"
+            }
+            let prompt = (norwegian ? "Write in Norwegian Bokmål. " : "Write in English. ")
+                + "Tone: " + tone + ". Activity: " + activity.rawValue
+            do {
+                let response = try await session.respond(to: prompt)
+                try Task.checkCancellation()
+                let phrases = audioCoachDraftLines(response.content)
+                return phrases.isEmpty ? nil : phrases
+            } catch is CancellationError { throw CancellationError() }
+            catch { return nil }
+        }
+        #endif
+        return nil
+    }
+
+    static func audioCoachDraftLines(_ text: String) -> [String] {
+        var result: [String] = []
+        for raw in text.split(whereSeparator: \.isNewline).prefix(12) {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard (8...120).contains(line.count),
+                  line.first?.isLetter == true,
+                  !line.contains(where: { $0.isNumber }),
+                  !line.contains("://"), !line.contains("<"), !line.contains(">"),
+                  !result.contains(line) else { continue }
+            result.append(line)
+            if result.count == 4 { break }
+        }
+        return result
+    }
+
+    static func audioCoachDraftFallback(style: ATHLTHCoachEncouragementStyle,
+                                        norwegian: Bool) -> [String] {
+        switch style {
+        case .praise:
+            return norwegian
+                ? ["Bra jobbet!", "Du kan være stolt av innsatsen.", "Flott at du møtte opp i dag.", "Gi deg selv litt ros for jobben du gjør."]
+                : ["Well done!", "Be proud of your effort.", "Great job showing up today.", "Give yourself credit for your work."]
+        case .push:
+            return norwegian
+                ? ["Finn fokuset og behold kontrollen!", "Ta ett steg om gangen.", "Hold en god rytme.", "Gjør ditt beste på din egen måte."]
+                : ["Find your focus and stay in control!", "Take it one step at a time.", "Keep a steady rhythm.", "Do your best in your own way."]
+        case .encouragement:
+            return norwegian
+                ? ["Fortsett i din egen rytme.", "Ta det steg for steg.", "Behold roen og fokuset.", "Du er godt i gang."]
+                : ["Keep your own rhythm.", "Take it step by step.", "Stay calm and focused.", "You are underway."]
+        }
+    }
+
     /// Select an ordering of real local candidates. The model has no tools,
     /// cannot create IDs, and cannot directly mutate a workout or a date.
     static func localPlanningOrder(options: [String], context: String) async throws -> [Int]? {

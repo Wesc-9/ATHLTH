@@ -181,6 +181,11 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var motivationStyle: ATHLTHCoachEncouragementStyle
     @State private var ownMessageText: String
     @State private var showingOwnMessages = false
+    @State private var aiPhraseStyle: ATHLTHCoachEncouragementStyle = .encouragement
+    @State private var aiPhraseSuggestions: [String] = []
+    @State private var aiPhraseSourceLocal = false
+    @State private var aiPhraseTask: Task<Void, Never>? = nil
+    @State private var aiPhraseLoading = false
     @State private var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @State private var historicalWorkoutID: UUID?
     @State private var activityFilter: ATHLTHCoachActivityFilter
@@ -930,6 +935,79 @@ struct ATHLTHCoachRuleComposer: View {
                         .padding(8)
                         .background(.white, in: RoundedRectangle(cornerRadius: 14))
                         .accessibilityIdentifier("athlth-coach-own-messages")
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(tr("Message suggestions", "Forslag til meldinger"), systemImage: "sparkles")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Picker(tr("Tone", "Tone"), selection: $aiPhraseStyle) {
+                            ForEach(ATHLTHCoachEncouragementStyle.allCases) { style in
+                                Text(style.title).tag(style)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        Button {
+                            aiPhraseTask?.cancel()
+                            aiPhraseLoading = true
+                            aiPhraseSuggestions = []
+                            let style = aiPhraseStyle
+                            let activity = effectiveActivity
+                            let norwegian = previewNorwegian
+                            aiPhraseTask = Task { @MainActor in
+                                let local = try? await ATHLTHIntelligenceEngine.localAudioCoachPhrases(
+                                    style: style, activity: activity, norwegian: norwegian
+                                )
+                                guard !Task.isCancelled else { return }
+                                aiPhraseSourceLocal = local != nil
+                                aiPhraseSuggestions = local ?? ATHLTHIntelligenceEngine.audioCoachDraftFallback(
+                                    style: style, norwegian: norwegian
+                                )
+                                aiPhraseLoading = false
+                            }
+                        } label: {
+                            HStack {
+                                if aiPhraseLoading { ProgressView() }
+                                Text(tr("Suggest messages", "Foreslå meldinger"))
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(bronze)
+                        }
+                        .disabled(aiPhraseLoading)
+                        if !aiPhraseSuggestions.isEmpty {
+                            Text(aiPhraseSourceLocal
+                                ? tr("Drafted on this device with Apple Intelligence.", "Utkast laget lokalt med Apple Intelligence.")
+                                : tr("Standard suggestions. Local AI was not available.", "Standardforslag. Lokal AI var ikke tilgjengelig."))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                            ForEach(aiPhraseSuggestions, id: \.self) { phrase in
+                                HStack(alignment: .top) {
+                                    Text(phrase)
+                                        .font(.subheadline)
+                                        .foregroundStyle(ink)
+                                    Spacer()
+                                    Button {
+                                        var lines = ownMessageLines
+                                        guard lines.count < 20, !lines.contains(phrase) else { return }
+                                        lines.append(phrase)
+                                        ownMessageText = lines.joined(separator: "\n")
+                                    } label: {
+                                        Image(systemName: ownMessageLines.contains(phrase)
+                                              ? "checkmark.circle.fill" : "plus.circle")
+                                            .foregroundStyle(bronze)
+                                            .frame(width: 36, height: 36)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(ownMessageLines.count >= 20 || ownMessageLines.contains(phrase))
+                                    .accessibilityLabel(tr("Add message", "Legg til melding"))
+                                }
+                            }
+                        }
+                        Text(tr("Review suggestions before adding them. No workout measurements are sent to AI.",
+                                "Se gjennom forslagene før du legger dem til. Ingen treningsmålinger sendes til AI."))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                    .padding(12)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .padding(18)
             }
@@ -943,6 +1021,11 @@ struct ATHLTHCoachRuleComposer: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .onDisappear {
+            aiPhraseTask?.cancel()
+            aiPhraseTask = nil
+            aiPhraseLoading = false
+        }
     }
 
     private var commandFooter: some View {

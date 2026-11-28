@@ -2,6 +2,15 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHIntelligenceRoutingTests: XCTestCase {
+    @MainActor
+    func testAudioCoachDraftParserDoesNotAcceptNumbersOrDuplicates() {
+        XCTAssertEqual(ATHLTHIntelligenceEngine.audioCoachDraftLines(
+            "Hold en god rytme.\nHold en god rytme.\nLøp 20 km.\n- Punkt\nBra jobbet i dag!"
+        ), ["Hold en god rytme.", "Bra jobbet i dag!"])
+        XCTAssertEqual(ATHLTHIntelligenceEngine.audioCoachDraftFallback(
+            style: .encouragement, norwegian: true).count, 4)
+    }
+
     func testExistingRoutesRemainUnchanged() {
         XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .dailyFormCalculation), .rules)
         XCTAssertEqual(ATHLTHIntelligenceRoutingPolicy.provider(for: .trainingProgram), .rules)
