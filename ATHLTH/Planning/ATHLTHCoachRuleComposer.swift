@@ -344,8 +344,7 @@ struct ATHLTHCoachRuleComposer: View {
     }
 
     private var canSave: Bool {
-        canAdvanceTrigger && !metrics.isEmpty && unavailableSelected.isEmpty && (!target.isGroup ||
-            !groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
+        canAdvanceTrigger && !metrics.isEmpty && unavailableSelected.isEmpty &&
             (isEditing || draft.customRules.count < 20)
     }
 
@@ -491,8 +490,8 @@ struct ATHLTHCoachRuleComposer: View {
                     .font(.caption2.weight(.semibold))
                     .tracking(1.1)
                     .foregroundStyle(muted)
-                TextField(tr("Name your group", "Gi gruppen et navn"),
-                          text: $groupName)
+                TextField("", text: $groupName,
+                          prompt: Text(tr("My choices", "Mine valg")).foregroundStyle(muted))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ink)
                     .textInputAutocapitalization(.sentences)
@@ -891,7 +890,8 @@ struct ATHLTHCoachRuleComposer: View {
 
     private func save() {
         guard canSave, let primary = metrics.first else { return }
-        let name = String(groupName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
+        let enteredName = String(groupName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(60))
+        let name = enteredName.isEmpty ? tr("My choices", "Mine valg") : enteredName
         let phrase = String(motivationPhrase.trimmingCharacters(
             in: .whitespacesAndNewlines).prefix(180))
         let oldGroup = draft.coachGroups.first { $0.id == target.groupID }
