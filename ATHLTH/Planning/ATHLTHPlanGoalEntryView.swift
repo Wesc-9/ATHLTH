@@ -267,8 +267,8 @@ struct ATHLTHPlanGoalEntryView: View {
         .frame(maxWidth: widthClass == .regular ? .infinity : ATHLTHPlanDesign.maxContentWidth)
     }
 
-    // Full-width scenic cover, with the editorial copy remaining entirely
-    // legible on top of the left-to-right warm-paper fade.
+    // Warm charcoal editorial cover with a controlled fade behind light copy.
+    // All photographic layers are decorative and cannot intercept navigation.
     private var referenceHero: some View {
         ZStack(alignment: .leading) {
             GeometryReader { geometry in
@@ -279,18 +279,27 @@ struct ATHLTHPlanGoalEntryView: View {
                     .clipped()
                     .accessibilityHidden(true)
             }
+            .allowsHitTesting(false)
+
+            Color(red: 0.15, green: 0.12, blue: 0.09)
+                .opacity(0.24)
+                .allowsHitTesting(false)
 
             LinearGradient(
                 stops: [
-                    .init(color: canvas, location: 0),
-                    .init(color: canvas.opacity(0.99), location: 0.29),
-                    .init(color: canvas.opacity(0.90), location: 0.48),
-                    .init(color: canvas.opacity(0.31), location: 0.78),
-                    .init(color: canvas.opacity(0.04), location: 1)
+                    .init(color: Color(red: 0.12, green: 0.10, blue: 0.08), location: 0),
+                    .init(color: Color(red: 0.15, green: 0.12, blue: 0.09).opacity(0.94), location: 0.28),
+                    .init(color: .black.opacity(0.66), location: 0.51),
+                    .init(color: .black.opacity(0.16), location: 1)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
             )
+            .allowsHitTesting(false)
+
+            LinearGradient(colors: [.clear, .black.opacity(0.22)],
+                           startPoint: .center, endPoint: .bottom)
+                .allowsHitTesting(false)
 
             VStack(alignment: .leading, spacing: 9) {
                 Text(ATHLTHLocalization.choose(
@@ -299,7 +308,7 @@ struct ATHLTHPlanGoalEntryView: View {
                 ))
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(2.6)
-                .foregroundStyle(muted)
+                .foregroundStyle(.white.opacity(0.83))
 
                 Text(ATHLTHLocalization.choose(
                     english: "What is your goal?",
@@ -309,7 +318,7 @@ struct ATHLTHPlanGoalEntryView: View {
                     size: dynamicTypeSize.isAccessibilitySize ? 32 : (wide ? 42 : 36),
                     weight: .regular, design: .serif
                 ))
-                .foregroundStyle(ink)
+                .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
                 .fixedSize(horizontal: false, vertical: true)
@@ -320,15 +329,15 @@ struct ATHLTHPlanGoalEntryView: View {
                     norwegian: "Velg hovedfokus for planen din."
                 ))
                 .font(.system(size: 13))
-                .foregroundStyle(muted)
+                .foregroundStyle(.white.opacity(0.83))
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, wide ? 26 : 19)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: dynamicTypeSize.isAccessibilitySize ? 220 : (wide ? 184 : 148))
-        .clipped()
-        .padding(.horizontal, -18)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .allowsHitTesting(false)
         .accessibilityElement(children: .contain)
     }
 
@@ -369,17 +378,28 @@ struct ATHLTHPlanGoalEntryView: View {
                         .clipped()
                         .accessibilityHidden(true)
                 }
+                .allowsHitTesting(false)
+
+                Color(red: 0.18, green: 0.13, blue: 0.09)
+                    .opacity(0.11)
+                    .allowsHitTesting(false)
 
                 LinearGradient(
                     stops: [
-                        .init(color: .white.opacity(0.99), location: 0),
-                        .init(color: .white.opacity(0.95), location: 0.27),
-                        .init(color: .white.opacity(0.68), location: 0.58),
-                        .init(color: .white.opacity(0.04), location: 1)
+                        .init(color: canvas, location: 0),
+                        .init(color: canvas.opacity(0.97), location: 0.26),
+                        .init(color: canvas.opacity(0.89), location: 0.44),
+                        .init(color: canvas.opacity(0.36), location: 0.75),
+                        .init(color: canvas.opacity(0.03), location: 1)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
+                .allowsHitTesting(false)
+
+                LinearGradient(colors: [.clear, .black.opacity(0.10)],
+                               startPoint: .center, endPoint: .bottom)
+                    .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: wide ? 8 : 6) {
                     Image(systemName: item.icon)
