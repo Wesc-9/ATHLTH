@@ -515,7 +515,7 @@ final class AIProgramService {
     func generate(
         _ request: AIProgramRequest, library: [ExerciseLibraryEntry],
         savedWorkouts: [PlannedSession], focus: TrainingFocus,
-        gymAvailable: Bool, selectedDateKeys: Set<Int>? = nil
+        gymAvailable: Bool, allowedEquipment: Set<String> = [], selectedDateKeys: Set<Int>? = nil
     ) async throws -> AIProgramDraft {
         guard (1...52).contains(request.weekCount),
               (1...7).contains(request.sessionsPerWeek),
@@ -526,6 +526,15 @@ final class AIProgramService {
         let excluded = Set((request.excludedMovements ?? []).map(ATHLTHExerciseReferenceResolver.key))
         let unavailable = Set((request.unavailableEquipment ?? []).map(ATHLTHExerciseReferenceResolver.key))
         let bodyweight = Set(["bodyweight", "body weight", "none", "no equipment", "kroppsvekt"].map(ATHLTHExerciseReferenceResolver.key))
+        let explicitGear = Set(allowedEquipment.map(ATHLTHExerciseReferenceResolver.key))
+        let permittedGear = bodyweight.union(explicitGear)
+        func acceptsGear(_ gear: Set<String>) -> Bool {
+            guard unavailable.isDisjoint(with: gear) else { return false }
+            if !explicitGear.isEmpty || !gymAvailable {
+                return !gear.isEmpty && gear.isSubset(of: permittedGear)
+            }
+            return true
+        }
         let minutes = min(180, max(5, request.sessionDurationMinutes))
         let focusKey = focus.rawValue.lowercased()
         let isRunning = focusKey == "running"
@@ -554,8 +563,7 @@ final class AIProgramService {
                 if block.kind == .exercise {
                     guard let snapshot = block.exerciseSnapshot else { return false }
                     let equipment = Set(snapshot.equipment.map(ATHLTHExerciseReferenceResolver.key))
-                    if !unavailable.isDisjoint(with: equipment) { return false }
-                    if !gymAvailable && (equipment.isEmpty || !equipment.isSubset(of: bodyweight)) { return false }
+                    if !acceptsGear(equipment) { return false }
                 }
             }
             return true
@@ -595,7 +603,7 @@ final class AIProgramService {
                 let gear = Set(entry.exercise.equipment.map(ATHLTHExerciseReferenceResolver.key))
                 let name = ATHLTHExerciseReferenceResolver.key(entry.canonicalName)
                 return !excluded.contains(where: { !$0.isEmpty && name.contains($0) }) &&
-                    unavailable.isDisjoint(with: gear) && (gymAvailable || (!gear.isEmpty && gear.isSubset(of: bodyweight)))
+                    acceptsGear(gear)
             }
             if custom.count >= 2 {
                 let picked = custom.prefix(min(5, max(2, minutes / 7)))
@@ -613,6 +621,20 @@ final class AIProgramService {
                     title: workout.title, routeID: nil, estimatedMinutes: minutes, to: &workout)
                 append(workout)
             }
+        }
+        // Native timed cardio is a supported training mode, not an invented
+        // movement. It is a fallback if no curated continuous recipe fits.
+        if candidates.isEmpty && (isRunning || isWalking || isMixed) && excluded.isEmpty {
+            let kind: WorkoutKind = isRunning ? .running : .walking
+            var workout = PlannedSession(id: UUID(),
+                title: kind == .running
+                    ? ATHLTHLocalization.choose(english: "Easy run", norwegian: "Rolig løping")
+                    : ATHLTHLocalization.choose(english: "Walk", norwegian: "Gåtur"),
+                kind: kind, scheduledStart: nil, durationMinutes: minutes,
+                targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: nil)
+            workout.workoutBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            append(workout)
         }
         guard !candidates.isEmpty else { throw AIProgramError.invalidProgram }
         candidates.sort {
