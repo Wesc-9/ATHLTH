@@ -771,7 +771,7 @@ final class MirroredWorkoutAudioCoach:
         let distance = verifiedDistance ?? 0
         var readout = ATHLTHAudioCoachSportPolicy.supportsRunningSteps(sport)
             ? (snapshot.coachReadoutContext ?? .init(routeRemainingMeters: snapshot.routeRemainingMeters))
-            : (sport.lowercased() == "strength" ? snapshot.strengthSnapshot.map { ATHLTHCoachReadoutContext.make(strength: $0) } ?? .init() : .init())
+            : (sport.lowercased() == "strength" ? snapshot.coachReadoutContext ?? .init() : .init())
         readout.appleLiveHeartRateZones = snapshot.appleLiveHeartRateZones
         readout.averageHeartRateBPM = snapshot.averageHeartRate
         readout.ghostTimeDifferenceSeconds = snapshot.ghostTimeDeltaSeconds
