@@ -1402,6 +1402,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 AnyView(wizardScroll(AnyView(weekStep)))
             }
         case .week:
+            if usesPinnedGuidedDayLayout {
+                AnyView(pinnedGuidedDayPage)
+            } else {
             AnyView(wizardScroll(AnyView(
                 Group {
                     if mode == .advanced {
@@ -1419,6 +1422,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             ))
             )
+            }
         case .review:
             AnyView(wizardScroll(AnyView(reviewStep)))
         }
@@ -3347,6 +3351,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    private var usesPinnedGuidedDayLayout: Bool {
+        ATHLTHDeviceRole.isIPad && widthClass == .regular &&
+            step == .week && mode == .advanced &&
+            weekPlanningApproach == .guided &&
+            guidedDayCursor < weekCount * 7 && guidedWeekDecisionSource == nil
+    }
+
+    private var pinnedGuidedDayPage: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            AnyView(sourceChoiceHeader)
+            AnyView(guidedWeekStep)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 14)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
     private var dailyDateSidebar: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -3394,8 +3417,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .foregroundStyle(isPlanned || suggestedTraining
                                 ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.secondary)
                     }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, usesPinnedGuidedDayLayout ? 6 : 14)
+                    .frame(maxWidth: .infinity,
+                           maxHeight: usesPinnedGuidedDayLayout ? .infinity : nil,
+                           alignment: .leading)
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
                     .background(guidedDayCursor == position ? ATHLTHTrainDesign.paleGold : .white, in: RoundedRectangle(cornerRadius: 14))
                 }
@@ -3440,7 +3466,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             } else if let finishedWeek = guidedWeekDecisionSource {
                 guidedCompletedWeekDecision(sourceWeek: finishedWeek)
             } else {
-                if widthClass == .regular {
+                if usesPinnedGuidedDayLayout {
+                    GeometryReader { geometry in
+                        HStack(alignment: .top, spacing: 24) {
+                            ScrollView {
+                                dailyDateSidebar
+                                    .frame(minHeight: geometry.size.height)
+                            }
+                            .scrollIndicators(.hidden)
+                            .frame(width: min(440, max(210, geometry.size.width * 0.33)))
+                            AnyView(guidedCurrentDayCard)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else if widthClass == .regular {
                     adaptivePlanPair(AnyView(dailyDateSidebar), AnyView(guidedCurrentDayCard))
                 } else {
                     guidedCurrentDayCard
@@ -3718,6 +3758,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
             ]?.isRestDay == true,
             suggestedTraining: isSuggestedTrainingDay(guidedCurrentWeekday, week: guidedCurrentWeek),
+            pinsDayActions: usesPinnedGuidedDayLayout,
             onSelectDay: { absoluteDay in
                 // The grouped menu spans all plan weeks, not just this week.
                 guidedDayCursor = min(max(0, absoluteDay), weekCount * 7 - 1)
