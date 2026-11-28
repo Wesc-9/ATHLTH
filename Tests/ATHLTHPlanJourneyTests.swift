@@ -297,17 +297,16 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
 
     @MainActor
     func testAdvancedSetupWithCompactPlanningMethodsFitsSmallPhones() {
-        // Both plans use the same form. The weekly option reveals an extra
-        // variation control; the daily option must not reserve space for it.
-        for planningApproach in [ATHLTHPlanWeekPlanningApproach.guided, .quick] {
+        // Check the current advanced setup in both manual and coach modes.
+        for buildWithCoach in [false, true] {
             for width in [320.0, 375.0, 430.0] {
                 let screen = ATHLTHPlanAdvancedScheduleEntryView(
                     title: .constant(""),
                     startDate: .constant(Date()),
                     weekCount: .constant(4),
                     varyWeekdays: .constant(false),
-                    planningApproach: planningApproach,
-                    onChooseApproach: { _ in },
+                    buildWithCoach: buildWithCoach,
+                    onChooseCoach: { _ in },
                     selectedDays: Set([1, 3, 5]),
                     suggestedName: "Løpeplan",
                     onToggleDay: { _ in },
@@ -321,7 +320,7 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
                 )
                 XCTAssertLessThanOrEqual(
                     measured.width, available + 1,
-                    "Advanced \(planningApproach) setup overflows a \(Int(width))-pt phone"
+                    "Advanced (coach: \(buildWithCoach)) setup overflows a \(Int(width))-pt phone"
                 )
             }
         }
