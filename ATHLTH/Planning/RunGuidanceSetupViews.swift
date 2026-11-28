@@ -459,6 +459,7 @@ struct RunGuidanceSetupView: View {
 }
 
 struct PerWorkoutAudioCoachView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
@@ -492,6 +493,7 @@ struct PerWorkoutAudioCoachView: View {
                         showStructuredOptions: showStructuredOptions,
                         triggerAvailability: triggerAvailability
                     )
+                    .environment(\.athlthAudioCoachApplySelectionAndClose, { dismiss() })
                 }
             }
             .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)

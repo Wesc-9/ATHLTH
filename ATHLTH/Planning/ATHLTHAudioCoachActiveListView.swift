@@ -8,7 +8,18 @@ private struct ATHLTHAudioCoachSaveAndCloseKey: EnvironmentKey {
     nonisolated(unsafe) static let defaultValue: (() -> Void)? = nil
 }
 
+private struct ATHLTHAudioCoachApplySelectionAndCloseKey: EnvironmentKey {
+    nonisolated(unsafe) static let defaultValue: (() -> Void)? = nil
+}
+
 extension EnvironmentValues {
+    /// Only the per-workout navigation destination supplies this fallback.
+    /// Choosing a saved template must not overwrite it or global defaults.
+    var athlthAudioCoachApplySelectionAndClose: (() -> Void)? {
+        get { self[ATHLTHAudioCoachApplySelectionAndCloseKey.self] }
+        set { self[ATHLTHAudioCoachApplySelectionAndCloseKey.self] = newValue }
+    }
+
     var athlthAudioCoachSaveAndClose: (() -> Void)? {
         get { self[ATHLTHAudioCoachSaveAndCloseKey.self] }
         set { self[ATHLTHAudioCoachSaveAndCloseKey.self] = newValue }
@@ -20,6 +31,7 @@ extension EnvironmentValues {
 struct ATHLTHAudioCoachActiveListView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.athlthAudioCoachSaveAndClose) private var saveAndClose
+    @Environment(\.athlthAudioCoachApplySelectionAndClose) private var applySelectionAndClose
     @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
@@ -186,6 +198,21 @@ struct ATHLTHAudioCoachActiveListView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(bronze)
                         .accessibilityIdentifier("athlth-coach-save-top")
+                } else if let applySelectionAndClose, !globalScope {
+                    Button(tr("Save", "Lagre")) {
+                        // applyTemplateDestination establishes a fresh baseline
+                        // after choosing Standard or a saved profile. Its bound
+                        // configuration is already the current workout choice.
+                        // Do not show a template overwrite dialog for selection.
+                        if !hasUnsavedTemplateChanges || !draft.enabled {
+                            applySelectionAndClose()
+                        } else {
+                            showingSaveChoices = true
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    .accessibilityIdentifier("athlth-coach-save-top")
                 } else if draft.enabled {
                     // Standalone profile editor retains Save / Save as new.
                     Button(tr("Save", "Lagre")) { showingSaveChoices = true }
