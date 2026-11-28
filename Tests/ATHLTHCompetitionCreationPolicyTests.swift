@@ -395,6 +395,22 @@ final class ATHLTHCompetitionCreationPolicyTests: XCTestCase {
         }
     }
 
+    func testStudioFormatCardsRespectColumnBudgetAndCompactHeight() {
+        let layout = ATHLTHCompetitionStudioLayout.self
+        for width: CGFloat in [320, 470, 620, 1000] {
+            let grid = layout.formatGridWidth(available: width)
+            XCTAssertLessThan(grid, width)
+            let count = layout.formatColumnCount(width: grid, accessibilityText: false)
+            let tile = (grid - CGFloat(count - 1) * layout.formatSpacing) / CGFloat(count)
+            XCTAssertGreaterThan(tile, 0)
+            XCTAssertLessThanOrEqual(tile * CGFloat(count) + CGFloat(count - 1) * layout.formatSpacing, width)
+        }
+        XCTAssertLessThan(layout.formatImageHeight(isGhost: false, accessibilityText: false), 142)
+        XCTAssertLessThan(layout.formatTextMinimumHeight(isGhost: false, accessibilityText: false), 112)
+        XCTAssertEqual(layout.formatImageHeight(isGhost: false, accessibilityText: true), 142)
+        XCTAssertEqual(layout.formatTextMinimumHeight(isGhost: false, accessibilityText: true), 112)
+    }
+
     func testStudioCompetitionFormatsAdaptToAvailableColumnWidth() {
         XCTAssertEqual(ATHLTHCompetitionStudioLayout.formatColumnCount(width: 469, accessibilityText: false), 1)
         XCTAssertEqual(ATHLTHCompetitionStudioLayout.formatColumnCount(width: 470, accessibilityText: false), 2)

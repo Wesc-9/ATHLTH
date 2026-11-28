@@ -3,7 +3,23 @@ import SwiftUI
 /// Width is the Studio detail column, not the entire device display.
 enum ATHLTHCompetitionStudioLayout {
     static let padding: CGFloat = 20
-    static let spacing: CGFloat = 18
+    static let spacing: CGFloat = 16
+    static let formatSpacing: CGFloat = 12
+
+    // Keep a little breathing room at the outer edge of the right column.
+    static func formatGridWidth(available: CGFloat) -> CGFloat {
+        max(0, available.isFinite ? available - 8 : 0)
+    }
+
+    static func formatImageHeight(isGhost: Bool, accessibilityText: Bool) -> CGFloat {
+        if accessibilityText { return isGhost ? 150 : 142 }
+        return isGhost ? 100 : 116
+    }
+
+    static func formatTextMinimumHeight(isGhost: Bool, accessibilityText: Bool) -> CGFloat {
+        if accessibilityText { return isGhost ? 86 : 112 }
+        return isGhost ? 64 : 90
+    }
 
     static func usesColumns(width: CGFloat, accessibilityText: Bool) -> Bool {
         width >= 800 && !accessibilityText
@@ -149,7 +165,7 @@ struct ATHLTHCompetitionEntryView: View {
         let formsWidth = max(0, contentWidth - overviewWidth - layout.spacing)
         let accessibilityText = dynamicTypeSize.isAccessibilitySize
 
-        return VStack(alignment: .leading, spacing: 22) {
+        return VStack(alignment: .leading, spacing: 16) {
             ATHLTHTrainPageTitle(title: "Konkurranse")
             studioDashboard(wide: layout.usesColumns(width: width, accessibilityText: accessibilityText))
             if layout.usesColumns(width: width, accessibilityText: accessibilityText) {
@@ -158,7 +174,7 @@ struct ATHLTHCompetitionEntryView: View {
                         .frame(width: overviewWidth, alignment: .topLeading)
                         .accessibilityIdentifier("athlth-ipad-competition-overview")
                     studioFormats(width: formsWidth)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .frame(width: formsWidth, alignment: .topLeading)
                 }
             } else {
                 // Keep both sections on one page in portrait and Stage Manager.
@@ -191,10 +207,10 @@ struct ATHLTHCompetitionEntryView: View {
     private func studioDashboard(wide: Bool) -> some View {
         Group {
             if wide {
-                HStack(alignment: .center, spacing: 26) {
+                HStack(alignment: .center, spacing: 24) {
                     studioDashboardHeading
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 66)
+                    Rectangle().fill(Color(red: 0.83, green: 0.71, blue: 0.53).opacity(0.40)).frame(width: 1, height: 58)
                         .accessibilityHidden(true)
                     studioDashboardMetrics
                         .frame(maxWidth: 390)
@@ -207,21 +223,36 @@ struct ATHLTHCompetitionEntryView: View {
             }
         }
         .foregroundStyle(.white)
-        .padding(24)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.ink],
-                           startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(LinearGradient(stops: [
+                    .init(color: Color(red: 0.45, green: 0.35, blue: 0.25), location: 0),
+                    .init(color: Color(red: 0.29, green: 0.24, blue: 0.20), location: 0.44),
+                    .init(color: Color(red: 0.13, green: 0.14, blue: 0.15), location: 1)
+                ], startPoint: .leading, endPoint: .trailing))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(RadialGradient(colors: [Color(red: 0.86, green: 0.70, blue: 0.46).opacity(0.16), .clear],
+                                             center: .topLeading, startRadius: 0, endRadius: 280))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                }
+        }
     }
 
     private var studioDashboardHeading: some View {
         HStack(alignment: .center, spacing: 16) {
             Image(systemName: "trophy")
                 .font(.system(size: 27, weight: .light))
-                .frame(width: 58, height: 58)
-                .background(.white.opacity(0.12), in: Circle())
+                .frame(width: 52, height: 52)
+                .foregroundStyle(Color(red: 0.98, green: 0.91, blue: 0.79))
+                .background(.white.opacity(0.10), in: Circle())
+                .overlay { Circle().strokeBorder(.white.opacity(0.20), lineWidth: 1) }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text("DIN KONKURRANSEARENA")
@@ -243,10 +274,12 @@ struct ATHLTHCompetitionEntryView: View {
     }
 
     private func studioFormats(width: CGFloat) -> some View {
-        let count = ATHLTHCompetitionStudioLayout.formatColumnCount(
-            width: width, accessibilityText: dynamicTypeSize.isAccessibilitySize
+        let layout = ATHLTHCompetitionStudioLayout.self
+        let gridWidth = layout.formatGridWidth(available: width)
+        let count = layout.formatColumnCount(
+            width: gridWidth, accessibilityText: dynamicTypeSize.isAccessibilitySize
         )
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Ny konkurranse")
                     .font(.system(.title2, design: .serif).weight(.semibold))
@@ -256,12 +289,13 @@ struct ATHLTHCompetitionEntryView: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 16, alignment: .top), count: count), spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: layout.formatSpacing, alignment: .top), count: count), spacing: layout.formatSpacing) {
                 formatButtons
             }
             // Solo competition gets the full final row, not an empty grid cell.
             ghostButton
         }
+        .frame(width: gridWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("athlth-ipad-competition-formats")
     }
@@ -383,7 +417,8 @@ struct ATHLTHCompetitionEntryView: View {
                                     title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Color.clear
-                .frame(height: title == "Ghost Race" ? 150 : 142)
+                .frame(height: ATHLTHCompetitionStudioLayout.formatImageHeight(
+                    isGhost: title == "Ghost Race", accessibilityText: dynamicTypeSize.isAccessibilitySize))
                 .overlay {
                     GeometryReader { geometry in
                         Image(artwork)
@@ -401,15 +436,15 @@ struct ATHLTHCompetitionEntryView: View {
                     Label(participants, systemImage: symbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
                         .background(.black.opacity(0.7), in: Capsule())
-                        .padding(12)
+                        .padding(9)
                 }
                 .clipped()
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .center, spacing: 6) {
                     Text(title)
                         .font(.system(.title3, design: .serif).weight(.semibold))
                         .foregroundStyle(ATHLTHTrainDesign.ink)
@@ -418,7 +453,7 @@ struct ATHLTHCompetitionEntryView: View {
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 28, height: 28)
                         .background(ATHLTHTrainDesign.canvas, in: Circle())
                         .accessibilityHidden(true)
                 }
@@ -428,9 +463,10 @@ struct ATHLTHCompetitionEntryView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
-            .padding(15)
+            .padding(11)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: title == "Ghost Race" ? 86 : 112, alignment: .topLeading)
+            .frame(minHeight: ATHLTHCompetitionStudioLayout.formatTextMinimumHeight(
+                isGhost: title == "Ghost Race", accessibilityText: dynamicTypeSize.isAccessibilitySize), alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.cardRadius, style: .continuous))
