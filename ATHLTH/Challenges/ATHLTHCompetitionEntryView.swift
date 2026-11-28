@@ -207,10 +207,10 @@ struct ATHLTHCompetitionEntryView: View {
     private func studioDashboard(wide: Bool) -> some View {
         Group {
             if wide {
-                HStack(alignment: .center, spacing: 24) {
+                HStack(alignment: .center, spacing: 26) {
                     studioDashboardHeading
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Rectangle().fill(Color(red: 0.83, green: 0.71, blue: 0.53).opacity(0.40)).frame(width: 1, height: 58)
+                    Rectangle().fill(Color(red: 0.72, green: 0.63, blue: 0.49).opacity(0.45)).frame(width: 1, height: 66)
                         .accessibilityHidden(true)
                     studioDashboardMetrics
                         .frame(maxWidth: 390)
@@ -222,42 +222,29 @@ struct ATHLTHCompetitionEntryView: View {
                 }
             }
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 22)
-        .padding(.vertical, 18)
+        .foregroundStyle(ATHLTHTrainDesign.ink)
+        .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(LinearGradient(stops: [
-                    .init(color: Color(red: 0.45, green: 0.35, blue: 0.25), location: 0),
-                    .init(color: Color(red: 0.29, green: 0.24, blue: 0.20), location: 0.44),
-                    .init(color: Color(red: 0.13, green: 0.14, blue: 0.15), location: 1)
-                ], startPoint: .leading, endPoint: .trailing))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(RadialGradient(colors: [Color(red: 0.86, green: 0.70, blue: 0.46).opacity(0.16), .clear],
-                                             center: .topLeading, startRadius: 0, endRadius: 280))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                }
-        }
+        .background(
+            LinearGradient(colors: [Color(red: 0.94, green: 0.89, blue: 0.80),
+                                    Color(red: 0.98, green: 0.96, blue: 0.92)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
     }
 
     private var studioDashboardHeading: some View {
         HStack(alignment: .center, spacing: 16) {
             Image(systemName: "trophy")
                 .font(.system(size: 27, weight: .light))
-                .frame(width: 52, height: 52)
-                .foregroundStyle(Color(red: 0.98, green: 0.91, blue: 0.79))
-                .background(.white.opacity(0.10), in: Circle())
-                .overlay { Circle().strokeBorder(.white.opacity(0.20), lineWidth: 1) }
+                .frame(width: 58, height: 58)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .background(ATHLTHTrainDesign.bronze.opacity(0.12), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text("DIN KONKURRANSEARENA")
                     .font(.caption2.weight(.semibold)).tracking(1.5)
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
                 Text("Utfordre deg selv. Konkurrer sammen.")
                     .font(.system(.title2, design: .serif))
                     .fixedSize(horizontal: false, vertical: true)
@@ -623,7 +610,8 @@ struct ATHLTHCompetitionEntryView: View {
     private func dashboardMetric(_ label: String, _ count: Int) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(String(count)).font(.system(size: 25, design: .serif)).monospacedDigit()
-            Text(label).font(.caption).foregroundStyle(.white.opacity(0.8))
+            Text(label).font(.caption)
+                .foregroundStyle(isStudioHub ? ATHLTHTrainDesign.secondary : Color.white.opacity(0.8))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
