@@ -550,26 +550,38 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     var body: some View {
         // Bound metadata decoding for the full plan wizard; an unbounded
         // SwiftUI generic chain exhausted the iPhone main-thread stack.
-        ZStack {
-            AnyView(planPresentations)
-                .allowsHitTesting(!showingPlanExitSheet)
-                .accessibilityHidden(showingPlanExitSheet)
-            if showingPlanExitSheet {
-                AnyView(planExitOverlay)
-                    .zIndex(1)
-            }
-        }
-        // Sole iPad plan sheet host, outside the changing plan canvas.
-        .sheet(item: $studioPresentedSheet, onDismiss: finishStudioSheetDismissal) { route in
-            studioSheetContent(route).id(route.id)
-        }
-        .onAppear { reconcileStudioSheet() }
-        .onChange(of: requestedStudioSheet?.id) { _, _ in reconcileStudioSheet() }
+        AnyView(planWizardPresentationRoot)
         .tint(ATHLTHTrainDesign.bronze)
         .interactiveDismissDisabled(!completedPlanCreation)
         .confirmationDialog(ATHLTHLocalization.choose(english: "Discard unsaved changes?", norwegian: "Forkaste ulagrede endringer?"), isPresented: $showingEditDiscard, titleVisibility: .visible) {
             Button(ATHLTHLocalization.choose(english: "Discard changes", norwegian: "Forkast endringer"), role: .destructive) { dismiss() }
             Button(ATHLTHLocalization.choose(english: "Keep editing", norwegian: "Fortsett redigering"), role: .cancel) {}
+        }
+    }
+
+    private var planWizardCanvas: some View {
+        ZStack {
+            AnyView(planPresentations)
+                .allowsHitTesting(!showingPlanExitSheet)
+                .accessibilityHidden(showingPlanExitSheet)
+            if showingPlanExitSheet {
+                AnyView(planExitOverlay).zIndex(1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var planWizardPresentationRoot: some View {
+        if studioFullscreenEditing {
+            // Sole iPad plan sheet host, outside the changing plan canvas.
+            planWizardCanvas
+                .sheet(item: $studioPresentedSheet, onDismiss: finishStudioSheetDismissal) { route in
+                    studioSheetContent(route).id(route.id)
+                }
+                .onAppear { reconcileStudioSheet() }
+                .onChange(of: requestedStudioSheet?.id) { _, _ in reconcileStudioSheet() }
+        } else {
+            planWizardCanvas
         }
     }
 
@@ -1116,38 +1128,38 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    @ViewBuilder
-    private func studioSheetContent(_ route: StudioPlanSheet) -> some View {
+    // Bound SwiftUI metadata for the large wizard and its nine routes.
+    private func studioSheetContent(_ route: StudioPlanSheet) -> AnyView {
         switch route {
         case .goal:
-            GoalCreationView()
+            return AnyView(GoalCreationView())
         case .design:
-            ATHLTHPlanDesignLabView()
+            return AnyView(ATHLTHPlanDesignLabView())
         case .coach:
-            studioCoachBuilderSheet
+            return AnyView(studioCoachBuilderSheet)
         case .consent:
-            studioCoachConsentSheet
+            return AnyView(studioCoachConsentSheet)
         case .preview(let preview):
-            guidedAIFillReview(preview)
+            return AnyView(guidedAIFillReview(preview))
         case .day(let selection):
-            planDayActionsSheet(for: selection.id)
+            return AnyView(planDayActionsSheet(for: selection.id))
         case .place(let selection):
-            ATHLTHPlanTrainingPlacePicker(
+            return AnyView(ATHLTHPlanTrainingPlacePicker(
                 initial: weekDayEdits[weekDayKey(selection.id)]?.trainingPlace
             ) { place in
                 updateWeekDay(selection.id) { edit in
                     edit.trainingPlace = place
                 }
                 editingTrainingPlaceDay = nil
-            }
+            })
         case .add(let destination):
-            advancedPlanAddSheet(destination)
+            return AnyView(advancedPlanAddSheet(destination))
         case .library(let selection):
-            ATHLTHPlanWorkoutLibraryPicker { workout in
+            return AnyView(ATHLTHPlanWorkoutLibraryPicker { workout in
                 assignLibraryWorkout(workout, to: selection.id, asExtra: selectingExtraFromLibrary)
                 selectingExtraFromLibrary = false
                 selectingLibraryDay = nil
-            }
+            })
         }
     }
 
