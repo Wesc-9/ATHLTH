@@ -488,15 +488,21 @@ struct ATHLTHPlanSetupFields: View {
                     .font(.system(size: 11))
             } else {
                 HStack {
-                    Text(tr("Today", "I dag"))
-                        .font(.system(size: 12, weight: .medium))
+                    Text(Calendar.current.isDateInToday(startDate)
+                         ? tr("Today", "I dag") : tr("Selected date", "Valgt dato"))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(ink)
                     Spacer()
-                    Text(startDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 10))
-                        .foregroundStyle(muted)
+                    DatePicker(tr("Start date", "Startdato"),
+                               selection: $startDate,
+                               in: min(Calendar.current.startOfDay(for: .now),
+                                       Calendar.current.startOfDay(for: startDate))...,
+                               displayedComponents: .date)
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                        .tint(bronze)
                 }
-                .padding(.vertical, 6)
+                .frame(minHeight: 44)
             }
         }
     }
