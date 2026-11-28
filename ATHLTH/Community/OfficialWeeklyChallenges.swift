@@ -327,8 +327,6 @@ enum OfficialWeeklyChallengeCountdown {
 
         let totalHours = Int(remainingSeconds / 3600)
         let days = totalHours / 24
-        let hours = totalHours % 24
-
         if days == 0 {
             return norwegian
                 ? "\(totalHours) \(totalHours == 1 ? "time" : "timer") igjen"
@@ -336,10 +334,10 @@ enum OfficialWeeklyChallengeCountdown {
         }
 
         if norwegian {
-            return "\(days) \(days == 1 ? "dag" : "dager") og \(hours) \(hours == 1 ? "time" : "timer") igjen"
+            return "\(days) \(days == 1 ? "dag" : "dager") igjen"
         }
 
-        return "\(days) \(days == 1 ? "day" : "days"), \(hours) \(hours == 1 ? "hour" : "hours") left"
+        return "\(days) \(days == 1 ? "day" : "days") left"
     }
 }
 
@@ -1257,6 +1255,8 @@ private enum OfficialWeeklyNorwegianCopy {
             return "Vær aktiv på fire forskjellige dager denne uken."
         case "Complete five qualifying sessions this week.":
             return "Fullfør fem tellende økter denne uken."
+        case "Join the community and collect 32 kilometres this week.":
+            return "Gå eller løp 32 km denne uken."
         default: return subtitle
         }
     }
@@ -2176,6 +2176,12 @@ struct OfficialWeeklyChallengeDetailView: View {
 
     let challengeID: UUID
 
+    private enum DetailPage: String, Identifiable {
+        case leaderboard, information
+        var id: String { rawValue }
+    }
+    @State private var detailPage: DetailPage?
+
     private var challenge: OfficialWeeklyChallenge? {
         store.challenges.first { $0.id == challengeID }
     }
@@ -2192,40 +2198,24 @@ struct OfficialWeeklyChallengeDetailView: View {
     var body: some View {
         Group {
             if let challenge {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 18) {
-                            premiumHeroCard(
-                                challenge,
-                                scrollProxy: proxy
-                            )
-                            challengeOverviewSection(challenge)
-                            progressSection(challenge)
-                                .id("weekly-progress")
-                            friendsProgressSection(challenge)
-                            leaderboardSection(challenge)
-                                .id("weekly-leaderboard")
-                            countedWorkoutsSection
-                                .id("weekly-counted-workouts")
-                            rulesSection(challenge)
-                                .id("weekly-rules")
-                        }
+                ScrollView {
+                    premiumHeroCard(challenge)
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
                         .padding(.bottom, 32)
-                    }
-                    .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                }
+                .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
                 .navigationTitle(ATHLTHLocalization.choose(
                     english: "Weekly Challenge",
                     norwegian: "Ukens utfordring"
                 ))
                 .navigationBarTitleDisplayMode(.inline)
-                    .task(id: health.workouts.map(\.id)) {
-                        await store.ensureParticipation(for: challenge)
-                        await store.syncCompletionState(
-                            workouts: health.workouts
-                        )
-                    }
+                .sheet(item: $detailPage) { page in
+                    challengeDetails(page)
+                }
+                .task(id: health.workouts.map(\.id)) {
+                    await store.ensureParticipation(for: challenge)
+                    await store.syncCompletionState(workouts: health.workouts)
                 }
             } else {
                 ContentUnavailableView(
@@ -2239,9 +2229,41 @@ struct OfficialWeeklyChallengeDetailView: View {
         }
     }
 
+    private func challengeDetails(_ page: DetailPage) -> some View {
+        NavigationStack {
+            ScrollView {
+                if let challenge {
+                    LazyVStack(spacing: 16) {
+                        switch page {
+                        case .leaderboard:
+                            leaderboardSection(challenge)
+                            friendsProgressSection(challenge)
+                        case .information:
+                            rulesSection(challenge)
+                            countedWorkoutsSection
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(page == .leaderboard
+                ? ATHLTHLocalization.choose(english: "Leaderboard", norwegian: "Ledertavle")
+                : ATHLTHLocalization.choose(english: "How it works", norwegian: "Slik fungerer det"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
+                        detailPage = nil
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
     private func premiumHeroCard(
-        _ challenge: OfficialWeeklyChallenge,
-        scrollProxy: ScrollViewProxy
+        _ challenge: OfficialWeeklyChallenge
     ) -> some View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomLeading) {
@@ -2276,8 +2298,14 @@ struct OfficialWeeklyChallengeDetailView: View {
 
                         Spacer()
 
-                        Text(timeRemaining(for: challenge))
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            Text(challenge.startsAt > context.date
+                                ? ATHLTHLocalization.choose(english: "Starts ", norwegian: "Starter ") + challenge.startsAt.formatted(.dateTime.month(.abbreviated).day())
+                                : OfficialWeeklyChallengeCountdown.remaining(until: challenge.endsAt, now: context.date))
+                        }
                             .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .foregroundStyle(.white.opacity(0.92))
                             .padding(.horizontal, 11)
                             .frame(height: 30)
@@ -2320,18 +2348,12 @@ struct OfficialWeeklyChallengeDetailView: View {
                             vertical: true
                         )
 
-                    Label(
-                        challenge.kind.targetText(challenge.targetValue),
-                        systemImage: challenge.kind.icon
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.88))
                 }
                 .padding(20)
             }
 
             VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 16) {
+                HStack(alignment: .center, spacing: 16) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(
                             ATHLTHLocalization.choose(english: "YOUR WEEKLY TARGET", norwegian: "UKENS MÅL")
@@ -2356,37 +2378,7 @@ struct OfficialWeeklyChallengeDetailView: View {
                             .lineLimit(2)
                             .minimumScaleFactor(0.78)
 
-                        Text(
-                            progressStatusDescription(for: challenge)
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
 
-                        HStack(spacing: 7) {
-                            Image(
-                                systemName: "checkmark.circle.fill"
-                            )
-
-                            Text(
-                                progressStatus(for: challenge)
-                            )
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.76)
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .padding(.horizontal, 10)
-                        .frame(height: 29)
-                        .background(
-                            ATHLTHTheme.champagneSoft.opacity(0.72),
-                            in: Capsule()
-                        )
                     }
 
                     Spacer(minLength: 6)
@@ -2431,286 +2423,42 @@ struct OfficialWeeklyChallengeDetailView: View {
                     .frame(width: 82, height: 82)
                 }
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
-                    spacing: 10
-                ) {
-                    OfficialWeeklyChallengeCompactStat(
-                        icon: "scope",
-                        title: ATHLTHLocalization.choose(english: "TARGET", norwegian: "MÅL"),
-                        value: compactTargetText(
-                            for: challenge
-                        ),
-                        detail:
-                            challenge.kind == .distance
-                                ? ATHLTHLocalization.choose(english: "Run or walk", norwegian: "Løp eller gå")
-                                : ATHLTHLocalization.choose(english: "Weekly goal", norwegian: "Ukens mål")
+                Button {
+                    detailPage = .leaderboard
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(english: "View leaderboard", norwegian: "Se ledertavle"),
+                        systemImage: "trophy"
                     )
-
-                    OfficialWeeklyChallengeCompactStat(
-                        icon: "chart.bar.fill",
-                        title: ATHLTHLocalization.choose(english: "PROGRESS", norwegian: "FREMGANG"),
-                        value: progressPercentText(
-                            for: challenge
-                        ),
-                        detail: resolvedProgressText(
-                            for: challenge
-                        )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .background(
+                        ATHLTHTheme.accent.opacity(0.09),
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                     )
-
-                    OfficialWeeklyChallengeCompactStat(
-                        icon: "calendar",
-                        title: ATHLTHLocalization.choose(english: "TIME LEFT", norwegian: "TID IGJEN"),
-                        value: shortTimeRemaining(
-                            for: challenge
-                        ),
-                        detail: dateRangeText(
-                            for: challenge
-                        )
-                    )
-
-                    OfficialWeeklyChallengeCompactStat(
-                        icon: "trophy.fill",
-                        title: ATHLTHLocalization.choose(english: "YOUR RANK", norwegian: "DIN PLASSERING"),
-                        value: rankText(
-                            for: challenge
-                        ),
-                        detail:
-                            ATHLTHLocalization.choose(
-                                english: "Automatic participation",
-                                norwegian: "Automatisk deltakelse"
-                            )
-                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .stroke(ATHLTHTheme.accentDeep.opacity(0.10), lineWidth: 0.8)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-weekly-leaderboard")
 
-                    Button {
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.32
-                            )
-                        ) {
-                            scrollProxy.scrollTo(
-                                "weekly-counted-workouts",
-                                anchor: .top
-                            )
-                        }
-                    } label: {
-                        HStack(spacing: 13) {
-                            Image(
-                                systemName:
-                                    "figure.run.circle.fill"
-                            )
-                            .font(
-                                .system(
-                                    size: 19,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.accentDeep
-                            )
-                            .frame(
-                                width: 40,
-                                height: 40
-                            )
-                            .background(
-                                ATHLTHTheme.accent
-                                    .opacity(0.12),
-                                in: Circle()
-                            )
-
-                            VStack(
-                                alignment: .leading,
-                                spacing: 3
-                            ) {
-                                Text(
-                                    ATHLTHLocalization.choose(english: "Counted workouts", norwegian: "Tellende økter")
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(
-                                            .semibold
-                                        )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme
-                                        .primaryText
-                                )
-
-                                Text(
-                                    countedWorkouts.isEmpty
-                                        ? ATHLTHLocalization.choose(english: "Your qualifying workouts will appear here.", norwegian: "Tellende treningsøkter vises her.")
-                                        : "\(countedWorkouts.count) qualifying \(countedWorkouts.count == 1 ? "workout" : "workouts") this week"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
-                                .lineLimit(1)
-                                .minimumScaleFactor(
-                                    0.80
-                                )
-                            }
-
-                            Spacer()
-
-                            Image(
-                                systemName:
-                                    "chevron.down"
-                            )
-                            .font(
-                                .system(
-                                    size: 13,
-                                    weight: .bold
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .accentDeep
-                                    .opacity(0.72)
-                            )
-                        }
-                        .padding(
-                            .horizontal,
-                            14
-                        )
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .frame(height: 66)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    ATHLTHTheme
-                                        .accent
-                                        .opacity(0.10),
-                                    ATHLTHTheme
-                                        .champagneSoft
-                                        .opacity(0.42)
-                                ],
-                                startPoint:
-                                    .leading,
-                                endPoint:
-                                    .trailing
-                            ),
-                            in:
-                                RoundedRectangle(
-                                    cornerRadius: 18,
-                                    style:
-                                        .continuous
-                                )
-                        )
-                        .overlay {
-                            RoundedRectangle(
-                                cornerRadius: 18,
-                                style: .continuous
-                            )
-                            .stroke(
-                                ATHLTHTheme
-                                    .accentDeep
-                                    .opacity(0.10),
-                                lineWidth: 0.8
-                            )
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-
-                HStack(spacing: 10) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.32)) {
-                            scrollProxy.scrollTo(
-                                "weekly-leaderboard",
-                                anchor: .top
-                            )
-                        }
-                    } label: {
-                        Label(
-                            "Leaderboard",
-                            systemImage: "trophy"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(
-                            ATHLTHTheme.accent.opacity(0.09),
-                            in: RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                            .stroke(
-                                ATHLTHTheme.accentDeep.opacity(0.10),
-                                lineWidth: 0.8
-                            )
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.32)) {
-                            scrollProxy.scrollTo(
-                                "weekly-rules",
-                                anchor: .top
-                            )
-                        }
-                    } label: {
-                        Label(
-                            "How it works",
-                            systemImage: "info.circle"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(
-                            ATHLTHTheme.champagneSoft.opacity(0.48),
-                            in: RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                            .stroke(
-                                ATHLTHTheme.accentDeep.opacity(0.10),
-                                lineWidth: 0.8
-                            )
-                        }
-                    }
-                    .buttonStyle(.plain)
+                Button {
+                    detailPage = .information
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(english: "How it works", norwegian: "Slik fungerer det"),
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-
-                HStack {
-                    if store.isCompleted(challenge.id) {
-                        Label(
-                            "Challenge completed",
-                            systemImage: "checkmark.seal.fill"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                    } else {
-                        Label(
-                            progressStatus(for: challenge),
-                            systemImage: "bolt.heart.fill"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-                    Spacer()
-                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-weekly-information")
             }
             .padding(20)
             .padding(.top, 8)
@@ -2759,144 +2507,6 @@ struct OfficialWeeklyChallengeDetailView: View {
             x: 0,
             y: 14
         )
-    }
-
-    private func challengeOverviewSection(
-        _ challenge: OfficialWeeklyChallenge
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("THIS WEEK'S FOCUS")
-                        .font(.caption.weight(.semibold))
-                        .tracking(1.8)
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                    Text(challengeFocusTitle(for: challenge))
-                        .font(
-                            .system(
-                                size: 25,
-                                weight: .semibold,
-                                design: .serif
-                            )
-                        )
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                }
-
-                Spacer()
-
-                Image(systemName: challenge.kind.icon)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        ATHLTHTheme.accent.opacity(0.10),
-                        in: Circle()
-                    )
-            }
-
-            Text(challengeFocusDescription(for: challenge))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 10) {
-                OfficialWeeklyChallengeInsightTile(
-                    eyebrow: "GOAL",
-                    value: compactTargetText(for: challenge),
-                    detail: challenge.kind == .distance
-                        ? ATHLTHLocalization.choose(english: "Run or walk", norwegian: "Løp eller gå")
-                        : "This week"
-                )
-
-                OfficialWeeklyChallengeInsightTile(
-                    eyebrow: "WINDOW",
-                    value: shortTimeRemaining(for: challenge),
-                    detail: dateRangeText(for: challenge)
-                )
-
-                OfficialWeeklyChallengeInsightTile(
-                    eyebrow: "COMMUNITY",
-                    value: "\(store.participantCount(for: challenge.id))",
-                    detail:
-                        "\(store.completedCount(for: challenge.id)) finished"
-                )
-            }
-        }
-        .padding(18)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.96),
-                    ATHLTHTheme.champagneSoft.opacity(0.58)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.70),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color: Color.black.opacity(0.045),
-            radius: 14,
-            y: 7
-        )
-    }
-
-    private func progressSection(
-        _ challenge: OfficialWeeklyChallenge
-    ) -> some View {
-        ATHLTHPlanSurface {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Your progress")
-                        .font(.title3.bold())
-
-                    Text(
-                        progressStatusDescription(for: challenge)
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Text(progressPercentText(for: challenge))
-                    .font(.title2.bold())
-                    .monospacedDigit()
-            }
-
-            ProgressView(
-                value: resolvedProgress(
-                    for: challenge
-                )
-            )
-            .tint(ATHLTHTheme.vitality)
-            .scaleEffect(x: 1, y: 1.35)
-
-            HStack {
-                Text(resolvedProgressText(for: challenge))
-                    .font(.subheadline.weight(.semibold))
-
-                Spacer()
-
-                Text(remainingText(for: challenge))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 
     private func friendsProgressSection(
@@ -3351,149 +2961,17 @@ struct OfficialWeeklyChallengeDetailView: View {
 
         switch challenge.kind {
         case .distance:
-            return String(
-                format: "%.1f / %.0f km",
-                value,
-                challenge.targetValue
-            )
+            return value.formatted(.number.precision(.fractionLength(1))) + " / " +
+                challenge.targetValue.formatted(.number.precision(.fractionLength(0...1))) + " km"
         case .sessions:
-            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) workouts"
+            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) " +
+                ATHLTHLocalization.choose(english: "workouts", norwegian: "økter")
         case .minutes:
             return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) min"
         case .streak:
-            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) days"
+            return "\(Int(value.rounded(.down))) / \(Int(challenge.targetValue.rounded())) " +
+                ATHLTHLocalization.choose(english: "days", norwegian: "dager")
         }
-    }
-
-    private func remainingText(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        let remaining = max(
-            challenge.targetValue -
-                resolvedCurrentValue(for: challenge),
-            0
-        )
-
-        switch challenge.kind {
-        case .distance:
-            return String(format: "%.1f km", remaining)
-        case .sessions:
-            return "\(Int(remaining.rounded(.up)))"
-        case .minutes:
-            return "\(Int(remaining.rounded(.up))) min"
-        case .streak:
-            return "\(Int(remaining.rounded(.up))) days"
-        }
-    }
-
-    private func remainingDetail(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        resolvedProgress(for: challenge) >= 1
-            ? "Goal reached"
-            : "to complete"
-    }
-
-    private func progressStatus(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        let progress = resolvedProgress(for: challenge)
-
-        if progress >= 1 {
-            return ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
-        }
-
-        let elapsed = elapsedFraction(for: challenge)
-
-        if progress + 0.08 >= elapsed {
-            return ATHLTHLocalization.choose(english: "On track", norwegian: "I rute")
-        }
-
-        return ATHLTHLocalization.choose(english: "Keep going", norwegian: "Fortsett slik")
-    }
-
-    private func progressStatusDescription(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        switch progressStatus(for: challenge) {
-        case ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført"):
-            return "You reached this week's target."
-        case ATHLTHLocalization.choose(english: "On track", norwegian: "I rute"):
-            return ATHLTHLocalization.choose(english: "Your progress is keeping pace with the challenge window.", norwegian: "Du ligger i rute til å nå ukens mål.")
-        default:
-            return ATHLTHLocalization.choose(english: "There is still time to move toward the weekly target.", norwegian: "Du har fortsatt tid til å nå ukens mål.")
-        }
-    }
-
-    private func elapsedFraction(
-        for challenge: OfficialWeeklyChallenge
-    ) -> Double {
-        let total = challenge.endsAt.timeIntervalSince(
-            challenge.startsAt
-        )
-
-        guard total > 0 else { return 1 }
-
-        let elapsed = Date().timeIntervalSince(
-            challenge.startsAt
-        )
-
-        return min(
-            max(elapsed / total, 0),
-            1
-        )
-    }
-
-    private func shortTimeRemaining(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        if challenge.startsAt > Date() {
-            let days = max(
-                Calendar.current.dateComponents(
-                    [.day],
-                    from: Date(),
-                    to: challenge.startsAt
-                ).day ?? 0,
-                0
-            )
-
-            return days == 0 ? "Today" : "\(days)d"
-        }
-
-        let days = max(
-            Calendar.current.dateComponents(
-                [.day],
-                from: Date(),
-                to: challenge.endsAt
-            ).day ?? 0,
-            0
-        )
-
-        return days == 0 ? "Today" : "\(days)d"
-    }
-
-    private func timeRemaining(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        if challenge.startsAt > Date() {
-            return "Starts " +
-                challenge.startsAt.formatted(
-                    .dateTime.month(.abbreviated).day()
-                )
-        }
-
-        let days = max(
-            Calendar.current.dateComponents(
-                [.day],
-                from: Date(),
-                to: challenge.endsAt
-            ).day ?? 0,
-            0
-        )
-
-        return days == 0
-            ? "Ends today"
-            : "\(days) day\(days == 1 ? "" : "s") left"
     }
 
     private func dateRangeText(
@@ -3507,31 +2985,6 @@ struct OfficialWeeklyChallengeDetailView: View {
         )
 
         return "\(start) – \(end)"
-    }
-
-    private func compactTargetText(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        switch challenge.kind {
-        case .distance:
-            return String(format: "%.0f km", challenge.targetValue)
-        case .sessions:
-            return "\(Int(challenge.targetValue.rounded()))×"
-        case .minutes:
-            return "\(Int(challenge.targetValue.rounded())) min"
-        case .streak:
-            return "\(Int(challenge.targetValue.rounded())) days"
-        }
-    }
-
-    private func rankText(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        guard let rank = store.rank(for: challenge.id) else {
-            return "—"
-        }
-
-        return "#\(rank)"
     }
 
     private func participantLabel(
@@ -3562,36 +3015,6 @@ struct OfficialWeeklyChallengeDetailView: View {
             return "\(Int(value.rounded(.down))) min"
         case .streak:
             return "\(Int(value.rounded(.down))) days"
-        }
-    }
-
-    private func challengeFocusTitle(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        switch challenge.kind {
-        case .distance:
-            return "Build distance, one session at a time"
-        case .sessions:
-            return "Consistency wins the week"
-        case .minutes:
-            return "Make time for movement"
-        case .streak:
-            return "Keep the streak alive"
-        }
-    }
-
-    private func challengeFocusDescription(
-        for challenge: OfficialWeeklyChallenge
-    ) -> String {
-        switch challenge.kind {
-        case .distance:
-            return "Every qualifying run and walk moves you toward the weekly target. Pace it your way and let ATHLTH track the total."
-        case .sessions:
-            return "Stack qualifying workouts across the challenge window and build a repeatable training rhythm."
-        case .minutes:
-            return "Your qualifying training minutes add up automatically throughout the week."
-        case .streak:
-            return "Complete qualifying activity on separate days and keep your momentum moving forward."
         }
     }
 

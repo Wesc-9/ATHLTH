@@ -25,14 +25,14 @@ final class OfficialWeeklyChallengeCountdownTests: XCTestCase {
         )
     }
 
-    func testCountdownShowsDaysAndHoursInsteadOfZeroDays() {
+    func testCountdownShowsDaysThenHours() {
         XCTAssertEqual(
             OfficialWeeklyChallengeCountdown.remaining(
                 until: now.addingTimeInterval(2 * 86_400 + 5 * 3600),
                 now: now,
                 norwegian: true
             ),
-            "2 dager og 5 timer igjen"
+            "2 dager igjen"
         )
         XCTAssertEqual(
             OfficialWeeklyChallengeCountdown.remaining(
@@ -87,6 +87,21 @@ final class OfficialWeeklyChallengeCountdownTests: XCTestCase {
         )
     }
 
+    func testCountdownSwitchesAtExactDayAndHourBoundaries() {
+        for (seconds, expected) in [
+            (86_400.0, "1 dag igjen"),
+            (86_399.0, "23 timer igjen"),
+            (3_600.0, "1 time igjen"),
+            (3_599.0, "59 minutter igjen"),
+            (1.0, "1 minutt igjen"),
+            (-1.0, "Avsluttet")
+        ] {
+            XCTAssertEqual(OfficialWeeklyChallengeCountdown.remaining(
+                until: now.addingTimeInterval(seconds), now: now, norwegian: true
+            ), expected)
+        }
+    }
+
     func testEnglishCountdownGrammar() {
         XCTAssertEqual(
             OfficialWeeklyChallengeCountdown.remaining(
@@ -94,7 +109,7 @@ final class OfficialWeeklyChallengeCountdownTests: XCTestCase {
                 now: now,
                 norwegian: false
             ),
-            "1 day, 1 hour left"
+            "1 day left"
         )
         XCTAssertEqual(
             OfficialWeeklyChallengeCountdown.remaining(
