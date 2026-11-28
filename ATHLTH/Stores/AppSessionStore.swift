@@ -3318,6 +3318,14 @@ final class AppSessionStore: ObservableObject {
         let today = calendar.startOfDay(for: Date())
         var revised: [TrainingPlanWeek] = []
         var removedIDs: Set<UUID> = []
+        let originalsByID = Dictionary(original.weeks.flatMap(\.days).flatMap(\.sessions).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let originalBlueprints = initialEdits.values.flatMap {
+            [$0.detailedWorkout].compactMap { $0 } + ($0.additionalDetailedWorkouts ?? [])
+        }
+        let draftIDs = edits.filter { $0.key <= weekCount * 7 && $0.value.isRestDay != true && $0.value.removeAllWorkouts != true }.values.flatMap {
+            ([$0.detailedWorkout].compactMap { $0 } + ($0.additionalDetailedWorkouts ?? [])).compactMap(\.sourceSessionID)
+        }
+        let occurrenceCounts = Dictionary(draftIDs.map { ($0, 1) }, uniquingKeysWith: +)
         for weekIndex in 0..<weekCount {
             let oldWeek = original.weeks.indices.contains(weekIndex) ? original.weeks[weekIndex] : nil
             var week = oldWeek ?? makeEmptyWeek(number: weekIndex + 1)
@@ -3348,8 +3356,6 @@ final class AppSessionStore: ObservableObject {
 
                 var workouts = previous
                 if changed {
-                    let oldBlueprints = [oldEdit?.detailedWorkout].compactMap { $0 } +
-                        (oldEdit?.additionalDetailedWorkouts ?? [])
                     let blueprints = [edit?.detailedWorkout].compactMap { $0 } +
                         (edit?.additionalDetailedWorkouts ?? [])
                     workouts = []
@@ -3368,15 +3374,25 @@ final class AppSessionStore: ObservableObject {
                         }
                     } else if edit?.removeAllWorkouts != true {
                         for blueprint in blueprints {
-                            let source = previous.first { $0.id == blueprint.sourceSessionID && !used.contains($0.id) }
-                            let unchanged = source != nil && oldBlueprints.contains(blueprint)
-                            guard unchanged || blueprint.isValid else { return false }
-                            var workout = unchanged ? source! : blueprint.applying(to: source)
+                            let localSource = previous.first { $0.id == blueprint.sourceSessionID && !used.contains($0.id) }
+                            let movedSource = blueprint.sourceSessionID.flatMap { id in
+                                occurrenceCounts[id] == 1 && !used.contains(id) ? originalsByID[id] : nil
+                            }
+                            let source = localSource ?? movedSource
+                            let oldBlueprint = source.flatMap { existing in
+                                originalBlueprints.first { $0.sourceSessionID == existing.id }
+                            }
+                            var recipe = blueprint
+                            recipe.startMinuteOfDay = oldBlueprint?.startMinuteOfDay
+                            let sameRecipe = source != nil && oldBlueprint == recipe
+                            let sameClock = oldBlueprint?.startMinuteOfDay == blueprint.startMinuteOfDay
+                            guard sameRecipe || blueprint.isValid else { return false }
+                            var workout = sameRecipe ? source! : blueprint.applying(to: source)
                             if let source { used.insert(source.id) }
-                            if !unchanged || moved {
+                            if !sameRecipe || !sameClock || moved || localSource == nil {
                                 if let minute = blueprint.startMinuteOfDay, (0..<1440).contains(minute) {
                                     workout.scheduledStart = calendar.date(byAdding: .minute, value: minute, to: newDate)
-                                } else if !unchanged { workout.scheduledStart = nil }
+                                } else { workout.scheduledStart = nil }
                             }
                             if edit?.trainingPlace != oldEdit?.trainingPlace || source == nil {
                                 workout.plannedTrainingPlace = edit?.trainingPlace
@@ -3423,8 +3439,14 @@ final class AppSessionStore: ObservableObject {
             planTemplates[index] = plan
             persistPlanTemplates()
         } else {
-            for id in removedIDs { PlannedWorkoutReminderScheduler.cancel(id) }
+            let retained = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+            for id in removedIDs.subtracting(retained.map(\.id)) { PlannedWorkoutReminderScheduler.cancel(id) }
             replaceTrainingPlan(plan)
+            if !isTrainingPlanPaused(plan.id) && !isTrainingPlanDeactivated(plan.id) {
+                for workout in retained where originalsByID[workout.id] != workout {
+                    PlannedWorkoutReminderScheduler.sync(workout)
+                }
+            }
         }
         return true
     }

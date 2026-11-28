@@ -676,12 +676,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     AnyView(planCanvasWithActions)
                 }
             }
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english: "New training plan",
-                    norwegian: "Ny treningsplan"
-                )
-            )
+            .navigationTitle(isEditingExisting
+                ? ATHLTHLocalization.choose(english: "Edit training plan", norwegian: "Rediger treningsplan")
+                : ATHLTHLocalization.choose(english: "New training plan", norwegian: "Ny treningsplan"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(step == .source || step == .mode || step == .goal ||
                      step == .goalDetails || step == .basics || step == .approach ||
@@ -6670,7 +6667,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
             if let conflict = conflictingPlan, approvedPlanReplacementID != conflict.id {
                 if isEditingExisting {
-                    Text(ATHLTHLocalization.choose(english: "Choose dates that do not overlap another plan.", norwegian: "Velg datoer som ikke overlapper en annen plan."))
+                    Text(ATHLTHLocalization.choose(english: "Choose dates that do not overlap another plan: ", norwegian: "Velg datoer som ikke overlapper en annen plan: ") + conflict.title)
                         .font(.caption).foregroundStyle(.secondary)
                 } else { conflictCard(conflict) }
             }
@@ -7377,7 +7374,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var resolvedEndDate: Date {
-        Calendar.current.date(
+        if let editingPlan, let end = editingPlan.endDate,
+           weekCount == editingPlan.weeks.count,
+           Calendar.current.isDate(startDate, inSameDayAs: originalEditAnchor) { return end }
+        return Calendar.current.date(
             byAdding: .day,
             value:
                 max(
