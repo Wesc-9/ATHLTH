@@ -111,6 +111,11 @@ jobs:
 
   ipad-smoke:
     needs: resolve-smoke-app
+    name: iPad ${{ matrix.size }}-inch smoke
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [11, 13]
     runs-on: xcode-27
     # Independent iPad launch check using a universal app from the same SHA.
     # If no shareable artifact exists, build locally as before.
@@ -207,20 +212,17 @@ jobs:
             build
 
       - name: Launch onboarding and all main tabs on iPad
-        # The 11- and 13-inch layouts are already independently exercised
-        # after full XCTest by Build ATHLTH. This independent smoke job
-        # checks all 12 screens on 11-inch without reusing a tired runner
-        # for a second 13-inch simulator (which timed out in two CI runs).
+        # Each size runs independently, on its own runner, using the same SHA.
         shell: bash
         env:
-          ATHLTH_IPAD_SMOKE_SIZE: "11"
+          ATHLTH_IPAD_SMOKE_SIZE: "${{ matrix.size }}"
         run: bash scripts/run_ipad_smoke.sh
 
       - name: Upload iPad smoke screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-ipad-smoke-screenshots
+          name: athlth-ipad-smoke-screenshots-${{ matrix.size }}
           path: ${{ runner.temp }}/athlth-ipad-*.png
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7

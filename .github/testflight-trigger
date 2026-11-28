@@ -383,3 +383,5 @@ ATHLTH 3.0.7 — user-authorized overnight TestFlight upload 2026-11-28. Source 
 ATHLTH 3.0.7 — authorized retry 2026-11-28 after verified Swift compile errors: NSString map cache key and recorder-owned strength coach readout (3d2b14de, 71acac37). Preserve all exact-commit release gates and signing; no stale upload or bypass.
 
 ATHLTH 3.0.7 — authorized retry 2026-11-28 after advanced plan layout XCTest initializer correction at beb20c0fecf686d48692f8619b4104c4f4a4eb43. Both manual and coach modes and all three phone widths remain tested; keep all exact-commit release gates, signed archive, Apple upload verification and approved artwork. No version bump or bypass.
+
+ATHLTH 3.0.7 — authorized TestFlight retry after fresh hybrid iPhone simulator recovery and corrected exact-commit iPad 11/13 independent matrix and screenshot gate. All five release workflows remain required; no XCTest exclusions, version bump, signing changes, or rejected exercise artwork.

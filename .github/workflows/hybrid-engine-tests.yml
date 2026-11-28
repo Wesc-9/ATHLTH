@@ -277,44 +277,79 @@ jobs:
         run: |
           set -euo pipefail
           DEVICE_MATRIX="$RUNNER_TEMP/athlth-test-simulators.txt"
-          xcrun simctl list devices available -j \
-            | python3 scripts/select_iphone_simulators.py > "$DEVICE_MATRIX"
+          DEVICE_JSON="$RUNNER_TEMP/athlth-test-registered-devices.json"
+          xcrun simctl list devices available -j > "$DEVICE_JSON"
+          python3 scripts/select_iphone_simulators.py < "$DEVICE_JSON" > "$DEVICE_MATRIX"
           test -s "$DEVICE_MATRIX"
-          # Prefer the first matching registered iPhone, but do not tie the
-          # entire required XCTest suite to one broken runner-owned device.
-          # Every candidate must pass a real boot and launchd probe. Only
-          # simulator startup may retry; no failed XCTest is ever skipped.
+          # Create a job-owned device using an actually registered runtime/type
+          # pair; never reuse a pre-existing, potentially wedged simulator.
+          python3 - "$DEVICE_JSON" "$DEVICE_MATRIX" <<'PY' > "$RUNNER_TEMP/athlth-test-device-types.txt"
+          import json, pathlib, sys
+          devices = json.loads(pathlib.Path(sys.argv[1]).read_text())["devices"]
+          pairs = {
+              d["udid"]: (runtime, d.get("deviceTypeIdentifier"))
+              for runtime, entries in devices.items() for d in entries
+              if d.get("udid")
+          }
+          for row in pathlib.Path(sys.argv[2]).read_text().splitlines():
+              _, udid, label = row.split("|", 2)
+              runtime, device_type = pairs[udid]
+              if not device_type:
+                  raise SystemExit(f"Missing device type for registered iPhone {label}")
+              print(f"{runtime}|{device_type}|{label}")
+          PY
+          test -s "$RUNNER_TEMP/athlth-test-device-types.txt"
+          UDID=""
+          cleanup_simulator() {
+            if [ -n "$UDID" ]; then
+              perl -e 'alarm shift; exec @ARGV' 45 xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
+              perl -e 'alarm shift; exec @ARGV' 45 xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
+              UDID=""
+            fi
+          }
+          trap cleanup_simulator EXIT
           simulator_ready=0
-          while IFS= read -r UDID; do
-            test -n "$UDID" || continue
-            echo "Checking hybrid XCTest simulator $UDID"
+          while IFS='|' read -r runtime device_type label; do
             for attempt in 1 2 3; do
-            echo "::group::Simulator startup attempt $attempt/3"
-            xcrun simctl shutdown "$UDID" 2>/dev/null || true
-            if [ "$attempt" -gt 1 ]; then
-              xcrun simctl shutdown all 2>/dev/null || true
-              xcrun simctl delete unavailable 2>/dev/null || true
-              killall -9 Simulator 2>/dev/null || true
-              killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
-              sleep 8
-            fi
-            if perl -e 'alarm shift; exec @ARGV' 90 xcrun simctl boot "$UDID" &&
-               perl -e 'alarm shift; exec @ARGV' 150 xcrun simctl bootstatus "$UDID" -b &&
-               perl -e 'alarm shift; exec @ARGV' 30 xcrun simctl spawn "$UDID" launchctl list >/dev/null; then
-              simulator_ready=1
+              echo "::group::Fresh hybrid simulator: $label, attempt $attempt/3"
+              cleanup_simulator
+              if UDID=$(perl -e 'alarm shift; exec @ARGV' 60 xcrun simctl create "ATHLTH-hybrid-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$attempt" "$device_type" "$runtime"); then
+                if perl -e 'alarm shift; exec @ARGV' 90 xcrun simctl boot "$UDID"; then
+                  # bootstatus may stall on a hosted runner even after launchd
+                  # is responding. Require both Booted state and live services.
+                  if ! perl -e 'alarm shift; exec @ARGV' 150 xcrun simctl bootstatus "$UDID" -b; then
+                    echo "::warning::bootstatus stalled; checking actual device state and services."
+                  fi
+                  for probe in 1 2 3; do
+                    if xcrun simctl list devices booted -j | python3 -c 'import json,sys; target=sys.argv[1]; sys.exit(0 if any(d.get("udid")==target and d.get("state")=="Booted" for group in json.load(sys.stdin)["devices"].values() for d in group) else 1)' "$UDID" &&
+                       perl -e 'alarm shift; exec @ARGV' 45 xcrun simctl spawn "$UDID" launchctl list >/dev/null; then
+                      simulator_ready=1
+                      break
+                    fi
+                    sleep 5
+                  done
+                fi
+              else
+                UDID=""
+              fi
+              if [ "$simulator_ready" -eq 1 ]; then
+                echo "::notice::Fresh simulator ready: $UDID"
+                echo "::endgroup::"
+                break
+              fi
+              echo "::warning::Simulator infrastructure failure before XCTest; discarding this device."
+              perl -e 'alarm shift; exec @ARGV' 25 xcrun simctl list devices 2>&1 | tail -60 || true
               echo "::endgroup::"
-              break
-            fi
-              echo "::warning::CoreSimulator startup failed on attempt $attempt; collecting diagnostics and retrying."
-              xcrun simctl list devices 2>&1 | tail -60 || true
-              echo "::endgroup::"
+              cleanup_simulator
             done
             if [ "$simulator_ready" -eq 1 ]; then break; fi
-          done < <(cut -d'|' -f2 "$DEVICE_MATRIX" | awk '!seen[$0]++')
+          done < "$RUNNER_TEMP/athlth-test-device-types.txt"
           if [ "$simulator_ready" -ne 1 ]; then
-            echo "::error::No registered iPhone simulator survived bounded startup recovery; XCTest was not executed."
+            echo "::error::SIMULATOR_STARTUP_FAILURE: no fresh compatible iPhone simulator became ready; XCTest was not executed."
             exit 1
           fi
+          # Run the complete targeted suite exactly once on the ready device.
+          # A compile or XCTest failure must fail the job, never be retried as startup.
           xcodebuild \
             -project ATHLTH.xcodeproj \
             -scheme ATHLTH \

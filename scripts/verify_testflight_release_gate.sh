@@ -75,41 +75,82 @@ if branch["object"]["sha"] != sha:
     print("::error::Release branch advanced during acceptance checks.")
     sys.exit(1)
 
-build_id = selected["Build ATHLTH"]["id"]
-jobs = []
-for page in range(1, 6):
-    batch = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100&page={page}")["jobs"]
-    jobs.extend(batch)
-    if len(batch) < 100:
-        break
-else:
-    print("::error::Build job list exceeds verification limit.")
-    sys.exit(1)
-for name in (["build"] if os.environ["GITHUB_REF_NAME"] in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1", "release/v3.0.2", "release/v3.0.3", "release/v3.0.4", "release/v3.0.5", "release/v3.0.6") else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
-    matches = [job for job in jobs if job["name"] == name]
-    if len(matches) != 1 or matches[0]["conclusion"] != "success":
-        print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
+if os.environ["GITHUB_REF_NAME"] == "release/v3.0.7":
+    build_id = selected["Build ATHLTH"]["id"]
+
+    def paged(run_id, resource):
+        items = []
+        for page in range(1, 6):
+            batch = api(f"repos/{repo}/actions/runs/{run_id}/{resource}?per_page=100&page={page}")[resource]
+            items.extend(batch)
+            if len(batch) < 100:
+                return items
+        print(f"::error::Incomplete {resource} verification for {run_id}")
         sys.exit(1)
 
-artifacts = []
-for page in range(1, 6):
-    batch = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100&page={page}")["artifacts"]
-    artifacts.extend(batch)
-    if len(batch) < 100:
-        break
-else:
-    print("::error::Build artifact list exceeds verification limit.")
-    sys.exit(1)
-for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] not in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1", "release/v3.0.2", "release/v3.0.3", "release/v3.0.4", "release/v3.0.5", "release/v3.0.6") else ()):
-    name = f"athlth-ipad-smoke-screenshots-{size}"
-    matched = [
-        artifact for artifact in artifacts
-        if artifact["name"] == name and not artifact["expired"]
-        and artifact["size_in_bytes"] >= 10_000
-    ]
-    if not matched:
-        print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
+    def verify_job(run_id, jobs, name):
+        matches = [job for job in jobs if job["name"] == name]
+        if len(matches) != 1 or matches[0]["conclusion"] != "success":
+            print(f"::error::Required job not verified: {name} in {run_id}")
+            sys.exit(1)
+
+    verify_job(build_id, paged(build_id, "jobs"), "build")
+    ipad_id = selected["ATHLTH iPad Compatibility Smoke Test"]["id"]
+    ipad_jobs = paged(ipad_id, "jobs")
+    ipad_artifacts = paged(ipad_id, "artifacts")
+    for size in (11, 13):
+        verify_job(ipad_id, ipad_jobs, f"iPad {size}-inch smoke")
+        name = f"athlth-ipad-smoke-screenshots-{size}"
+        matched = [
+            artifact for artifact in ipad_artifacts
+            if artifact["name"] == name and not artifact["expired"]
+            and artifact["size_in_bytes"] >= 10_000
+        ]
+        if len(matched) != 1:
+            print(f"::error::Missing or ambiguous verified iPad {size}-inch screenshot artifact in {ipad_id}")
+            sys.exit(1)
+
+    # Recheck HEAD after the job and artifact verification too.
+    branch = api(f"repos/{repo}/git/ref/heads/{os.environ['GITHUB_REF_NAME']}")
+    if branch["object"]["sha"] != sha:
+        print("::error::Release branch advanced during job verification.")
         sys.exit(1)
+else:
+    build_id = selected["Build ATHLTH"]["id"]
+    jobs = []
+    for page in range(1, 6):
+        batch = api(f"repos/{repo}/actions/runs/{build_id}/jobs?per_page=100&page={page}")["jobs"]
+        jobs.extend(batch)
+        if len(batch) < 100:
+            break
+    else:
+        print("::error::Build job list exceeds verification limit.")
+        sys.exit(1)
+    for name in (["build"] if os.environ["GITHUB_REF_NAME"] in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1", "release/v3.0.2", "release/v3.0.3", "release/v3.0.4", "release/v3.0.5", "release/v3.0.6") else ["build", "iPad 11-inch smoke", "iPad 13-inch smoke"]):
+        matches = [job for job in jobs if job["name"] == name]
+        if len(matches) != 1 or matches[0]["conclusion"] != "success":
+            print(f"::error::Required iPad/iOS job not verified: {name} in {build_id}")
+            sys.exit(1)
+
+    artifacts = []
+    for page in range(1, 6):
+        batch = api(f"repos/{repo}/actions/runs/{build_id}/artifacts?per_page=100&page={page}")["artifacts"]
+        artifacts.extend(batch)
+        if len(batch) < 100:
+            break
+    else:
+        print("::error::Build artifact list exceeds verification limit.")
+        sys.exit(1)
+    for size in ((11, 13) if os.environ["GITHUB_REF_NAME"] not in ("release/v2.2.6", "release/v2.2.7", "release/v2.2.8", "release/v2.2.9", "release/v2.3.0", "release/v3.0.0", "release/v3.0.1", "release/v3.0.2", "release/v3.0.3", "release/v3.0.4", "release/v3.0.5", "release/v3.0.6") else ()):
+        name = f"athlth-ipad-smoke-screenshots-{size}"
+        matched = [
+            artifact for artifact in artifacts
+            if artifact["name"] == name and not artifact["expired"]
+            and artifact["size_in_bytes"] >= 10_000
+        ]
+        if not matched:
+            print(f"::error::Missing verified iPad {size}-inch screenshot artifact")
+            sys.exit(1)
 
 print(f"All five workflows and branch-specific build jobs verified for {sha}.")
 sys.exit(0)
