@@ -49,6 +49,33 @@ final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
         XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(for: workout))
     }
 
+    func testCustomWalkingPayloadRetainsOrderedPhases() {
+        let routeID = UUID()
+        var first = ATHLTHQuickRunTimelineAdapter.routeBlock(
+            routeID: routeID, title: "Warm-up", distanceMeters: 1000, phase: .warmup)
+        first.cardioActivity = .walking
+        var second = WorkoutTemplateBlock(sequence: 2, kind: .run, title: "Brisk walk",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 600, targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main)
+        second.cardioActivity = .walking
+        second.isIndoor = false
+        var workout = PlannedSession(id: UUID(), title: "Custom walk", kind: .walking,
+            scheduledStart: nil, durationMinutes: nil, targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil, routeID: routeID, exercises: [], notes: nil)
+        workout.workoutBlocks = [first, second]
+        var configuration = WalkQuickStartConfiguration(
+            captureDevice: .iPhone, audioCoach: .disabled, autoPauseEnabled: false,
+            spotifyPlaylist: nil, spotifyAutoplay: false, friends: [], socialMode: .physical,
+            gearIDs: [])
+        configuration.advancedWorkout = workout
+        let payload = configuration.trainTogetherInvitePayload
+        XCTAssertEqual(payload.workout.id, workout.id)
+        XCTAssertEqual(payload.workout.routeID, routeID)
+        XCTAssertEqual(payload.workout.resolvedWorkoutBlocks.map(\.resolvedPhase), [.warmup, .main])
+        XCTAssertEqual(payload.workout.resolvedWorkoutBlocks.last?.durationSeconds, 600)
+    }
+
     func testStrengthNeverOffersWalkingCompanion() {
         for iPad in [false, true] {
             let tools = ATHLTHQuickStartActivity.strength.availableTools(
