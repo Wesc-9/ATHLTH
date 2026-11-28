@@ -5079,10 +5079,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func advancedWeekItems(for week: Int) -> [ATHLTHAdvancedWeekBuilderView.Day] {
         (1...7).map { weekday in
             let edit = weekDayEdits[weekDayKey(weekday, weekIndex: week)]
-            let primary = edit?.detailedWorkout ??
+            let primary = edit?.removeAllWorkouts == true ? nil : (edit?.detailedWorkout ??
                 (edit?.removeTemplateDetail == true
-                    ? nil : structuredWorkoutsByDay[weekday])
-            let extras = edit?.additionalDetailedWorkouts ?? []
+                    ? nil : structuredWorkoutsByDay[weekday]))
+            let extras = edit?.removeAllWorkouts == true ? [] : (edit?.additionalDetailedWorkouts ?? [])
             let planned = selectedDays.contains(weekday) ||
                 edit?.isRestDay == false ||
                 edit?.kind != nil || edit?.title != nil ||
@@ -5110,7 +5110,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             for weekday in 1...7 {
                 let fromKey = weekDayKey(weekday, weekIndex: source)
                 let toKey = weekDayKey(weekday, weekIndex: week)
-                if !overwrite && weekDayEdits[toKey] != nil {
+                if !overwrite && (weekDayEdits[toKey] != nil || structuredWorkoutsByDay[weekday] != nil) {
                     // Protect each individually edited destination day.
                     continue
                 }
@@ -6368,8 +6368,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     ),
                 title:
                     ATHLTHLocalization.choose(
-                        english: "Ready to build",
-                        norwegian: "Klar til å bygge"
+                        english: "Plan summary",
+                        norwegian: "Sammendrag av treningsplanen"
                     ),
                 subtitle:
                     ATHLTHLocalization.choose(
@@ -6615,12 +6615,49 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                     in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        if !selectingCoachDays {
+                            Button { appendSummaryQuickWorkout("walking", day: day.weekday, week: week) } label: {
+                                Label(ATHLTHLocalization.choose(english: "Add walk", norwegian: "Legg til gåøkt"), systemImage: "figure.walk")
+                            }
+                            Button { appendSummaryQuickWorkout("running", day: day.weekday, week: week) } label: {
+                                Label(ATHLTHLocalization.choose(english: "Add run", norwegian: "Legg til løpeøkt"), systemImage: "figure.run")
+                            }
+                            Button { appendSummaryQuickWorkout("strength", day: day.weekday, week: week) } label: {
+                                Label(ATHLTHLocalization.choose(english: "Add strength workout", norwegian: "Legg til styrkeøkt"), systemImage: "dumbbell")
+                            }
+                        }
+                    }
                 }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    private func appendSummaryQuickWorkout(_ choice: String, day: Int, week: Int) {
+        guard let block = guidedQuickBlock(for: choice) else { return }
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: block.title, kind: workoutKind(for: [block]),
+            durationMinutes: max(5, Int((block.durationSeconds ?? 2700) / 60)),
+            routeID: nil, blocks: [block]
+        )
+        guard blueprint.isValid else { return }
+        let key = weekDayKey(day, weekIndex: week)
+        let existing = advancedWeekItems(for: week).first { $0.weekday == day }?.workouts ?? []
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        let all = existing + [blueprint]
+        edit.detailedWorkout = all[0]
+        edit.additionalDetailedWorkouts = Array(all.dropFirst())
+        edit.title = all[0].title
+        edit.kind = all[0].kind
+        edit.durationMinutes = all[0].durationMinutes
+        edit.isRestDay = false
+        edit.removeAllWorkouts = false
+        edit.removeTemplateDetail = true
+        weekDayEdits[key] = edit
+        saveResumableDraft()
     }
 
     private var reviewSummaryPanel: some View {
