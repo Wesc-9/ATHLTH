@@ -64,6 +64,20 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
                        "A suggestion never completes a day.")
     }
 
+    func testPlanDragIdentityRejectsForeignDraftAndInvalidPayload() throws {
+        let id = UUID()
+        let raw = ATHLTHPlanDragPayload.encode(scope: "current", key: 9, workout: 1, block: id)
+        let decoded = try XCTUnwrap(ATHLTHPlanDragPayload.decode(raw, scope: "current"))
+        XCTAssertEqual(decoded.dateKey, 9)
+        XCTAssertEqual(decoded.workout, 1)
+        XCTAssertEqual(decoded.block, id)
+        XCTAssertNil(ATHLTHPlanDragPayload.decode(raw, scope: "another"))
+        XCTAssertNil(ATHLTHPlanDragPayload.decode("current|9|-1|-", scope: "current"))
+        XCTAssertNil(ATHLTHPlanDragPayload.decode("current|9|1|not-an-id", scope: "current"))
+        let whole = ATHLTHPlanDragPayload.encode(scope: "current", key: 2, workout: 0)
+        XCTAssertNil(try XCTUnwrap(ATHLTHPlanDragPayload.decode(whole, scope: "current")).block)
+    }
+
     func testGuidedDayRequiresExplicitRestOrValidWorkout() {
         XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(nil))
 
