@@ -1534,7 +1534,23 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
 
+    // Original artwork is indexed once by immutable source ID, never a translated name.
+    private static let originalArtworkIndex: [String: URL] = {
+        guard let root = Bundle.main.url(forResource: "ATHLTHExerciseArtwork", withExtension: "bundle"),
+              let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: files.filter { $0.pathExtension == "webp" }.map { ($0.lastPathComponent, $0) })
+    }()
+
+    static func originalArtworkPair(for sourceID: String, in index: [String: URL]) -> (start: URL, peak: URL)? {
+        guard !sourceID.isEmpty, sourceID.utf8.allSatisfy({
+            (97...122).contains($0) || (48...57).contains($0) || $0 == 45
+        }), let start = index[sourceID + "-start.webp"],
+           let peak = index[sourceID + "-peak.webp"], start != peak else { return nil }
+        return (start, peak)
+    }
+
     private func mapRepDB(_ source: RepDBExercise) -> ExerciseLibraryEntry {
+        let originalArt = Self.originalArtworkPair(for: source.id, in: Self.originalArtworkIndex)
         let startURL = source.images?.flat?.start
             .flatMap { URL(string: $0, relativeTo: imageBaseURL)?.absoluteURL }
         let peakURL = source.images?.flat?.peak
@@ -1542,7 +1558,7 @@ final class ExerciseLibraryStore: ObservableObject {
         let mainURL = source.images?.flat?.main
             .flatMap { URL(string: $0, relativeTo: imageBaseURL)?.absoluteURL }
 
-        let imageURL = startURL ?? mainURL ?? peakURL
+        let imageURL = originalArt?.start ?? startURL ?? mainURL ?? peakURL
         let equipment = source.equipment.map { [$0.humanizedRepDB] } ?? []
 
         let primaryMuscles =
@@ -1574,11 +1590,11 @@ final class ExerciseLibraryStore: ObservableObject {
             difficulty: source.difficulty?.humanizedRepDB,
             bodyPart: source.bodyPart?.humanizedRepDB,
             imageStartURL:
-                bundledRepDBImageURL(source.images?.flat?.start)
+                originalArt?.start ?? bundledRepDBImageURL(source.images?.flat?.start)
                 ?? bundledRepDBImageURL(source.images?.flat?.main)
                 ?? startURL ?? mainURL,
             imagePeakURL:
-                bundledRepDBImageURL(source.images?.flat?.peak)
+                originalArt?.peak ?? bundledRepDBImageURL(source.images?.flat?.peak)
                 ?? peakURL
         )
     }

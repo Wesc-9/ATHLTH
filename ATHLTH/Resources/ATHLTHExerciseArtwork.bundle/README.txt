@@ -1,0 +1,1 @@
+Original ATHLTH exercise artwork. Name approved pairs <exact-repdb-id>-start.webp and <exact-repdb-id>-peak.webp. Square 832 x 832 WebP, 20-30 kB target, 40 kB preferred ceiling. Warm cream, black and white ATHLTH clothing. Verify technique and equipment before adding. Both files must exist before replacing legacy artwork. Keep exercise IDs and RepDB data attribution.

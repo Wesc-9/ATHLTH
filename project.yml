@@ -30,13 +30,18 @@ targets:
       - path: ATHLTH
         excludes:
           - Resources/RepDBOffline.bundle/**
+          - Resources/ATHLTHExerciseArtwork.bundle/**
           - Resources/athlth-weighted-plank-front.webp
           - Resources/athlth-weighted-plank-side.webp
       - path: ATHLTH/Resources/athlth-weighted-plank-front.webp
         buildPhase: resources
       - path: ATHLTH/Resources/athlth-weighted-plank-side.webp
         buildPhase: resources
-      # A folder reference copies the complete licensed snapshot as one resource.
+      # Original exercise artwork uses a single folder reference.
+      - path: ATHLTH/Resources/ATHLTHExerciseArtwork.bundle
+        type: folder
+        buildPhase: resources
+      # A folder reference copies the licensed snapshot and uncovered images.
       # The files are created by prepare_repdb_offline.py and never committed.
       - path: ATHLTH/Resources/RepDBOffline.bundle
         type: folder

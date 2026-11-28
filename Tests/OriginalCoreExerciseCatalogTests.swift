@@ -77,6 +77,19 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testOriginalArtworkRequiresCompleteExactIDPair() {
+        let start = URL(fileURLWithPath: "/fixture/bench-press-start.webp")
+        let peak = URL(fileURLWithPath: "/fixture/bench-press-peak.webp")
+        let complete = ["bench-press-start.webp": start, "bench-press-peak.webp": peak]
+        let pair = ExerciseLibraryStore.originalArtworkPair(for: "bench-press", in: complete)
+        XCTAssertEqual(pair?.start, start)
+        XCTAssertEqual(pair?.peak, peak)
+        XCTAssertNil(ExerciseLibraryStore.originalArtworkPair(for: "bench-press", in: ["bench-press-start.webp": start]))
+        XCTAssertNil(ExerciseLibraryStore.originalArtworkPair(for: "incline-bench-press", in: complete))
+        XCTAssertNil(ExerciseLibraryStore.originalArtworkPair(for: "../bench-press", in: complete))
+    }
+
+    @MainActor
     func testWeightedPlankIsDistinctLocalizedAndHasBundledArtwork() throws {
         let library = ExerciseLibraryStore()
         let slug = "athlth-native-weighted-plank"

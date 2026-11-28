@@ -12,6 +12,7 @@ import io
 import json
 import pathlib
 import posixpath
+import re
 import shutil
 import sys
 import tempfile
@@ -20,6 +21,7 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEST = ROOT / "ATHLTH" / "Resources" / "RepDBOffline.bundle"
+ORIGINALS = ROOT / "ATHLTH" / "Resources" / "ATHLTHExerciseArtwork.bundle"
 URLS = (
     "https://cdn.repdb.co/repdb-assets/site/repdb-free.zip",
     "https://codeload.github.com/RepDB/exercise-dataset/zip/refs/heads/main",
@@ -48,7 +50,21 @@ def _safe_image_path(value: object) -> str | None:
     return path
 
 
-def _prepare_archive(data: bytes) -> tuple[bytes, dict[str, bytes], int]:
+def _has_original_pair(source_id: str, root: pathlib.Path) -> bool:
+    if not isinstance(source_id, str) or not re.fullmatch(r"[a-z0-9-]+", source_id):
+        return False
+    for position in ("start", "peak"):
+        path = root / f"{source_id}-{position}.webp"
+        if not path.is_file():
+            return False
+        data = path.read_bytes()
+        if not (20 <= len(data) <= 100_000 and data[:4] == b"RIFF" and
+                data[8:12] == b"WEBP" and int.from_bytes(data[4:8], "little") + 8 == len(data)):
+            raise ValueError(f"invalid original WebP: {path.name}")
+    return True
+
+
+def _prepare_archive(data: bytes, originals: pathlib.Path = ORIGINALS) -> tuple[bytes, dict[str, bytes], int]:
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         names = set(archive.namelist())
         json_candidates = sorted(
@@ -67,14 +83,18 @@ def _prepare_archive(data: bytes) -> tuple[bytes, dict[str, bytes], int]:
                 if len(set(ids)) != len(ids):
                     raise ValueError("duplicate exercise identifiers")
                 prefix = json_name[:-len("exercises.json")]
+                all_assets = set()
                 assets = set()
                 for exercise in exercises:
+                    covered = _has_original_pair(exercise["id"], originals)
                     flat = (exercise.get("images") or {}).get("flat") or {}
                     for key in ("start", "peak", "main"):
                         image_path = _safe_image_path(flat.get(key))
                         if image_path:
-                            assets.add(image_path)
-                if len(assets) < len(exercises) // 2:
+                            all_assets.add(image_path)
+                            if not covered:
+                                assets.add(image_path)
+                if len(all_assets) < len(exercises) // 2:
                     raise ValueError("missing expected exercise art")
                 absent = [asset for asset in assets if prefix + asset not in names]
                 if absent:
