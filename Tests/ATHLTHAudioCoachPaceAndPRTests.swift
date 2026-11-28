@@ -98,6 +98,20 @@ final class ATHLTHAudioCoachPaceAndPRTests: XCTestCase {
         XCTAssertFalse(ATHLTHAudioCoachRule.Metric.personalRecord.requiresInternet)
     }
 
+    func testStrengthProgressNeedsActualComparableEvidence() {
+        let rule = ATHLTHAudioCoachRule(trigger: .strengthProgressConfirmed, metric: .motivation, interval: 1)
+        var ctx = ATHLTHCoachReadoutContext()
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 20, journal: &journal).isEmpty)
+        ctx.verifiedStrengthProgress = .init(exerciseName: "Knebøy", currentWeightKg: 80,
+            previousWeightKg: 80, repetitions: 8, completedSetCount: 3, confirmedAt: Date())
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 21, journal: &journal).isEmpty)
+        ctx.verifiedStrengthProgress = .init(exerciseName: "Knebøy", currentWeightKg: 85,
+            previousWeightKg: 80, repetitions: 8, completedSetCount: 3, confirmedAt: Date())
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 22, journal: &journal).count, 1)
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 23, journal: &journal).isEmpty)
+    }
+
     func testCadenceRequiresFreshMeasuredSensorData() {
         let rule = ATHLTHAudioCoachRule(trigger: .cadenceBelow, metric: .motivation, interval: 160)
         var ctx = ATHLTHCoachReadoutContext()

@@ -78,7 +78,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: .progress
         case .ghostAhead, .ghostBehind: .ghost
         case .cadenceBelow, .cadenceAbove: .cadence
-        case .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: .strength
+        case .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding, .strengthProgressConfirmed: .strength
         case .nearFinishTime: .finish
         case .nearFinishDistance: .finish
         case .slowerThanPreviousWorkout: .history
@@ -351,6 +351,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 choice(.lastExerciseSet)
                 choice(.lastStrengthSet)
                 choice(.strengthRestEnding)
+                choice(.strengthProgressConfirmed)
                 if trigger == .strengthSetCompleted {
                     Stepper(tr("Every", "Hvert") + " \(interval) " + tr("completed sets", "fullførte sett"),
                             value: $interval, in: 1...10)

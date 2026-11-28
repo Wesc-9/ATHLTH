@@ -216,8 +216,12 @@ final class StrengthWorkoutStore: ObservableObject {
         didSet {
             personalRecordMemo.clear()
             repRecordMemo.clear()
+            coachProgressMemoKey = nil
+            coachProgressMemo = nil
         }
     }
+    private var coachProgressMemoKey: String?
+    private var coachProgressMemo: ATHLTHCoachVerifiedStrengthProgress?
     private let personalRecordMemo = ATHLTHProjectionMemo<String, [StrengthPersonalRecord]>()
     private let repRecordMemo = ATHLTHProjectionMemo<String, [StrengthRepPersonalRecord]>()
     /// Completed workouts imported from the signed-in account are merged
@@ -2725,6 +2729,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
         snapshot.requiresCompanionExecutionOrder = workout.requiresCompanionExecutionOrder
         snapshot.nextExecutionLabel = nextExecutionLabel
+        snapshot.coachVerifiedStrengthProgress = verifiedCoachStrengthProgress(workout)
         // The Watch may show/adjust plates only when the iPhone knows this
         // exercise uses a bar. Nil intentionally preserves legacy total entry
         // for older/offline Watch-created sessions.
@@ -2736,6 +2741,55 @@ final class StrengthWorkoutStore: ObservableObject {
             return item.barWeightKilograms ?? suggestedBarWeight(for: item)
         }
         return snapshot
+    }
+
+    /// Only evaluate historical evidence when a progression rule was
+    /// explicitly enabled. Cache per recorded result, not per UI tick.
+    private func verifiedCoachStrengthProgress(_ workout: StrengthWorkoutLog) -> ATHLTHCoachVerifiedStrengthProgress? {
+        guard workout.advancedConfiguration?.audioCoach.enabled == true,
+              workout.advancedConfiguration?.audioCoach.customStrengthEventRules?.contains(where: {
+                  $0.trigger == .strengthProgressConfirmed
+              }) == true else { return nil }
+        let now = Date()
+        var latest: (exercise: StrengthExerciseLog, set: StrengthSetLog, date: Date)?
+        for exercise in workout.exercises where exercise.isEmbeddedRunningInterval != true {
+            for set in exercise.sets {
+                guard set.isCompleted, let date = set.completedAt,
+                      ATHLTHCoachSensorFreshness.isFresh(sampledAt: date, maximumAge: 20, now: now),
+                      latest.map({ date > $0.date }) ?? true else { continue }
+                latest = (exercise, set, date)
+            }
+        }
+        guard let latest,
+              latest.exercise.groupStyle != .dropSet,
+              latest.exercise.exercise.coachLoadBasis != nil,
+              ATHLTHCoachStrengthComparableHistory.isComparableWorkingSet(latest.set),
+              let weight = latest.set.completedWeightKilograms,
+              let reps = latest.set.resolvedCompletedReps else { return nil }
+        let key = workout.id.uuidString + latest.set.id.uuidString + "|\(weight)|\(reps)"
+        if coachProgressMemoKey == key {
+            return coachProgressMemo.flatMap { $0.isValid(now: now) ? $0 : nil }
+        }
+        coachProgressMemoKey = key
+        coachProgressMemo = nil
+        guard let previous = ATHLTHCoachStrengthComparableHistory.sessions(
+            for: latest.exercise, in: workoutHistory, now: workout.startedAt, limit: 1
+        ).first, !previous.isAmbiguous,
+              previous.exercise.groupStyle != .dropSet else { return nil }
+        let previousWeight = previous.exercise.sets.filter {
+            ATHLTHCoachStrengthComparableHistory.isComparableWorkingSet($0) &&
+                $0.resolvedCompletedReps == reps
+        }.compactMap(\.completedWeightKilograms).max()
+        guard let previousWeight else { return nil }
+        let evidence = ATHLTHCoachVerifiedStrengthProgress(
+            exerciseName: latest.exercise.exercise.displayName,
+            currentWeightKg: weight, previousWeightKg: previousWeight,
+            repetitions: reps, completedSetCount: workout.totalCompletedSets,
+            confirmedAt: latest.date
+        )
+        guard evidence.isValid(now: now) else { return nil }
+        coachProgressMemo = evidence
+        return evidence
     }
 
     @discardableResult

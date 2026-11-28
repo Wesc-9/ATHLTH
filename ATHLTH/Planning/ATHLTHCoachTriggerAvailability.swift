@@ -148,7 +148,7 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
                 (trigger == .distance || hasDistanceGoal)
         case .nearFinishTime, .workoutTimeProgress: return hasTimeGoal
         case .workoutDistanceProgress: return supportsDistance && hasDistanceGoal
-        case .stepTimeProgress, .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: return hasStructuredSteps
+        case .stepTimeProgress, .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding, .strengthProgressConfirmed: return hasStructuredSteps
         case .ghostAhead, .ghostBehind: return supportsDistance
         case .elevationGain, .uphillDetected: return supportsOutdoorElevation
         case .paceFasterOverall, .paceFasterLastKilometer:

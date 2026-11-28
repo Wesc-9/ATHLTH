@@ -128,7 +128,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case workoutTimeProgress, workoutDistanceProgress, stepTimeProgress
         case ghostAhead, ghostBehind, lastStrengthSet
         case cadenceBelow, cadenceAbove
-        case strengthSetCompleted, lastExerciseSet, strengthRestEnding
+        case strengthSetCompleted, lastExerciseSet, strengthRestEnding, strengthProgressConfirmed
         case slowerThanPreviousWorkout
         case elevationGain, uphillDetected
         case heartRateAbove, heartRateBelow, zoneEnter, zoneExit
@@ -155,7 +155,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                  .uphillDetected, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget,
                  .slowerThanPreviousWorkout, .workoutTimeProgress, .workoutDistanceProgress,
                  .stepTimeProgress, .ghostAhead, .ghostBehind, .lastStrengthSet,
-                 .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding,
+                 .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding, .strengthProgressConfirmed,
                  .cadenceBelow, .cadenceAbove: return true
             default: return false
             }
@@ -192,7 +192,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var isProgress: Bool { self == .workoutTimeProgress || self == .workoutDistanceProgress || self == .stepTimeProgress }
         var isStrengthEvent: Bool {
             self == .lastStrengthSet || self == .strengthSetCompleted ||
-                self == .lastExerciseSet || self == .strengthRestEnding
+                self == .lastExerciseSet || self == .strengthRestEnding || self == .strengthProgressConfirmed
         }
         var needsStructuredStep: Bool {
             !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
@@ -272,6 +272,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .strengthSetCompleted: return tr("Every completed set(s)", "Hvert fullførte sett")
             case .lastExerciseSet: return tr("Last set of exercise", "Siste sett i øvelsen")
             case .strengthRestEnding: return tr("Before rest ends", "Før hvilepausen er ferdig")
+            case .strengthProgressConfirmed: return tr("Verified strength progress", "Bekreftet styrkefremgang")
             case .elevationGain: return tr("Elevation gained", "Høydemeter")
             case .uphillDetected: return tr("When climbing", "Når du løper oppover")
             case .zoneBelow: return tr("Below heart-rate zone", "Under pulssone")
@@ -778,6 +779,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 ? "Husk å ta en slurk vann når det passer."
                 : "Remember to take a sip of water when convenient."
         case .motivation:
+            if trigger == .strengthProgressConfirmed {
+                guard let evidence = context.verifiedStrengthProgress, evidence.isValid() else { return nil }
+                let kg = evidence.currentWeightKg.formatted(.number.precision(.fractionLength(0...1)))
+                return norwegian ? "Bra jobbet! \(evidence.exerciseName): \(kg) kilo med samme antall repetisjoner som sist, men tyngre."
+                    : "Great work! \(evidence.exerciseName): \(kg) kilograms, heavier than last time for the same repetitions."
+            }
             if trigger.isCadenceCondition {
                 guard let cadence = context.measuredCadenceStepsPerMinute,
                       ATHLTHCoachSensorFreshness.validCadence(cadence, sampledAt: context.cadenceSampleAt) else { return nil }
@@ -1171,6 +1178,9 @@ enum ATHLTHAudioCoachRuleDelivery {
                     guard let index = context.stepIndex, index >= 0 else { continue }
                     milestone = index + 1
                 } else { milestone = 1 }
+            } else if rule.trigger == .strengthProgressConfirmed {
+                guard let evidence = context.verifiedStrengthProgress, evidence.isValid() else { continue }
+                milestone = evidence.completedSetCount
             } else if rule.trigger == .strengthSetCompleted {
                 guard let count = context.completedStrengthSetCount, count > 0,
                       count % rule.validatedInterval == 0 else { continue }
@@ -1765,6 +1775,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var currentSetNumber: Int? = nil
     var remainingSetCount: Int? = nil
     var completedStrengthSetCount: Int? = nil
+    var verifiedStrengthProgress: ATHLTHCoachVerifiedStrengthProgress? = nil
     var isFinalExerciseSet: Bool? = nil
     var strengthRestRemainingSeconds: Double? = nil
     var ghostTimeDifferenceSeconds: Double? = nil
@@ -1860,6 +1871,10 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
         }
         context.remainingSetCount = max(0, snapshot.totalSets - snapshot.completedSets - (snapshot.skippedSets ?? 0))
         context.completedStrengthSetCount = max(0, snapshot.completedSets)
+        if let progress = snapshot.coachVerifiedStrengthProgress,
+           progress.completedSetCount == snapshot.completedSets, progress.isValid() {
+            context.verifiedStrengthProgress = progress
+        }
         if !snapshot.isResting && !snapshot.allExercisesComplete && !snapshot.currentExerciseComplete,
            snapshot.setCount > 0, snapshot.setIndex >= 0 {
             context.isFinalExerciseSet = snapshot.setIndex == snapshot.setCount - 1

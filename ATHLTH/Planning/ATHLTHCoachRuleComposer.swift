@@ -1078,7 +1078,7 @@ struct ATHLTHCoachRuleComposer: View {
                     metrics = [.personalRecord]
                 case .ghostAhead, .ghostBehind:
                     metrics = [.ghostDistanceDifference]
-                case .cadenceBelow, .cadenceAbove:
+                case .cadenceBelow, .cadenceAbove, .strengthProgressConfirmed:
                     metrics = [.motivation]
                 case .lastStrengthSet, .lastExerciseSet, .strengthSetCompleted:
                     metrics = [.remainingSets]

@@ -1849,6 +1849,25 @@ struct WatchTimedStrengthCountdown: Codable, Hashable {
     var isRunning: Bool { resumedAt != nil }
 }
 
+/// Only an actual completed set compared against the previous comparable
+/// recorded session may produce this short-lived, local evidence.
+struct ATHLTHCoachVerifiedStrengthProgress: Codable, Hashable {
+    let exerciseName: String
+    let currentWeightKg: Double
+    let previousWeightKg: Double
+    let repetitions: Int
+    let completedSetCount: Int
+    let confirmedAt: Date
+
+    func isValid(now: Date = Date()) -> Bool {
+        !exerciseName.isEmpty && currentWeightKg.isFinite && previousWeightKg.isFinite &&
+            (0...1500).contains(currentWeightKg) && previousWeightKg > 0 &&
+            currentWeightKg > previousWeightKg + 0.01 && repetitions > 0 &&
+            completedSetCount > 0 &&
+            ATHLTHCoachSensorFreshness.isFresh(sampledAt: confirmedAt, maximumAge: 20, now: now)
+    }
+}
+
 struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var workoutID: UUID
     var title: String
@@ -1901,6 +1920,7 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     // Only compact ordering metadata; no extra polling or duplicated log.
     var requiresCompanionExecutionOrder: Bool? = nil
     var nextExecutionLabel: String? = nil
+    var coachVerifiedStrengthProgress: ATHLTHCoachVerifiedStrengthProgress? = nil
 
     var currentCoachLoadBasisRaw: String? {
         exerciseQueue?.first(where: { $0.index == exerciseIndex })?
