@@ -8,8 +8,8 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
     @Binding var weekCount: Int
     @Binding var varyWeekdays: Bool
 
-    let planningApproach: ATHLTHPlanWeekPlanningApproach?
-    let onChooseApproach: (ATHLTHPlanWeekPlanningApproach) -> Void
+    let buildWithCoach: Bool
+    let onChooseCoach: (Bool) -> Void
     let selectedDays: Set<Int>
     let suggestedName: String
     let onToggleDay: (Int) -> Void
@@ -23,10 +23,10 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
             selectedDays: selectedDays,
             suggestedName: suggestedName,
             advanced: true,
-            planningApproach: planningApproach,
+            buildWithCoach: buildWithCoach,
             varyWeekdays: $varyWeekdays,
             onToggleDay: onToggleDay,
-            onChooseApproach: onChooseApproach,
+            onChooseCoach: onChooseCoach,
             onModeChange: { isAdvanced in
                 if !isAdvanced { onSelectSimple() }
             }
