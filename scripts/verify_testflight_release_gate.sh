@@ -75,7 +75,7 @@ if branch["object"]["sha"] != sha:
     print("::error::Release branch advanced during acceptance checks.")
     sys.exit(1)
 
-if os.environ["GITHUB_REF_NAME"] == "release/v3.0.7":
+if os.environ["GITHUB_REF_NAME"] in ("release/v3.0.7", "release/v3.0.8"):
     build_id = selected["Build ATHLTH"]["id"]
 
     def paged(run_id, resource):
