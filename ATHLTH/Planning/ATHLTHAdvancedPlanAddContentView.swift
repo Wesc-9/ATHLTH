@@ -20,10 +20,13 @@ struct ATHLTHAdvancedPlanAddContentView: View {
 
     let initialKind: Kind
     let phase: WorkoutPhaseKind
+    var onClose: (() -> Void)? = nil
     let onExercise: ([WorkoutTemplateBlock]) -> Void
     let onWorkout: (PlannedSession) -> Void
 
     @State private var kind: Kind = .exercise
+    @State private var didInitializeKind = false
+    @State private var didFinish = false
     @State private var origin: Origin = .all
     @State private var search = ""
     @State private var searchInput = ""
@@ -165,7 +168,11 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                 .padding(15)
             }
             .background(canvas.ignoresSafeArea())
-            .onAppear { kind = initialKind }
+            .onAppear {
+                guard !didInitializeKind else { return }
+                didInitializeKind = true
+                kind = initialKind
+            }
             .onChange(of: kind) { _, _ in
                 searchInput = ""
                 search = ""
@@ -188,7 +195,7 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                    Button { if let onClose { onClose() } else { dismiss() } } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if kind == .exercise {
@@ -204,8 +211,10 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             .navigationDestination(item: $selectedExerciseID) { exerciseID in
                 if let item = exercises.allExercises.first(where: { $0.id == exerciseID }) {
                     ATHLTHAdvancedExerciseConfigurationView(entry: item, phase: phase) { blocks in
+                        guard !didFinish else { return }
+                        didFinish = true
                         onExercise(blocks)
-                        dismiss()
+                        if onClose == nil { dismiss() }
                     }
                 }
             }
@@ -215,7 +224,6 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                     selectedExerciseID = entry.id
                 })
             }
-            .onAppear { kind = initialKind }
             .task {
                 async let a: Void = exercises.refresh()
                 async let b: Void = favorites.refresh()
@@ -404,8 +412,10 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             }
             ForEach(workouts) { item in
                 Button {
+                    guard !didFinish else { return }
+                    didFinish = true
                     onWorkout(item.session)
-                    dismiss()
+                    if onClose == nil { dismiss() }
                 } label: {
                     HStack(spacing: 11) {
                         Image(systemName: item.session.kind.systemImage)

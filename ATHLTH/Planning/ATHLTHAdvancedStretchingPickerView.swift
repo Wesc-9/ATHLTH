@@ -6,6 +6,8 @@ struct ATHLTHAdvancedStretchingPickerView: View {
     @Environment(\.dismiss) private var dismiss
 
     let phase: WorkoutPhaseKind
+    var onClose: (() -> Void)? = nil
+    @State private var didFinish = false
     let onAdd: ([WorkoutTemplateBlock]) -> Void
 
     var body: some View {
@@ -15,10 +17,12 @@ struct ATHLTHAdvancedStretchingPickerView: View {
                     let block = ATHLTHWellnessBlockFactory.block(
                         for: guide, phase: phase
                     )
+                    guard !didFinish else { return }
+                    didFinish = true
                     onAdd([block])
-                    dismiss()
+                    if onClose == nil { dismiss() }
                 },
-                onClose: { dismiss() }
+                onClose: { if let onClose { onClose() } else { dismiss() } }
             )
         }
     }

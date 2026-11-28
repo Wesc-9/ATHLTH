@@ -559,6 +559,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .zIndex(1)
             }
         }
+        // Sole iPad plan sheet host, outside the changing plan canvas.
+        .sheet(item: $studioPresentedSheet, onDismiss: finishStudioSheetDismissal) { route in
+            studioSheetContent(route).id(route.id)
+        }
+        .onAppear { reconcileStudioSheet() }
+        .onChange(of: requestedStudioSheet?.id) { _, _ in reconcileStudioSheet() }
         .tint(ATHLTHTrainDesign.bronze)
         .interactiveDismissDisabled(!completedPlanCreation)
         .confirmationDialog(ATHLTHLocalization.choose(english: "Discard unsaved changes?", norwegian: "Forkaste ulagrede endringer?"), isPresented: $showingEditDiscard, titleVisibility: .visible) {
@@ -989,7 +995,320 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    // A stable identity is held until the native dismissal callback arrives.
+    // A second request cannot re-present an already dismissing iPad sheet.
+    private enum StudioPlanSheet: Identifiable {
+        case goal, design, coach, consent
+        case preview(GuidedAIFillPreview)
+        case day(WeekDayEditorSelection)
+        case place(WeekDayEditorSelection)
+        case add(AdvancedAddDestination)
+        case library(WeekDayEditorSelection)
+
+        var id: String {
+            switch self {
+            case .goal: return "goal"
+            case .design: return "design"
+            case .coach: return "coach"
+            case .consent: return "consent"
+            case .preview(let item): return "preview-" + item.id.uuidString
+            case .day(let item): return "day-" + String(item.id)
+            case .place(let item): return "place-" + String(item.id)
+            case .add(let item): return "add-" + item.id.uuidString
+            case .library(let item): return "library-" + String(item.id)
+            }
+        }
+    }
+
+    @State private var studioPresentedSheet: StudioPlanSheet?
+    @State private var studioSheetInFlight: StudioPlanSheet?
+
+    private var requestedStudioSheet: StudioPlanSheet? {
+        guard studioFullscreenEditing else { return nil }
+        if showingNewGoalFromPlan { return .goal }
+        if showingPlanDesignLab { return .design }
+        if showingAIBuilder { return .coach }
+        if showingGuidedAIConsent { return .consent }
+        if let guidedAIFillPreview { return .preview(guidedAIFillPreview) }
+        if let editingWeekDay { return .day(editingWeekDay) }
+        if let editingTrainingPlaceDay { return .place(editingTrainingPlaceDay) }
+        if let advancedAddDestination { return .add(advancedAddDestination) }
+        if let selectingLibraryDay { return .library(selectingLibraryDay) }
+        return nil
+    }
+
+    private func reconcileStudioSheet() {
+        guard studioFullscreenEditing else { return }
+        let requested = requestedStudioSheet
+        switch ATHLTHPlanModalTransitionPolicy.action(
+            requestedID: requested?.id, inFlightID: studioSheetInFlight?.id,
+            isPresented: studioPresentedSheet != nil
+        ) {
+        case .present:
+            studioSheetInFlight = requested
+            studioPresentedSheet = requested
+        case .dismiss:
+            studioPresentedSheet = nil
+        case .none:
+            break
+        }
+    }
+
+    private func finishStudioSheetDismissal() {
+        guard let dismissed = studioSheetInFlight else { return }
+        // Accept native dismissal unconditionally. A transient inactive
+        // phase during iPad presentation is not a reason to re-open it.
+        studioPresentedSheet = nil
+        switch dismissed {
+        case .goal:
+            showingNewGoalFromPlan = false
+            // Link the actual newly created goal, not an illustrated preset.
+            if let newGoal = goalStore.activeGoals.first(where: {
+                $0.status == .active && !goalIDsBeforeCreation.contains($0.id)
+        case .design:
+            showingPlanDesignLab = false
+        case .coach:
+            showingAIBuilder = false
+            // Coach-created plans use exactly the same persisted preview
+            // and navigation flow as manually created plans.
+            if createdPlanID != nil {
+                showingCreatedPlan = true
+            }
+        case .consent:
+            showingGuidedAIConsent = false
+        case .preview(let item):
+            if guidedAIFillPreview?.id == item.id { guidedAIFillPreview = nil }
+        case .day(let selection):
+            if editingWeekDay?.id == selection.id { editingWeekDay = nil }
+            if let pendingTrainingPlaceDay {
+                self.pendingTrainingPlaceDay = nil
+                editingTrainingPlaceDay = pendingTrainingPlaceDay
+            } else if let pendingStudioDay {
+                self.pendingStudioDay = nil
+                composingAdvancedDay = pendingStudioDay
+            } else if let pendingLibraryDay {
+                self.pendingLibraryDay = nil
+                selectingLibraryDay = pendingLibraryDay
+            }
+        case .place(let selection):
+            if editingTrainingPlaceDay?.id == selection.id { editingTrainingPlaceDay = nil }
+            if let reopenDayAfterPlace {
+                self.reopenDayAfterPlace = nil
+                editingWeekDay = reopenDayAfterPlace
+            }
+        case .add(let destination):
+            if advancedAddDestination?.id == destination.id { advancedAddDestination = nil }
+        case .library(let selection):
+            if selectingLibraryDay?.id == selection.id {
+                selectingLibraryDay = nil
+                selectingExtraFromLibrary = false
+            }
+        }
+        studioSheetInFlight = nil
+        schedulePlanCheckpoint()
+        Task { @MainActor in
+            await Task.yield()
+            reconcileStudioSheet()
+        }
+    }
+
+    @ViewBuilder
+    private func studioSheetContent(_ route: StudioPlanSheet) -> some View {
+        switch route {
+        case .goal:
+            GoalCreationView()
+        case .design:
+            ATHLTHPlanDesignLabView()
+        case .coach:
+            studioCoachBuilderSheet
+        case .consent:
+            studioCoachConsentSheet
+        case .preview(let preview):
+            guidedAIFillReview(preview)
+        case .day(let selection):
+            planDayActionsSheet(for: selection.id)
+        case .place(let selection):
+            ATHLTHPlanTrainingPlacePicker(
+                initial: weekDayEdits[weekDayKey(selection.id)]?.trainingPlace
+            ) { place in
+                updateWeekDay(selection.id) { edit in
+                    edit.trainingPlace = place
+                }
+                editingTrainingPlaceDay = nil
+            }
+        case .add(let destination):
+            advancedPlanAddSheet(destination)
+        case .library(let selection):
+            ATHLTHPlanWorkoutLibraryPicker { workout in
+                assignLibraryWorkout(workout, to: selection.id, asExtra: selectingExtraFromLibrary)
+                selectingExtraFromLibrary = false
+                selectingLibraryDay = nil
+            }
+        }
+    }
+
+    private var studioCoachBuilderSheet: some View {
+            AIProgramBuilderView(
+                mode: .generate,
+                // Coach selected on the start screen must collect its own
+                // intake. Seeded AI for legacy drafts keeps its wizard values.
+                seed: entryChoice == .coach ? nil : aiBuilderSeed,
+                onProgramCreatedPlanID: { id in
+                    createdPlanID = id
+                    completedPlanCreation = true
+                    draftStore.clear(userID: session.profile.userID, draftID: draftID)
+                }
+            )
+    }
+
+    private var studioCoachConsentSheet: some View {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Label("ATHLTH Coach", systemImage: "sparkles")
+                            .font(.title2.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(english: "Use your goal and current plan to prepare changes.", norwegian: "Ta utgangspunkt i målet ditt og planen du har laget."))
+                        Label(ATHLTHLocalization.choose(
+                            english: coachFillScope == nil ? "ATHLTH Coach suggests workouts for empty days only." : "ATHLTH Coach changes only the selected dates.",
+                            norwegian: coachFillScope == nil ? "ATHLTH Coach foreslår økter kun på tomme dager." : "ATHLTH Coach endrer kun de valgte datoene."
+                        ), systemImage: "calendar.badge.plus")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        if step == .week && !coachReturnToReview {
+                            Button {
+                                coachFillScope = remainingGuidedCoachKeys
+                            } label: {
+                                Label(ATHLTHLocalization.choose(english: "Fill the remaining days instead", norwegian: "Fyll ut resten i stedet"), systemImage: "calendar")
+                            }
+                            .disabled(remainingGuidedCoachKeys.isEmpty)
+                        }
+                        Text(ATHLTHLocalization.choose(english: "Your goal, plan and equipment are processed on this device. Dates outside the selected scope are protected. Review suggestions before applying.", norwegian: "Mål, plan og utstyr behandles lokalt på enheten. Datoer utenfor valget beskyttes. Se gjennom forslag før de tas i bruk."))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button {
+                            showingGuidedAIConsent = false
+                            Task { await generateGuidedAISuggestions() }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(english: "Prepare suggestions", norwegian: "Lag forslag"), systemImage: "sparkles")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent).tint(ATHLTHPlanDesign.accentInk)
+                        .disabled(isGuidedAIFilling)
+                    }.padding(20)
+                }
+                .background(ATHLTHPlanDesign.canvas)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) { showingGuidedAIConsent = false; coachFillScope = nil; coachReturnToReview = false }
+                    }
+                }
+            }
+            .presentationDetents([.large])
+            .tint(ATHLTHPlanDesign.accentInk)
+    }
+
+    @ViewBuilder
+    private func advancedPlanAddSheet(_ destination: AdvancedAddDestination) -> some View {
+            if destination.kind == .stretching {
+                ATHLTHAdvancedStretchingPickerView(
+                    phase: destination.phase,
+                    onClose: { advancedAddDestination = nil }
+                ) { blocks in
+                    insertGuidedLibraryExercise(
+                        blocks, day: destination.day, week: destination.week,
+                        workoutIndex: destination.workoutIndex
+                    )
+                    advancedAddDestination = nil
+                }
+            } else {
+                ATHLTHAdvancedPlanAddContentView(
+                    initialKind: destination.kind,
+                    phase: destination.phase,
+                    onClose: { advancedAddDestination = nil },
+                    onExercise: { blocks in
+                        insertGuidedLibraryExercise(
+                            blocks, day: destination.day, week: destination.week,
+                            workoutIndex: destination.workoutIndex)
+                        advancedAddDestination = nil
+                    },
+                    onWorkout: { workout in
+                        insertGuidedLibraryWorkout(
+                            workout, day: destination.day, week: destination.week)
+                        advancedAddDestination = nil
+                    }
+                )
+            }
+    }
+
+    @ViewBuilder
     private var planPresentations: some View {
+        if studioFullscreenEditing {
+            AnyView(studioPlanAlerts)
+        } else {
+            AnyView(phonePlanPresentations)
+        }
+    }
+
+    private var studioPlanAlerts: some View {
+        AnyView(planSecondaryObservers)
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Could not create plan",
+                norwegian: "Kunne ikke opprette planen"
+            ),
+            isPresented:
+                Binding(
+                    get: {
+                        creationError != nil
+                    },
+                    set: { shown in
+                        if !shown {
+                            creationError = nil
+                        }
+                    }
+                )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(creationError ?? "")
+        }
+        .alert(ATHLTHLocalization.choose(english: "Clear planned day?", norwegian: "Slette planleggingen for dagen?"),
+               isPresented: Binding(get: { pendingClearDay != nil }, set: { if !$0 { pendingClearDay = nil } })) {
+            Button(ATHLTHLocalization.choose(english: "Delete", norwegian: "Slett"), role: .destructive) {
+                if let key = pendingClearDay { writePlanWorkouts([], key: key); saveResumableDraft() }
+                pendingClearDay = nil
+            }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) { pendingClearDay = nil }
+        } message: {
+            Text(ATHLTHLocalization.choose(english: "The date stays in the plan. Its workouts and rest-day designation are removed.", norwegian: "Datoen beholdes i planen, men øktene og eventuell hviledag fjernes."))
+        }
+        .confirmationDialog(ATHLTHLocalization.choose(english: "Unfinished weeks", norwegian: "Uker som ikke er ferdig"), isPresented: $showingGuidedFinishOptions, titleVisibility: .visible) {
+            if firstCompletedGuidedWeek != nil {
+                Button(ATHLTHLocalization.choose(english: "Copy first completed week", norwegian: "Kopier første utfylte uke")) { copyFirstGuidedWeekAndReview() }
+            }
+            Button(ATHLTHLocalization.choose(english: "Ask ATHLTH Coach to fill remaining dates", norwegian: "Be ATHLTH Coach fylle ut resten")) { startCoachRemaining(returnToReview: true) }
+            Button(ATHLTHLocalization.choose(english: "Go to summary anyway", norwegian: "Gå til sammendrag")) { openGuidedSummary() }
+            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(english: "Some weeks contain fewer planned workouts than your original target.", norwegian: "Noen uker har færre planlagte økter enn du valgte i oppsettet."))
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Automatic plan fill", norwegian: "Automatisk utfylling"),
+            isPresented: Binding(
+                get: { guidedAIError != nil },
+                set: { if !$0 { guidedAIError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { guidedAIError = nil }
+        } message: {
+            Text(guidedAIError ?? "")
+        }
+    }
+
+    private var phonePlanPresentations: some View {
         AnyView(planSecondaryObservers)
         .alert(
             ATHLTHLocalization.choose(
@@ -1157,33 +1476,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         }
         .sheet(item: $advancedAddDestination.keepingPresentedItemWhenInactive(scenePhase)) { destination in
-            if destination.kind == .stretching {
-                ATHLTHAdvancedStretchingPickerView(
-                    phase: destination.phase
-                ) { blocks in
-                    insertGuidedLibraryExercise(
-                        blocks, day: destination.day, week: destination.week,
-                        workoutIndex: destination.workoutIndex
-                    )
-                    advancedAddDestination = nil
-                }
-            } else {
-                ATHLTHAdvancedPlanAddContentView(
-                    initialKind: destination.kind,
-                    phase: destination.phase,
-                    onExercise: { blocks in
-                        insertGuidedLibraryExercise(
-                            blocks, day: destination.day, week: destination.week,
-                            workoutIndex: destination.workoutIndex)
-                        advancedAddDestination = nil
-                    },
-                    onWorkout: { workout in
-                        insertGuidedLibraryWorkout(
-                            workout, day: destination.day, week: destination.week)
-                        advancedAddDestination = nil
-                    }
-                )
-            }
+            advancedPlanAddSheet(destination)
         }
         .sheet(item: $selectingLibraryDay.keepingPresentedItemWhenInactive(scenePhase)) { selection in
             ATHLTHPlanWorkoutLibraryPicker { workout in

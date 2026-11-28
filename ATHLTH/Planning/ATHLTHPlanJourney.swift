@@ -103,3 +103,15 @@ enum ATHLTHPlanEditorContinuityPolicy {
         !sceneIsActive && incomingSelectionIsNil
     }
 }
+
+/// Serializes native iPad sheet transitions, including the interval between
+/// a nil binding and UIKit's actual dismissal callback.
+enum ATHLTHPlanModalTransitionPolicy {
+    enum Action: Equatable { case none, present, dismiss }
+    static func action(requestedID: String?, inFlightID: String?, isPresented: Bool) -> Action {
+        if let inFlightID {
+            return isPresented && requestedID != inFlightID ? .dismiss : .none
+        }
+        return requestedID == nil || isPresented ? .none : .present
+    }
+}

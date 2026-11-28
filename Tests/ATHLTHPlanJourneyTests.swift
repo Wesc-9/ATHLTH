@@ -3,6 +3,27 @@ import SwiftUI
 @testable import ATHLTH
 
 final class ATHLTHPlanJourneyTests: XCTestCase {
+    func testStudioMenuNeverReopensDuringNativeDismissal() {
+        typealias Policy = ATHLTHPlanModalTransitionPolicy
+        for route in ["goal", "design", "coach", "consent", "preview-1", "day-1", "place-1", "add-1", "library-1"] {
+            XCTAssertEqual(Policy.action(requestedID: route, inFlightID: nil, isPresented: false), .present)
+            XCTAssertEqual(Policy.action(requestedID: route, inFlightID: route, isPresented: true), .none)
+            XCTAssertEqual(Policy.action(requestedID: route, inFlightID: route, isPresented: false), .none)
+            XCTAssertEqual(Policy.action(requestedID: nil, inFlightID: route, isPresented: true), .dismiss)
+            XCTAssertEqual(Policy.action(requestedID: nil, inFlightID: route, isPresented: false), .none)
+            XCTAssertEqual(Policy.action(requestedID: nil, inFlightID: nil, isPresented: false), .none)
+        }
+    }
+
+    func testStudioMenuHandoffWaitsForActualDismissal() {
+        typealias Policy = ATHLTHPlanModalTransitionPolicy
+        for (first, next) in [("day-1", "place-1"), ("place-1", "day-1"), ("day-1", "library-1"), ("consent", "preview-1")] {
+            XCTAssertEqual(Policy.action(requestedID: next, inFlightID: first, isPresented: true), .dismiss)
+            XCTAssertEqual(Policy.action(requestedID: next, inFlightID: first, isPresented: false), .none)
+            XCTAssertEqual(Policy.action(requestedID: next, inFlightID: nil, isPresented: false), .present)
+        }
+    }
+
     func testBriefBackgroundForegroundKeepsExactlyTheSameEditor() {
         // An existing card is not re-presented and must keep its identity,
         // navigation stack, open child sheets and current scroll position.
