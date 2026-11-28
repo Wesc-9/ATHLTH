@@ -3,6 +3,39 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachEventTriggerTests: XCTestCase {
+    func testAdvancedRequestValidatesCombinedThresholdAndMultipleMetrics() {
+        var availability = ATHLTHCoachTriggerAvailability.basicCoach(activity: .running, hasRoute: false, structured: true)
+        availability.hasPaceGoal = true
+        let input = "Når jeg er saktere enn målfart i 20 sekunder under drag, og pulsen er maks sone 3, gi meg motivasjon og tempo. Minst 2 minutter mellom beskjeder."
+        let json = """
+            [{"trigger":"paceSlowerThanTarget","metrics":["motivation","pace"],"scope":"effort","sustainedSeconds":20,"repeatDelaySeconds":120,"maximumZone":3}]
+            """
+        let rules = ATHLTHCoachAdvancedRequest.decode(json, input: input, availability: availability)
+        XCTAssertEqual(rules?.first?.triggerConditions?.sustainedSeconds, 20)
+        XCTAssertEqual(rules?.first?.triggerConditions?.repeatDelaySeconds, 120)
+        XCTAssertEqual(rules?.first?.triggerConditions?.maximumZone, 3)
+        XCTAssertEqual(rules?.first?.scope, .effort)
+        XCTAssertEqual(rules?.first?.selectedMetrics, [.motivation, .pace])
+        XCTAssertNil(ATHLTHCoachAdvancedRequest.decode(json.replacingOccurrences(of: ":120", with: ":180"), input: input, availability: availability))
+        XCTAssertNil(ATHLTHCoachAdvancedRequest.decode(json.replacingOccurrences(of: "\"maximumZone\"", with: "\"minimumZone\""), input: input, availability: availability))
+    }
+
+    func testAdvancedRequestRequiresWholeBatchToBeSupported() {
+        let availability = ATHLTHCoachTriggerAvailability.basicCoach(activity: .running, hasRoute: false, structured: true)
+        let input = "Puls og distanse hvert 5. minutt; si fra 10 sekunder før hvert drag"
+        let json = """
+            [{"trigger":"time","interval":300,"metrics":["heartRate","distance"]},
+             {"trigger":"beforeEffort","interval":10,"metrics":["motivation"]}]
+            """
+        XCTAssertEqual(ATHLTHCoachAdvancedRequest.decode(json, input: input, availability: availability)?.count, 2)
+        XCTAssertNil(ATHLTHCoachAdvancedRequest.decode(json, input: input,
+            availability: .basicCoach(activity: .running, hasRoute: false, structured: false)))
+        let offline = ATHLTHCoachAdvancedRequest.offline(input, availability: availability)
+        XCTAssertEqual(offline?.count, 2)
+        XCTAssertEqual(offline?.first?.selectedMetrics, [.heartRate, .distance])
+        XCTAssertNil(ATHLTHCoachAdvancedRequest.offline("Puls hvert 5. minutt, men bare i sone 3", availability: availability))
+    }
+
     func testPlainLanguageRequestCreatesExactIntervalWarning() {
         let request = "Jeg ønsker å få beskjed 10 sekunder før hver intervall-drag"
         let availability = ATHLTHCoachTriggerAvailability.basicCoach(activity: .running, hasRoute: false, structured: true)

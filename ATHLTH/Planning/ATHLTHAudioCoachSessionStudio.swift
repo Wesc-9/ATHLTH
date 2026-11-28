@@ -104,13 +104,212 @@ enum ATHLTHCoachRequestParser {
     }
 }
 
+/// The model only proposes values from this closed, typed schema. It never
+/// decodes directly into the persisted rule type or assigns rule identities.
+struct ATHLTHCoachRequestSpecification: Decodable {
+    let trigger: ATHLTHAudioCoachRule.Trigger
+    let interval: Int?
+    let metrics: [ATHLTHAudioCoachRule.Metric]
+    let activity: ATHLTHCoachActivityFilter?
+    let phases: [ATHLTHCoachWorkoutPhase]?
+    let scope: ATHLTHAudioCoachRule.Scope?
+    let selection: ATHLTHCoachEventSelection?
+    let sustainedSeconds: Int?
+    let repeatDelaySeconds: Int?
+    let maximumZone: Int?
+}
+
+enum ATHLTHCoachAdvancedRequest {
+    typealias Rule = ATHLTHAudioCoachRule
+    typealias Spec = ATHLTHCoachRequestSpecification
+
+    // A historical-reference trigger cannot be authored without selecting
+    // the actual workout. Own messages also need the separate text editor.
+    static let triggers = Rule.Trigger.allCases.filter { $0 != .slowerThanPreviousWorkout }
+    static let metrics = Rule.Metric.allCases.filter { $0 != .ownMessage }
+
+    private static func captures(_ pattern: String, _ input: String) -> [[String]] {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return [] }
+        let text = input as NSString
+        return regex.matches(in: input, range: NSRange(location: 0, length: text.length)).map { match in
+            (1..<match.numberOfRanges).map { i in
+                let range = match.range(at: i)
+                return range.location == NSNotFound ? "" : text.substring(with: range)
+            }
+        }
+    }
+    private static func amounts(_ input: String, units: String, multiplier: Int = 1) -> Set<Int> {
+        Set(captures("(?<![\\d.,])([0-9]{1,5})\\s*(" + units + ")(?!\\p{L})", input)
+            .compactMap { Int($0[0]) }.map { $0 * multiplier })
+    }
+    private static func seconds(_ input: String) -> Set<Int> {
+        amounts(input, units: "sekunder|sekund|sek|seconds|second|secs|sec|s")
+            .union(amounts(input, units: "minutter|minutt|min|minutes|minute|mins", multiplier: 60))
+    }
+    private static func meters(_ input: String) -> Set<Int> {
+        amounts(input, units: "meter|metres|meters|m")
+            .union(amounts(input, units: "kilometer|kilometre|kilometers|kilometres|km", multiplier: 1000))
+    }
+    private static func integers(_ input: String) -> Set<Int> {
+        Set(captures("(?<![\\d.,])([0-9]{1,5})(?![\\d.,])", input).compactMap { Int($0[0]) })
+    }
+    private static func paces(_ input: String) -> Set<Int> {
+        Set(captures("(?<!\\d)([0-9]{1,2}):([0-5][0-9])(?!\\d)", input).compactMap {
+            guard let m = Int($0[0]), let s = Int($0[1]) else { return nil }
+            return m * 60 + s
+        })
+    }
+    private static func interval(_ spec: Spec, input: String) -> Int? {
+        let n = spec.interval ?? 1
+        switch spec.trigger {
+        case .time, .randomMotivation, .nearFinishTime, .strengthRestEnding,
+             .beforeNextStep, .beforeMain, .beforeCooldown, .beforeEffort:
+            return seconds(input).contains(n) ? n : nil
+        case .distance, .nearFinishDistance, .elevationGain:
+            return meters(input).contains(n) ? n : nil
+        case .paceFasterOverall, .paceFasterLastKilometer:
+            return paces(input).contains(n) ? n : nil
+        case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress:
+            if n == 50 && ["halvveis", "halfway"].contains(where: { input.lowercased().contains($0) }) { return n }
+            return amounts(input, units: "%|prosent|percent").contains(n) ? n : nil
+        case .heartRateAbove, .heartRateBelow, .zoneEnter, .zoneExit, .zoneBelow,
+             .cadenceBelow, .cadenceAbove, .strengthSetCompleted:
+            return integers(input).contains(n) ? n : nil
+        default:
+            return spec.interval == nil || n == 1 ? 1 : nil
+        }
+    }
+
+    static func validate(_ specs: [Spec], input: String,
+                         availability: ATHLTHCoachTriggerAvailability) -> [Rule]? {
+        guard (1...5).contains(specs.count), !input.isEmpty else { return nil }
+        var result: [Rule] = []
+        for spec in specs {
+            guard triggers.contains(spec.trigger), (1...6).contains(spec.metrics.count),
+                  Set(spec.metrics).count == spec.metrics.count,
+                  spec.metrics.allSatisfy({ metrics.contains($0) }),
+                  let interval = interval(spec, input: input) else { return nil }
+            let activity = spec.activity ?? (spec.trigger.isStrengthEvent ? .strength : (availability.workoutActivity ?? .all))
+            guard [.all, .running, .walking, .strength, .intervals].contains(activity),
+                  availability.supports(spec.trigger, for: activity),
+                  activity != .strength || spec.trigger.isStrengthEvent else { return nil }
+            if spec.trigger.isStrengthEvent && activity != .strength { return nil }
+            if spec.trigger.needsStructuredStep && activity == .strength { return nil }
+            let available = ATHLTHCoachCommandSelection.available(
+                activity: activity, structured: availability.hasStructuredSteps,
+                routes: availability.hasDistanceGoal, distance: availability.supportsDistance
+            )
+            guard spec.metrics.allSatisfy({ available.contains($0) }),
+                  let metric = spec.metrics.first else { return nil }
+            if spec.metrics.contains(.personalRecord) && spec.trigger != .personalRecordConfirmed { return nil }
+            if spec.metrics.contains(where: { [.ghostTimeDifference, .ghostDistanceDifference].contains($0) }) &&
+                !spec.trigger.isGhostCondition { return nil }
+            if let phases = spec.phases {
+                guard !phases.isEmpty, Set(phases).count == phases.count,
+                      availability.hasStructuredSteps, activity != .strength else { return nil }
+            }
+            if let scope = spec.scope, scope != .workout {
+                // Effort/group scope is implemented for periodic readouts;
+                // threshold rules may use effort scope as a work-only gate.
+                guard availability.hasStructuredSteps, activity != .strength,
+                      spec.trigger.isPeriodic || (scope == .effort && spec.trigger.supportsThresholdConditions) else { return nil }
+            }
+            if let selection = spec.selection, selection != .every {
+                let selectable: [Rule.Trigger] = [.beforeNextStep, .stepStart, .stepEnd, .recoveryStart, .recoveryEnd]
+                guard selectable.contains(spec.trigger) else { return nil }
+            }
+            var conditions = ATHLTHCoachTriggerConditions()
+            if let duration = spec.sustainedSeconds {
+                guard (1...300).contains(duration), seconds(input).contains(duration) else { return nil }
+                conditions.sustainedSeconds = duration
+            }
+            if let delay = spec.repeatDelaySeconds {
+                guard (1...1800).contains(delay), seconds(input).contains(delay) else { return nil }
+                conditions.repeatDelaySeconds = delay
+            }
+            if let zone = spec.maximumZone {
+                guard (1...5).contains(zone), integers(input).contains(zone) else { return nil }
+                conditions.maximumZone = zone
+            }
+            guard conditions.isEmpty || spec.trigger.supportsThresholdConditions else { return nil }
+            // The existing threshold engine requires actual fresh pulse,
+            // and never accepts a missing sample as meeting the zone gate.
+            var rule = Rule(trigger: spec.trigger, metric: metric, interval: interval,
+                            additionalMetrics: spec.metrics.count > 1 ? Array(spec.metrics.dropFirst()) : nil)
+            guard rule.validatedInterval == interval else { return nil }
+            rule.activityFilter = activity == .all ? nil : activity
+            rule.allowedPhases = spec.phases
+            rule.scope = spec.scope == .workout ? nil : spec.scope
+            rule.eventSelection = spec.selection == .every ? nil : spec.selection
+            rule.triggerConditions = conditions.isEmpty ? nil : conditions
+            guard !result.contains(where: { ATHLTHCoachRequestParser.same($0, rule) }) else { return nil }
+            result.append(rule)
+        }
+        return result
+    }
+
+    static func decode(_ json: String, input: String,
+                       availability: ATHLTHCoachTriggerAvailability) -> [Rule]? {
+        guard json.utf8.count <= 16000, let data = json.data(using: .utf8) else { return nil }
+        // Reject unknown keys instead of silently dropping unsupported logic
+        // such as OR, a minimum pulse zone, or a second threshold.
+        let keys: Set<String> = ["trigger", "interval", "metrics", "activity", "phases",
+            "scope", "selection", "sustainedSeconds", "repeatDelaySeconds", "maximumZone"]
+        guard let objects = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]],
+              objects.allSatisfy({ Set($0.keys).isSubset(of: keys) }),
+              let specs = try? JSONDecoder().decode([Spec].self, from: data) else { return nil }
+        return validate(specs, input: input, availability: availability)
+    }
+
+    /// Offline deterministic path for explicitly separated simple reminders
+    /// and the common periodic multi-metric request. Never discard conditions
+    /// or interpret a complex request as a simpler one.
+    static func offline(_ input: String, availability: ATHLTHCoachTriggerAvailability) -> [Rule]? {
+        let clauses = input.split(whereSeparator: { $0 == ";" || $0.isNewline })
+        guard (1...5).contains(clauses.count) else { return nil }
+        var result: [Rule] = []
+        for clause in clauses {
+            let t = String(clause).trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = t.lowercased()
+            let complex = ["bare", "kun ", "only", "if ", "hvis", " dersom", "minst", "maks", "under drag", "during", "utenfor", "tilbake", "sone", " eller ", " or ", " ikke ", "ikke ", "don't", "do not", "første", "siste", "first", "last"]
+            guard !complex.contains(where: { lower.contains($0) }),
+                  let intent = ATHLTHCoachRequestParser.intent(t),
+                  var rule = ATHLTHCoachRequestParser.rule(t, intent: intent, availability: availability) else { return nil }
+            if intent == .everyTime || intent == .everyDistance {
+                var requested: [Rule.Metric] = []
+                if lower.contains("puls") || lower.contains("heart rate") { requested.append(.heartRate) }
+                if lower.contains("tempo") || lower.contains("pace") { requested.append(.averagePace) }
+                if lower.contains("distanse") || lower.contains("hvor langt") || lower.contains("distance") { requested.append(.distance) }
+                if lower.contains("hvor lenge") || lower.contains("elapsed") { requested.append(.elapsedTime) }
+                if lower.contains("motiver") || lower.contains("motivasjon") || lower.contains("encourag") { requested.append(.motivation) }
+                if lower.contains("drikke") || lower.contains("hydration") || lower.contains("drink") { requested.append(.hydrationReminder) }
+                if lower.contains(" og ") || lower.contains(" and ") {
+                    guard requested.count >= 2 else { return nil }
+                }
+                if let first = requested.first {
+                    rule.metric = first
+                    rule.additionalMetrics = requested.count > 1 ? Array(requested.dropFirst()) : nil
+                }
+            } else if lower.contains(" og ") || lower.contains(" and ") { return nil }
+            let available = ATHLTHCoachCommandSelection.available(
+                activity: rule.activityFilter ?? .all, structured: availability.hasStructuredSteps,
+                routes: availability.hasDistanceGoal, distance: availability.supportsDistance
+            )
+            guard rule.selectedMetrics.allSatisfy({ available.contains($0) }),
+                  !result.contains(where: { ATHLTHCoachRequestParser.same($0, rule) }) else { return nil }
+            result.append(rule)
+        }
+        return result
+    }
+}
+
 struct ATHLTHCoachRequestView: View {
     @Binding var rules: [ATHLTHAudioCoachRule]
     let availability: ATHLTHCoachTriggerAvailability
     var showSaved = false
     var protectedRuleIDs: Set<UUID> = []
     @State private var request = ""
-    @State private var proposal: ATHLTHAudioCoachRule?
+    @State private var proposals: [ATHLTHAudioCoachRule] = []
     @State private var status: String?
     @State private var loading = false
     @State private var task: Task<Void, Never>?
@@ -127,7 +326,7 @@ struct ATHLTHCoachRequestView: View {
                 .background(ATHLTHPlanDesign.canvas, in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityIdentifier("athlth-coach-request-input")
                 .onChange(of: request) { _, _ in
-                    task?.cancel(); generation = UUID(); loading = false; proposal = nil; status = nil
+                    task?.cancel(); generation = UUID(); loading = false; proposals = []; status = nil
                 }
             Button(action: search) {
                 HStack {
@@ -137,27 +336,65 @@ struct ATHLTHCoachRequestView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(loading || request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            if let proposal {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(proposal.trigger.summary(interval: proposal.validatedInterval)).font(.headline)
-                    Text(proposal.metric.title).font(.subheadline)
-                    if proposal.trigger == .beforeEffort {
-                        Text(tr("Only when time to the next effort is known.", "Bare når tiden frem til neste drag er kjent.")).font(.caption)
+            if !proposals.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Review your suggestions", "Se gjennom forslagene")).font(.headline)
+                    ForEach(proposals) { proposal in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top) {
+                                Text(proposal.trigger.summary(interval: proposal.validatedInterval)).font(.headline)
+                                Spacer(minLength: 0)
+                                Button {
+                                    proposals.removeAll { $0.id == proposal.id }
+                                } label: {
+                                    Image(systemName: "xmark.circle").frame(width: 44, height: 44)
+                                }.buttonStyle(.plain).accessibilityLabel(tr("Remove suggestion", "Fjern forslag"))
+                            }
+                            Text(proposal.selectedMetrics.map(\.title).joined(separator: " · ")).font(.subheadline)
+                            if let conditions = proposal.triggerConditions {
+                                Text(conditions.summary).font(.subheadline)
+                            }
+                            if let phases = proposal.allowedPhases {
+                                Text(tr("Only in: ", "Kun i: ") + phases.map(\.title).joined(separator: ", ")).font(.caption)
+                            }
+                            if let scope = proposal.scope {
+                                Text(scope.title).font(.caption)
+                            }
+                            if let selection = proposal.eventSelection {
+                                Text(selection.title).font(.caption)
+                            }
+                            if let activity = proposal.activityFilter {
+                                Text(activity.title).font(.caption)
+                            }
+                            if proposal.trigger == .beforeEffort {
+                                Text(tr("Only when time to the next effort is known.", "Bare når tiden frem til neste drag er kjent.")).font(.caption)
+                            }
+                            if let sample = ATHLTHCoachCommandSelection.example(for: proposal,
+                                activity: proposal.activityFilter ?? .all,
+                                norwegian: tr("en", "no") == "no") {
+                                Text(tr("Example: ", "Eksempel: ") + sample)
+                                    .font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                        }
+                        .padding(10)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    let additions = proposals.filter { proposed in
+                        !rules.contains(where: { ATHLTHCoachRequestParser.same($0, proposed) && $0.isEnabled })
                     }
                     Button {
-                        guard rules.count < 20 else { return }
-                        if rules.contains(where: { ATHLTHCoachRequestParser.same($0, proposal) && $0.isEnabled }) {
-                            status = tr("Already added.", "Denne beskjeden finnes allerede.")
-                        } else {
-                            rules.append(proposal)
-                            status = tr("Reminder added.", "Beskjed lagt til.")
-                        }
-                        self.proposal = nil
+                        guard rules.count + additions.count <= 20 else { return }
+                        rules.append(contentsOf: additions)
+                        status = additions.isEmpty ? tr("Already added.", "Disse beskjedene finnes allerede.") :
+                            tr("Reminders added.", "Beskjedene er lagt til.")
+                        proposals = []
                     } label: {
-                        Label(tr("Add reminder", "Legg til beskjed"), systemImage: "plus.circle.fill")
+                        Label(tr("Add reminders", "Legg til beskjeder"), systemImage: "plus.circle.fill")
                             .frame(maxWidth: .infinity, minHeight: 44)
-                    }.buttonStyle(.borderedProminent).disabled(rules.count >= 20)
-                    if rules.count >= 20 { Text(tr("Maximum 20 rules.", "Maks 20 regler.")).font(.caption) }
+                    }.buttonStyle(.borderedProminent).disabled(rules.count + additions.count > 20)
+                    if rules.count + additions.count > 20 {
+                        Text(tr("Maximum 20 rules. Remove a suggestion or an old rule.", "Maks 20 regler. Fjern et forslag eller en gammel regel.")).font(.caption)
+                    }
                 }.padding(12).background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
             }
             if let status { Text(status).font(.subheadline).foregroundStyle(ATHLTHPlanDesign.secondaryInk) }
@@ -194,22 +431,25 @@ struct ATHLTHCoachRequestView: View {
         .onDisappear { task?.cancel(); generation = UUID(); loading = false }
     }
     private func search() {
-        let input = String(request.prefix(400))
-        proposal = nil; status = nil
-        if let intent = ATHLTHCoachRequestParser.intent(input) { finish(input, intent); return }
-        guard ATHLTHCoachRequestParser.number(input) != nil else { finish(input, nil); return }
+        let input = request.trimmingCharacters(in: .whitespacesAndNewlines)
+        proposals = []; status = nil
+        guard !input.isEmpty, input.count <= 1200 else {
+            status = tr("Describe up to five reminders in 1200 characters.", "Beskriv opptil fem beskjeder med maks 1200 tegn.")
+            return
+        }
+        task?.cancel()
         loading = true
         let token = UUID(); generation = token
+        let capabilities = availability
         task = Task { @MainActor in
-            let intent = await ATHLTHIntelligenceEngine.localAudioCoachRequestIntent(input)
+            let generated = await ATHLTHIntelligenceEngine.localAudioCoachRequestRules(input, availability: capabilities)
             guard !Task.isCancelled, generation == token else { return }
-            loading = false; finish(input, intent)
-        }
-    }
-    private func finish(_ input: String, _ intent: ATHLTHCoachRequestIntent?) {
-        proposal = intent.flatMap { ATHLTHCoachRequestParser.rule(input, intent: $0, availability: availability) }
-        if proposal == nil {
-            status = tr("Try one supported reminder with a number and unit.", "Fant ingen passende beskjed. Prøv én påminnelse med tall og enhet.")
+            loading = false
+            proposals = generated ?? ATHLTHCoachAdvancedRequest.offline(input, availability: capabilities) ?? []
+            if proposals.isEmpty {
+                status = tr("No complete supported suggestion. Describe the reminder more precisely or use Advanced.",
+                    "Fant ikke et fullstendig støttet forslag. Beskriv ønsket mer presist eller bruk Avansert.")
+            }
         }
     }
 }
