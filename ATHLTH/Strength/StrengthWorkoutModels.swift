@@ -102,6 +102,8 @@ struct StrengthAudioCoachConfiguration:
     var announceExerciseComplete: Bool? = nil
     var motivationEveryCompletedSets: Int? = nil
     var personalMotivationPhrase: String? = nil
+    // Effective shared rule snapshot, resolved at launch (disabled groups excluded).
+    var customStrengthEventRules: [ATHLTHAudioCoachRule]? = nil
 
     var announceWorkoutStatus = false
     var workoutStatusIntervalMinutes = 15
@@ -168,6 +170,7 @@ struct StrengthAudioCoachConfiguration:
                 )
             )
         configuration.speechStyle = speechStyle
+        configuration.customRules = customStrengthEventRules
 
         configuration
             .announceStrengthSetComplete =

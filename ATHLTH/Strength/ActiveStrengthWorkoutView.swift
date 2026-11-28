@@ -674,6 +674,9 @@ struct ActiveStrengthWorkoutView: View {
                 }
                 announceCountdownIntoStrengthRestIfDue(at: timestamp)
                 announceTimedStrengthGroupCountdownIfDue(at: timestamp)
+                if strength.isResting {
+                    evaluateCustomStrengthEvents(restOnly: true)
+                }
             }
             .onChange(
                 of:
@@ -700,6 +703,7 @@ struct ActiveStrengthWorkoutView: View {
             }
             .onChange(of: strength.currentSetIndex) {
                 loadDefaultsFromCurrentSet()
+                evaluateCustomStrengthEvents()
             }
             .onChange(
                 of:
@@ -726,6 +730,7 @@ struct ActiveStrengthWorkoutView: View {
                 showingExerciseInstructions = false
                 showingWorkoutReview = false
                 announceNextExerciseIfNeeded(previousIndex: oldValue)
+                evaluateCustomStrengthEvents()
             }
             .onChange(
                 of:
@@ -741,6 +746,7 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 announceCompletedSetIfNeeded()
+                evaluateCustomStrengthEvents()
                 if let id = isolatedSetID,
                    strength.activeWorkout?.exercises.contains(where: { exercise in
                        exercise.sets.contains(where: { $0.id == id && $0.isCompleted })
@@ -755,6 +761,7 @@ struct ActiveStrengthWorkoutView: View {
                 scheduleRestCues(
                     for: newValue
                 )
+                evaluateCustomStrengthEvents()
             }
         }
         .task(
@@ -1011,7 +1018,40 @@ struct ActiveStrengthWorkoutView: View {
                     configuration.audioCoach,
                 cueKind: .workoutStart
             )
+            evaluateCustomStrengthEvents()
         }
+    }
+
+    /// Use the existing event callbacks/timer, not a new polling task.
+    /// Watch-owned workouts have their own authoritative voice scheduler.
+    @MainActor
+    private func evaluateCustomStrengthEvents(restOnly: Bool = false) {
+        guard !finishInProgress,
+              let workout = strength.activeWorkout,
+              workout.captureDevice == .iPhone,
+              let config = workout.advancedConfiguration?.audioCoach,
+              config.enabled, !strengthCoach.speechPaused,
+              let configured = config.customStrengthEventRules,
+              !configured.isEmpty else { return }
+        let rules = restOnly ? configured.filter { $0.trigger == .strengthRestEnding } : configured
+        guard !rules.isEmpty else { return }
+        // Do not build the exercise-queue snapshot on every rest tick.
+        if restOnly {
+            guard let end = strength.restEndsAt,
+                  end.timeIntervalSinceNow > 0,
+                  rules.contains(where: { end.timeIntervalSinceNow <= Double($0.validatedInterval) })
+            else { return }
+        }
+        guard let snapshot = strength.watchSnapshot else { return }
+        var context = ATHLTHCoachReadoutContext.make(strength: snapshot)
+        context.plannedHeartRateZone = strength.currentExercise?.targetHeartRateZone ?? workout.liveHeartRateTargetZone
+        strengthCoach.evaluateCustomStrengthEvents(
+            workoutID: workout.id, rules: rules, context: context,
+            elapsed: strength.elapsedSessionSeconds(for: workout),
+            heartRate: strength.freshPhoneHeartRate(),
+            maximumHeartRate: (appSession.onboardingProfile?.maximumHeartRateBPM).map(Double.init),
+            configuration: config
+        )
     }
 
     /// Speaks a fresh summary using the same set/exercise state displayed

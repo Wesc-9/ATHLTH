@@ -1738,6 +1738,21 @@ enum WorkoutLaunchCoordinator {
             throw ATHLTHWorkoutSessionLaunchError.alreadyRecording
         }
 
+        // Carry the same resolved strength events into the phone-owned
+        // recording path. Watch-owned workouts keep their existing transfer.
+        var advancedConfiguration = advancedConfiguration
+        if audioCoach.enabled {
+            let rules = ATHLTHAudioCoachSportPolicy.eligibleStrengthRules(
+                audioCoach.activeCustomRules
+            ).filter { $0.trigger.isStrengthEvent }
+            if !rules.isEmpty {
+                advancedConfiguration.audioCoach.enabled = true
+                advancedConfiguration.audioCoach.customStrengthEventRules = rules
+            }
+        } else {
+            advancedConfiguration.audioCoach.customStrengthEventRules = nil
+        }
+
         // Basic tracking can still opt into voice guidance. Keep the
         // selected coach in all workout and invitation payloads without
         // enabling advanced tracking metrics or Spotify by accident.

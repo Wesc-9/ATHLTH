@@ -15,6 +15,8 @@ final class StrengthAudioCoachSpeaker:
     private var cueQueue = ATHLTHCoachCueQueue()
     private var localSpeechWatchdog: Task<Void, Never>?
     private var eventLedger = ATHLTHCoachEventLedger()
+    private var customStrengthWorkoutID: UUID?
+    private var customStrengthSlots: [UUID: Int] = [:]
     // A queued or remote cue is not delivered until playback actually starts.
     // Invalidate stale asynchronous callbacks after mute, countdown or stop.
     private var playbackGeneration = UUID()
@@ -238,6 +240,46 @@ final class StrengthAudioCoachSpeaker:
         }
     }
 
+    func evaluateCustomStrengthEvents(
+        workoutID: UUID,
+        rules: [ATHLTHAudioCoachRule],
+        context: ATHLTHCoachReadoutContext,
+        elapsed: TimeInterval,
+        heartRate: Double?,
+        maximumHeartRate: Double?,
+        configuration: StrengthAudioCoachConfiguration
+    ) {
+        guard configuration.enabled, !speechPaused, !rules.isEmpty else { return }
+        if customStrengthWorkoutID != workoutID {
+            customStrengthWorkoutID = workoutID
+            customStrengthSlots = [:]
+        }
+        let norwegian: Bool
+        switch configuration.language {
+        case .norwegian: norwegian = true
+        case .english: norwegian = false
+        case .system:
+            norwegian = ["nb", "nn", "no"].contains(
+                Locale.autoupdatingCurrent.language.languageCode?.identifier.lowercased() ?? ""
+            )
+        }
+        let due = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: rules, distanceMeters: 0, elapsedSeconds: elapsed,
+            paceSecondsPerKilometer: nil, heartRateBPM: heartRate,
+            norwegian: norwegian, maximumHeartRateBPM: maximumHeartRate,
+            context: context, sport: "strength", lastSlots: &customStrengthSlots
+        )
+        guard !due.isEmpty else { return }
+        let text = due.map(\.text).joined(separator: " ")
+        let key = ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+            standardMilestones: [], customAnnouncements: due
+        )
+        speak(english: text, norwegian: text, configuration: configuration,
+              cueKind: .strengthSet, event: ATHLTHCoachEvent(
+                kind: .strengthSet, key: key, priority: .routineCoach, validFor: 8
+              ))
+    }
+
     private func markSpokenEventStarted(
         _ event: ATHLTHCoachEvent,
         text: String,
@@ -310,6 +352,8 @@ final class StrengthAudioCoachSpeaker:
         cueQueue.reset()
         priorityCountdownUntil = nil
         eventLedger.reset()
+        customStrengthWorkoutID = nil
+        customStrengthSlots = [:]
         replayMemory.reset()
         lastCoachMessage = nil
         speechPaused = false
