@@ -65,6 +65,24 @@ enum ATHLTHBasicRunGoalRecipe {
 }
 
 enum ATHLTHQuickRunTimelineAdapter {
+    /// Seed the existing studio with a single course at the athlete's
+    /// chosen phase. The route is not a second independent workout.
+    static func routeBlock(
+        routeID: UUID, title: String, distanceMeters: Double,
+        phase: WorkoutPhaseKind
+    ) -> WorkoutTemplateBlock {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: title,
+            exerciseSlug: nil, distanceMeters: distanceMeters,
+            repetitions: nil, durationSeconds: nil,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil, phase: phase
+        )
+        block.cardioActivity = .running
+        block.routeID = routeID
+        block.isIndoor = false
+        return block
+    }
+
     /// A library exercise is a session-local recipe, not a newly saved
     /// library workout. Keep the full ordered work/recovery group intact.
     static func exerciseWorkout(

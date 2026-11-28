@@ -1812,6 +1812,9 @@ struct RunQuickStartSheet: View {
     @State private var showingRunningLibrary = false
     @State private var showingRunningExercises = false
     @State private var selectedExerciseSource = false
+    @State private var builtOwnWorkout = false
+    @State private var showingAllRunTypes = false
+    @State private var routeBuilderPhase: WorkoutPhaseKind?
     @State private var openEditorAfterLibrary = false
     @State private var showingDetailedWorkoutBuilder = false
 
@@ -1870,6 +1873,9 @@ struct RunQuickStartSheet: View {
                         watchStartingScreenCard
                     }
                     quickStartTypePicker
+                    if mode == .free && plannedSession == nil {
+                        buildOwnRunButton
+                    }
 
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
@@ -1898,6 +1904,9 @@ struct RunQuickStartSheet: View {
                     // configurable warm-up/step engine as planned running.
                     if mode == .route, selectedRoute != nil {
                         ATHLTHRouteWarmupCard(configuration: $routeWarmup)
+                        if plannedSession == nil {
+                            routeBuildActions
+                        }
                     }
 
                     ATHLTHQuickStartToolsRow(
@@ -1959,7 +1968,19 @@ struct RunQuickStartSheet: View {
                     SavedRoutesView(
                         selectionTitle: "Choose Route"
                     ) { route in
+                        let changedType = mode != .route
                         selectedRoute = route
+                        if changedType {
+                            selectedWorkout = nil
+                            advancedWorkout = nil
+                            basicGoalSelected = false
+                            basicGhostSelected = false
+                            selectedExerciseSource = false
+                            builtOwnWorkout = false
+                            routeWarmup = .disabled
+                        }
+                        mode = .route
+                        showingAllRunTypes = false
                         showingRoutes = false
                     }
                 }
@@ -1979,6 +2000,8 @@ struct RunQuickStartSheet: View {
                     ) { workout in
                         advancedWorkout = nil
                         selectedExerciseSource = false
+                        builtOwnWorkout = false
+                        selectedRoute = nil
                         selectedWorkout = workout
                         if let importedEnvironment = workout.launchRunEnvironment {
                             environment = importedEnvironment
@@ -1987,6 +2010,7 @@ struct RunQuickStartSheet: View {
                         basicGoalSelected = false
                         basicGhostSelected = false
                         mode = .structured
+                        showingAllRunTypes = false
                         openEditorAfterLibrary = isAdvancedSetup
                         showingRunningLibrary = false
                     }
@@ -2009,23 +2033,21 @@ struct RunQuickStartSheet: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingDetailedWorkoutBuilder) {
+            .sheet(isPresented: $showingDetailedWorkoutBuilder, onDismiss: {
+                routeBuilderPhase = nil
+            }) {
                 // Exactly the same advanced studio and ordered timeline as
                 // Plan -> From Scratch -> Running, not the legacy interval
                 // composer and not a second workout execution engine.
                 WorkoutTemplateBuilderView(
-                    initialTitle: basicGoalSelected
-                        ? basicGoalWorkout.title
-                        : advancedWorkout?.title ??
-                          selectedWorkout?.title ?? quickWorkoutName,
-                    initialBlocks: (basicGoalSelected
-                        ? basicGoalWorkout.resolvedWorkoutBlocks
-                        : advancedWorkout?.resolvedWorkoutBlocks) ??
-                        selectedWorkout.map {
-                            ATHLTHQuickRunTimelineAdapter.editorBlocks(from: $0)
-                        } ?? [],
-                    initialRouteID: basicGoalSelected ? nil :
-                        (advancedWorkout?.routeID ?? selectedWorkout?.routeID),
+                    initialTitle: routeBuilderPhase != nil
+                        ? (selectedRoute?.title ?? quickWorkoutName)
+                        : basicGoalSelected ? basicGoalWorkout.title
+                        : advancedWorkout?.title ?? selectedWorkout?.title ?? quickWorkoutName,
+                    initialBlocks: runBuilderInitialBlocks,
+                    initialRouteID: routeBuilderPhase != nil ? selectedRoute?.id :
+                        (basicGoalSelected ? nil : advancedWorkout?.routeID ?? selectedWorkout?.routeID),
+                    initialPhase: routeBuilderPhase == .warmup ? .main : nil,
                     draftContext: "quick-run-advanced",
                     initialActivity: .running,
                     initialStudioAdvanced: true,
@@ -2036,10 +2058,17 @@ struct RunQuickStartSheet: View {
                             launchFailure = issue
                             return false
                         }
+                        if mode == .free || mode == .route || builtOwnWorkout {
+                            builtOwnWorkout = true
+                            selectedExerciseSource = false
+                        }
                         advancedWorkout = workout
                         basicGoalSelected = false
                         basicGhostSelected = false
+                        selectedRoute = nil
                         selectedWorkout = nil
+                        routeWarmup = .disabled
+                        showingAllRunTypes = false
                         quickWorkoutName = workout.title
                         environment = ATHLTHQuickRunTimelineAdapter.environment(
                             for: workout
@@ -2208,6 +2237,7 @@ struct RunQuickStartSheet: View {
                 if selected != .structured {
                     basicGoalSelected = false
                     selectedExerciseSource = false
+                    builtOwnWorkout = false
                 }
                 if selected != .route { basicGhostSelected = false }
             }
@@ -2341,48 +2371,163 @@ struct RunQuickStartSheet: View {
         }
     }
 
+    private var chosenRunType: ATHLTHQuickStartType {
+        switch mode {
+        case .free: return .free
+        case .route: return .route
+        case .structured: return selectedExerciseSource ? .exercises : .workout
+        }
+    }
+
+    private var hasSelectedRunContent: Bool {
+        switch mode {
+        case .free: return false
+        case .route: return selectedRoute != nil
+        case .structured: return advancedWorkout != nil || selectedWorkout != nil || basicGoalSelected
+        }
+    }
+
+    @ViewBuilder
     private var quickStartTypePicker: some View {
-        ATHLTHQuickStartTypeSelector(
-            activity: .running,
-            advanced: isAdvancedSetup,
-            selection: Binding(
-                get: {
-                    switch mode {
-                    case .free: return .free
-                    case .route: return .route
-                    case .structured: return selectedExerciseSource ? .exercises : .workout
-                    }
-                },
-                set: { _ in }
-            ),
-            routeAllowed: environment == .outdoor
-        ) { type in
-            // Opening the exercise library is non-destructive until selection.
-            if type == .exercises {
-                showingRunningExercises = true
-                return
+        if hasSelectedRunContent && !showingAllRunTypes {
+            HStack(spacing: 12) {
+                Image(systemName: builtOwnWorkout ? "slider.horizontal.3" : chosenRunType.symbol)
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 40, height: 40)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 12))
+                Text(builtOwnWorkout
+                    ? ATHLTHLocalization.choose(english: "Custom run", norwegian: "Egen løpeøkt")
+                    : chosenRunType.title(for: .running))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer(minLength: 4)
+                Button {
+                    showingAllRunTypes = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Change type", norwegian: "Bytt type"), systemImage: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-quick-run-change-type")
             }
-            basicGoalSelected = false
-            basicGhostSelected = false
-            selectedExerciseSource = false
-            switch type {
-            case .free:
-                mode = .free
-                selectedRoute = nil
-                selectedWorkout = nil
-                advancedWorkout = nil
-            case .route:
-                mode = .route
-                showingRoutes = true
-            case .workout:
-                mode = .structured
-                showingRunningLibrary = true
-            case .competition:
-                break
-            case .exercises:
-                break
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .athlthTrainPaper()
+        } else {
+            ATHLTHQuickStartTypeSelector(
+                activity: .running,
+                advanced: isAdvancedSetup,
+                selection: Binding(get: { chosenRunType }, set: { _ in }),
+                routeAllowed: environment == .outdoor
+            ) { type in
+                switch type {
+                case .free:
+                    mode = .free
+                    selectedRoute = nil
+                    selectedWorkout = nil
+                    advancedWorkout = nil
+                    selectedExerciseSource = false
+                    builtOwnWorkout = false
+                    basicGoalSelected = false
+                    basicGhostSelected = false
+                    routeWarmup = .disabled
+                    showingAllRunTypes = false
+                case .route:
+                    // Keep the current recipe until a route is actually chosen.
+                    showingRoutes = true
+                case .workout:
+                    showingRunningLibrary = true
+                case .exercises:
+                    showingRunningExercises = true
+                case .competition:
+                    break
+                }
+            }
+            if hasSelectedRunContent && showingAllRunTypes {
+                Button(ATHLTHLocalization.choose(english: "Keep current type", norwegian: "Behold valgt type")) {
+                    showingAllRunTypes = false
+                }
+                .font(.caption.weight(.semibold))
+                .tint(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
+    }
+
+    private var buildOwnRunButton: some View {
+        Button {
+            routeBuilderPhase = nil
+            showingDetailedWorkoutBuilder = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus.circle")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(english: "Build your own workout", norwegian: "Bygg egen økt"))
+                        .font(.subheadline.weight(.semibold))
+                    Text(ATHLTHLocalization.choose(english: "Combine routes, exercises and workout phases.", norwegian: "Kombiner ruter, løpeøvelser og deløkter."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .padding(12)
+            .frame(minHeight: 54)
+            .athlthTrainPaper()
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-quick-run-build-own")
+    }
+
+    private var routeBuildActions: some View {
+        Menu {
+            Button {
+                routeBuilderPhase = .warmup
+                showingDetailedWorkoutBuilder = true
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Use route as warm-up", norwegian: "Bruk ruten som oppvarming"), systemImage: "figure.run")
+            }
+            Button {
+                routeBuilderPhase = .main
+                showingDetailedWorkoutBuilder = true
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Use route as main section", norwegian: "Bruk ruten som hoveddel"), systemImage: "map")
+            }
+            Button {
+                routeBuilderPhase = .cooldown
+                showingDetailedWorkoutBuilder = true
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Use route as cool-down", norwegian: "Bruk ruten som nedjogging"), systemImage: "figure.walk")
+            }
+        } label: {
+            Label(ATHLTHLocalization.choose(english: "Build on this route", norwegian: "Bygg videre på ruten"), systemImage: "plus.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .padding(.horizontal, 12)
+                .athlthTrainPaper()
+        }
+        .accessibilityIdentifier("athlth-quick-run-build-on-route")
+    }
+
+    private var runBuilderInitialBlocks: [WorkoutTemplateBlock] {
+        if let phase = routeBuilderPhase, let selectedRoute {
+            return [ATHLTHQuickRunTimelineAdapter.routeBlock(
+                routeID: selectedRoute.id, title: selectedRoute.title,
+                distanceMeters: selectedRoute.distanceKilometers * 1_000,
+                phase: phase)]
+        }
+        if basicGoalSelected { return basicGoalWorkout.resolvedWorkoutBlocks }
+        return advancedWorkout?.resolvedWorkoutBlocks ?? selectedWorkout.map {
+            ATHLTHQuickRunTimelineAdapter.editorBlocks(from: $0)
+        } ?? []
     }
 
     private func selectRunningExercise(_ blocks: [WorkoutTemplateBlock]) {
@@ -2394,6 +2539,8 @@ struct RunQuickStartSheet: View {
             return
         }
         selectedExerciseSource = true
+        builtOwnWorkout = false
+        showingAllRunTypes = false
         basicGoalSelected = false
         basicGhostSelected = false
         selectedRoute = nil
@@ -2405,7 +2552,8 @@ struct RunQuickStartSheet: View {
     }
 
     private func chooseStructuredContent() {
-        if selectedExerciseSource { showingRunningExercises = true }
+        if builtOwnWorkout { showingDetailedWorkoutBuilder = true }
+        else if selectedExerciseSource { showingRunningExercises = true }
         else { showingRunningLibrary = true }
     }
 

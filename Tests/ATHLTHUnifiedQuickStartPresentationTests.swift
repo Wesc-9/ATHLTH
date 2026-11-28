@@ -18,6 +18,19 @@ final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
                        [.free, .workout, .exercises])
     }
 
+    func testRouteCanBeSeededInAnyRunningPhase() {
+        let routeID = UUID()
+        for phase in [WorkoutPhaseKind.warmup, .main, .cooldown] {
+            let block = ATHLTHQuickRunTimelineAdapter.routeBlock(
+                routeID: routeID, title: "Route", distanceMeters: 4000, phase: phase)
+            XCTAssertEqual(block.routeID, routeID)
+            XCTAssertEqual(block.resolvedPhase, phase)
+            XCTAssertEqual(block.distanceMeters, 4000)
+            XCTAssertEqual(block.cardioActivity, .running)
+            XCTAssertEqual(block.isIndoor, false)
+        }
+    }
+
     func testRunningExerciseRecipePreservesWorkAndRecovery() {
         var run = WorkoutTemplateBlock(sequence: 1, kind: .run, title: "Interval",
             exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
