@@ -650,6 +650,10 @@ struct CoachPlanAdaptationView: View {
     private func generate(
         for plan: TrainingPlan
     ) async {
+        guard session.signedIn, session.hasPaidAccess else {
+            errorMessage = (session.signedIn ? AIProgramError.premiumRequired : AIProgramError.sessionExpired).localizedDescription
+            return
+        }
         isGenerating = true
         errorMessage = nil
         infoMessage = nil
