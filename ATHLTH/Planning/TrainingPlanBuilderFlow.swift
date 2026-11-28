@@ -4226,6 +4226,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         guard !isGuidedAIFilling, !completedPlanCreation, session.signedIn,
               (step == .week || step == .review), mode == .advanced else { return }
 
+        guard session.hasPaidAccess else {
+            guidedAIError = AIProgramError.premiumRequired.localizedDescription
+            return
+        }
         isGuidedAIFilling = true
         defer { isGuidedAIFilling = false }
 
