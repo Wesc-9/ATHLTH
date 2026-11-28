@@ -99,6 +99,7 @@ enum NorwegianExerciseText {
         "none": "Uten utstyr",
         "other": "Annet",
         "plate": "Vektskive",
+        "weight plate": "Vektskive",
         "plates": "Vektskiver",
         "power rack": "Power rack",
         "pull up bar": "Pull-up-stang",
