@@ -43,6 +43,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var interruptedComposerTarget: ATHLTHCoachEditorTarget?
     @State private var composerCheckpoint: ATHLTHCoachComposerCheckpoint?
     @State private var showingVoiceOptions = false
+    @State private var showingTemplatePreview = false
     @State private var showingSaveChoices = false
     @State private var showingDirtyTemplatePrompt = false
     @State private var showingResetStandardPrompt = false
@@ -84,6 +85,118 @@ struct ATHLTHAudioCoachActiveListView: View {
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private var previewNorwegian: Bool {
+        switch draft.language {
+        case .norwegian: return true
+        case .english: return false
+        case .system:
+            return ["no", "nb", "nn"].contains(
+                Locale.current.language.languageCode?.identifier.lowercased() ?? ""
+            )
+        }
+    }
+
+    private var previewGroups: [ATHLTHAudioCoachGroup] {
+        let assigned = Set(draft.coachGroups.flatMap(\.ruleIDs))
+        let activeRules = draft.customRules.filter { $0.isEnabled }
+        var groups = draft.coachGroups.filter { $0.isEnabled }.compactMap { group -> ATHLTHAudioCoachGroup? in
+            var copy = group
+            copy.ruleIDs = copy.ruleIDs.filter { id in activeRules.contains { $0.id == id } }
+            copy.optionIDs = copy.optionIDs.filter {
+                ATHLTHAudioCoachOption(rawValue: $0)?.isActive(in: draft) == true
+            }
+            return copy.ruleIDs.isEmpty && copy.optionIDs.isEmpty ? nil : copy
+        }
+        for rule in activeRules where !assigned.contains(rule.id) {
+            groups.append(ATHLTHAudioCoachGroup(
+                id: rule.id, name: rule.metric.title, ruleIDs: [rule.id],
+                trigger: rule.trigger, interval: rule.interval
+            ))
+        }
+        let assignedOptions = Set(draft.coachGroups.flatMap(\.optionIDs))
+        for option in ATHLTHAudioCoachOption.allCases where !option.isContentList &&
+            !assignedOptions.contains(option.rawValue) &&
+            option.isVisible(route: showRouteOptions, structured: showStructuredOptions) &&
+            option.isActive(in: draft) {
+            groups.append(ATHLTHAudioCoachGroup(name: option.title, optionIDs: [option.rawValue]))
+        }
+        return groups
+    }
+
+    private var templatePreview: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Examples of the active groups and commands. These are simulated values, not a live workout.",
+                            "Eksempler på aktive grupper og kommandoer. Dette er simulerte verdier, ikke en aktiv økt."))
+                        .font(.subheadline)
+                        .foregroundStyle(dim)
+                    let groups = previewGroups
+                    if groups.isEmpty {
+                        Text(tr("No active commands", "Ingen aktive kommandoer"))
+                            .foregroundStyle(dim)
+                    }
+                    ForEach(groups) { group in
+                        let sample = ATHLTHAudioCoachGroupPreview.text(
+                            group: group, rules: draft.customRules, norwegian: previewNorwegian
+                        )
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(group.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                Spacer(minLength: 0)
+                                Button {
+                                    ATHLTHAudioCoachPreviewSpeaker.shared.speak(
+                                        language: draft.language,
+                                        voiceIdentifier: draft.voiceIdentifier,
+                                        speechRate: draft.speechRate,
+                                        speechVolume: draft.speechVolume,
+                                        duckOtherAudio: draft.duckOtherAudio,
+                                        speechStyle: draft.speechStyle,
+                                        sampleText: sample
+                                    )
+                                } label: {
+                                    Image(systemName: "speaker.wave.2")
+                                        .foregroundStyle(bronze)
+                                        .frame(width: 44, height: 44)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(tr("Listen", "Prøvelytt") + " " + group.name)
+                            }
+                            if let trigger = group.trigger {
+                                Text(trigger.summary(interval: group.interval ?? 1))
+                                    .font(.caption)
+                                    .foregroundStyle(bronze)
+                            }
+                            if let conditions = group.triggerConditions, !conditions.isEmpty {
+                                Text(conditions.summary)
+                                    .font(.caption)
+                                    .foregroundStyle(dim)
+                            }
+                            Text(sample)
+                                .font(.subheadline)
+                                .foregroundStyle(ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(14)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                    }
+                }
+                .padding(16)
+            }
+            .background(ATHLTHPlanDesign.canvas)
+            .navigationTitle(tr("Test template", "Test malen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(tr("Done", "Ferdig")) { showingTemplatePreview = false }
+                        .foregroundStyle(bronze)
+                }
+            }
+        }
     }
 
     private var hasUnsavedTemplateChanges: Bool {
@@ -161,6 +274,38 @@ struct ATHLTHAudioCoachActiveListView: View {
                     onAddGroup: { composerTarget = .newGroup() },
                     onAddGeneralCommand: { composerTarget = .newCommand() }
                 )
+                Button {
+                    showingTemplatePreview = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "waveform")
+                            .foregroundStyle(bronze)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(tr("Test template", "Test malen"))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            Text(tr("Listen to examples without starting a workout",
+                                    "Prøvelytt på eksempler uten å starte en økt"))
+                                .font(.caption)
+                                .foregroundStyle(dim)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(bronze)
+                    }
+                    .padding(17)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 19))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 19)
+                            .strokeBorder(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .sheet(isPresented: $showingTemplatePreview) {
+                    templatePreview
+                }
+                .accessibilityIdentifier("athlth-coach-test-template")
                 DisclosureGroup(isExpanded: $showingVoiceOptions) {
                     voiceAndMusicContent
                         .padding(.top, 12)

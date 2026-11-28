@@ -1549,6 +1549,15 @@ enum ATHLTHAudioCoachGroupPreview {
         context.overallPaceSecondsPerKilometer = 330
         context.lastKilometerPaceSecondsPerKilometer = 285
         context.targetPaceSecondsPerKilometer = 300
+        context.averageHeartRateBPM = 142
+        context.currentEffortNumber = 2
+        context.remainingEffortCount = 2
+        context.nextEffortName = norwegian ? "Intervall 3" : "Interval 3"
+        context.currentSetNumber = 2
+        context.remainingSetCount = 3
+        context.ghostTimeDifferenceSeconds = 12
+        context.ghostDistanceDifferenceMeters = 40
+        context.workoutRemainingMeters = 2100
         context.verifiedPersonalRecordEnglish = "New verified personal best at 5 kilometres"
         context.verifiedPersonalRecordNorwegian = "Ny bekreftet personlig rekord på 5 kilometer"
         context.remainingExerciseCount = 2
@@ -1605,6 +1614,18 @@ enum ATHLTHAudioCoachGroupPreview {
             case "routeRemaining":
                 phrase = norwegian ? "2,1 kilometer igjen av ruten"
                                    : "2.1 kilometers remaining on the route"
+            case "pauseResume":
+                phrase = norwegian ? "Økten er satt på pause. Økten fortsetter." : "Workout paused. Workout resumed."
+            case "routeETA":
+                phrase = norwegian ? "Omtrent 12 minutter til mål" : "About 12 minutes to finish"
+            case "clockTime":
+                phrase = norwegian ? "Klokken er 10:30" : "The time is 10:30"
+            case "remainingStepDistance":
+                phrase = norwegian ? "200 meter igjen av draget" : "200 metres remaining in the effort"
+            case "intervalRecoveryCountdown", "scopedCountdowns":
+                phrase = norwegian ? "Neste del om 3, 2, 1" : "Next step in 3, 2, 1"
+            case "contextual":
+                phrase = norwegian ? "Motbakke foran. Finn en jevn rytme." : "Uphill ahead. Find a steady rhythm."
             default:
                 phrase = nil
             }

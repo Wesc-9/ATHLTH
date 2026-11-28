@@ -572,6 +572,17 @@ struct ATHLTHCoachRuleComposer: View {
         .accessibilityIdentifier("athlth-coach-command-builder")
     }
 
+    private var previewNorwegian: Bool {
+        switch draft.language {
+        case .norwegian: return true
+        case .english: return false
+        case .system:
+            return ["no", "nb", "nn"].contains(
+                Locale.current.language.languageCode?.identifier.lowercased() ?? ""
+            )
+        }
+    }
+
     private var exampleText: String? {
         guard let first = metrics.first else { return nil }
         var rule = ATHLTHAudioCoachRule(
@@ -585,7 +596,7 @@ struct ATHLTHCoachRuleComposer: View {
         }
         return ATHLTHCoachCommandSelection.example(
             for: rule, activity: effectiveActivity,
-            norwegian: tr("en", "nb") == "nb"
+            norwegian: previewNorwegian
         )
     }
 
@@ -619,9 +630,31 @@ struct ATHLTHCoachRuleComposer: View {
                 Spacer(minLength: 0)
             }
             Divider()
-            Text(tr("Message preview", "Forhåndsvisning"))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(bronze)
+            HStack {
+                Text(tr("Message preview", "Forhåndsvisning"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+                Spacer()
+                if let exampleText, !exampleText.isEmpty {
+                    Button {
+                        ATHLTHAudioCoachPreviewSpeaker.shared.speak(
+                            language: draft.language,
+                            voiceIdentifier: draft.voiceIdentifier,
+                            speechRate: draft.speechRate,
+                            speechVolume: draft.speechVolume,
+                            duckOtherAudio: draft.duckOtherAudio,
+                            speechStyle: draft.speechStyle,
+                            sampleText: exampleText
+                        )
+                    } label: {
+                        Label(tr("Listen", "Prøvelytt"), systemImage: "speaker.wave.2")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(bronze)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("athlth-coach-command-listen")
+                }
+            }
             Text(exampleText ?? tr(
                 "Add content to see your message here.",
                 "Legg til innhold for å se meldingen her."))
