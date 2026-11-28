@@ -21,6 +21,22 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
         )
     }
 
+    func testBrowseActivitySeparatesCardioFromStrengthWithoutMisclassifyingWalkingLunges() {
+        XCTAssertEqual(ATHLTHExerciseBrowseActivity.single(name: "Running", category: nil, bodyPart: "Cardio"), .running)
+        XCTAssertEqual(ATHLTHExerciseBrowseActivity.single(name: "Walking", category: nil, bodyPart: "Cardio"), .walking)
+        XCTAssertEqual(ATHLTHExerciseBrowseActivity.single(name: "Walking Lunge", category: "Strength", bodyPart: "Legs"), .strength)
+        XCTAssertEqual(ATHLTHExerciseBrowseActivity.single(name: "Benkpress", category: nil, bodyPart: "Chest"), .strength)
+        XCTAssertEqual(ATHLTHExerciseBrowseActivity.single(name: "Rowing Machine", category: "Cardio", bodyPart: nil), .other)
+    }
+
+    func testRunningIntervalRecipesUseRunningActivityFilter() throws {
+        let item = try XCTUnwrap(ATHLTHCompoundExerciseCatalog.bundled.first {
+            $0.familyID == "athlth:running:interval:4x4"
+        })
+        XCTAssertEqual(ATHLTHExerciseBrowseActivity.compound(item), .running)
+        XCTAssertEqual(item.category, .intervals)
+    }
+
     func testLiveStrengthMusclePageFollowsStartAndPeakPhotos() {
         let start = URL(fileURLWithPath: "/tmp/start.png")
         let peak = URL(fileURLWithPath: "/tmp/peak.png")

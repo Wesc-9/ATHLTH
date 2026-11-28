@@ -260,6 +260,68 @@ private struct ATHLTHEquipmentFilterDropdown: View {
     }
 }
 
+/// Browsing activities are independent of the strength-only insertion API.
+enum ATHLTHExerciseBrowseActivity: String, CaseIterable, Identifiable {
+    case strength, running, walking, other
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .strength: ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .running: ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .walking: ATHLTHLocalization.choose(english: "Walking", norwegian: "Gå")
+        case .other: ATHLTHLocalization.choose(english: "Other", norwegian: "Annet")
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .strength: "dumbbell"
+        case .running: "figure.run"
+        case .walking: "figure.walk"
+        case .other: "figure.mixed.cardio"
+        }
+    }
+    static func single(name: String, category: String?, bodyPart: String?) -> Self {
+        let title = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if ["running", "run", "jogging", "jogg", "løping", "løp", "treadmill",
+            "treadmill running", "treadmill run", "running on a treadmill",
+            "running (treadmill)", "løping på tredemølle", "løp på tredemølle", "tredemølle"].contains(title) { return .running }
+        if ["walking", "walk", "gå", "gange", "walking on a treadmill",
+            "treadmill walking", "gå på tredemølle"].contains(title) { return .walking }
+        if [category, bodyPart].compactMap({ $0?.lowercased() }).contains("cardio") { return .other }
+        return .strength
+    }
+
+    static func compound(_ item: ATHLTHCompoundExercise) -> Self {
+        let efforts = item.blocks.filter { $0.kind == .run && !$0.isRestOrActiveRecovery }
+        if !efforts.isEmpty && efforts.allSatisfy({ $0.cardioActivity?.rawValue == "walking" }) {
+            return item.blocks.contains(where: { $0.kind == .exercise }) ? .other : .walking
+        }
+        if item.isRunning { return .running }
+        if item.category == .strength { return .strength }
+        return .other
+    }
+}
+
+/// A presentation-only union. Compound recipes retain their original IDs,
+/// blocks, ownership and detail destination; no synthetic strength exercise.
+private enum ATHLTHExerciseBrowseRow: Identifiable {
+    case single(ExerciseLibraryEntry, String)
+    case compound(ATHLTHCompoundExercise)
+
+    var id: String {
+        switch self {
+        case .single(let entry, _): entry.id.uuidString
+        case .compound(let item): item.id
+        }
+    }
+    var title: String {
+        switch self {
+        case .single(_, let title): title
+        case .compound(let item): item.title
+        }
+    }
+}
+
 // Non-publishing memo: unrelated redraws must not scan the whole catalog.
 @MainActor
 private final class ATHLTHExercisePickerResultsCache {
@@ -272,13 +334,13 @@ private final class ATHLTHExercisePickerResultsCache {
         let favoriteIDs: Set<String>
     }
     private var key: Key?
-    private var entries: [ExerciseLibraryEntry] = []
-    private var targets: [String: UUID] = [:]
+    private var entries: [ATHLTHExerciseBrowseRow] = []
+    private var targets: [String: String] = [:]
 
     func resolve(
-        _ key: Key, entries makeEntries: () -> [ExerciseLibraryEntry],
-        targets makeTargets: ([ExerciseLibraryEntry]) -> [String: UUID]
-    ) -> ([ExerciseLibraryEntry], [String: UUID]) {
+        _ key: Key, entries makeEntries: () -> [ATHLTHExerciseBrowseRow],
+        targets makeTargets: ([ATHLTHExerciseBrowseRow]) -> [String: String]
+    ) -> ([ATHLTHExerciseBrowseRow], [String: String]) {
         if self.key != key {
             entries = makeEntries()
             targets = makeTargets(entries)
@@ -308,6 +370,13 @@ struct ExerciseLibraryView: View {
     @State private var query = ""
     @State private var queryInput = ""
     @State private var selectedBodyPart = "All"
+    @State private var browseActivity: ATHLTHExerciseBrowseActivity?
+    @State private var runningCategory: ATHLTHCompoundExercise.Category?
+    @State private var compoundRecords: [ATHLTHCompoundExercise] = []
+    @State private var compoundRevision = 0
+    @State private var savedMainSectionIDs: Set<UUID> = []
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @ObservedObject private var workoutCatalog = WorkoutTemplateCatalogStore.shared
     @State private var selectedEquipment = "All"
     @State private var equipmentFilterPresentation: ATHLTHEquipmentFilterPresentation?
     @State private var resultsCache = ATHLTHExercisePickerResultsCache()
@@ -369,6 +438,7 @@ struct ExerciseLibraryView: View {
                 normalizedBodyPart
             ) ? normalizedBodyPart : "All"
         )
+        _browseActivity = State(initialValue: onSelect == nil && normalizedBodyPart != "All" ? .strength : nil)
     }
 
     private var results: [ExerciseLibraryEntry] {
@@ -383,6 +453,7 @@ struct ExerciseLibraryView: View {
                 .filter { $0.itemType == .exercise }
                 .map(\.itemID))
             : []
+        if onSelect == nil && browseActivity == .running && runningCategory != nil { return [] }
         return library.search(
             query: query,
             bodyPart: selectedBodyPart,
@@ -411,8 +482,102 @@ struct ExerciseLibraryView: View {
                 .includesInExerciseResults(
                     sourceIdentifier: entry.sourceIdentifier
                 )
-            return sourceMatches && favoriteMatches && isExercise
+            let activityMatches = onSelect != nil || browseActivity == nil ||
+                ATHLTHExerciseBrowseActivity.single(name: entry.name, category: entry.category,
+                    bodyPart: entry.bodyPart) == browseActivity
+            return sourceMatches && favoriteMatches && isExercise && activityMatches
         }
+    }
+
+    private func refreshCompoundRecords() {
+        guard onSelect == nil else { return }
+        let saved = ATHLTHWorkoutMainSectionLibrary.load(userID: session.profile.userID)
+        savedMainSectionIDs = Set(saved.map(\.id))
+        compoundRecords = ATHLTHCompoundExerciseCatalog.build(
+            running: runningLibrary.allTemplates, workoutCatalog: workoutCatalog.entries, saved: saved)
+        compoundRevision += 1
+    }
+
+    private func browseRows() -> [ATHLTHExerciseBrowseRow] {
+        let single = displayedResults.map { ATHLTHExerciseBrowseRow.single($0, library.localizedExerciseName($0)) }
+        guard onSelect == nil, !scannerResultsActive, selectedSection != .marketplace,
+              selectedBodyPart == "All", selectedEquipment == "All" else { return single }
+        let favoriteIDs = favoritesOnly ? Set(favorites.favorites.lazy
+            .filter { $0.itemType == .exercise }.map(\.itemID)) : []
+        let clean = ATHLTHWorkoutLibraryExerciseIndex.normalize(query)
+        let compound = compoundRecords.filter { item in
+            let activity = ATHLTHExerciseBrowseActivity.compound(item)
+            return (selectedSection == .mine ? item.isPersonal : !item.isPersonal) &&
+                (browseActivity == nil || activity == browseActivity) &&
+                (runningCategory == nil || item.category == runningCategory) &&
+                (!favoritesOnly || favoriteIDs.contains(item.id)) &&
+                (clean.isEmpty || [item.title, item.category.title, item.detail, activity.title]
+                    .contains { ATHLTHWorkoutLibraryExerciseIndex.normalize($0).contains(clean) })
+        }.map { ATHLTHExerciseBrowseRow.compound($0) }
+        guard !compound.isEmpty else { return single }
+        return ATHLTHLibraryAlphabetSort.sorted(single + compound, title: { $0.title })
+    }
+
+    private func compoundCard(_ item: ATHLTHCompoundExercise) -> some View {
+        let activity = ATHLTHExerciseBrowseActivity.compound(item)
+        return VStack(alignment: .leading, spacing: 0) {
+            NavigationLink {
+                ATHLTHCompoundExerciseDetailView(exercise: item)
+            } label: {
+                if displayMode == .grid {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Image(systemName: activity.symbol)
+                            .font(.system(size: 28, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 64, height: 64)
+                            .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 14))
+                        Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(2)
+                        Text(item.category.title + " · " + item.detail)
+                            .font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk).lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
+                } else {
+                    HStack(spacing: 12) {
+                        Image(systemName: activity.symbol)
+                            .font(.system(size: 25, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 64, height: 64)
+                            .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 14))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title).font(.subheadline.weight(.semibold))
+                            Text(activity.title + " · " + item.category.title)
+                                .font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Text(item.detail).font(.caption).foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.trailing, 34)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .foregroundStyle(ATHLTHPlanDesign.ink)
+        .padding(12)
+        .athlthPlanCard(radius: 17)
+        .overlay(alignment: .topTrailing) {
+            LibraryFavoriteButton(kind: .exercise, itemID: item.id,
+                title: item.title, subtitle: item.category.title + " · " + item.detail,
+                icon: activity.symbol)
+                .padding(8)
+        }
+        .contextMenu {
+            if item.isPersonal && item.sourceIDs.contains(where: savedMainSectionIDs.contains) {
+                Button(role: .destructive) {
+                    for id in item.sourceIDs where savedMainSectionIDs.contains(id) {
+                        ATHLTHWorkoutMainSectionLibrary.delete(id, userID: session.profile.userID)
+                    }
+                    refreshCompoundRecords()
+                } label: {
+                    Label(ATHLTHLocalization.choose(english: "Remove saved main section", norwegian: "Fjern lagret hoveddel"), systemImage: "trash")
+                }
+            }
+        }
+        .accessibilityIdentifier("compound-exercise-" + item.id)
     }
 
     private var freeStrengthShortcutLabel: some View {
@@ -497,19 +662,20 @@ struct ExerciseLibraryView: View {
 
     private var pageFilterKey: String {
         [query, selectedBodyPart, selectedEquipment, selectedSection.rawValue,
-         String(favoritesOnly), String(scannerResultsActive)].joined(separator: "|")
+         String(favoritesOnly), String(scannerResultsActive), browseActivity?.rawValue ?? "all",
+         runningCategory?.rawValue ?? "all", String(compoundRevision)].joined(separator: "|")
     }
 
     var body: some View {
         // Reuse one filtered/sorted list for empty state, rows and alphabet targets.
         // Marketplace has its own remote catalog. Do not filter/sort the
         // entire on-device exercise library while that tab is selected.
-        let presentation: ([ExerciseLibraryEntry], [String: UUID])
+        let presentation: ([ATHLTHExerciseBrowseRow], [String: String])
         if selectedSection == .marketplace || (onSelect == nil && standaloneFavorites) {
             presentation = ([], [:])
         } else if scannerResultsActive {
-            let scanned = displayedResults
-            presentation = (scanned, library.alphabetIndexTargets(for: scanned))
+            let scanned = browseRows()
+            presentation = (scanned, ATHLTHLibraryAlphabetLookup(items: scanned, id: { $0.id }, title: { $0.title }).targets)
         } else {
             let favoriteIDs: Set<String> = favoritesOnly ? Set(favorites.favorites.lazy
                 .filter { $0.itemType == .exercise }.map(\.itemID)) : []
@@ -519,8 +685,8 @@ struct ExerciseLibraryView: View {
                       translationRevision: norwegianTranslations.revision,
                       norwegian: ATHLTHLocalization.isNorwegian,
                       favoriteIDs: favoriteIDs),
-                entries: { results },
-                targets: { library.alphabetIndexTargets(for: $0) }
+                entries: { browseRows() },
+                targets: { ATHLTHLibraryAlphabetLookup(items: $0, id: { $0.id }, title: { $0.title }).targets }
             )
         }
         let (entries, alphabetTargets) = presentation
@@ -609,46 +775,6 @@ struct ExerciseLibraryView: View {
             .padding(.top, 7)
 
             filters
-            if selectedSection == .library && onSelect == nil {
-                NavigationLink {
-                    // Compound interval exercises belong in the same
-                    // Exercises destination, not in a second workout engine.
-                    ATHLTHCompoundExerciseLibraryView()
-                } label: {
-                    HStack(spacing: 11) {
-                        Image(systemName: "figure.run")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(width: 44, height: 44)
-                            .background(ATHLTHPlanDesign.selectedSurface,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Running · Intervals",
-                                norwegian: "Løping · Intervaller"
-                            ))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Text(ATHLTHLocalization.choose(
-                                english: "4×4 and reusable main sections from workout plans",
-                                norwegian: "4×4 og gjenbrukbare hoveddeler fra treningsøkter"
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                    .padding(12)
-                    .athlthPlanCard(radius: 17)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 6)
-                .accessibilityIdentifier("exercise-library-running-intervals")
-            }
             translationAvailabilityBanner
 
             if selectedSection == .library,
@@ -744,7 +870,7 @@ struct ExerciseLibraryView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if selectedSection == .library &&
                 library.isLoading &&
-                library.athlthCatalogExercises.isEmpty {
+                library.athlthCatalogExercises.isEmpty && entries.isEmpty {
                 ProgressView(ATHLTHLocalization.choose(
                     english: "Loading exercises…", norwegian: "Laster øvelser…"
                 ))
@@ -785,12 +911,14 @@ struct ExerciseLibraryView: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         .multilineTextAlignment(.center)
                         if selectedBodyPart != "All" || selectedEquipment != "All" ||
-                       !query.isEmpty || favoritesOnly {
+                       !query.isEmpty || favoritesOnly || browseActivity != nil {
                             Button(ATHLTHLocalization.choose(
                                 english: "Clear filters", norwegian: "Nullstill filtrene"
                             )) {
                                 selectedBodyPart = "All"
                                 selectedEquipment = "All"
+                                browseActivity = nil
+                                runningCategory = nil
                                 query = ""
                                 queryInput = ""
                                 favoritesOnly = false
@@ -817,13 +945,15 @@ struct ExerciseLibraryView: View {
                             spacing: 10
                         ) {
                             ForEach(
-                                ATHLTHExerciseAlphabetPage.visibleEntries(
-                                    from: entries,
-                                    startIndex: visibleStartIndex,
-                                    limit: visibleLimit
+                                ATHLTHLibraryAlphabetWindow.visible(
+                                    entries, start: visibleStartIndex, limit: visibleLimit
                                 )
-                            ) { entry in
+                            ) { row in
                                 Group {
+                                    switch row {
+                                    case .compound(let item):
+                                        compoundCard(item)
+                                    case .single(let entry, _):
                                     if displayMode == .grid, let onSelect {
                                         // A dedicated footer keeps the entire
                                         // illustration and title unobstructed
@@ -911,8 +1041,9 @@ struct ExerciseLibraryView: View {
                                             }
                                         }
                                     }
+                                    }
                                 }
-                                .id(entry.id)
+                                .id(row.id)
                             }
 
                             if selectedSection == .library,
@@ -980,6 +1111,7 @@ struct ExerciseLibraryView: View {
                         async let exercises: Void = library.refresh(force: true)
                         async let saved: Void = favorites.refresh()
                         _ = await (exercises, saved)
+                        if onSelect == nil { await workoutCatalog.refresh(); refreshCompoundRecords() }
                     }
                     .overlay(
                         alignment: .trailing
@@ -990,10 +1122,7 @@ struct ExerciseLibraryView: View {
                                 // only the 50 rows currently mounted in the grid.
                                 targets: alphabetTargets,
                                 onJump: { id in
-                                    guard let index =
-                                        ATHLTHExerciseAlphabetPage.startIndex(
-                                            for: id, in: entries
-                                        )
+                                    guard let index = entries.firstIndex(where: { $0.id == id })
                                     else { return }
                                     visibleStartIndex = index
                                     visibleLimit = ATHLTHLibraryPagination.pageSize
@@ -1043,7 +1172,7 @@ struct ExerciseLibraryView: View {
                 .transaction { $0.animation = nil }
             }
         }
-        .navigationTitle(selectionTitle ?? "Exercises")
+        .navigationTitle(selectionTitle ?? ATHLTHLocalization.choose(english: "Exercises", norwegian: "Øvelser"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if onSelect == nil {
@@ -1120,6 +1249,7 @@ struct ExerciseLibraryView: View {
             }
         }
         .onAppear {
+            refreshCompoundRecords()
             refreshExerciseHistory()
             displayMode = .load(userID: session.profile.userID)
             preferredColumns = ATHLTHLibraryColumnPreference.load(
@@ -1129,7 +1259,11 @@ struct ExerciseLibraryView: View {
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
             libraryViewWidth = width
         }
+        .onChange(of: workoutCatalog.entries) { _, _ in refreshCompoundRecords() }
+        .onReceive(runningLibrary.$customTemplates.dropFirst()) { _ in refreshCompoundRecords() }
         .onChange(of: session.profile.userID) { _, userID in
+            compoundRecords = []
+            refreshCompoundRecords()
             strengthHistoryIndex = .empty
             equipmentFilterPresentation = nil
             refreshExerciseHistory()
@@ -1150,6 +1284,7 @@ struct ExerciseLibraryView: View {
         ) { owner in
             guard owner == session.profile.userID else { return }
             refreshExerciseHistory()
+            refreshCompoundRecords()
         }
         // Debounce typing so long catalog scans do not run for each key.
         .task(id: queryInput) {
@@ -1163,6 +1298,7 @@ struct ExerciseLibraryView: View {
             if query != normalized { query = normalized }
         }
         .task {
+            if onSelect == nil { await workoutCatalog.refresh() }
             recents.refresh()
             async let exerciseRefresh: Void = library.refresh()
             async let favoriteRefresh: Void = favorites.refresh()
@@ -1511,23 +1647,40 @@ struct ExerciseLibraryView: View {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 8) {
-                        muscleGroupChip(
-                            ATHLTHLocalization.choose(
-                                english: "All", norwegian: "Alle"
-                            ),
-                            value: "All"
-                        )
-                        .id("All")
-
-                        ForEach(ATHLTHExerciseMuscleFilterPresentation.sorted(
-                            library.bodyParts,
-                            title: library.localizedBodyPartTitle
-                        ), id: \.self) { part in
-                            muscleGroupChip(
-                                library.localizedBodyPartTitle(part),
-                                value: part
-                            )
-                            .id(part)
+                        if onSelect == nil {
+                            if let activity = browseActivity {
+                                activityChip(activity).id("activity-" + activity.rawValue)
+                            } else {
+                                activityChip(nil).id("activity-all")
+                                ForEach(ATHLTHExerciseBrowseActivity.allCases) { activity in
+                                    activityChip(activity).id("activity-" + activity.rawValue)
+                                }
+                            }
+                        }
+                        if onSelect != nil || browseActivity == .strength {
+                            if onSelect != nil {
+                                muscleGroupChip(ATHLTHLocalization.choose(english: "All", norwegian: "Alle"), value: "All").id("All")
+                            }
+                            ForEach(ATHLTHExerciseMuscleFilterPresentation.sorted(
+                                library.bodyParts, title: library.localizedBodyPartTitle
+                            ), id: \.self) { part in
+                                muscleGroupChip(library.localizedBodyPartTitle(part), value: part).id(part)
+                            }
+                        } else if browseActivity == .running {
+                            ForEach([ATHLTHCompoundExercise.Category.intervals, .threshold, .hills, .fartlek, .running]) { category in
+                                Button {
+                                    runningCategory = runningCategory == category ? nil : category
+                                } label: {
+                                    Text(category.title)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(runningCategory == category ? Color.white : ATHLTHPlanDesign.ink)
+                                        .padding(.horizontal, 13).frame(minHeight: 44)
+                                        .background(runningCategory == category ? ATHLTHPlanDesign.ink : Color.white, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(runningCategory == category ? [.isSelected] : [])
+                                .id("running-" + category.rawValue)
+                            }
                         }
                     }
                     .padding(.vertical, 2)
@@ -1537,7 +1690,10 @@ struct ExerciseLibraryView: View {
                 // cannot be separated by unused space on tall iPhones.
                 .frame(height: dynamicTypeSize.isAccessibilitySize ? 62 : 48)
                 .onAppear {
-                    proxy.scrollTo(selectedBodyPart, anchor: .center)
+                    if onSelect != nil { proxy.scrollTo(selectedBodyPart, anchor: .center) }
+                }
+                .onChange(of: browseActivity) { _, activity in
+                    proxy.scrollTo("activity-" + (activity?.rawValue ?? "all"), anchor: .leading)
                 }
                 .onChange(of: selectedBodyPart) { _, value in
                     withAnimation(.easeOut(duration: 0.18)) {
@@ -1546,7 +1702,7 @@ struct ExerciseLibraryView: View {
                 }
             }
             .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Muscle groups", norwegian: "Muskelgrupper"
+                english: "Activity and exercise filters", norwegian: "Treningsform og øvelsesfiltre"
             ))
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1583,6 +1739,7 @@ struct ExerciseLibraryView: View {
                     .buttonStyle(.plain)
                     }
 
+                    if onSelect != nil || browseActivity == .strength {
                     Button {
                         equipmentFilterPresentation = ATHLTHEquipmentFilterPresentation(
                             options: ATHLTHEquipmentFilterOption.make(
@@ -1604,9 +1761,10 @@ struct ExerciseLibraryView: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("exercise-equipment-filter")
                     .anchorPreference(key: ATHLTHEquipmentFilterAnchor.self, value: .bounds) { $0 }
+                    }
 
                     if selectedBodyPart != "All" || selectedEquipment != "All" ||
-                       favoritesOnly {
+                       favoritesOnly || browseActivity != nil {
                         Button(
                             ATHLTHLocalization.choose(
                                 english: "Clear",
@@ -1616,6 +1774,8 @@ struct ExerciseLibraryView: View {
                             selectedBodyPart = "All"
                             selectedEquipment = "All"
                             favoritesOnly = false
+                            browseActivity = nil
+                            runningCategory = nil
                         }
                         .font(.caption.weight(.semibold))
                         .frame(minHeight: 44)
@@ -1630,10 +1790,34 @@ struct ExerciseLibraryView: View {
         .padding(.bottom, 6)
     }
 
+    private func activityChip(_ activity: ATHLTHExerciseBrowseActivity?) -> some View {
+        let selected = browseActivity == activity
+        return Button {
+            browseActivity = selected ? nil : activity
+            selectedBodyPart = "All"
+            selectedEquipment = "All"
+            runningCategory = nil
+            equipmentFilterPresentation = nil
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: activity?.symbol ?? "square.grid.2x2")
+                Text(activity?.title ?? ATHLTHLocalization.choose(english: "All", norwegian: "Alle"))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
+            .padding(.horizontal, 13).frame(minHeight: 44)
+            .background(selected ? ATHLTHPlanDesign.ink : Color.white, in: Capsule())
+            .overlay { Capsule().strokeBorder(ATHLTHPlanDesign.outline, lineWidth: selected ? 0 : 0.8) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("exercise-activity-" + (activity?.rawValue ?? "all"))
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
     private func muscleGroupChip(_ title: String, value: String) -> some View {
         let selected = selectedBodyPart == value
         return Button {
-            selectedBodyPart = value
+            selectedBodyPart = onSelect == nil && selected ? "All" : value
         } label: {
             HStack(spacing: 6) {
                 if value == "All" {
