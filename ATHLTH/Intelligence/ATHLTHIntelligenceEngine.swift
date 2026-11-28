@@ -62,7 +62,9 @@ enum ATHLTHIntelligenceRoutingPolicy {
         case .workoutInsight, .recoveryInsight, .coachQuestion, .privateHistorySearch, .trophyInscription:
             return localAvailable ? .appleLocal : .rules
         case .equipmentRecognition: return .appleVision
-        case .trainingProgram, .strengthSession, .planAdaptation, .pushToTalk:
+        case .trainingProgram, .strengthSession, .planAdaptation:
+            return localAvailable ? .appleLocal : .rules
+        case .pushToTalk:
             return .groq
         case .realtimeConversation:
             return .openAIRealtime
@@ -84,9 +86,6 @@ enum ATHLTHIntelligenceRoutingPolicy {
     static func groqEndpoint(for feature: ATHLTHIntelligenceFeature) throws -> String {
         guard provider(for: feature) == .groq else { throw ATHLTHIntelligenceDiagnosticError.unavailable }
         switch feature {
-        case .trainingProgram: return "generate-training-program"
-        case .strengthSession: return "generate-strength-session"
-        case .planAdaptation: return "generate-plan-adaptation"
         case .pushToTalk: return "audio-coach-groq-turn"
         default: throw ATHLTHIntelligenceDiagnosticError.unavailable
         }
