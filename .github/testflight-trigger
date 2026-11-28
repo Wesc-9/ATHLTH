@@ -377,3 +377,5 @@ ATHLTH 3.0.6 build 146 — authorized retry: replace unavailable watchOS navigat
 ATHLTH 3.0.6 build 146 — authorized retry: fix local Vision call and Coach error shadowing; preserve exact-commit gates.
 ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27 after exhaustive iPad workout shortcut navigation fix 97972ef0. Require all five exact-commit release gates, signed archive and Apple upload; no gate bypass or frozen branch changes.
 ATHLTH 3.0.6 build 146 — authorized retry 2026-11-27 after two outdated workout category XCTest expectations updated for approved Sports activity; all five exact-commit release gates remain mandatory.
+
+ATHLTH 3.0.7 — user-authorized overnight TestFlight upload 2026-11-28. Source 4e7136ec32e3070b2417031e604c739323000c43. Preserve approved exercise artwork only; no rejected images. Require exact-commit release gates, signed archive and verified App Store Connect delivery. Fix confirmed failures on release/v3.0.7 and retry; no gate bypass, stale upload or frozen branch changes.
