@@ -424,7 +424,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                              symbol: "star") {
                             showingFavoritePlans = true
                         }
-                        referenceEmptyAction(tr("AI coach", "AI-coach"),
+                        referenceEmptyAction(tr("ATHLTH Coach", "ATHLTH Coach"),
                                              caption: tr("Personal guidance", "Personlig hjelp"),
                                              symbol: "sparkles") {
                             showingAICreation = true
