@@ -47,9 +47,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var title = ""
 
-    // A blank title means automatic naming from a REAL linked goal or
-    // workout focus, never a generic "My training plan".
+    // Simple plans use a neutral title unless the user enters one.
+    // Advanced retains its existing goal-based naming.
     private var defaultPlanTitle: String {
+        if mode == .basic {
+            return ATHLTHLocalization.choose(
+                english: "My training plan", norwegian: "Min treningsplan")
+        }
         if let linked = goalStore.activeGoals.first(where: {
             $0.status == .active && selectedGoalIDs.contains($0.id)
         }) {
@@ -79,6 +83,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         return trimmed.isEmpty ? defaultPlanTitle : trimmed
     }
     @State private var weekCount = 4
+    @State private var simpleDurationUnspecified = true
     @State private var startDate =
         ATHLTHTrainingPlanBuilderFlow.defaultStartDate()
     // A conflict can be resolved only by an explicit choice from the athlete.
@@ -225,7 +230,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingAIBuilder = false
     @State private var prefersAIPlanBuild = false
     @State private var showingGuidedAIConsent = false
-    @State private var saveToLibrary = true
     @State private var isGuidedAIFilling = false
     @State private var guidedAIError: String?
     @State private var guidedAIFillPreview: GuidedAIFillPreview?
@@ -278,10 +282,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         var guidedTargetDays: Set<Int>? = nil
         var reviewingGuidedDay: Bool? = nil
         var buildWithCoach: Bool? = nil
+        var simpleDurationUnspecified: Bool? = nil
     }
     private var checkpointConfiguration: ConfigurationCheckpoint {
         ConfigurationCheckpoint(
-            saveToLibrary: saveToLibrary, customTitle: title, workoutTitles: workoutTitleOverridesByDay,
+            saveToLibrary: true, customTitle: title, workoutTitles: workoutTitleOverridesByDay,
             workoutMinutes: workoutMinutesByDay,
             goalDetail: goalDetail, summary: planSummary,
             injuryFree: injuryFree, limitations: injuriesOrLimitations,
@@ -291,7 +296,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             visibility: visibility, selectedDay: selectedAdvancedWeekDay,
             aiInstruction: aiAdjustmentInstruction,
             guidedTargetDays: guidedTargetDays, reviewingGuidedDay: reviewingGuidedDay,
-            buildWithCoach: prefersAIPlanBuild)
+            buildWithCoach: prefersAIPlanBuild,
+            simpleDurationUnspecified: simpleDurationUnspecified)
     }
 
     private var configurationCheckpoint: Data? {
@@ -2382,6 +2388,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     title: $title,
                     startDate: $startDate,
                     weekCount: $weekCount,
+                    durationUnspecified: $simpleDurationUnspecified,
                     selectedDays: selectedDays,
                     suggestedName: defaultPlanTitle,
                     onToggleDay: { day in
@@ -2392,7 +2399,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     },
                     onSelectAdvanced: { openModeStart(advanced: true) }
                 )
-                planLibrarySaveChoice
                 if let conflictingPlan, approvedPlanReplacementID != conflictingPlan.id {
                     conflictCard(conflictingPlan)
                 }
@@ -3282,19 +3288,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             return parts.joined(separator: "; ")
         }.joined(separator: " | ")
-    }
-
-    private var planLibrarySaveChoice: some View {
-        Toggle(isOn: $saveToLibrary) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(ATHLTHLocalization.choose(english: "Save in My plans", norwegian: "Lagre i Mine planer"))
-                    .font(.subheadline.weight(.semibold))
-                Text(ATHLTHLocalization.choose(english: "Keep a reusable copy on your account, available on iPhone and iPad.", norwegian: "Behold en gjenbrukbar kopi på kontoen din, tilgjengelig på iPhone og iPad."))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .tint(ATHLTHPlanDesign.accentInk)
-        .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func aiProposal(
@@ -6587,7 +6580,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 icon: "checkmark.seal.fill"
             )
 
-            planLibrarySaveChoice
             if mode == .advanced {
                 AnyView(guidedSummaryWeeks)
                 reviewSummaryPanel
@@ -7310,12 +7302,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
     }
 
+    private var effectivePlanWeekCount: Int {
+        mode == .basic && simpleDurationUnspecified ? 4 : weekCount
+    }
+
     private var resolvedEndDate: Date {
         Calendar.current.date(
             byAdding: .day,
             value:
                 max(
-                    weekCount * 7 - 1,
+                    effectivePlanWeekCount * 7 - 1,
                     0
                 ),
             to:
@@ -7378,7 +7374,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         startDate = draft.startDate
         if let data = draft.configuration,
            let saved = try? JSONDecoder().decode(ConfigurationCheckpoint.self, from: data) {
-            saveToLibrary = saved.saveToLibrary ?? true
+            simpleDurationUnspecified = saved.simpleDurationUnspecified ?? (draft.weekCount == 4)
             title = saved.customTitle ?? title
             goalDetail = saved.goalDetail
             planSummary = saved.summary
@@ -8093,7 +8089,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             builderProfile: currentPlanBuilderProfile,
             planVisibility: visibility,
             planSummary: planSummary,
-            saveToLibrary: saveToLibrary
+            saveToLibrary: true
         )
     }
 
@@ -8217,7 +8213,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .createConfiguredTrainingPlan(
                     title: resolvedPlanTitle,
                     summary: planSummary,
-                    weekCount: weekCount,
+                    weekCount: effectivePlanWeekCount,
                     startDate: startDate,
                     endDate: resolvedEndDate,
                     visibility: visibility,
@@ -8226,7 +8222,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     structuredWorkoutsByDay: mode == .advanced
                         ? structuredWorkoutsByDay : [:],
                     weekDayEdits: mode == .advanced ? weekDayEdits : [:],
-                    saveToLibrary: saveToLibrary
+                    saveToLibrary: true
                 )
 
         guard let created else {
