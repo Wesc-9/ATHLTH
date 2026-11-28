@@ -96,13 +96,16 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
         if activity == .intervals && !hasStructuredSteps &&
             isWorkoutSpecific { return false }
 
-        switch activity {
+        // An all-sports selection inside a concrete workout must still obey
+        // the actual workout's sport restrictions.
+        let effectiveActivity = activity == .all ? (workoutActivity ?? .all) : activity
+        switch effectiveActivity {
         case .strength, .functional:
             switch trigger {
             case .distance, .nearFinishDistance, .elevationGain,
                  .uphillDetected, .slowerThanPreviousWorkout,
                  .paceFasterOverall, .paceFasterLastKilometer,
-                 .paceFasterThanTarget, .paceSlowerThanTarget:
+                 .paceFasterThanTarget, .paceSlowerThanTarget, .personalRecordConfirmed:
                 return false
             default: return true
             }
@@ -118,9 +121,11 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
         case .cycling:
             return trigger != .slowerThanPreviousWorkout &&
                 trigger != .paceFasterThanTarget &&
-                trigger != .paceSlowerThanTarget
+                trigger != .paceSlowerThanTarget &&
+                trigger != .personalRecordConfirmed
         case .walking:
-            return trigger != .slowerThanPreviousWorkout
+            return trigger != .slowerThanPreviousWorkout &&
+                trigger != .personalRecordConfirmed
         case .all, .running, .intervals:
             return true
         }
