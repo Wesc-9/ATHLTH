@@ -465,6 +465,7 @@ struct PerWorkoutAudioCoachView: View {
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
     var triggerAvailability: ATHLTHCoachTriggerAvailability? = nil
+    var simpleMode = false
 
     var body: some View {
         ScrollView {
@@ -491,7 +492,8 @@ struct PerWorkoutAudioCoachView: View {
                         draft: $draft,
                         showRouteOptions: showRouteOptions,
                         showStructuredOptions: showStructuredOptions,
-                        triggerAvailability: triggerAvailability
+                        triggerAvailability: triggerAvailability,
+                        simpleMode: simpleMode
                     )
                     .environment(\.athlthAudioCoachApplySelectionAndClose, { dismiss() })
                 }
@@ -504,6 +506,13 @@ struct PerWorkoutAudioCoachView: View {
         .tint(ATHLTHPlanDesign.accentInk)
         .navigationTitle("Audio Coach")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if simpleMode {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) { dismiss() }
+                }
+            }
+        }
     }
 }
 

@@ -2580,6 +2580,22 @@ struct RunQuickStartSheet: View {
                 )
                 .tint(ATHLTHPlanDesign.accentInk)
                 .disabled(!session.canAccess(.audioCoach))
+                if audioCoachDraft.enabled {
+                    NavigationLink {
+                        PerWorkoutAudioCoachView(
+                            draft: $audioCoachDraft,
+                            showRouteOptions: selectedRoute != nil,
+                            showStructuredOptions: (mode == .structured && (selectedWorkout != nil || advancedWorkout != nil)) || plannedSession != nil,
+                            triggerAvailability: .basicCoach(activity: .running, hasRoute: selectedRoute != nil,
+                                structured: (mode == .structured && (selectedWorkout != nil || advancedWorkout != nil)) || plannedSession != nil),
+                            simpleMode: true
+                        )
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Choose what to hear", norwegian: "Velg hva du vil høre"), systemImage: "waveform")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                    .disabled(!session.canAccess(.audioCoach))
+                }
                 if mode == .route && selectedRoute != nil {
                     Toggle(
                         ATHLTHLocalization.choose(
@@ -4509,6 +4525,21 @@ struct WalkQuickStartSheet: View {
                 Toggle("Audio Coach", isOn: $audioCoachDraft.enabled)
                     .tint(ATHLTHPlanDesign.accentInk)
                     .disabled(!session.canAccess(.audioCoach))
+                if audioCoachDraft.enabled {
+                    NavigationLink {
+                        PerWorkoutAudioCoachView(
+                            draft: $audioCoachDraft,
+                            showRouteOptions: selectedWalkingRoute != nil,
+                            showStructuredOptions: plannedSession != nil,
+                            triggerAvailability: .basicCoach(activity: .walking, hasRoute: selectedWalkingRoute != nil, structured: plannedSession != nil),
+                            simpleMode: true
+                        )
+                    } label: {
+                        Label(ATHLTHLocalization.choose(english: "Choose what to hear", norwegian: "Velg hva du vil høre"), systemImage: "waveform")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                    .disabled(!session.canAccess(.audioCoach))
+                }
             }
         case .equipment:
             WorkoutGearSelectionCard(
@@ -5102,13 +5133,15 @@ struct AudioCoachSetupCard: View {
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
     var triggerAvailability: ATHLTHCoachTriggerAvailability? = nil
+    var simpleMode = false
 
     var body: some View {
         ATHLTHAudioCoachSessionStudio(
             draft: $draft,
             showRouteOptions: showRouteOptions,
             showStructuredOptions: showStructuredOptions,
-            triggerAvailability: triggerAvailability
+            triggerAvailability: triggerAvailability,
+            simpleMode: simpleMode
         )
     }
 }
@@ -5314,3 +5347,12 @@ private extension Optional where Wrapped == String {
          }
      }
  }
+
+extension ATHLTHCoachTriggerAvailability {
+    static func basicCoach(activity: ATHLTHCoachActivityFilter, hasRoute: Bool, structured: Bool) -> Self {
+        var result = session(hasRoute: hasRoute, structured: structured)
+        result.workoutActivity = activity
+        result.supportsDistance = activity != .strength
+        return result
+    }
+}

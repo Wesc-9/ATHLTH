@@ -494,8 +494,8 @@ struct WorkoutStartOptionsView: View {
                     $showingAudioCoachSettings
             ) {
                 StrengthAudioCoachSettingsView(
-                    configuration:
-                        $strengthAudioCoach
+                    configuration: $strengthAudioCoach,
+                    simpleMode: trackingMode == .simple
                 )
             }
             .sheet(
@@ -847,6 +847,13 @@ struct WorkoutStartOptionsView: View {
                 .font(.subheadline.weight(.semibold))
                 .tint(ATHLTHPlanDesign.accentInk)
                 .accessibilityIdentifier("athlth-strength-basic-audio-coach")
+                if strengthAudioCoach.enabled {
+                    Button { showingAudioCoachSettings = true } label: {
+                        Label(ATHLTHLocalization.choose(english: "Choose what to hear", norwegian: "Velg hva du vil høre"), systemImage: "waveform")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                }
             } else {
                 advancedOptionButton(
                     title: "Audio Coach",
@@ -1557,6 +1564,7 @@ struct WorkoutStartOptionsView: View {
 struct StrengthAudioCoachSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var configuration: StrengthAudioCoachConfiguration
+    var simpleMode = false
     @State private var showingVoiceChoices = false
 
     private func tr(_ english: String, _ norwegian: String) -> String {
@@ -1565,7 +1573,36 @@ struct StrengthAudioCoachSettingsView: View {
 
     var body: some View {
         NavigationStack {
+            if simpleMode {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle("Audio Coach", isOn: $configuration.enabled).font(.title3.weight(.semibold))
+                            if configuration.enabled {
+                                Divider()
+                                Text(tr("What do you want to hear?", "Hva vil du høre?")).font(.headline)
+                                Toggle(tr("When I finish a set", "Når jeg er ferdig med et sett"), isOn: $configuration.announceSetComplete)
+                                Toggle(tr("What exercise comes next", "Hvilken øvelse som kommer neste"), isOn: $configuration.announceNextExercise)
+                                Toggle(tr("When my rest is over", "Når hvilepausen er ferdig"), isOn: $configuration.announceRestComplete)
+                                Toggle(tr("Reminder before rest ends", "Beskjed før pausen er ferdig"), isOn: $configuration.announceRestCountdown)
+                                if configuration.announceRestCountdown {
+                                    Picker(tr("Time left", "Tid igjen"), selection: $configuration.restCountdownSeconds) {
+                                        ForEach(Array(Set([5, 10, 15, 30, configuration.restCountdownSeconds])).sorted(), id: \.self) { Text("\($0) s").tag($0) }
+                                    }
+                                }
+                            }
+                        }.padding(18).background(.white, in: RoundedRectangle(cornerRadius: 20))
+                        if configuration.enabled {
+                            DisclosureGroup(tr("Want another reminder?", "Ønsker du en annen beskjed?")) { strengthRequestCard }
+                        }
+                    }.padding(16).frame(maxWidth: 680).frame(maxWidth: .infinity)
+                }.background(ATHLTHPlanDesign.canvas)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                    .navigationTitle("Audio Coach")
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button(tr("Done", "Ferdig")) { dismiss() } } }
+            } else {
             Form {
+                if configuration.enabled { Section { strengthRequestCard } }
                 Section {
                     Toggle("Audio Coach", isOn: $configuration.enabled)
                         .tint(ATHLTHTheme.premiumGold)
@@ -1836,7 +1873,15 @@ struct StrengthAudioCoachSettingsView: View {
                     Button(tr("Done", "Ferdig")) { dismiss() }
                 }
             }
+            }
         }
+    }
+
+    private var strengthRequestCard: some View {
+        ATHLTHCoachRequestView(rules: Binding(
+            get: { configuration.customStrengthEventRules ?? [] },
+            set: { configuration.customStrengthEventRules = $0 }
+        ), availability: .basicCoach(activity: .strength, hasRoute: false, structured: true))
     }
 
     private var selectedExperience: ATHLTHCoachExperiencePreset? {

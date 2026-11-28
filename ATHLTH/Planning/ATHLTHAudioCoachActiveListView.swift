@@ -269,6 +269,7 @@ struct ATHLTHAudioCoachActiveListView: View {
             .padding(.vertical, 5)
 
             if draft.enabled {
+                ATHLTHCoachRequestView(rules: $draft.customRules, availability: triggerAvailability ?? (globalScope ? .global : .session(hasRoute: showRouteOptions, structured: showStructuredOptions)))
                 ATHLTHAudioCoachCircleOverview(
                     draft: $draft,
                     selectedProfileName: $selectedProfileName,
