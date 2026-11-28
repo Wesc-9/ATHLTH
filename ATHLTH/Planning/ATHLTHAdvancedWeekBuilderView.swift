@@ -39,7 +39,15 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     let onAddGroup: (Int, [WorkoutTemplateBlock], WorkoutKind) -> Void
     let onCopyWeek: (Int, [Int], Bool) -> Void
     let onMakeRecoveryWeek: (Int) -> Void
+    var dragScope = ""
+    var onDropItem: (String, Int, Int?, WorkoutPhaseKind?, UUID?) -> Bool = { _, _, _, _, _ in false }
+    var onDeleteWorkout: (Int, Int) -> Void = { _, _ in }
+    var onDeleteBlock: (Int, Int, UUID) -> Void = { _, _, _ in }
+    var onClearDay: (Int) -> Void = { _ in }
     let onSwitchToDayView: () -> Void
+
+    @State private var pendingDeleteAction: (() -> Void)?
+    @State private var showingDeleteConfirmation = false
 
     @State private var showingStructure = false
     @State private var showingQuickActions = false
@@ -114,6 +122,13 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 inlineGroupKind = nil
                 inlineGroupDay = nil
             }
+        }
+        .alert(tr("Remove planned content?", "Slette planlagt innhold?"), isPresented: $showingDeleteConfirmation) {
+            Button(tr("Delete", "Slett"), role: .destructive) {
+                pendingDeleteAction?()
+                pendingDeleteAction = nil
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) { pendingDeleteAction = nil }
         }
         .sheet(isPresented: $showingCopy) {
             copySheet
@@ -363,6 +378,11 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 } label: {
                     Label(tr("Add exercise", "Legg til øvelse"), systemImage: "dumbbell")
                 }
+                if day.isRestDay || !day.workouts.isEmpty {
+                    Button(role: .destructive) { onClearDay(day.weekday) } label: {
+                        Label(tr("Clear day", "Slett planlegging for dagen"), systemImage: "trash")
+                    }
+                }
                 Button {
                     requestRestDayChange(for: day)
                 } label: {
@@ -381,6 +401,9 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                                 day.date.formatted(.dateTime.weekday(.wide)))
         }
         .padding(7)
+        .dropDestination(for: String.self) { items, _ in
+            items.first.map { onDropItem($0, day.weekday, nil, nil, nil) } ?? false
+        }
         .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
@@ -523,6 +546,11 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                                day: Int, index: Int) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
+                Image(systemName: "line.3.horizontal")
+                    .foregroundStyle(secondary)
+                    .frame(width: 28, height: 44)
+                    .contentShape(Rectangle())
+                    .draggable(ATHLTHPlanDragPayload.encode(scope: dragScope, key: selectedWeek * 7 + day, workout: index))
                 Image(systemName: workout.kind.systemImage).foregroundStyle(gold)
                     .frame(width: 30, height: 30)
                     .background(ATHLTHTrainDesign.paleGold, in: Circle())
@@ -538,9 +566,33 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                         .font(.caption).foregroundStyle(gold)
                 }
                 .buttonStyle(.plain)
+                Button(role: .destructive) {
+                    pendingDeleteAction = { onDeleteWorkout(day, index) }
+                    showingDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash").foregroundStyle(secondary)
+                        .frame(width: 34, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Delete workout", "Slett treningsøkt"))
+            }
+            .dropDestination(for: String.self) { items, _ in
+                items.first.map { onDropItem($0, day, index, .main, nil) } ?? false
             }
             ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
                 phase(section, day: day, index: index, workout: workout)
+            }
+            let existingPhases = Set(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks).map(\.phase))
+            ForEach([WorkoutPhaseKind.warmup, .main, .cooldown].filter { !existingPhases.contains($0) }, id: \.self) { phase in
+                Label(phase.title, systemImage: phase.symbol)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(secondary)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .background(paper, in: RoundedRectangle(cornerRadius: 9))
+                    .dropDestination(for: String.self) { items, _ in
+                        items.first.map { onDropItem($0, day, index, phase, nil) } ?? false
+                    }
             }
         }
         .padding(13)
@@ -570,6 +622,10 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 .foregroundStyle(gold)
                 .accessibilityLabel(tr("Add to", "Legg til i") + " " + phase.title)
             }
+            .contentShape(Rectangle())
+            .dropDestination(for: String.self) { items, _ in
+                items.first.map { onDropItem($0, day, index, phase, nil) } ?? false
+            }
             ForEach(Array(blocks.enumerated()), id: \.element.editorDragID) { pair in
                 if let groupID = pair.element.groupID,
                    let groupKind = pair.element.groupKind {
@@ -589,6 +645,16 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                                 }
                             }
                         )
+                        .draggable(ATHLTHPlanDragPayload.encode(scope: dragScope, key: selectedWeek * 7 + day, workout: index, block: pair.element.editorDragID))
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                pendingDeleteAction = { onDeleteBlock(day, index, pair.element.editorDragID) }
+                                showingDeleteConfirmation = true
+                            } label: { Label(tr("Delete group", "Slett gruppe"), systemImage: "trash") }
+                        }
+                        .dropDestination(for: String.self) { items, _ in
+                            items.first.map { onDropItem($0, day, index, phase, pair.element.editorDragID) } ?? false
+                        }
                     }
                 } else {
                 Button {
@@ -629,6 +695,16 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                                 in: RoundedRectangle(cornerRadius: 10))
                 }
                 .buttonStyle(.plain)
+                .draggable(ATHLTHPlanDragPayload.encode(scope: dragScope, key: selectedWeek * 7 + day, workout: index, block: pair.element.editorDragID))
+                .dropDestination(for: String.self) { items, _ in
+                    items.first.map { onDropItem($0, day, index, phase, pair.element.editorDragID) } ?? false
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        pendingDeleteAction = { onDeleteBlock(day, index, pair.element.editorDragID) }
+                        showingDeleteConfirmation = true
+                    } label: { Label(tr("Delete step", "Slett deløkt"), systemImage: "trash") }
+                }
                 .accessibilityHint(tr(
                     "Edit the duration, pace, intensity or recovery for this step.",
                     "Rediger varighet, tempo, intensitet eller pause for denne deløkten."
