@@ -42,6 +42,15 @@ final class ATHLTHCoachTriggerCapabilityTests: XCTestCase {
         XCTAssertTrue(global.supports(.slowerThanPreviousWorkout, for: .running))
     }
 
+    func testAllSelectionInConcreteStrengthWorkoutStillUsesStrengthRestrictions() {
+        var capabilities = ATHLTHCoachTriggerAvailability.session(hasRoute: false, structured: true)
+        capabilities.workoutActivity = .strength
+        XCTAssertFalse(capabilities.supports(.distance, for: .all))
+        XCTAssertFalse(capabilities.supports(.paceFasterOverall, for: .all))
+        XCTAssertFalse(capabilities.supports(.personalRecordConfirmed, for: .all))
+        XCTAssertTrue(capabilities.supports(.heartRateAbove, for: .all))
+    }
+
     func testHistoricKilometreMustBeMeasuredAndSpeakOnce() {
         var rule = ATHLTHAudioCoachRule(
             trigger: .slowerThanPreviousWorkout,

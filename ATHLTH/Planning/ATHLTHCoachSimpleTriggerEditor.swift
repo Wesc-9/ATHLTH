@@ -12,6 +12,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     @Binding var activityFilter: ATHLTHCoachActivityFilter
     var historicalReferences: [ATHLTHCoachHistoricalRunReference] = []
     @Binding var historicalWorkoutID: UUID?
+    @Binding var conditions: ATHLTHCoachTriggerConditions
 
     @State private var distanceUnit = 0
     @State private var timeUnit = 1
@@ -147,7 +148,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
     }
 
     private func choose(_ choice: Family) {
-        guard familyAvailable(choice) else { return }
+        guard familyAvailable(choice), family != choice else { return }
         switch choice {
         case .distance: trigger = .distance; interval = 1_000
         case .time: trigger = .time; interval = 60
@@ -504,6 +505,9 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 }
             }
 
+            if trigger.supportsThresholdConditions {
+                thresholdConditions
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text(tr("PREVIEW", "FORHÅNDSVISNING"))
                     .font(.caption2.weight(.bold))
@@ -512,6 +516,11 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 Text(trigger.summary(interval: interval))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
+                if trigger.supportsThresholdConditions && !conditions.isEmpty {
+                    Text(conditions.summary)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
                 if eventSelection != .every {
                     Text(eventSelection.title)
                         .font(.caption)
@@ -539,6 +548,41 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                     (interval >= 60 && interval % 60 == 0 ? 1 : 0)
             }
         }
+    }
+
+    private var thresholdConditions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(tr("ADDITIONAL CONDITIONS", "TILLEGGSBETINGELSER"))
+                .font(.caption2.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            Picker(tr("Condition duration", "Varighet på avvik"), selection: $conditions.sustainedSeconds) {
+                Text(tr("Immediately", "Med en gang")).tag(nil as Int?)
+                ForEach([10, 20, 30, 60, 120], id: \.self) { value in
+                    Text("\(value) " + tr("sec", "sek")).tag(value as Int?)
+                }
+            }
+            Picker(tr("Minimum between cues", "Minst mellom varsler"), selection: $conditions.repeatDelaySeconds) {
+                Text(tr("No extra limit", "Ingen ekstra grense")).tag(nil as Int?)
+                ForEach([30, 60, 120, 180, 300], id: \.self) { value in
+                    Text("\(value) " + tr("sec", "sek")).tag(value as Int?)
+                }
+            }
+            Picker(tr("Maximum heart-rate zone", "Maksimal pulssone"), selection: $conditions.maximumZone) {
+                Text(tr("Any zone", "Alle soner")).tag(nil as Int?)
+                ForEach(1...5, id: \.self) { value in
+                    Text("S\(value)").tag(value as Int?)
+                }
+            }
+            Text(tr("All selected conditions must be satisfied. Missing heart-rate data cannot satisfy a zone limit.",
+                    "Alle valgte betingelser må være oppfylt. Manglende pulsdata kan ikke oppfylle en sonegrense."))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .pickerStyle(.menu)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 14))
     }
 
     @ViewBuilder

@@ -98,6 +98,52 @@ final class ATHLTHAudioCoachPaceAndPRTests: XCTestCase {
         XCTAssertFalse(ATHLTHAudioCoachRule.Metric.personalRecord.requiresInternet)
     }
 
+    func testSustainedPaceAndRepeatDelay() {
+        var rule = ATHLTHAudioCoachRule(trigger: .paceFasterOverall, metric: .averagePace, interval: 300)
+        rule.triggerConditions = .init(sustainedSeconds: 20, repeatDelaySeconds: 120)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.overallPaceSecondsPerKilometer = 290
+        var journal: [UUID: Int] = [:]
+        for t in [0.0, 10.0] {
+            XCTAssertTrue(due(rule: rule, context: ctx, elapsed: t, journal: &journal).isEmpty)
+        }
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 20, journal: &journal).count, 1)
+        ctx.overallPaceSecondsPerKilometer = 320
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 30, journal: &journal).isEmpty)
+        ctx.overallPaceSecondsPerKilometer = 290
+        for t in [40.0, 50.0, 60.0] {
+            XCTAssertTrue(due(rule: rule, context: ctx, elapsed: t, journal: &journal).isEmpty)
+        }
+    }
+
+    func testMissingSampleResetsSustainedCondition() {
+        var rule = ATHLTHAudioCoachRule(trigger: .paceFasterOverall, metric: .averagePace, interval: 300)
+        rule.triggerConditions = .init(sustainedSeconds: 20)
+        var ctx = ATHLTHCoachReadoutContext()
+        var journal: [UUID: Int] = [:]
+        ctx.overallPaceSecondsPerKilometer = 290
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 0, journal: &journal).isEmpty)
+        ctx.overallPaceSecondsPerKilometer = nil
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 10, journal: &journal).isEmpty)
+        ctx.overallPaceSecondsPerKilometer = 290
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 20, journal: &journal).isEmpty)
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 30, journal: &journal).isEmpty)
+        XCTAssertEqual(due(rule: rule, context: ctx, elapsed: 40, journal: &journal).count, 1)
+    }
+
+    func testAdditionalZoneConditionRequiresMeasuredHeartRate() throws {
+        var rule = ATHLTHAudioCoachRule(trigger: .paceSlowerThanTarget, metric: .pace, interval: 1)
+        rule.triggerConditions = .init(maximumZone: 3)
+        var ctx = ATHLTHCoachReadoutContext()
+        ctx.targetPaceSecondsPerKilometer = 300
+        var journal: [UUID: Int] = [:]
+        XCTAssertTrue(due(rule: rule, context: ctx, elapsed: 60, currentPace: 320, journal: &journal).isEmpty)
+        var config = WatchAudioCoachConfiguration.disabled
+        config.customRules = [rule]
+        let restored = try JSONDecoder().decode(WatchAudioCoachConfiguration.self, from: JSONEncoder().encode(config))
+        XCTAssertEqual(restored.activeCustomRules.first?.triggerConditions, rule.triggerConditions)
+    }
+
     func testDataModelPaceRuleRoundTripsIntoWatchTransfer() throws {
         let rule = ATHLTHAudioCoachRule(
             trigger: .paceFasterLastKilometer, metric: .lastKilometerPace,

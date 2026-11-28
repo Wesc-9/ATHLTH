@@ -96,6 +96,26 @@ enum ATHLTHCoachActivityFilter: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Optional extra conditions on live threshold triggers. Nil preserves legacy
+/// immediate crossing behavior, including existing Watch configurations.
+struct ATHLTHCoachTriggerConditions: Codable, Hashable {
+    var sustainedSeconds: Int? = nil
+    var repeatDelaySeconds: Int? = nil
+    var maximumZone: Int? = nil
+
+    var isEmpty: Bool {
+        sustainedSeconds == nil && repeatDelaySeconds == nil && maximumZone == nil
+    }
+    var summary: String {
+        let no = ATHLTHLocalization.choose(english: "en", norwegian: "nb") == "nb"
+        var parts: [String] = []
+        if let sustainedSeconds { parts.append(no ? "I minst \(sustainedSeconds) sek" : "For at least \(sustainedSeconds) sec") }
+        if let repeatDelaySeconds { parts.append(no ? "Minst \(repeatDelaySeconds) sek mellom varsler" : "At least \(repeatDelaySeconds) sec between cues") }
+        if let maximumZone { parts.append(no ? "Puls maks sone \(maximumZone)" : "Heart rate at most zone \(maximumZone)") }
+        return parts.joined(separator: " · ")
+    }
+}
+
 /// Independent periodic Audio Coach rules. Stored as part of the iPhone
 /// settings and copied unchanged to a Watch workout's configuration.
 struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
@@ -156,6 +176,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             default:
                 return false
             }
+        }
+        var supportsThresholdConditions: Bool {
+            isHeartRateCondition || isPaceCondition || self == .uphillDetected
         }
         var needsStructuredStep: Bool {
             !isPeriodic && !isHeartRateCondition && !isPaceCondition &&
@@ -391,6 +414,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     var historicalWorkoutID: UUID? = nil
     var historicalWorkoutFirstKilometerSeconds: Double? = nil
     var historicalWorkoutTitle: String? = nil
+    var triggerConditions: ATHLTHCoachTriggerConditions? = nil
 
     var isEnabled: Bool { enabled ?? true }
 
@@ -986,16 +1010,68 @@ enum ATHLTHAudioCoachRuleDelivery {
                         previousActive: (lastSlots[rule.id] ?? 0) % 2 == 1
                     )
                 }
-                guard let active = state else { continue }
+                let conditions = rule.triggerConditions
+                let candidateKey = conditionJournalKey(rule.id, tag: 0xA1)
+                let sampleKey = conditionJournalKey(rule.id, tag: 0xA2)
+                guard let active = state else {
+                    if conditions != nil {
+                        lastSlots.removeValue(forKey: candidateKey)
+                        lastSlots.removeValue(forKey: sampleKey)
+                    }
+                    continue
+                }
                 let previousState = lastSlots[rule.id] ?? 0
                 let wasActive = previousState % 2 == 1
+                let shouldAnnounce = rule.trigger == .zoneExit
+                    ? (wasActive && !active) : (!wasActive && active)
+                if let conditions, !conditions.isEmpty {
+                    if !shouldAnnounce || !rule.isEnabled || !rule.matchesPhase(context) {
+                        lastSlots.removeValue(forKey: candidateKey)
+                        lastSlots.removeValue(forKey: sampleKey)
+                        // Track non-announcing transitions even outside the scope.
+                        // Announcing transitions wait for their selected phase.
+                        if shouldAnnounce { continue }
+                    } else {
+                        guard elapsedSeconds.isFinite, elapsedSeconds >= 0,
+                              elapsedSeconds < Double(Int.max / 2) else { continue }
+                        if let maximumZone = conditions.maximumZone {
+                            guard let bpm = heartRateBPM, bpm.isFinite, (35...250).contains(bpm),
+                                  let zone = ATHLTHHeartRateZones.measuredZone(
+                                      heartRateBPM: bpm, maximumBPM: maximumHeartRateBPM
+                                  ), zone <= min(max(maximumZone, 1), 5) else {
+                                lastSlots.removeValue(forKey: candidateKey)
+                                lastSlots.removeValue(forKey: sampleKey)
+                                continue
+                            }
+                        }
+                        let now = Int(elapsedSeconds)
+                        if let seconds = conditions.sustainedSeconds, seconds > 0 {
+                            // Don't count an unavailable or suspended stream as
+                            // time spent continuously meeting a condition.
+                            let previousSample = lastSlots[sampleKey]
+                            if previousSample == nil || now < previousSample! ||
+                                now - previousSample! > 15 {
+                                lastSlots[candidateKey] = now
+                            }
+                            lastSlots[sampleKey] = now
+                            let start = lastSlots[candidateKey] ?? now
+                            lastSlots[candidateKey] = start
+                            guard now - start >= min(seconds, 300) else { continue }
+                        }
+                        lastSlots.removeValue(forKey: candidateKey)
+                        lastSlots.removeValue(forKey: sampleKey)
+                    }
+                }
                 guard active != wasActive else { continue }
                 let updatedState = previousState + 1
                 lastSlots[rule.id] = updatedState
                 alreadyConsumed = true
-                let shouldAnnounce = rule.trigger == .zoneExit
-                    ? (wasActive && !active) : (!wasActive && active)
                 guard shouldAnnounce else { continue }
+                if let delay = conditions?.repeatDelaySeconds, delay > 0,
+                   let previous = lastSlots[conditionJournalKey(rule.id, tag: 0xA3)],
+                   elapsedSeconds - Double(previous) < Double(min(delay, 1800)) {
+                    continue
+                }
                 milestone = (updatedState + 1) / 2
             } else if rule.trigger == .randomMotivation {
                 milestone = randomMotivationSlot(
@@ -1109,6 +1185,12 @@ enum ATHLTHAudioCoachRuleDelivery {
                     context: context,
                     excluding: Set(rule.selectedMetrics).subtracting(effective)
                   ) else { continue }
+            if rule.trigger.supportsThresholdConditions,
+               (rule.triggerConditions?.repeatDelaySeconds ?? 0) > 0,
+               elapsedSeconds.isFinite, elapsedSeconds >= 0,
+               elapsedSeconds < Double(Int.max / 2) {
+                lastSlots[conditionJournalKey(rule.id, tag: 0xA3)] = Int(elapsedSeconds)
+            }
             let covered = Set(effective)
             messages.append(ATHLTHAudioCoachDueAnnouncement(
                 text: message,
@@ -1139,6 +1221,15 @@ enum ATHLTHAudioCoachRuleDelivery {
             digest = (digest ^ UInt64(byte)) &* 0x100000001b3
         }
         return "audio:" + String(digest, radix: 16)
+    }
+
+    // Keep optional threshold state in the existing per-session journal,
+    // not in a second scheduler or wall-clock timer. The variant byte uses
+    // a reserved, non-RFC UUID variant so authored UUIDs cannot collide.
+    private static func conditionJournalKey(_ id: UUID, tag: UInt8) -> UUID {
+        let u = id.uuid
+        return UUID(uuid: (u.0, u.1, u.2, u.3, u.4, u.5, u.6, u.7,
+                           u.8 & 0x3F, u.9 ^ tag, u.10, u.11, u.12, u.13, u.14, u.15))
     }
 
     /// Faster means fewer seconds/km. Ten seconds/km of hysteresis lets the
@@ -1361,6 +1452,7 @@ struct ATHLTHAudioCoachGroup: Codable, Hashable, Identifiable {
     var phases: [ATHLTHCoachWorkoutPhase]? = nil
     var eventSelection: ATHLTHCoachEventSelection? = nil
     var activityFilter: ATHLTHCoachActivityFilter? = nil
+    var triggerConditions: ATHLTHCoachTriggerConditions? = nil
 
     var isEnabled: Bool { enabled ?? true }
 }
@@ -1429,6 +1521,7 @@ extension WatchAudioCoachConfiguration {
                 effective.eventSelection = group.eventSelection
                 effective.activityFilter = group.activityFilter ??
                     authored.activityFilter
+                effective.triggerConditions = group.triggerConditions ?? authored.triggerConditions
             }
             return effective
         }

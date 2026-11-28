@@ -48,6 +48,7 @@ struct ATHLTHCoachComposerCheckpoint: Equatable {
     let activityFilter: ATHLTHCoachActivityFilter
     var linkedCountdownSeconds: Int? = nil
     var ownMessageText: String? = nil
+    var triggerConditions: ATHLTHCoachTriggerConditions? = nil
 }
 
 /// Presentation policy only. Keep the persisted rule and its speech formatter
@@ -184,6 +185,7 @@ struct ATHLTHCoachRuleComposer: View {
     @State private var historicalWorkoutID: UUID?
     @State private var activityFilter: ATHLTHCoachActivityFilter
     @State private var linkedCountdownSeconds: Int?
+    @State private var triggerConditions: ATHLTHCoachTriggerConditions
 
     private var currentCheckpoint: ATHLTHCoachComposerCheckpoint {
         ATHLTHCoachComposerCheckpoint(
@@ -195,7 +197,8 @@ struct ATHLTHCoachRuleComposer: View {
             historicalWorkoutID: historicalWorkoutID,
             activityFilter: activityFilter,
             linkedCountdownSeconds: linkedCountdownSeconds,
-            ownMessageText: ownMessageText
+            ownMessageText: ownMessageText,
+            triggerConditions: triggerConditions
         )
     }
 
@@ -248,6 +251,9 @@ struct ATHLTHCoachRuleComposer: View {
             (checkpoint?.stage == "name" || target.startAtTrigger
                 ? .trigger
                 : (target.groupID != nil || target.ruleID != nil) ? .commands : .trigger))
+        _triggerConditions = State(initialValue:
+            checkpoint?.triggerConditions ?? group?.triggerConditions ??
+            original?.triggerConditions ?? .init())
         _groupName = State(initialValue:
             checkpoint?.groupName ?? group?.name ?? "")
         _trigger = State(initialValue: checkpoint?.trigger ??
@@ -429,7 +435,8 @@ struct ATHLTHCoachRuleComposer: View {
                             triggerAvailability: triggerAvailability,
                             activityFilter: $activityFilter,
                             historicalReferences: historicalReferences,
-                            historicalWorkoutID: $historicalWorkoutID
+                            historicalWorkoutID: $historicalWorkoutID,
+                            conditions: $triggerConditions
                         )
                     case .commands:
                         commandStep
@@ -603,6 +610,11 @@ struct ATHLTHCoachRuleComposer: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ink)
                         .fixedSize(horizontal: false, vertical: true)
+                    if trigger.supportsThresholdConditions && !triggerConditions.isEmpty {
+                        Text(triggerConditions.summary)
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -992,6 +1004,7 @@ struct ATHLTHCoachRuleComposer: View {
         if let previous { rule.id = previous.id }
         rule.activityFilter = activityFilter == .all ? nil : activityFilter
         rule.linkedCountdownSeconds = resolvedLinkedCountdown
+        rule.triggerConditions = trigger.supportsThresholdConditions && !triggerConditions.isEmpty ? triggerConditions : nil
         if trigger == .slowerThanPreviousWorkout,
            let reference = selectedHistory {
             rule.historicalWorkoutID = reference.id
@@ -1028,6 +1041,7 @@ struct ATHLTHCoachRuleComposer: View {
                 draft.coachGroups[groupIndex].eventSelection = eventSelection
                 draft.coachGroups[groupIndex].phases = allowedPhases
                 draft.coachGroups[groupIndex].activityFilter = rule.activityFilter
+                draft.coachGroups[groupIndex].triggerConditions = rule.triggerConditions
             } else {
                 var group = ATHLTHAudioCoachGroup(name: name)
                 group.trigger = trigger
@@ -1036,6 +1050,7 @@ struct ATHLTHCoachRuleComposer: View {
                 group.eventSelection = eventSelection
                 group.phases = allowedPhases
                 group.activityFilter = rule.activityFilter
+                group.triggerConditions = rule.triggerConditions
                 group.enabled = true
                 draft.customRules.append(rule)
                 draft.coachGroups.append(group)

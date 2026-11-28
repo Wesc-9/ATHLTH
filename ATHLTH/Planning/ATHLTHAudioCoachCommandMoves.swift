@@ -104,6 +104,7 @@ enum ATHLTHAudioCoachCommandMoves {
             newRule.id = UUID()
             newRule.trigger = trigger
             newRule.interval = interval
+            newRule.triggerConditions = destinationConfig?.triggerConditions
             newRule.metric = metric
             newRule.additionalMetrics = nil
             if metric != .motivation { newRule.customPhrase = nil }
