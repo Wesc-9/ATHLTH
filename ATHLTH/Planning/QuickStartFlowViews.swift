@@ -175,6 +175,7 @@ struct AudioCoachDraft {
         smartPrompts.pushOnUnexpectedPaceDrop = nil
         smartPrompts.paceDropThresholdPercent = nil
         smartPrompts.adaptiveCooldownSeconds = nil
+        smartPrompts.talkFrequency = nil
     }
 
     /// One-tap announcement template. A complete distance/time/pulse cue

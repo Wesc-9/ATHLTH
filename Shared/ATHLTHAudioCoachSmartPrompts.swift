@@ -138,12 +138,49 @@ enum ATHLTHCoachMotivationControlMode: String, Codable, CaseIterable, Identifiab
     }
 }
 
+/// Only optional, automatically scheduled coaching is affected. Authored
+/// custom rules, countdowns, target alerts and navigation retain their timing.
+enum ATHLTHCoachTalkFrequency: String, Codable, CaseIterable, Identifiable {
+    case low, normal, active
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .low: return ATHLTHLocalization.choose(english: "Low", norwegian: "Lite")
+        case .normal: return ATHLTHLocalization.choose(english: "Normal", norwegian: "Normal")
+        case .active: return ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
+        }
+    }
+    var detail: String {
+        switch self {
+        case .low: return ATHLTHLocalization.choose(english: "More space between optional coaching cues.", norwegian: "Mer ro mellom valgfrie coachingbeskjeder.")
+        case .normal: return ATHLTHLocalization.choose(english: "Balanced frequency for optional coaching.", norwegian: "Balansert frekvens på valgfrie coachingbeskjeder.")
+        case .active: return ATHLTHLocalization.choose(english: "More frequent optional encouragement.", norwegian: "Hyppigere valgfrie oppmuntringer og tilbakemeldinger.")
+        }
+    }
+    var intervalMultiplier: Double {
+        switch self {
+        case .low: return 2
+        case .normal: return 1
+        case .active: return 0.65
+        }
+    }
+    var minimumGap: Double {
+        switch self {
+        case .low: return 75
+        case .normal: return 35
+        case .active: return 30
+        }
+    }
+}
+
 /// Optional in Watch transfers: older iPhone/Watch builds continue to decode.
 struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var motivationEnabled = false
     var motivationIntervalSeconds = 60
     var randomEncouragementEnabled = false
     var randomIntervalSeconds = 240
+    var talkFrequency: ATHLTHCoachTalkFrequency? = nil
+    var resolvedTalkFrequency: ATHLTHCoachTalkFrequency { talkFrequency ?? .normal }
     var customEncouragements: [String] = []
     var landmarks: [ATHLTHCoachLandmark] = []
     // Optional so already stored profiles and old Watch transfers still decode.
@@ -223,11 +260,11 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     }
 
     var validatedMotivationInterval: Double {
-        Double(min(max(motivationIntervalSeconds, 30), 600))
+        max(30, Double(min(max(motivationIntervalSeconds, 30), 600)) * resolvedTalkFrequency.intervalMultiplier)
     }
 
     var validatedRandomInterval: Double {
-        Double(min(max(randomIntervalSeconds, 90), 900))
+        max(90, Double(min(max(randomIntervalSeconds, 90), 900)) * resolvedTalkFrequency.intervalMultiplier)
     }
 }
 
@@ -303,7 +340,7 @@ struct ATHLTHAudioCoachSmartState {
         }
         if settings.randomEncouragementEnabled {
             nextRandomAt = max(nextRandomAt,
-                elapsed + max(35, settings.validatedRandomInterval / 4))
+                elapsed + max(settings.resolvedTalkFrequency.minimumGap, settings.validatedRandomInterval / 4))
         }
     }
 
@@ -386,7 +423,7 @@ struct ATHLTHAudioCoachSmartState {
                 let previousPace = priorMinutePace
                 priorMinutePace = currentPace
 
-                if elapsed - lastSpokenAt >= 35 {
+                if elapsed - lastSpokenAt >= settings.resolvedTalkFrequency.minimumGap {
                     let style = settings.encouragementStyle ?? .encouragement
                     var proposed: String?
 
@@ -505,7 +542,7 @@ struct ATHLTHAudioCoachSmartState {
         if nextRandomAt == 0 {
             nextRandomAt = settings.validatedRandomInterval
         }
-        guard elapsed >= nextRandomAt, elapsed - lastSpokenAt >= 35 else {
+        guard elapsed >= nextRandomAt, elapsed - lastSpokenAt >= settings.resolvedTalkFrequency.minimumGap else {
             return nil
         }
         let base = Int(settings.validatedRandomInterval)

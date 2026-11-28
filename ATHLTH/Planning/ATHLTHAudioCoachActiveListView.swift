@@ -199,6 +199,38 @@ struct ATHLTHAudioCoachActiveListView: View {
         }
     }
 
+    private var talkFrequencyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(tr("Talk frequency", "Talefrekvens"), systemImage: "waveform")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ink)
+            Picker(tr("Talk frequency", "Talefrekvens"), selection: Binding(
+                get: { draft.smartPrompts.resolvedTalkFrequency },
+                set: { draft.smartPrompts.talkFrequency = $0 }
+            )) {
+                ForEach(ATHLTHCoachTalkFrequency.allCases) { frequency in
+                    Text(frequency.title).tag(frequency)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("athlth-coach-talk-frequency")
+            Text(draft.smartPrompts.resolvedTalkFrequency.detail)
+                .font(.caption)
+                .foregroundStyle(dim)
+            Text(tr("Your own triggers, countdowns and target alerts are unchanged.",
+                    "Dine egne triggere, nedtellinger og målvarsler endres ikke."))
+                .font(.caption2)
+                .foregroundStyle(dim)
+        }
+        .padding(17)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 19))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19)
+                .strokeBorder(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
+        }
+    }
+
     private var hasUnsavedTemplateChanges: Bool {
         guard let baselineConfiguration else { return false }
         return draft.configuration() != baselineConfiguration
@@ -274,6 +306,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     onAddGroup: { composerTarget = .newGroup() },
                     onAddGeneralCommand: { composerTarget = .newCommand() }
                 )
+                talkFrequencyCard
                 Button {
                     showingTemplatePreview = true
                 } label: {

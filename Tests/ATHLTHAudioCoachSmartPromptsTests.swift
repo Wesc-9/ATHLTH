@@ -3,6 +3,25 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
+    func testTalkFrequencyScalesOptionalCuesButPreservesTargetsAndAuthoredValues() throws {
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.motivationIntervalSeconds = 180
+        settings.randomIntervalSeconds = 240
+        XCTAssertEqual(settings.resolvedTalkFrequency, .normal)
+        XCTAssertEqual(settings.validatedMotivationInterval, 180)
+        settings.talkFrequency = .low
+        XCTAssertEqual(settings.validatedMotivationInterval, 360)
+        XCTAssertEqual(settings.validatedRandomInterval, 480)
+        XCTAssertEqual(settings.resolvedTargetZoneGrace, 10)
+        XCTAssertEqual(settings.resolvedTargetZoneRepeat, 120)
+        settings.talkFrequency = .active
+        XCTAssertEqual(settings.validatedMotivationInterval, 117, accuracy: 0.01)
+        XCTAssertEqual(settings.motivationIntervalSeconds, 180)
+        let restored = try JSONDecoder().decode(ATHLTHAudioCoachSmartSettings.self,
+            from: JSONEncoder().encode(settings))
+        XCTAssertEqual(restored.talkFrequency, .active)
+    }
+
     func testZoneWarningTimingSupportsOneMinuteIntervalsAndOldProfiles() throws {
         var settings = ATHLTHAudioCoachSmartSettings()
         XCTAssertEqual(settings.resolvedTargetZoneGrace, 10)
