@@ -11,11 +11,29 @@ final class ATHLTHUnifiedQuickStartPresentationTests: XCTestCase {
 
     func testActivityTypeChoicesAreSharedAcrossBasicAndAdvanced() {
         XCTAssertEqual(ATHLTHQuickStartActivity.running.types,
-                       [.free, .route, .workout])
+                       [.free, .route, .workout, .exercises])
         XCTAssertEqual(ATHLTHQuickStartActivity.walking.types,
                        [.free, .route])
         XCTAssertEqual(ATHLTHQuickStartActivity.strength.types,
                        [.free, .workout, .exercises])
+    }
+
+    func testRunningExerciseRecipePreservesWorkAndRecovery() {
+        var run = WorkoutTemplateBlock(sequence: 1, kind: .run, title: "Interval",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 240, targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main)
+        run.cardioActivity = .running
+        let rest = WorkoutTemplateBlock(sequence: 2, kind: .rest, title: "Recovery",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 120, targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main)
+        let workout = ATHLTHQuickRunTimelineAdapter.exerciseWorkout(
+            from: [run, rest], environment: .treadmill)
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.map(\.kind), [.run, .rest])
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.map(\.durationSeconds), [240, 120])
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.first?.isIndoor, true)
+        XCTAssertNil(ATHLTHQuickRunTimelineAdapter.validationError(for: workout))
     }
 
     func testStrengthNeverOffersWalkingCompanion() {

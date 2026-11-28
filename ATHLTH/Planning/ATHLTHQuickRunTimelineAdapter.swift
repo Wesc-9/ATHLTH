@@ -65,6 +65,28 @@ enum ATHLTHBasicRunGoalRecipe {
 }
 
 enum ATHLTHQuickRunTimelineAdapter {
+    /// A library exercise is a session-local recipe, not a newly saved
+    /// library workout. Keep the full ordered work/recovery group intact.
+    static func exerciseWorkout(
+        from blocks: [WorkoutTemplateBlock],
+        environment: RunEnvironment
+    ) -> PlannedSession {
+        let main = blocks.filter { $0.kind == .run && !$0.isActiveRecovery }
+        let title = main.first?.groupID.flatMap {
+            ATHLTHIntervalRecipeEditing.summary(for: $0, in: blocks)?.displayName
+        } ?? main.first?.title ?? ATHLTHLocalization.choose(
+            english: "Running exercise", norwegian: "Løpeøvelse")
+        var workout = PlannedSession(
+            id: UUID(), title: title, kind: .running,
+            scheduledStart: nil,
+            durationMinutes: ATHLTHWorkoutDurationEstimator.minutes(for: blocks),
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        workout.workoutBlocks = blocks
+        return withEnvironment(workout, environment: environment)
+    }
+
     /// A library run is projected only to seed the shared studio; its
     /// source template is never mutated unless the user saves a new one.
     static func editorBlocks(from template: RunningWorkoutTemplate) -> [WorkoutTemplateBlock] {

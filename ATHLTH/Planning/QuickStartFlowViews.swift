@@ -1810,6 +1810,8 @@ struct RunQuickStartSheet: View {
 
     @State private var showingRoutes = false
     @State private var showingRunningLibrary = false
+    @State private var showingRunningExercises = false
+    @State private var selectedExerciseSource = false
     @State private var openEditorAfterLibrary = false
     @State private var showingDetailedWorkoutBuilder = false
 
@@ -1976,6 +1978,7 @@ struct RunQuickStartSheet: View {
                         selectionTitle: "Choose Workout"
                     ) { workout in
                         advancedWorkout = nil
+                        selectedExerciseSource = false
                         selectedWorkout = workout
                         if let importedEnvironment = workout.launchRunEnvironment {
                             environment = importedEnvironment
@@ -1986,6 +1989,23 @@ struct RunQuickStartSheet: View {
                         mode = .structured
                         openEditorAfterLibrary = isAdvancedSetup
                         showingRunningLibrary = false
+                    }
+                }
+            }
+            .sheet(isPresented: $showingRunningExercises) {
+                NavigationStack {
+                    ATHLTHRunningExercisePickerView(
+                        userID: session.profile.userID, phase: .main
+                    ) { blocks in
+                        selectRunningExercise(blocks)
+                        showingRunningExercises = false
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                                showingRunningExercises = false
+                            }
+                        }
                     }
                 }
             }
@@ -2185,7 +2205,10 @@ struct RunQuickStartSheet: View {
                 firePendingQuickRun()
             }
             .onChange(of: mode) { _, selected in
-                if selected != .structured { basicGoalSelected = false }
+                if selected != .structured {
+                    basicGoalSelected = false
+                    selectedExerciseSource = false
+                }
                 if selected != .route { basicGhostSelected = false }
             }
             .onChange(of: basicGhostTargetMinutes) { _, minutes in
@@ -2327,15 +2350,21 @@ struct RunQuickStartSheet: View {
                     switch mode {
                     case .free: return .free
                     case .route: return .route
-                    case .structured: return .workout
+                    case .structured: return selectedExerciseSource ? .exercises : .workout
                     }
                 },
                 set: { _ in }
             ),
             routeAllowed: environment == .outdoor
         ) { type in
+            // Opening the exercise library is non-destructive until selection.
+            if type == .exercises {
+                showingRunningExercises = true
+                return
+            }
             basicGoalSelected = false
             basicGhostSelected = false
+            selectedExerciseSource = false
             switch type {
             case .free:
                 mode = .free
@@ -2354,6 +2383,30 @@ struct RunQuickStartSheet: View {
                 break
             }
         }
+    }
+
+    private func selectRunningExercise(_ blocks: [WorkoutTemplateBlock]) {
+        let workout = ATHLTHQuickRunTimelineAdapter.exerciseWorkout(
+            from: blocks, environment: environment
+        )
+        if let issue = ATHLTHQuickRunTimelineAdapter.validationError(for: workout) {
+            launchFailure = issue
+            return
+        }
+        selectedExerciseSource = true
+        basicGoalSelected = false
+        basicGhostSelected = false
+        selectedRoute = nil
+        selectedWorkout = nil
+        advancedWorkout = workout
+        quickWorkoutName = workout.title
+        launchFailure = nil
+        mode = .structured
+    }
+
+    private func chooseStructuredContent() {
+        if selectedExerciseSource { showingRunningExercises = true }
+        else { showingRunningLibrary = true }
     }
 
     @ViewBuilder
@@ -2420,7 +2473,7 @@ struct RunQuickStartSheet: View {
                     }
                     Spacer(minLength: 4)
                     Button(ATHLTHLocalization.choose(english: "Change", norwegian: "Endre")) {
-                        showingRunningLibrary = true
+                        chooseStructuredContent()
                     }
                     .buttonStyle(.bordered)
                     .tint(ATHLTHTrainDesign.bronze)
@@ -2483,7 +2536,7 @@ struct RunQuickStartSheet: View {
                 english: "Change", norwegian: "Endre"
             )) {
                 if mode == .route { showingRoutes = true }
-                else { showingRunningLibrary = true }
+                else { chooseStructuredContent() }
             }
             .buttonStyle(.bordered)
             .tint(ATHLTHTrainDesign.bronze)
@@ -2861,7 +2914,7 @@ struct RunQuickStartSheet: View {
                     Spacer()
 
                     Button {
-                        showingRunningLibrary = true
+                        chooseStructuredContent()
                     } label: {
                         Text(
                             selectedWorkout == nil && advancedWorkout == nil

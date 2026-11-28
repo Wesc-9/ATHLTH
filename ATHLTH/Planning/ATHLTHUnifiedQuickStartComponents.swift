@@ -25,7 +25,7 @@ enum ATHLTHQuickStartActivity: Hashable, Identifiable {
 
     var types: [ATHLTHQuickStartType] {
         switch self {
-        case .running: return [.free, .route, .workout]
+        case .running: return [.free, .route, .workout, .exercises]
         case .walking: return [.free, .route]
         case .strength: return [.free, .workout, .exercises]
         }
@@ -59,8 +59,9 @@ enum ATHLTHQuickStartType: String, Identifiable {
             english: "Route", norwegian: "Rute")
         case .workout: return ATHLTHLocalization.choose(
             english: "Training workout", norwegian: "Treningsøkt")
-        case .exercises: return ATHLTHLocalization.choose(
-            english: "Add exercises", norwegian: "Legg til øvelser")
+        case .exercises: return activity == .running
+            ? ATHLTHLocalization.choose(english: "Running exercises", norwegian: "Løpeøvelser")
+            : ATHLTHLocalization.choose(english: "Add exercises", norwegian: "Legg til øvelser")
         case .competition: return ATHLTHLocalization.choose(
             english: "Competition", norwegian: "Konkurranse")
         }
@@ -77,9 +78,9 @@ enum ATHLTHQuickStartType: String, Identifiable {
         case .workout: return ATHLTHLocalization.choose(
             english: "Use a workout from your library.",
             norwegian: "Velg en økt fra biblioteket.")
-        case .exercises: return ATHLTHLocalization.choose(
-            english: "Choose exercises before starting.",
-            norwegian: "Velg øvelser før start.")
+        case .exercises: return activity == .running
+            ? ATHLTHLocalization.choose(english: "Choose intervals or other running exercises from the library.", norwegian: "Velg intervaller eller andre løpeøvelser fra biblioteket.")
+            : ATHLTHLocalization.choose(english: "Choose exercises before starting.", norwegian: "Velg øvelser før start.")
         case .competition: return ATHLTHLocalization.choose(
             english: "Duel, league or cup against other athletes.",
             norwegian: "Duell, liga eller cup mot andre utøvere.")
