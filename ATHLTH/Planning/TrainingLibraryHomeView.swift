@@ -4655,6 +4655,19 @@ struct MyTrainingPlansLibraryView: View {
         session.planTemplates.first { $0.tags.contains("saved-source:" + plan.id.uuidString) }
     }
 
+    private func favoritePlanID(_ plan: TrainingPlan) -> UUID {
+        // Respect a favorite previously saved against either visible source.
+        // New favorites are stored against the actual scheduled plan.
+        if favorites.favorites.contains(where: {
+            $0.itemType == .plan && $0.itemID == plan.id.uuidString
+        }) { return plan.id }
+        if let template = linkedTemplate(for: plan),
+           favorites.favorites.contains(where: {
+               $0.itemType == .plan && $0.itemID == template.id.uuidString
+           }) { return template.id }
+        return plan.id
+    }
+
     private func featuredPlanTile(_ plan: TrainingPlan, active: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Group {
@@ -4671,7 +4684,7 @@ struct MyTrainingPlansLibraryView: View {
             }
             .buttonStyle(.plain)
             HStack {
-                LibraryFavoriteButton(kind: .plan, itemID: (linkedTemplate(for: plan)?.id ?? plan.id).uuidString,
+                LibraryFavoriteButton(kind: .plan, itemID: favoritePlanID(plan).uuidString,
                                       title: plan.title, subtitle: "", icon: "calendar")
                 Spacer()
                 Menu {
@@ -4797,6 +4810,17 @@ struct MyTrainingPlansLibraryView: View {
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            if !reusable {
+                Text(session.isTrainingPlanPaused(plan.id)
+                     ? ATHLTHLocalization.choose(english: "Paused", norwegian: "Pauset")
+                     : session.isTrainingPlanDeactivated(plan.id)
+                        ? ATHLTHLocalization.choose(english: "Inactive", norwegian: "Inaktiv")
+                        : session.trainingPlanStatus(plan) == .completed
+                            ? ATHLTHLocalization.choose(english: "Ended", norwegian: "Avsluttet")
+                            : ATHLTHLocalization.choose(english: "Planned", norwegian: "Planlagt"))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
             HStack {
                 Text(reusable
                     ? ATHLTHLocalization.choose(english: "Use", norwegian: "Bruk")
@@ -4857,7 +4881,7 @@ struct MyTrainingPlansLibraryView: View {
             HStack(spacing: 4) {
                 LibraryFavoriteButton(
                     kind: .plan,
-                    itemID: (reusable ? plan.id : (linkedTemplate(for: plan)?.id ?? plan.id)).uuidString,
+                    itemID: (reusable ? plan.id : favoritePlanID(plan)).uuidString,
                     title: plan.title,
                     subtitle: "",
                     icon: "calendar"
