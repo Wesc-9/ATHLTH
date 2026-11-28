@@ -277,6 +277,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         var aiInstruction: String
         var guidedTargetDays: Set<Int>? = nil
         var reviewingGuidedDay: Bool? = nil
+        var buildWithCoach: Bool? = nil
     }
     private var checkpointConfiguration: ConfigurationCheckpoint {
         ConfigurationCheckpoint(
@@ -289,7 +290,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             hasCompetitionDate: hasCompetitionDate, competitionDate: competitionDate,
             visibility: visibility, selectedDay: selectedAdvancedWeekDay,
             aiInstruction: aiAdjustmentInstruction,
-            guidedTargetDays: guidedTargetDays, reviewingGuidedDay: reviewingGuidedDay)
+            guidedTargetDays: guidedTargetDays, reviewingGuidedDay: reviewingGuidedDay,
+            buildWithCoach: prefersAIPlanBuild)
     }
 
     private var configurationCheckpoint: Data? {
@@ -809,6 +811,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: structuredWorkoutsByDay) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: weekDayEdits) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: weekPlanningApproach) { _, _ in schedulePlanCheckpoint() }
+        .onChange(of: prefersAIPlanBuild) { _, _ in schedulePlanCheckpoint() }
         .onChange(of: guidedDayCursor) { _, _ in
             selectedPlanWeekIndex = guidedCurrentWeek
             guidedTrainingPlaceExpanded = false
@@ -1922,15 +1925,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var advancedSetupSummary: String {
-        let method: String
-        switch weekPlanningApproach {
-        case .guided:
-            method = ATHLTHLocalization.choose(english: "Daily plan", norwegian: "Dagsplan")
-        case .quick:
-            method = ATHLTHLocalization.choose(english: "Weekly plan", norwegian: "Ukeplan")
-        case .none:
-            method = ATHLTHLocalization.choose(english: "Select layout", norwegian: "Velg oppsett")
-        }
+        let method = prefersAIPlanBuild
+            ? ATHLTHLocalization.choose(english: "Coach", norwegian: "Coach")
+            : ATHLTHLocalization.choose(english: "Build yourself", norwegian: "Bygg selv")
         let weeks = ATHLTHLocalization.choose(
             english: "\(weekCount) weeks", norwegian: "\(weekCount) uker"
         )
@@ -1968,7 +1965,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             } label: {
                 HStack(spacing: 12) {
                     Spacer(minLength: 12)
-                    Text(ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
+                    Text(step == .basics && mode == .advanced && prefersAIPlanBuild
+                         ? ATHLTHLocalization.choose(english: "Continue with Coach", norwegian: "Fortsett med Coach")
+                         : ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
                         .font(.subheadline.weight(.semibold))
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.right")
@@ -2001,7 +2000,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // data. Simple plans are created from their setup and open the week view.
     private var selectedBuildMethod: ATHLTHPlanBuildMethod {
         if prefersAIPlanBuild { return .ai }
-        return weekPlanningApproach == .quick ? .weekByWeek : .dayByDay
+        return .dayByDay
     }
 
     private func selectBuildMethod(_ method: ATHLTHPlanBuildMethod) {
@@ -2490,9 +2489,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     startDate: $startDate,
                     weekCount: $weekCount,
                     varyWeekdays: $varyWeekdays,
-                    planningApproach: weekPlanningApproach,
-                    onChooseApproach: { choice in
-                        selectBuildMethod(choice == .guided ? .dayByDay : .weekByWeek)
+                    buildWithCoach: prefersAIPlanBuild,
+                    onChooseCoach: { choice in
+                        prefersAIPlanBuild = choice
                     },
                     selectedDays: selectedDays,
                     suggestedName: defaultPlanTitle,
@@ -3523,10 +3522,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Button(ATHLTHLocalization.choose(english: "Switch to week view", norwegian: "Bytt til ukeoversikt")) {
                     selectedPlanWeekIndex = guidedCurrentWeek
                     selectedAdvancedWeekDay = nil
-                    // Reuse the same mode transition as the setup selector.
-                    // Switching views must not reset the saved dated workouts.
+                    // Layout is independent of authorship and never resets the draft.
                     guidedWeekAwaitingDecision = nil
-                    prefersAIPlanBuild = false
                     weekPlanningApproach = .quick
                     saveResumableDraft()
                 }
@@ -5246,7 +5243,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 guidedDayCursor = max(0, Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: startDate), to: date).day ?? 0)
                 guidedWeekAwaitingDecision = nil
                 selectedAdvancedWeekDay = nil
-                prefersAIPlanBuild = false
                 weekPlanningApproach = .guided
                 saveResumableDraft()
             }
@@ -7136,6 +7132,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                   guidedDayCursor < weekCount * 7 {
                             if reviewingGuidedDay { openGuidedSummary() }
                             else { advanceGuidedDay() }
+                        } else if step == .week && mode == .advanced {
+                            requestGuidedSummary()
                         } else {
                             goForward()
                         }
@@ -7152,7 +7150,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                             english: "Review plan", norwegian: "Se over planen")
                                         : ATHLTHLocalization.choose(
                                             english: "Next day", norwegian: "Neste dag"))
-                                    : ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
+                                    : step == .week && mode == .advanced
+                                        ? ATHLTHLocalization.choose(english: "Finish · Summary", norwegian: "Ferdig · Sammendrag")
+                                        : ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
                             )
                             .font(.subheadline.weight(.bold))
 
@@ -7257,7 +7257,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             let goalIsLinked = selectedGoalChoice == "none" ||
                 selectedGoalChoice.isEmpty || !selectedGoalIDs.isEmpty
             return conflictIsResolved && goalIsLinked &&
-                (mode != .advanced || weekPlanningApproach != nil)
+                (mode != .advanced || !selectedDays.isEmpty)
         case .profile:
             return
                 injuryFree ||
@@ -7433,6 +7433,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             workoutMinutesByDay = saved.workoutMinutes ?? workoutMinutesByDay
             guidedTargetDays = saved.guidedTargetDays
             reviewingGuidedDay = saved.reviewingGuidedDay ?? false
+            prefersAIPlanBuild = saved.buildWithCoach ?? false
         }
         weekDayEdits = draft.weekDayEdits ?? [:]
         weekPlanningApproach = draft.planningApproach.flatMap(
@@ -7463,10 +7464,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
               selectedGoalIDs.isEmpty)) {
             step = .goalDetails
         }
-        // The new advanced setup requires a method. Legacy incomplete drafts
-        // without one return to setup instead of opening an empty week screen.
-        if step == .week && mode == .advanced && weekPlanningApproach == nil {
-            step = .basics
+        // Legacy drafts without a stored layout use the default day view.
+        // Existing dated edits and the saved weekly layout are kept.
+        if mode == .advanced && weekPlanningApproach == nil {
+            weekPlanningApproach = .guided
         }
     }
 
@@ -7573,6 +7574,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func goForward() {
         if step == .basics && mode == .advanced {
             guidedTargetDays = selectedDays
+            if weekPlanningApproach == nil { weekPlanningApproach = .guided }
+            if prefersAIPlanBuild {
+                step = .week
+                startCoachRemaining(returnToReview: true)
+                saveResumableDraft()
+                return
+            }
         }
         // An explicit "No specific goal" goes straight to plan scheduling.
         // Other choices must complete the separate goal-creation page.
