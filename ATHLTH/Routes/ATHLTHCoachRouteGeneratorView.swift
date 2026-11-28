@@ -41,8 +41,8 @@ struct ATHLTHCoachRouteGeneratorView: View {
             Form {
                 Section {
                     Label(
-                        tr("Describe the run. Coach will find walkable routes in Apple Maps.",
-                           "Beskriv turen. Coach finner gangbare ruteforslag i Apple Maps."),
+                        tr("Describe the run. ATHLTH Coach will find walkable routes in Apple Maps.",
+                           "Beskriv turen. ATHLTH Coach finner gangbare ruteforslag i Apple Maps."),
                         systemImage: "figure.run"
                     )
                     .font(.subheadline.weight(.semibold))
@@ -172,7 +172,7 @@ struct ATHLTHCoachRouteGeneratorView: View {
                 }
 
                 if !suggestions.isEmpty {
-                    Section(tr("Coach's route suggestions", "Ruteforslag fra coach")) {
+                    Section(tr("ATHLTH Coach's route suggestions", "Ruteforslag fra coach")) {
                         ForEach(suggestions) { item in
                             Button {
                                 selectedID = item.id
@@ -246,7 +246,7 @@ struct ATHLTHCoachRouteGeneratorView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(tr("Coach Route Builder", "Lag rute med Coach"))
+            .navigationTitle(tr("ATHLTH Coach Route Builder", "Lag rute med ATHLTH Coach"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -354,7 +354,7 @@ struct ATHLTHCoachRouteGeneratorView: View {
             id: UUID(),
             ownerID: session.profile.userID,
             title: routeTitle.isEmpty
-                ? tr("Coach route", "Coach-rute") +
+                ? tr("ATHLTH Coach route", "Coach-rute") +
                     String(format: " · %.1f km", selected.distanceMeters / 1000)
                 : routeTitle,
             visibility: .privateOnly,

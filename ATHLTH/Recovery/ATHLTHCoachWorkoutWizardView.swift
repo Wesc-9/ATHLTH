@@ -73,8 +73,8 @@ struct ATHLTHCoachWorkoutWizardView: View {
                     Text(tr("Your workout", "Din økt"))
                 } footer: {
                     Text(tr(
-                        "Coach will suggest the exercises, structure and intensity. You choose your own weights and pace.",
-                        "Coach foreslår øvelser, oppsett og intensitet. Du velger selv treningsvekter og tempo."
+                        "ATHLTH Coach will suggest the exercises, structure and intensity. You choose your own weights and pace.",
+                        "ATHLTH Coach foreslår øvelser, oppsett og intensitet. Du velger selv treningsvekter og tempo."
                     ))
                 }
 
@@ -105,7 +105,7 @@ struct ATHLTHCoachWorkoutWizardView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button(action: continueWithCoach) {
-                    Label(tr("Continue with Coach", "Fortsett med Coach"), systemImage: "sparkles")
+                    Label(tr("Continue with ATHLTH Coach", "Fortsett med ATHLTH Coach"), systemImage: "sparkles")
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.borderedProminent)

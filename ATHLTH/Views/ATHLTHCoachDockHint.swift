@@ -29,8 +29,8 @@ struct ATHLTHCoachDockHint: View {
             norwegian: "Åpne ATHLTH Coach"
         ))
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Double tap or swipe up to open Coach",
-            norwegian: "Dobbelttrykk eller sveip opp for å åpne Coach"
+            english: "Double tap or swipe up to open ATHLTH Coach",
+            norwegian: "Dobbelttrykk eller sveip opp for å åpne ATHLTH Coach"
         ))
     }
 }

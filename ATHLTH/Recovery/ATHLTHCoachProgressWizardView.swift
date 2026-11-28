@@ -48,7 +48,7 @@ struct ATHLTHCoachProgressWizardView: View {
                     }
                 }
 
-                Section(tr("What should Coach focus on? (optional)", "Hva vil du analysere? (valgfritt)")) {
+                Section(tr("What should ATHLTH Coach focus on? (optional)", "Hva vil du analysere? (valgfritt)")) {
                     TextField(
                         tr("E.g. running pace, strength or consistency",
                            "F.eks. løpetempo, styrke eller treningsmengde"),
@@ -59,8 +59,8 @@ struct ATHLTHCoachProgressWizardView: View {
 
                 Section {
                     Label(tr(
-                        "Selecting data does not share it. Coach requests approval for this question before any data leaves your device; unselected categories remain excluded.",
-                        "Å velge data deler dem ikke. Coach ber om godkjenning før data sendes for dette spørsmålet; kategorier du ikke velger, utelates."
+                        "Selecting data does not share it. ATHLTH Coach requests approval for this question before any data leaves your device; unselected categories remain excluded.",
+                        "Å velge data deler dem ikke. ATHLTH Coach ber om godkjenning før data sendes for dette spørsmålet; kategorier du ikke velger, utelates."
                     ), systemImage: "lock.shield")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -75,7 +75,7 @@ struct ATHLTHCoachProgressWizardView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button(action: continueWithCoach) {
-                    Label(tr("Review with Coach", "Analyser med Coach"), systemImage: "chart.line.uptrend.xyaxis")
+                    Label(tr("Review with ATHLTH Coach", "Analyser med ATHLTH Coach"), systemImage: "chart.line.uptrend.xyaxis")
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.borderedProminent)

@@ -1744,7 +1744,7 @@ private struct ATHLTHiPadCoachWorkspaceView: View {
 
                 Spacer(minLength: 12)
 
-                Picker(tr("Coach view", "Coach-visning"), selection: $selectedSection) {
+                Picker(tr("ATHLTH Coach view", "Coach-visning"), selection: $selectedSection) {
                     Text(tr("Recovery", "Restitusjon")).tag("recovery")
                     Text(tr("Strength progression", "Styrkeprogresjon"))
                         .tag("progression")
@@ -1823,8 +1823,8 @@ private struct ATHLTHiPadCoachWorkspaceView: View {
                                                 Text(plan.title)
                                                     .font(.subheadline.weight(.semibold))
                                                     .foregroundStyle(ATHLTHPlanDesign.ink)
-                                                Text(tr("Review Coach suggestions",
-                                                        "Se forslag fra Coach"))
+                                                Text(tr("Review ATHLTH Coach suggestions",
+                                                        "Se forslag fra ATHLTH Coach"))
                                                     .font(.caption)
                                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                             }

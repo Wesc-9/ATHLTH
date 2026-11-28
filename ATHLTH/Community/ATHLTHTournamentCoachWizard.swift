@@ -73,7 +73,7 @@ enum ATHLTHTournamentLocalCoachPolicy {
             exerciseIDs: selected.map(\.id), exerciseNames: selected.map(\.name),
             startMode: start, environment: environment.rawValue,
             releaseEvery: 1, completionHours: 24, allowedRules: "", prohibitedRules: "",
-            explanation: "Lokalt forslag basert på tilgjengelige konkurranseøvelser. Kontroller øvelser, frister, poeng og regler før publisering. Uspesifiserte regler er ikke fastsatt av Coach.")
+            explanation: "Lokalt forslag basert på tilgjengelige konkurranseøvelser. Kontroller øvelser, frister, poeng og regler før publisering. Uspesifiserte regler er ikke fastsatt av ATHLTH Coach.")
     }
 }
 
@@ -120,10 +120,10 @@ struct ATHLTHTournamentCoachWizard: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 17) {
-                    Label("Coach bygger konkurransen", systemImage: "sparkles")
+                    Label("ATHLTH Coach bygger konkurransen", systemImage: "sparkles")
                         .font(.system(size: 25, design: .serif))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
-                    Text("Beskriv konkurransen du ønsker. Coach foreslår regler og øvelser fra det eksisterende biblioteket, som du kan kontrollere og endre før publisering.")
+                    Text("Beskriv konkurransen du ønsker. ATHLTH Coach foreslår regler og øvelser fra det eksisterende biblioteket, som du kan kontrollere og endre før publisering.")
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
@@ -145,7 +145,7 @@ struct ATHLTHTournamentCoachWizard: View {
                         .padding(15)
                         .background(ATHLTHArenaV3Style.panel())
 
-                    Text("Coach henter godkjente konkurranseøvelser fra biblioteket. Teksten du skriver, behandles lokalt. Ingen helseopplysninger eller deltakerdata sendes til AI.")
+                    Text("ATHLTH Coach henter godkjente konkurranseøvelser fra biblioteket. Teksten du skriver, behandles lokalt. Ingen helseopplysninger eller deltakerdata sendes til AI.")
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
@@ -155,7 +155,7 @@ struct ATHLTHTournamentCoachWizard: View {
                         HStack(spacing: 9) {
                             if busy { ProgressView().tint(.white) }
                             Image(systemName: "sparkles")
-                            Text(busy ? "Coach setter opp…" : "Lag konkurranseforslag")
+                            Text(busy ? "ATHLTH Coach setter opp…" : "Lag konkurranseforslag")
                         }
                         .font(.headline)
                         .foregroundStyle(.white)

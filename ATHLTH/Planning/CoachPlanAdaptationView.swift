@@ -150,7 +150,7 @@ struct CoachPlanAdaptationView: View {
                 .foregroundStyle(ATHLTHTheme.primaryText)
 
             Text(
-                "Coach reviews your current plan, goals and recent training, then proposes changes. Nothing is changed until you accept."
+                "ATHLTH Coach reviews your current plan, goals and recent training, then proposes changes. Nothing is changed until you accept."
             )
             .font(.subheadline)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -225,7 +225,7 @@ struct CoachPlanAdaptationView: View {
                         userNotes = [userNotes, request].filter { !$0.isEmpty }.joined(separator: "\n\n")
                     }
                 } label: {
-                    Label(ATHLTHLocalization.choose(english: "Add request to Coach", norwegian: "Legg til forespørsel til Coach"), systemImage: "sparkles")
+                    Label(ATHLTHLocalization.choose(english: "Add request to ATHLTH Coach", norwegian: "Legg til forespørsel til ATHLTH Coach"), systemImage: "sparkles")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
@@ -269,8 +269,8 @@ struct CoachPlanAdaptationView: View {
                 }
                 .buttonStyle(.plain)
                 Text(ATHLTHLocalization.choose(
-                    english: "The recovery score stays on your device. Only the request you choose to add is sent to Coach.",
-                    norwegian: "Restitusjonsscoren forblir på enheten. Bare forespørselen du velger å legge til, sendes til Coach."))
+                    english: "The recovery score stays on your device. Only the request you choose to add is sent to ATHLTH Coach.",
+                    norwegian: "Restitusjonsscoren forblir på enheten. Bare forespørselen du velger å legge til, sendes til ATHLTH Coach."))
                     .font(.caption2).foregroundStyle(ATHLTHTheme.mutedText)
             }
             .padding(16)
@@ -285,7 +285,7 @@ struct CoachPlanAdaptationView: View {
                 .font(.title3.weight(.bold))
 
             Text(
-                "Optional. Tell Coach about travel, a busy week, missed sessions or a change in availability."
+                "Optional. Tell ATHLTH Coach about travel, a busy week, missed sessions or a change in availability."
             )
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -322,8 +322,8 @@ struct CoachPlanAdaptationView: View {
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         .textSelection(.enabled)
                     Toggle(ATHLTHLocalization.choose(
-                        english: "Include this evidence in Coach review",
-                        norwegian: "Ta med disse resultatene i Coach-vurderingen"),
+                        english: "Include this evidence in ATHLTH Coach review",
+                        norwegian: "Ta med disse resultatene i ATHLTH Coach-vurderingen"),
                         isOn: $includeWorkoutEvidence)
                         .font(.subheadline)
                         .disabled(!canIncludeWorkoutEvidence)
@@ -372,7 +372,7 @@ struct CoachPlanAdaptationView: View {
 
                     Text(
                         isGenerating
-                            ? "Coach is reviewing…"
+                            ? "ATHLTH Coach is reviewing…"
                             : "Review my plan"
                     )
                 }
@@ -439,7 +439,7 @@ struct CoachPlanAdaptationView: View {
                 .font(.subheadline.weight(.semibold))
 
                 Text(
-                    "Coach uses the context available in ATHLTH and your note above. It does not assume missing health data means you skipped training."
+                    "ATHLTH Coach uses the context available in ATHLTH and your note above. It does not assume missing health data means you skipped training."
                 )
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -631,7 +631,7 @@ struct CoachPlanAdaptationView: View {
                 .font(.headline)
 
             Text(
-                "Coach needs an active plan before it can propose safe changes."
+                "ATHLTH Coach needs an active plan before it can propose safe changes."
             )
             .font(.subheadline)
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -687,13 +687,13 @@ struct CoachPlanAdaptationView: View {
 
             guard !generated.changes.isEmpty else {
                 infoMessage =
-                    "Coach reviewed your plan and did not find a useful change to suggest right now."
+                    "ATHLTH Coach reviewed your plan and did not find a useful change to suggest right now."
                 return
             }
 
             guard session.stageCoachPlanProposal(generated) else {
                 errorMessage =
-                    "Your plan changed while Coach was reviewing it. Run the review again."
+                    "Your plan changed while ATHLTH Coach was reviewing it. Run the review again."
                 return
             }
         } catch {
@@ -710,7 +710,7 @@ struct CoachPlanAdaptationView: View {
 
         guard session.applyCoachPlanProposal(proposal) else {
             errorMessage =
-                "The plan changed after this proposal was created. Generate a fresh Coach review."
+                "The plan changed after this proposal was created. Generate a fresh ATHLTH Coach review."
             return
         }
 

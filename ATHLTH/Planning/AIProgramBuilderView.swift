@@ -457,8 +457,8 @@ struct AIProgramBuilderView: View {
                                     hasCoachIntakeChanges)
         .confirmationDialog(
             ATHLTHLocalization.choose(
-                english: isSingleWorkout ? "Leave Coach workout builder?" : "Leave Coach plan builder?",
-                norwegian: isSingleWorkout ? "Forlate øktbyggeren?" : "Forlate Coach-planleggeren?"
+                english: isSingleWorkout ? "Leave ATHLTH Coach workout builder?" : "Leave ATHLTH Coach plan builder?",
+                norwegian: isSingleWorkout ? "Forlate øktbyggeren?" : "Forlate ATHLTH Coach-planleggeren?"
             ),
             isPresented: $showingCoachExitConfirmation,
             titleVisibility: .visible
@@ -600,7 +600,7 @@ struct AIProgramBuilderView: View {
                 Button {
                     Task { await generatePreview() }
                 } label: {
-                    Label(ATHLTHLocalization.choose(english: "Generate another workout", norwegian: "Be Coach om et nytt forslag"),
+                    Label(ATHLTHLocalization.choose(english: "Generate another workout", norwegian: "Be ATHLTH Coach om et nytt forslag"),
                           systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
@@ -646,15 +646,15 @@ struct AIProgramBuilderView: View {
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "Tell Coach what you actually need.",
-                norwegian: "Fortell Coach hva du faktisk trenger."))
+                english: "Tell ATHLTH Coach what you actually need.",
+                norwegian: "Fortell ATHLTH Coach hva du faktisk trenger."))
                 .font(.largeTitle)
                 .fontDesign(.serif)
                 .foregroundStyle(ATHLTHTrainDesign.ink)
 
             Text(ATHLTHLocalization.choose(
-                english: "Coach waits until the required choices are yours. A linked main goal is optional.",
-                norwegian: "Coach venter til de nødvendige valgene er dine. Et koblet hovedmål er valgfritt."))
+                english: "ATHLTH Coach waits until the required choices are yours. A linked main goal is optional.",
+                norwegian: "ATHLTH Coach venter til de nødvendige valgene er dine. Et koblet hovedmål er valgfritt."))
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
 
@@ -662,8 +662,8 @@ struct AIProgramBuilderView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "Coach understands your training",
-                            norwegian: "Coach kjenner treningsgrunnlaget ditt"
+                            english: "ATHLTH Coach understands your training",
+                            norwegian: "ATHLTH Coach kjenner treningsgrunnlaget ditt"
                         ),
                         systemImage: "chart.line.uptrend.xyaxis"
                     )
@@ -674,8 +674,8 @@ struct AIProgramBuilderView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                     Text(ATHLTHLocalization.choose(
-                        english: "Calculated on your device from completed strength logs. Shared for plan creation because Coach History is enabled. Nothing is changed until you approve the plan.",
-                        norwegian: "Beregnet lokalt fra fullførte styrkeøkter. Deles ved planoppretting fordi Coach-historikk er aktivert. Ingen endringer lagres før du godkjenner planen."
+                        english: "Calculated on your device from completed strength logs. Shared for plan creation because ATHLTH Coach History is enabled. Nothing is changed until you approve the plan.",
+                        norwegian: "Beregnet lokalt fra fullførte styrkeøkter. Deles ved planoppretting fordi ATHLTH Coach-historikk er aktivert. Ingen endringer lagres før du godkjenner planen."
                     ))
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
@@ -686,8 +686,8 @@ struct AIProgramBuilderView: View {
                             in: RoundedRectangle(cornerRadius: 19))
             } else {
                 Text(ATHLTHLocalization.choose(
-                    english: "Training-history analysis is disabled until you enable Coach History. Your locally saved workouts remain unchanged.",
-                    norwegian: "Analyse av treningshistorikk er deaktivert til du aktiverer Coach-historikk. Lokalt lagrede økter endres ikke."
+                    english: "Training-history analysis is disabled until you enable ATHLTH Coach History. Your locally saved workouts remain unchanged.",
+                    norwegian: "Analyse av treningshistorikk er deaktivert til du aktiverer ATHLTH Coach-historikk. Lokalt lagrede økter endres ikke."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
@@ -952,7 +952,7 @@ struct AIProgramBuilderView: View {
                         standaloneIntake.sessionsPerWeek = nil
                     } label: {
                         Text(ATHLTHLocalization.choose(
-                            english: "Let Coach decide", norwegian: "La Coach bestemme"
+                            english: "Let ATHLTH Coach decide", norwegian: "La ATHLTH Coach bestemme"
                         ))
                         .underline(standaloneIntake.coachChoosesFrequency)
                         .font(.caption.weight(.semibold))
@@ -1012,7 +1012,7 @@ struct AIProgramBuilderView: View {
                         standaloneIntake.sessionDurationMinutes = nil
                     } label: {
                         Text(ATHLTHLocalization.choose(
-                            english: "Let Coach decide", norwegian: "La Coach bestemme"
+                            english: "Let ATHLTH Coach decide", norwegian: "La ATHLTH Coach bestemme"
                         ))
                         .underline(standaloneIntake.coachChoosesDuration)
                         .font(.caption.weight(.semibold))
@@ -1132,8 +1132,8 @@ struct AIProgramBuilderView: View {
                     norwegian: "Utstyr du har tilgang til"))
                     .font(.subheadline.bold())
                 Text(ATHLTHLocalization.choose(
-                    english: "If neither list is filled, Coach assumes you have access to all standard equipment.",
-                    norwegian: "Hvis du ikke velger noe, antar Coach at du har tilgang til alt vanlig utstyr."))
+                    english: "If neither list is filled, ATHLTH Coach assumes you have access to all standard equipment.",
+                    norwegian: "Hvis du ikke velger noe, antar ATHLTH Coach at du har tilgang til alt vanlig utstyr."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                 if !standaloneIntake.equipment.isEmpty {
@@ -1267,8 +1267,8 @@ struct AIProgramBuilderView: View {
                         .font(.caption.weight(.semibold))
                         .buttonStyle(.borderless)
                         .accessibilityHint(ATHLTHLocalization.choose(
-                            english: "Restores your private notes for this draft. Sharing with Coach remains off.",
-                            norwegian: "Henter private notater til denne planen. Deling med Coach forblir av."
+                            english: "Restores your private notes for this draft. Sharing with ATHLTH Coach remains off.",
+                            norwegian: "Henter private notater til denne planen. Deling med ATHLTH Coach forblir av."
                         ))
                     }
 
@@ -1283,22 +1283,22 @@ struct AIProgramBuilderView: View {
                         .lineLimit(2...5)
                         .textFieldStyle(.roundedBorder)
                     Text(ATHLTHLocalization.choose(
-                        english: "Coach will exclude these exercises. Your plan is also checked before it can be saved.",
-                        norwegian: "Coach skal utelukke disse øvelsene. Planen kontrolleres også før den kan lagres."))
+                        english: "ATHLTH Coach will exclude these exercises. Your plan is also checked before it can be saved.",
+                        norwegian: "ATHLTH Coach skal utelukke disse øvelsene. Planen kontrolleres også før den kan lagres."))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
 
                     Toggle(isOn: $standaloneIntake.healthSharingAuthorized) {
                         Text(ATHLTHLocalization.choose(
-                            english: "I consent to Coach using injury details and excluded exercises on this device for this plan",
-                            norwegian: "Jeg samtykker til at Coach bruker skadeopplysninger og øvelser jeg ikke kan utføre lokalt på enheten for denne planen"))
+                            english: "I consent to ATHLTH Coach using injury details and excluded exercises on this device for this plan",
+                            norwegian: "Jeg samtykker til at ATHLTH Coach bruker skadeopplysninger og øvelser jeg ikke kan utføre lokalt på enheten for denne planen"))
                             .font(.subheadline)
                     }
                     .tint(ATHLTHTrainDesign.bronze)
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Sharing is optional and off by default. Without consent, Coach cannot tailor a plan to undisclosed injuries. Coach cannot guarantee medical safety; review your plan before training.",
-                        norwegian: "Deling er frivillig og av som standard. Uten samtykke kan Coach ikke tilpasse planen til skader som ikke er delt. Coach kan ikke garantere medisinsk sikkerhet – gjennomgå planen før trening."))
+                        english: "Sharing is optional and off by default. Without consent, ATHLTH Coach cannot tailor a plan to undisclosed injuries. ATHLTH Coach cannot guarantee medical safety; review your plan before training.",
+                        norwegian: "Deling er frivillig og av som standard. Uten samtykke kan ATHLTH Coach ikke tilpasse planen til skader som ikke er delt. ATHLTH Coach kan ikke garantere medisinsk sikkerhet – gjennomgå planen før trening."))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                 }
@@ -1356,8 +1356,8 @@ struct AIProgramBuilderView: View {
                 Task { await generatePreview() }
             } label: {
                 Label(ATHLTHLocalization.choose(
-                    english: isSingleWorkout ? "Find a workout with Coach" : "Build my plan with Coach",
-                    norwegian: isSingleWorkout ? "La Coach finne en økt" : "Lag planen min med Coach"),
+                    english: isSingleWorkout ? "Find a workout with ATHLTH Coach" : "Build my plan with ATHLTH Coach",
+                    norwegian: isSingleWorkout ? "La ATHLTH Coach finne en økt" : "Lag planen min med ATHLTH Coach"),
                       systemImage: "sparkles")
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -1662,8 +1662,8 @@ struct AIProgramBuilderView: View {
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "Coach respects your goal, dates and available days. Set optional experience, equipment and time preferences below. Nothing is saved until you approve.",
-                norwegian: "Coach tar hensyn til målet, datoene og dagene dine. Du kan legge til erfaring, utstyr og ønsket tidsramme nedenfor. Ingenting lagres før du godkjenner."
+                english: "ATHLTH Coach respects your goal, dates and available days. Set optional experience, equipment and time preferences below. Nothing is saved until you approve.",
+                norwegian: "ATHLTH Coach tar hensyn til målet, datoene og dagene dine. Du kan legge til erfaring, utstyr og ønsket tidsramme nedenfor. Ingenting lagres før du godkjenner."
             ))
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -1871,7 +1871,7 @@ struct AIProgramBuilderView: View {
                 Text(
                     showingQuestions
                         ? "Tell ATHLTH what matters. We’ll combine it with your goals, schedule and training profile."
-                        : "Review the inputs that shape your adaptive training plan before Coach builds it."
+                        : "Review the inputs that shape your adaptive training plan before ATHLTH Coach builds it."
                 )
                 .font(.subheadline)
                 .foregroundStyle(
@@ -1956,8 +1956,8 @@ struct AIProgramBuilderView: View {
                             ))
                             .font(.subheadline.weight(.semibold))
                             Text(ATHLTHLocalization.choose(
-                                english: "Coach chooses a reasonable number of workouts based on your current level, goals and available days. Review everything before saving.",
-                                norwegian: "Coach foreslår antall økter ut fra nivå, mål og tilgjengelige dager. Du kontrollerer alt før lagring."
+                                english: "ATHLTH Coach chooses a reasonable number of workouts based on your current level, goals and available days. Review everything before saving.",
+                                norwegian: "ATHLTH Coach foreslår antall økter ut fra nivå, mål og tilgjengelige dager. Du kontrollerer alt før lagring."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -2184,7 +2184,7 @@ struct AIProgramBuilderView: View {
         VStack(alignment: .leading, spacing: 10) {
             coachSectionHeading(
                 eyebrow: "02 · DIRECTION",
-                title: "What should Coach build toward?"
+                title: "What should ATHLTH Coach build toward?"
             )
 
             coachCard {
@@ -2272,7 +2272,7 @@ struct AIProgramBuilderView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("Tell Coach what matters most")
+                    Text("Tell ATHLTH Coach what matters most")
                         .font(.subheadline.weight(.semibold))
 
                     HStack {
@@ -2312,7 +2312,7 @@ struct AIProgramBuilderView: View {
                     }
 
                     Text(
-                        "Coach combines this with the goals you select above. You do not need to repeat information already stored in a goal."
+                        "ATHLTH Coach combines this with the goals you select above. You do not need to repeat information already stored in a goal."
                     )
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2387,7 +2387,7 @@ struct AIProgramBuilderView: View {
         VStack(alignment: .leading, spacing: 10) {
             coachSectionHeading(
                 eyebrow: "04 · ADAPT",
-                title: "Anything Coach should protect?"
+                title: "Anything ATHLTH Coach should protect?"
             )
 
             coachCard {
@@ -2441,7 +2441,7 @@ struct AIProgramBuilderView: View {
             coachCard {
                 if goalStore.activeGoals.isEmpty {
                     Text(
-                        "No active goals yet. Coach will build around your training focus and free-text direction."
+                        "No active goals yet. ATHLTH Coach will build around your training focus and free-text direction."
                     )
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2619,7 +2619,7 @@ struct AIProgramBuilderView: View {
             librarySaveChoice
             coachSectionHeading(
                 eyebrow: ATHLTHLocalization.choose(english: "YOUR PLAN", norwegian: "DIN PLAN"),
-                title: ATHLTHLocalization.choose(english: "Coach draft", norwegian: "Forslag fra coach")
+                title: ATHLTHLocalization.choose(english: "ATHLTH Coach draft", norwegian: "Forslag fra coach")
             )
             coachCard {
             Text(draft.title)
@@ -3153,7 +3153,7 @@ struct AIProgramBuilderView: View {
                 generated, expectedPlanID: completingPlanID,
                 expectedVersion: completingPlanVersion
             ) else {
-                errorMessage = "The plan changed while this draft was being prepared. Close Coach and reopen the plan to generate a fresh draft."
+                errorMessage = "The plan changed while this draft was being prepared. Close ATHLTH Coach and reopen the plan to generate a fresh draft."
                 return
             }
 
