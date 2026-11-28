@@ -1290,8 +1290,8 @@ struct AIProgramBuilderView: View {
 
                     Toggle(isOn: $standaloneIntake.healthSharingAuthorized) {
                         Text(ATHLTHLocalization.choose(
-                            english: "I explicitly consent to sharing injury details and forbidden exercises with ATHLTH Coach's AI provider for this plan",
-                            norwegian: "Jeg samtykker uttrykkelig til at skadeopplysninger og øvelser jeg ikke kan utføre deles med AI-leverandøren til ATHLTH Coach for denne planen"))
+                            english: "I consent to Coach using injury details and excluded exercises on this device for this plan",
+                            norwegian: "Jeg samtykker til at Coach bruker skadeopplysninger og øvelser jeg ikke kan utføre lokalt på enheten for denne planen"))
                             .font(.subheadline)
                     }
                     .tint(ATHLTHTrainDesign.bronze)
@@ -2925,7 +2925,13 @@ struct AIProgramBuilderView: View {
         )
 
         do {
-            let result = try await service.generate(request)
+            if exerciseLibrary.allExercises.isEmpty { await exerciseLibrary.refresh() }
+            let gym = gymAccess.lowercased()
+            let result = try await service.generate(request,
+                library: exerciseLibrary.allExercises,
+                savedWorkouts: session.savedWorkoutTemplates,
+                focus: trainingFocus,
+                gymAvailable: gym == "yes" || gym.contains("gym") || gym.contains("treningssenter"))
             guard session.signedIn, session.profile.userID == requestOwnerID else { return }
             // AI may propose something on a weekday the user already
             // detailed manually. Overlay the authoritative Studio workout
