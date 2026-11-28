@@ -19,6 +19,8 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var ghostUpdates: WatchGhostRaceAudioConfiguration? = nil
     /// Minutes since local midnight; nil means no fixed start time.
     var startMinuteOfDay: Int? = nil
+    /// Identity of an existing occurrence in an edit draft, never used for new plans.
+    var sourceSessionID: UUID? = nil
 
     var isValid: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -34,6 +36,31 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             }).contains { groupID in
                 blocks.filter { $0.groupID == groupID && $0.kind == .exercise }.count < 2
             }
+    }
+
+    /// A lossless editing snapshot: the original session is retained on save
+    /// when its blueprint was not changed, including unsupported legacy fields.
+    static func editingSnapshot(_ workout: PlannedSession) -> Self {
+        var result = Self(
+            title: workout.title, kind: workout.kind,
+            durationMinutes: workout.durationMinutes ?? 45,
+            routeID: workout.routeID,
+            blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        )
+        result.sourceSessionID = workout.id
+        result.gearIDs = workout.gearIDs
+        result.spotifyPlaylist = workout.spotifyPlaylist
+        result.spotifyAutoplayOnStart = workout.spotifyAutoplayOnStart
+        result.spotifyIntervalTrack = workout.spotifyIntervalTrack
+        result.audioCoachConfiguration = workout.audioCoachConfiguration
+        result.routeAlertConfiguration = workout.routeAlertConfiguration
+        result.ghostTargetDurationSeconds = workout.ghostTargetDurationSeconds
+        result.ghostUpdates = workout.ghostUpdates
+        if let date = workout.scheduledStart {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+            result.startMinuteOfDay = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        }
+        return result
     }
 
     var category: String {

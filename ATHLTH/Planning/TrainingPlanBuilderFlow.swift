@@ -37,6 +37,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     let resumesDraftOnAppear: Bool
     /// New plans use their own checkpoint; old and completed plans are safe.
     let draftID: UUID?
+    let editingPlan: TrainingPlan?
+    let editingReusablePlan: Bool
+    @State private var initialEditDays: [Int: ATHLTHPlanWeekDayEdit] = [:]
+    @State private var originalEditAnchor = Date()
+    @State private var editableProfile: TrainingPlanBuilderProfile?
+    @State private var showingEditDiscard = false
+    private var isEditingExisting: Bool { editingPlan != nil }
     var onCreated: ((UUID) -> Void)? = nil
 
     @State private var step: BuilderStep
@@ -97,7 +104,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var isCreatingPlan = false
     @State private var usesScopedWorkoutDrafts = true
     private var workoutDraftContextPrefix: String {
-        usesScopedWorkoutDrafts ? "new-program-\(draftID?.uuidString ?? "legacy")" : "new-program"
+        if let editingPlan { return "edit-program-\(editingPlan.id.uuidString)-\(draftID?.uuidString ?? "session")" }
+        return usesScopedWorkoutDrafts ? "new-program-\(draftID?.uuidString ?? "legacy")" : "new-program"
     }
     @State private var secondaryFocus: TrainingPlanFocus?
     @State private var focusWeight = 70
@@ -323,8 +331,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         initialAdvanced: Bool,
         resumesDraftOnAppear: Bool = false,
         draftID: UUID? = nil,
+        editingPlan: TrainingPlan? = nil,
+        editingReusablePlan: Bool = false,
         onCreated: ((UUID) -> Void)? = nil
     ) {
+        self.editingPlan = editingPlan
+        self.editingReusablePlan = editingReusablePlan
         self.resumesDraftOnAppear = resumesDraftOnAppear
         self.draftID = draftID
         self.onCreated = onCreated
@@ -334,7 +346,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             initialAdvanced
         // The entry screen always offers three clear starting paths.
         // The existing basics/profile/week/review steps remain intact.
-        _step = State(initialValue: .mode)
+        _step = State(initialValue: editingPlan == nil ? .mode : .review)
         _entryChoice = State(initialValue: initialAdvanced ? .advanced : .simple)
         _mode = State(
             initialValue:
@@ -549,6 +561,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .tint(ATHLTHTrainDesign.bronze)
         .interactiveDismissDisabled(!completedPlanCreation)
+        .confirmationDialog(ATHLTHLocalization.choose(english: "Discard unsaved changes?", norwegian: "Forkaste ulagrede endringer?"), isPresented: $showingEditDiscard, titleVisibility: .visible) {
+            Button(ATHLTHLocalization.choose(english: "Discard changes", norwegian: "Forkast endringer"), role: .destructive) { dismiss() }
+            Button(ATHLTHLocalization.choose(english: "Keep editing", norwegian: "Fortsett redigering"), role: .cancel) {}
+        }
     }
 
     // Footer buttons belong to the *plan* column. The workout editor
@@ -715,6 +731,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var planLifecycle: some View {
         AnyView(planNavigation)
         .onAppear {
+            if let editingPlan {
+                guard !didApplySuggestedStartDate else { return }
+                didApplySuggestedStartDate = true
+                hydrateExistingPlan(editingPlan)
+                return
+            }
             // Read before setting the editing marker. SwiftUI can recreate a
             // sheet host after a quick app switch even while its original
             // TrainProgramCreationLaunch still says resumesDraftOnAppear=false.
@@ -1273,6 +1295,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         proposed.routeAlertConfiguration = extras.routeAlertConfiguration
         proposed.ghostTargetDurationSeconds = extras.ghostTargetDurationSeconds
         proposed.ghostUpdates = extras.ghostUpdates
+                    if isEditingExisting && !addingExtraWorkout,
+                       let previous = selectedWorkoutForEditor(day: selection.id) {
+                        proposed.sourceSessionID = previous.sourceSessionID
+                        proposed.startMinuteOfDay = previous.startMinuteOfDay
+                    }
                     guard proposed.isValid else { return false }
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
@@ -1475,7 +1502,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             } else {
             AnyView(wizardScroll(AnyView(
                 Group {
-                    if mode == .advanced {
+                    if mode == .advanced || isEditingExisting {
                         switch weekPlanningApproach {
                         case .none:
                             AnyView(weekStep)
@@ -3413,7 +3440,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var usesPinnedGuidedDayLayout: Bool {
         ATHLTHDeviceRole.isIPad && widthClass == .regular &&
-            step == .week && mode == .advanced &&
+            step == .week && (mode == .advanced || isEditingExisting) &&
             weekPlanningApproach == .guided &&
             guidedDayCursor < weekCount * 7 && guidedWeekDecisionSource == nil
     }
@@ -6580,14 +6607,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 icon: "checkmark.seal.fill"
             )
 
-            if mode == .advanced {
+            if isEditingExisting {
+                AnyView(existingPlanEditFields)
+                AnyView(guidedSummaryWeeks)
+            } else if mode == .advanced {
                 AnyView(guidedSummaryWeeks)
                 reviewSummaryPanel
             } else {
                 adaptivePlanPair(AnyView(reviewSummaryPanel), AnyView(reviewWeeksPanel))
             }
 
-            if !goalStore.goals.isEmpty {
+            if !goalStore.goals.isEmpty && !editingReusablePlan {
                 builderPanel {
                     VStack(
                         alignment: .leading,
@@ -6639,9 +6669,48 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
 
             if let conflict = conflictingPlan, approvedPlanReplacementID != conflict.id {
-                conflictCard(conflict)
+                if isEditingExisting {
+                    Text(ATHLTHLocalization.choose(english: "Choose dates that do not overlap another plan.", norwegian: "Velg datoer som ikke overlapper en annen plan."))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else { conflictCard(conflict) }
             }
 
+        }
+    }
+
+    private var existingPlanEditFields: some View {
+        builderPanel {
+            VStack(alignment: .leading, spacing: 12) {
+                TextField(ATHLTHLocalization.choose(english: "Plan name", norwegian: "Navn på planen"), text: $title)
+                    .font(.headline)
+                TextField(ATHLTHLocalization.choose(english: "Description", norwegian: "Beskrivelse"), text: $planSummary, axis: .vertical)
+                    .lineLimit(2...5)
+                Picker(ATHLTHLocalization.choose(english: "Level", norwegian: "Detaljnivå"), selection: $mode) {
+                    Text(ATHLTHLocalization.choose(english: "Simple", norwegian: "Enkel")).tag(TrainingPlanBuilderMode.basic)
+                    Text(ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")).tag(TrainingPlanBuilderMode.advanced)
+                }
+                .pickerStyle(.segmented)
+                Stepper(ATHLTHLocalization.format(english: "%d weeks", norwegian: "%d uker", weekCount), value: $weekCount, in: 1...52)
+                if !editingReusablePlan {
+                    DatePicker(ATHLTHLocalization.choose(english: "Start date", norwegian: "Startdato"), selection: $startDate, displayedComponents: .date)
+                } else {
+                    Text(ATHLTHLocalization.choose(english: "Saved plan · not scheduled", norwegian: "Lagret plan · ikke lagt i kalenderen"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Picker(ATHLTHLocalization.choose(english: "Visibility", norwegian: "Synlighet"), selection: $visibility) {
+                    ForEach(ProfileVisibility.allCases) { value in
+                        Text(value.title).tag(value)
+                    }
+                }
+                Picker(ATHLTHLocalization.choose(english: "Focus", norwegian: "Fokus"), selection: $focus) {
+                    ForEach(TrainingPlanFocus.allCases) { value in Text(value.title).tag(value) }
+                }
+                Picker(ATHLTHLocalization.choose(english: "Goal", norwegian: "Mål"), selection: $goal) {
+                    ForEach(TrainingPlanGoalType.allCases) { value in Text(value.title).tag(value) }
+                }
+                Text(ATHLTHLocalization.choose(english: "Changes update this plan. Completed and past workouts are protected.", norwegian: "Endringene oppdaterer denne planen. Gjennomførte og tidligere økter er beskyttet."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -7136,7 +7205,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Button {
                         if step == .basics && mode == .basic {
                             createPlan(seedSuggestedWeek: true)
-                        } else if step == .week && mode == .advanced &&
+                        } else if step == .week && (mode == .advanced || isEditingExisting) &&
                                   weekPlanningApproach == .guided &&
                                   guidedDayCursor < weekCount * 7 {
                             if reviewingGuidedDay { openGuidedSummary() }
@@ -7211,7 +7280,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Button {
                         createPlan(seedSuggestedWeek: mode == .basic)
                     } label: {
-                        Label(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig"), systemImage: "checkmark.seal.fill")
+                        Label(isEditingExisting ? ATHLTHLocalization.choose(english: "Save changes", norwegian: "Lagre endringer") : ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig"), systemImage: "checkmark.seal.fill")
                             .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 52)
@@ -7290,7 +7359,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var canCreatePlan: Bool {
-        !selectedDays.isEmpty &&
+        if isEditingExisting { return conflictIsResolved && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return !selectedDays.isEmpty &&
         conflictIsResolved &&
         (
             mode == .basic || injuryFree ||
@@ -7303,7 +7373,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var effectivePlanWeekCount: Int {
-        mode == .basic && simpleDurationUnspecified ? 4 : weekCount
+        !isEditingExisting && mode == .basic && simpleDurationUnspecified ? 4 : weekCount
     }
 
     private var resolvedEndDate: Date {
@@ -7323,14 +7393,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private var conflictingPlan: TrainingPlan? {
-        session.trainingPlanConflict(
+        if editingReusablePlan { return nil }
+        if let editingPlan, session.isTrainingPlanPaused(editingPlan.id) || session.isTrainingPlanDeactivated(editingPlan.id) { return nil }
+        return session.trainingPlanConflict(
             startDate: startDate,
-            endDate: resolvedEndDate
+            endDate: resolvedEndDate,
+            excludingPlanID: editingPlan?.id
         )
     }
 
     private var conflictIsResolved: Bool {
         guard let conflictingPlan else { return true }
+        if isEditingExisting { return false }
         return approvedPlanReplacementID == conflictingPlan.id
     }
 
@@ -7366,6 +7440,63 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     /// Restore the last editing position without an alert. The checkpoint is
     /// account-scoped checkpoint includes entered text and workout configuration.
+    private func hydrateExistingPlan(_ plan: TrainingPlan) {
+        isHydratingPlanDraft = true
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekday = (calendar.component(.weekday, from: today) + 5) % 7 + 1
+        let monday = calendar.date(byAdding: .day, value: 1 - weekday, to: today) ?? today
+        originalEditAnchor = calendar.startOfDay(for: plan.startDate ?? monday)
+        startDate = originalEditAnchor
+        title = plan.title
+        planSummary = plan.summary
+        visibility = plan.visibility
+        weekCount = max(1, plan.weeks.count)
+        simpleDurationUnspecified = false
+        editableProfile = plan.builderProfile
+        mode = plan.builderProfile?.mode ?? .advanced
+        entryChoice = mode == .basic ? .simple : .advanced
+        focus = plan.builderProfile?.primaryFocus ?? .generalFitness
+        goal = plan.builderProfile?.goal ?? .improveFitness
+        selectedGoalChoice = "none"
+        selectedGoalIDs = Set(goalStore.goals.filter { $0.linkedTrainingPlanID == plan.id }.map(\.id))
+        let startWeekday = (calendar.component(.weekday, from: originalEditAnchor) + 5) % 7 + 1
+        var edits: [Int: ATHLTHPlanWeekDayEdit] = [:]
+        var actualDays: Set<Int> = []
+        for (weekIndex, week) in plan.weeks.enumerated() {
+            for day in week.days {
+                let weekday = (startWeekday + day.dayIndex - 2) % 7 + 1
+                let key = weekIndex * 7 + weekday
+                let workouts = day.sessions.filter { !$0.isExplicitRestDay }
+                let blueprints = workouts.map(ATHLTHPlanStructuredWorkoutBlueprint.editingSnapshot)
+                var edit = ATHLTHPlanWeekDayEdit()
+                edit.detailedWorkout = blueprints.first
+                edit.additionalDetailedWorkouts = Array(blueprints.dropFirst())
+                edit.title = blueprints.first?.title
+                edit.kind = blueprints.first?.kind
+                edit.durationMinutes = blueprints.first?.durationMinutes
+                edit.trainingPlace = workouts.first?.plannedTrainingPlace
+                edit.isRestDay = day.sessions.contains(where: { $0.isExplicitRestDay })
+                edit.removeTemplateDetail = true
+                edit.removeAllWorkouts = blueprints.isEmpty
+                if !blueprints.isEmpty { actualDays.insert(weekday) }
+                edits[key] = edit
+            }
+        }
+        selectedDays = Set(plan.builderProfile?.preferredDayIndexes ?? Array(actualDays))
+        if selectedDays.isEmpty { selectedDays = [1, 3, 5] }
+        sessionsPerWeek = selectedDays.count
+        initialEditDays = edits
+        weekDayEdits = edits
+        weekPlanningApproach = .guided
+        firstGuidedWeekDecisionMade = true
+        step = .review
+        Task { @MainActor in
+            await Task.yield()
+            isHydratingPlanDraft = false
+        }
+    }
+
     private func restorePlanDraft(_ draft: ATHLTHPlanCreationDraft) {
         mode = draft.advanced ? .advanced : .basic
         entryChoice = draft.advanced ? .advanced : .simple
@@ -7486,7 +7617,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private func schedulePlanCheckpoint() {
         pendingPlanCheckpoint?.cancel()
-        guard didApplySuggestedStartDate, !completedPlanCreation,
+        guard !isEditingExisting, didApplySuggestedStartDate, !completedPlanCreation,
               !deliberatelyDiscardedPlanDraft, !isHydratingPlanDraft else { return }
         let owner = session.profile.userID
         pendingPlanCheckpoint = Task { @MainActor in
@@ -7500,7 +7631,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func saveResumableDraft() -> Bool {
         pendingPlanCheckpoint?.cancel()
         pendingPlanCheckpoint = nil
-        guard didApplySuggestedStartDate,
+        guard !isEditingExisting, didApplySuggestedStartDate,
               !completedPlanCreation,
               !deliberatelyDiscardedPlanDraft,
               !isHydratingPlanDraft else {
@@ -7569,6 +7700,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func requestClosePlanCreation() {
+        if isEditingExisting && !completedPlanCreation {
+            showingEditDiscard = true
+            return
+        }
         if completedPlanCreation {
             dismiss()
             return
@@ -7611,6 +7746,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     /// Day detail is an internal route, not an instruction to leave the plan.
     private func goBackInPlanBuilder() {
+        if isEditingExisting && step == .review { requestClosePlanCreation(); return }
         if reviewingGuidedDay && step == .week {
             openGuidedSummary()
             return
@@ -8176,10 +8312,47 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     }
 
+    private func saveExistingPlan(_ plan: TrainingPlan) {
+        isCreatingPlan = true
+        defer { isCreatingPlan = false }
+        var profile = editableProfile
+        if profile == nil && (mode != .advanced || focus != .generalFitness || goal != .improveFitness) {
+            profile = currentPlanBuilderProfile
+        }
+        if var existing = profile {
+            existing.mode = mode
+            if focus != (editableProfile?.primaryFocus ?? .generalFitness) { existing.primaryFocus = focus }
+            if goal != (editableProfile?.goal ?? .improveFitness) { existing.goal = goal }
+            profile = existing
+        }
+        guard session.saveEditedTrainingPlan(
+            original: plan, reusable: editingReusablePlan,
+            originalAnchor: originalEditAnchor, title: resolvedPlanTitle,
+            summary: planSummary, visibility: visibility, startDate: startDate,
+            weekCount: weekCount, builderProfile: profile,
+            initialEdits: initialEditDays, edits: weekDayEdits
+        ) else {
+            creationError = ATHLTHLocalization.choose(
+                english: "Could not save. Check overlapping dates, past workouts, removed weeks or changes made on another device.",
+                norwegian: "Kunne ikke lagre. Kontroller overlappende datoer, tidligere økter, fjernede uker eller endringer fra en annen enhet.")
+            return
+        }
+        if !editingReusablePlan {
+            goalStore.setLinkedPlan(plan.id, goalIDs: selectedGoalIDs)
+        }
+        completedPlanCreation = true
+        onCreated?(plan.id)
+        dismiss()
+    }
+
     private func createPlan(
         seedSuggestedWeek: Bool
     ) {
         guard canCreatePlan, !isCreatingPlan, !completedPlanCreation else {
+            return
+        }
+        if let editingPlan {
+            saveExistingPlan(editingPlan)
             return
         }
 

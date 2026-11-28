@@ -3270,6 +3270,165 @@ final class AppSessionStore: ObservableObject {
         return plan
     }
 
+    /// Commit the existing builder's edit draft without scheduling a copy.
+    /// Unchanged occurrences and their legacy metadata retain their original IDs.
+    @discardableResult
+    func saveEditedTrainingPlan(
+        original: TrainingPlan,
+        reusable: Bool,
+        originalAnchor: Date,
+        title: String,
+        summary: String,
+        visibility: ProfileVisibility,
+        startDate: Date,
+        weekCount: Int,
+        builderProfile: TrainingPlanBuilderProfile?,
+        initialEdits: [Int: ATHLTHPlanWeekDayEdit],
+        edits: [Int: ATHLTHPlanWeekDayEdit]
+    ) -> Bool {
+        let current = reusable
+            ? planTemplates.first(where: { $0.id == original.id })
+            : trainingPlan(withID: original.id)
+        guard var plan = current, plan == original,
+              plan.ownerID == profile.userID,
+              (1...52).contains(weekCount),
+              !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+
+        let calendar = Calendar.current
+        let oldStart = calendar.startOfDay(for: originalAnchor)
+        let newStart = reusable ? oldStart : calendar.startOfDay(for: startDate)
+        let timelineChanged = newStart != oldStart || weekCount != original.weeks.count
+        let end = timelineChanged
+            ? calendar.date(byAdding: .day, value: weekCount * 7 - 1, to: newStart) ?? newStart
+            : original.endDate ?? calendar.date(byAdding: .day, value: weekCount * 7 - 1, to: newStart) ?? newStart
+        if !reusable, !isTrainingPlanPaused(plan.id), !isTrainingPlanDeactivated(plan.id),
+           trainingPlanConflict(startDate: newStart, endDate: end, excludingPlanID: plan.id) != nil {
+            return false
+        }
+        // Shortening must be deliberate: clear future workouts first, and never
+        // discard completed weeks or an existing training block silently.
+        if weekCount < original.weeks.count {
+            guard original.weeks.dropFirst(weekCount).allSatisfy({ week in
+                week.days.allSatisfy { $0.sessions.isEmpty }
+            }), (original.trainingBlocks ?? []).allSatisfy({ $0.endWeek <= weekCount }) else { return false }
+        }
+
+        let oldWeekday = (calendar.component(.weekday, from: oldStart) + 5) % 7 + 1
+        let newWeekday = (calendar.component(.weekday, from: newStart) + 5) % 7 + 1
+        let today = calendar.startOfDay(for: Date())
+        var revised: [TrainingPlanWeek] = []
+        var removedIDs: Set<UUID> = []
+        for weekIndex in 0..<weekCount {
+            let oldWeek = original.weeks.indices.contains(weekIndex) ? original.weeks[weekIndex] : nil
+            var week = oldWeek ?? makeEmptyWeek(number: weekIndex + 1)
+            var days: [TrainingPlanDay] = []
+            for offset in 1...7 {
+                let weekday = (newWeekday + offset - 2) % 7 + 1
+                let oldOffset = (weekday - oldWeekday + 7) % 7 + 1
+                let oldDay = oldWeek?.days.first(where: { $0.dayIndex == oldOffset })
+                guard var day = oldDay ?? week.days.first(where: { $0.dayIndex == offset }) else { return false }
+                day.dayIndex = offset
+                let key = weekIndex * 7 + weekday
+                let oldEdit = initialEdits[key]
+                let edit = edits[key]
+                let previous = oldDay?.sessions ?? []
+                let oldDate = calendar.date(byAdding: .day, value: weekIndex * 7 + oldOffset - 1, to: oldStart) ?? oldStart
+                let newDate = calendar.date(byAdding: .day, value: weekIndex * 7 + offset - 1, to: newStart) ?? newStart
+                let moved = !reusable && oldDate != newDate
+                let changed = edit != oldEdit
+                // Preserve history and recorded occurrences even if a user
+                // changes the start date or requests a Coach rewrite.
+                if !reusable, (changed || moved), !previous.isEmpty,
+                   oldDate < today || previous.contains(where: {
+                       isPlanSessionManuallyCompleted(planID: plan.id, sessionID: $0.id) ||
+                       isPlanSessionSkipped(planID: plan.id, sessionID: $0.id) ||
+                       linkedHealthWorkoutID(planID: plan.id, sessionID: $0.id) != nil
+                   }) { return false }
+                if !reusable, changed, newDate < today { return false }
+
+                var workouts = previous
+                if changed {
+                    let oldBlueprints = [oldEdit?.detailedWorkout].compactMap { $0 } +
+                        (oldEdit?.additionalDetailedWorkouts ?? [])
+                    let blueprints = [edit?.detailedWorkout].compactMap { $0 } +
+                        (edit?.additionalDetailedWorkouts ?? [])
+                    workouts = []
+                    var used: Set<UUID> = []
+                    if edit?.isRestDay == true {
+                        if let rest = previous.first(where: { $0.isExplicitRestDay }) {
+                            workouts = [rest]
+                        } else {
+                            var rest = PlannedSession(id: UUID(),
+                                title: ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"),
+                                kind: .recovery, scheduledStart: nil, durationMinutes: nil,
+                                targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+                                routeID: nil, exercises: [], notes: nil)
+                            rest.workoutCategory = "rest_day"
+                            workouts = [rest]
+                        }
+                    } else if edit?.removeAllWorkouts != true {
+                        for blueprint in blueprints {
+                            let source = previous.first { $0.id == blueprint.sourceSessionID && !used.contains($0.id) }
+                            let unchanged = source != nil && oldBlueprints.contains(blueprint)
+                            guard unchanged || blueprint.isValid else { return false }
+                            var workout = unchanged ? source! : blueprint.applying(to: source)
+                            if let source { used.insert(source.id) }
+                            if !unchanged || moved {
+                                if let minute = blueprint.startMinuteOfDay, (0..<1440).contains(minute) {
+                                    workout.scheduledStart = calendar.date(byAdding: .minute, value: minute, to: newDate)
+                                } else if !unchanged { workout.scheduledStart = nil }
+                            }
+                            if edit?.trainingPlace != oldEdit?.trainingPlace || source == nil {
+                                workout.plannedTrainingPlace = edit?.trainingPlace
+                            }
+                            workouts.append(workout)
+                        }
+                    }
+                }
+                if moved && !changed {
+                    workouts = workouts.map { source in
+                        var workout = source
+                        if let date = source.scheduledStart {
+                            let parts = calendar.dateComponents([.hour, .minute, .second], from: date)
+                            workout.scheduledStart = calendar.date(bySettingHour: parts.hour ?? 0,
+                                minute: parts.minute ?? 0, second: parts.second ?? 0, of: newDate)
+                        }
+                        return workout
+                    }
+                }
+                removedIDs.formUnion(Set(previous.map(\.id)).subtracting(workouts.map(\.id)))
+                day.sessions = workouts
+                days.append(day)
+            }
+            week.days = days
+            revised.append(week)
+        }
+
+        plan.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        plan.summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        plan.visibility = visibility
+        plan.builderProfile = builderProfile
+        plan.weeks = revised
+        if !reusable {
+            plan.startDate = newStart
+            if timelineChanged { plan.endDate = end }
+        }
+        // A template remains unscheduled even when its virtual dates are used
+        // to render the builder. Its document ID and library position stay put.
+        guard plan != original else { return true }
+        plan.version += 1
+        plan.updatedAt = Date()
+        if reusable {
+            guard let index = planTemplates.firstIndex(where: { $0.id == plan.id }) else { return false }
+            planTemplates[index] = plan
+            persistPlanTemplates()
+        } else {
+            for id in removedIDs { PlannedWorkoutReminderScheduler.cancel(id) }
+            replaceTrainingPlan(plan)
+        }
+        return true
+    }
+
     func replaceActivePlan(with plan: TrainingPlan) {
         var replacement = plan
 

@@ -4309,6 +4309,7 @@ struct MyTrainingPlansLibraryView: View {
     @State private var scheduleError: String?
     @State private var reviewingPlan: TrainingPlan?
     @State private var editingScheduledPlan: TrainingPlan?
+    @State private var editLaunchID = UUID()
     @State private var pendingPlanAction: PersonalPlanAction?
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
@@ -4588,20 +4589,13 @@ struct MyTrainingPlansLibraryView: View {
             TrainingPlanCreationView()
         }
         .sheet(item: $editingScheduledPlan) { plan in
-            NavigationStack {
-                ScrollView {
-                    AdvancedPlannerView(planID: plan.id).padding()
-                }
-                .navigationTitle(plan.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(ATHLTHLocalization.choose(english: "Done", norwegian: "Ferdig")) {
-                            editingScheduledPlan = nil
-                        }
-                    }
-                }
-            }
+            ATHLTHTrainingPlanBuilderFlow(
+                startsAtSourceChoice: false,
+                initialAdvanced: plan.builderProfile?.mode != .basic,
+                draftID: editLaunchID,
+                editingPlan: plan,
+                editingReusablePlan: session.planTemplates.contains(where: { $0.id == plan.id })
+            )
         }
         .confirmationDialog(
             pendingPlanAction?.plan.title ?? "",
@@ -4684,13 +4678,18 @@ struct MyTrainingPlansLibraryView: View {
         visibleLimit = ATHLTHLibraryPagination.pageSize
     }
 
-    @ViewBuilder
-    private func scheduledPlanManagementActions(_ plan: TrainingPlan) -> some View {
+    private func editPlanAction(_ plan: TrainingPlan) -> some View {
         Button {
+            editLaunchID = UUID()
             editingScheduledPlan = plan
         } label: {
             Label(ATHLTHLocalization.choose(english: "Edit plan", norwegian: "Rediger plan"), systemImage: "pencil")
         }
+    }
+
+    @ViewBuilder
+    private func scheduledPlanManagementActions(_ plan: TrainingPlan) -> some View {
+        editPlanAction(plan)
         if session.isTrainingPlanPaused(plan.id) || session.isTrainingPlanDeactivated(plan.id) {
             Button {
                 if !session.resumeTrainingPlan(plan.id) {
@@ -4996,6 +4995,7 @@ struct MyTrainingPlansLibraryView: View {
                 Menu {
                     if !reusable { scheduledPlanManagementActions(plan) }
                     if reusable {
+                        editPlanAction(plan)
                         Button {
                             scheduleCompactTemplate(plan)
                         } label: {
@@ -5100,6 +5100,8 @@ struct MyTrainingPlansLibraryView: View {
                     subtitle: "", icon: "calendar")
 
                 Menu {
+                    editPlanAction(template)
+                    Divider()
                     deletePlanAction(template, reusable: true)
                 } label: {
                     Image(systemName: "ellipsis")
