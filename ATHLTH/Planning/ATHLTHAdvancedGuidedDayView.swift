@@ -319,8 +319,10 @@ struct ATHLTHAdvancedGuidedDayView: View {
                             let isSelected = absoluteDay == (weekNumber - 1) * 7 + dayIndex
 
                             Button {
-                                onSelectDay(absoluteDay)
+                                // Close the popover before changing the
+                                // date that owns its anchor.
                                 showingDayPicker = false
+                                onSelectDay(absoluteDay)
                             } label: {
                                 HStack(spacing: 10) {
                                     Text(dayDate(absoluteDay).formatted(

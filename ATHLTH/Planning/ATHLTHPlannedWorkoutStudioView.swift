@@ -1689,6 +1689,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         action: AddSheetAction
     ) -> some View {
         Button {
+            guard queuedAddAction == nil, addSheetRequest != nil else { return }
             queuedAddAction = action
             addSheetRequest = nil
         } label: {

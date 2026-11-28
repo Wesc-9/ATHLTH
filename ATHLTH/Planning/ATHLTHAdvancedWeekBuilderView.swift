@@ -911,6 +911,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     }
 
     private func presentCopy(source: Int) {
+        guard !showingCopy else { return }
         copyTargets = []
         for index in 0..<weekCount where index != source {
             copyTargets.insert(index)
@@ -955,8 +956,11 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                            isOn: $replaceTargets)
                         .tint(gold)
                     Button {
-                        onCopyWeek(selectedWeek, copyTargets.sorted(), replaceTargets)
+                        let source = selectedWeek
+                        let targets = copyTargets.sorted()
+                        let replace = replaceTargets
                         showingCopy = false
+                        onCopyWeek(source, targets, replace)
                     } label: {
                         Label(tr("Copy to selected weeks", "Kopier til valgte uker"),
                               systemImage: "square.on.square")

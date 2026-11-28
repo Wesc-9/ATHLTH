@@ -108,6 +108,16 @@ enum ATHLTHPlanEditorContinuityPolicy {
 /// a nil binding and UIKit's actual dismissal callback.
 enum ATHLTHPlanModalTransitionPolicy {
     enum Action: Equatable { case none, present, dismiss }
+    enum WakeRoute: Equatable { case none, exercise, running, auxiliary(String) }
+
+    static func wakeRoute(actuallyBackgrounded: Bool, hasVisibleMenu: Bool,
+                          exercise: Bool, running: Bool, auxiliary: String?) -> WakeRoute {
+        guard actuallyBackgrounded, !hasVisibleMenu else { return .none }
+        if exercise { return .exercise }
+        if running { return .running }
+        if let auxiliary { return .auxiliary(auxiliary) }
+        return .none
+    }
     static func action(requestedID: String?, inFlightID: String?, isPresented: Bool) -> Action {
         if let inFlightID {
             return isPresented && requestedID != inFlightID ? .dismiss : .none

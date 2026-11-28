@@ -15,6 +15,23 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
         }
     }
 
+    func testStudioWorkoutMenuOnlyRestoresOneAfterRealBackgrounding() {
+        typealias Policy = ATHLTHPlanModalTransitionPolicy
+        XCTAssertEqual(Policy.wakeRoute(actuallyBackgrounded: false, hasVisibleMenu: false,
+            exercise: true, running: true, auxiliary: "routePicker"), .none)
+        XCTAssertEqual(Policy.wakeRoute(actuallyBackgrounded: true, hasVisibleMenu: true,
+            exercise: true, running: true, auxiliary: "routePicker"), .none)
+        XCTAssertEqual(Policy.wakeRoute(actuallyBackgrounded: true, hasVisibleMenu: false,
+            exercise: true, running: true, auxiliary: "routePicker"), .exercise)
+        XCTAssertEqual(Policy.wakeRoute(actuallyBackgrounded: true, hasVisibleMenu: false,
+            exercise: false, running: true, auxiliary: "routePicker"), .running)
+        for key in ["blockPicker", "savedWorkoutPicker", "routePicker", "routeBuilder", "copyPicker",
+                    "workoutReview", "extra:gear", "step:0", "exerciseInfo:0"] {
+            XCTAssertEqual(Policy.wakeRoute(actuallyBackgrounded: true, hasVisibleMenu: false,
+                exercise: false, running: false, auxiliary: key), .auxiliary(key))
+        }
+    }
+
     func testStudioMenuHandoffWaitsForActualDismissal() {
         typealias Policy = ATHLTHPlanModalTransitionPolicy
         for (first, next) in [("day-1", "place-1"), ("place-1", "day-1"), ("day-1", "library-1"), ("consent", "preview-1")] {

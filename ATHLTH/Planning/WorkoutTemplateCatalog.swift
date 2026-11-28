@@ -4899,6 +4899,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var draftRestored = false
     @State private var draftActive = false
     @State private var initialQuickAddConsumed = false
+    @State private var studioActuallyBackgrounded = false
     @State private var draftFinished = false
     @State private var draftNotice = false
     @State private var pendingDraftCheckpoint: Task<Void, Never>?
@@ -6299,6 +6300,46 @@ struct WorkoutTemplateBuilderView: View {
                 scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: scenePhase) { _, phase in
+                if studioFullscreenEditing {
+                    // Presenting an iPad system card can temporarily make the
+                    // scene inactive. That is not a background transition.
+                    if phase == .background {
+                        studioActuallyBackgrounded = true
+                        resumeExercisePickerAfterWake = showingExercisePicker || resumeExercisePickerAfterWake
+                        resumeRunningPickerAfterWake = showingRunningExercisePicker || resumeRunningPickerAfterWake
+                        resumeAuxiliarySheetAfterWake = activeAuxiliarySheetKey ?? resumeAuxiliarySheetAfterWake
+                        persistWorkoutDraft()
+                    } else if phase == .active && studioActuallyBackgrounded {
+                        studioActuallyBackgrounded = false
+                        let exercise = resumeExercisePickerAfterWake
+                        let running = resumeRunningPickerAfterWake
+                        let auxiliary = resumeAuxiliarySheetAfterWake
+                        resumeExercisePickerAfterWake = false
+                        resumeRunningPickerAfterWake = false
+                        resumeAuxiliarySheetAfterWake = nil
+                        // Restore at most one missing child after actual
+                        // backgrounding. Clear intent before presentation.
+                        Task { @MainActor in
+                            await Task.yield()
+                            guard scenePhase == .active, draftActive, !draftFinished else { return }
+                            let hasVisibleMenu = showingExercisePicker || showingRunningExercisePicker ||
+                                activeAuxiliarySheetKey != nil || showingDiscardConfirmation
+                            switch ATHLTHPlanModalTransitionPolicy.wakeRoute(
+                                actuallyBackgrounded: true, hasVisibleMenu: hasVisibleMenu,
+                                exercise: exercise, running: running, auxiliary: auxiliary
+                            ) {
+                            case .exercise: showingExercisePicker = true
+                            case .running: showingRunningExercisePicker = true
+                            case .auxiliary(let key):
+                                resumeAuxiliarySheetAfterWake = key
+                                resumeAuxiliarySheetIfNeeded()
+                            case .none: break
+                            }
+                            persistWorkoutDraft()
+                        }
+                    }
+                    return
+                }
                 if phase != .active {
                     // A suspended iOS sheet can be implicitly dismissed.
                     // Keep its presentation intent in the recoverable draft.
@@ -6690,7 +6731,7 @@ struct WorkoutTemplateBuilderView: View {
             .sheet(isPresented: $showingSavedWorkoutPicker, onDismiss: {
                 // An intentional swipe/Close must restore the SAME workout
                 // builder, not reopen the picker on the next scene activation.
-                if scenePhase == .active &&
+                if (scenePhase == .active || (studioFullscreenEditing && !studioActuallyBackgrounded)) &&
                    resumeAuxiliarySheetAfterWake == "savedWorkoutPicker" {
                     resumeAuxiliarySheetAfterWake = nil
                 }
@@ -6882,7 +6923,7 @@ struct WorkoutTemplateBuilderView: View {
             }
             .sheet(item: $studioStepEditorSelection, onDismiss: {
                 // An intentional dismissal must not re-open a saved step.
-                if scenePhase == .active {
+                if scenePhase == .active || (studioFullscreenEditing && !studioActuallyBackgrounded) {
                     if resumeAuxiliarySheetAfterWake?.hasPrefix("step:") == true {
                         resumeAuxiliarySheetAfterWake = nil
                     }
@@ -6954,7 +6995,7 @@ struct WorkoutTemplateBuilderView: View {
                 ATHLTHLinkedExerciseDetailView(block: block)
             }
             .sheet(isPresented: $showingExercisePicker, onDismiss: {
-                if scenePhase == .active {
+                if scenePhase == .active || (studioFullscreenEditing && !studioActuallyBackgrounded) {
                     resumeExercisePickerAfterWake = false
                 }
                 persistWorkoutDraft()
@@ -6995,7 +7036,7 @@ struct WorkoutTemplateBuilderView: View {
                 .presentationCornerRadius(24)
             }
             .sheet(isPresented: $showingRunningExercisePicker, onDismiss: {
-                if scenePhase == .active {
+                if scenePhase == .active || (studioFullscreenEditing && !studioActuallyBackgrounded) {
                     resumeRunningPickerAfterWake = false
                 }
                 persistWorkoutDraft()
