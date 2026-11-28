@@ -61,47 +61,50 @@ final class CoachPlanAdaptationService {
     func generate(
         request: CoachPlanAdaptationRequest
     ) async throws -> CoachPlanChangeProposal {
-        try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(containsHealthContext: !request.recentTraining.isEmpty)
-        let draft: CoachPlanAdaptationDraft = try await client.functions.invoke(
-            ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .planAdaptation),
-            options: FunctionInvokeOptions(body: request)
-        )
-
+        // Restrict edits to future, existing sessions. Do not generate a
+        // replacement exercise or change training intensity from free text.
+        let notes = request.userNotes.lowercased()
+        let asksForLess = ["shorter", "reduce", "less", "easier", "lighter",
+                           "kortere", "reduser", "roligere", "lettere", "mindre"]
+            .contains { notes.contains($0) }
         let dayFormatter = DateFormatter()
         dayFormatter.calendar = Calendar(identifier: .gregorian)
         dayFormatter.locale = Locale(identifier: "en_US_POSIX")
         dayFormatter.dateFormat = "yyyy-MM-dd"
-
-        let changes = draft.changes.compactMap { change -> CoachPlanChange? in
-            guard let kind = CoachPlanChangeKind(rawValue: change.kind) else {
-                return nil
-            }
-
-            return CoachPlanChange(
-                kind: kind,
-                sessionID: change.sessionID,
-                sourceDate: change.sourceDate.flatMap {
-                    dayFormatter.date(from: $0)
-                },
-                targetDate: change.targetDate.flatMap {
-                    dayFormatter.date(from: $0)
-                },
-                title: change.title,
-                summary: change.summary,
-                reason: change.reason,
-                replacementTitle: change.replacementTitle,
-                durationMinutes: change.durationMinutes,
-                intensityNote: change.intensityNote
-            )
+        let future = request.days.filter { ($0.date ?? "") >= request.today }.sorted {
+            ($0.date ?? "") < ($1.date ?? "")
         }
-
+        var candidates: [CoachPlanChange] = []
+        if asksForLess {
+            for day in future.prefix(7) {
+                for workout in day.sessions {
+                    guard let duration = workout.durationMinutes, duration >= 20 else { continue }
+                    let shortened = max(15, Int(Double(duration) * 0.8))
+                    candidates.append(CoachPlanChange(
+                        kind: .adjustDuration, sessionID: workout.id,
+                        sourceDate: day.date.flatMap { dayFormatter.date(from: $0) },
+                        title: workout.title,
+                        summary: ATHLTHLocalization.choose(
+                            english: "Review a shorter scheduled duration: \(shortened) min",
+                            norwegian: "Vurder kortere planlagt varighet: \(shortened) min"),
+                        reason: ATHLTHLocalization.choose(
+                            english: "Requested a lighter or shorter schedule. Review the actual exercise prescription separately.",
+                            norwegian: "Du ba om en lettere eller kortere plan. Kontroller selve øktinnholdet separat."),
+                        durationMinutes: shortened))
+                }
+            }
+        }
+        candidates = Array(candidates.prefix(24))
+        let labels = candidates.map { $0.title + " · " + $0.summary }
+        let ranked = try await ATHLTHIntelligenceEngine.localPlanningOrder(options: labels, context: request.userNotes)
+        let chosen = (ranked ?? Array(candidates.indices)).first.map { [candidates[$0]] } ?? []
         return CoachPlanChangeProposal(
-            planID: request.planID,
-            planVersion: request.planVersion,
-            headline: draft.headline,
-            rationale: draft.rationale,
-            changes: changes
-        )
+            planID: request.planID, planVersion: request.planVersion,
+            headline: ATHLTHLocalization.choose(english: "Local plan review", norwegian: "Lokal plangjennomgang"),
+            rationale: ATHLTHLocalization.choose(
+                english: "Only existing workouts are eligible. Review any change before accepting.",
+                norwegian: "Kun eksisterende økter kan endres. Kontroller endringen før du godkjenner."),
+            changes: chosen)
     }
 
     static func makeRequest(
