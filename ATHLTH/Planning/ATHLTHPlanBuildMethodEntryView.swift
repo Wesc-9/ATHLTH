@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Choice is available only to Advanced plan builders.
-/// Manual options use the existing week and guided-day editors; AI uses
-/// ATHLTH's existing AIProgramBuilderView. No parallel plan is created here.
+/// Manual planning uses both calendar views; Coach proposes editable workouts.
+/// The legacy weekByWeek case is kept for internal layout routing.
 enum ATHLTHPlanBuildMethod: String, CaseIterable, Identifiable {
     case dayByDay
     case weekByWeek
@@ -35,32 +35,32 @@ struct ATHLTHPlanBuildMethodEntryView: View {
             introduction
             methodCard(
                 .dayByDay,
-                name: tr("Day by day", "Dag for dag"),
+                name: tr("Build yourself", "Bygg selv"),
                 description: tr(
-                    "Plan each training day separately. Once a week is complete, copy it to the remaining weeks.",
-                    "Gå gjennom hver treningsdag enkeltvis. Når en uke er ferdig, kan du kopiere den videre i planen."
+                    "Plan your workouts freely, switch calendar views and ask Coach for help.",
+                    "Planlegg øktene fritt, bytt mellom dagsplan og ukeoversikt, og få hjelp av Coach."
                 ),
                 photo: "PlanScheduleHero",
-                symbol: "calendar.badge.checkmark",
+                symbol: "calendar",
                 qualities: [
-                    ("target", tr("Detailed", "Detaljert")),
+                    ("calendar", tr("Daily and weekly", "Dag og uke")),
                     ("square.on.square", tr("Copy week", "Kopier uke")),
-                    ("dumbbell", tr("Each day", "Daglige valg"))
+                    ("sparkles", tr("Coach help", "Coach-hjelp"))
                 ]
             )
             methodCard(
-                .weekByWeek,
-                name: tr("Week by week", "Uke for uke"),
+                .ai,
+                name: tr("Let Coach build the plan", "La Coach bygge planen"),
                 description: tr(
-                    "Build complete weeks together, then adjust workouts, workload and progression from week to week.",
-                    "Bygg hele uker samlet og juster økter, belastning og progresjon fra uke til uke."
+                    "Get a complete editable training proposal for your goals and schedule.",
+                    "Få et komplett treningsforslag som du kan tilpasse etter mål og treningsdager."
                 ),
                 photo: "PlanEntryAdvanced",
-                symbol: "chart.bar.fill",
+                symbol: "sparkles",
                 qualities: [
-                    ("calendar", tr("Week structure", "Ukestruktur")),
-                    ("slider.horizontal.3", tr("Manual", "Manuell")),
-                    ("chart.line.uptrend.xyaxis", tr("Progression", "Progresjon"))
+                    ("target", tr("Your goals", "Dine mål")),
+                    ("calendar", tr("Your days", "Dine dager")),
+                    ("pencil", tr("Editable", "Redigerbar"))
                 ]
             )
             HStack(spacing: 9) {
@@ -118,8 +118,8 @@ struct ATHLTHPlanBuildMethodEntryView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Text(tr(
-                    "Choose whether to plan one day at a time or build entire weeks.",
-                    "Velg om du vil planlegge dag for dag eller bygge ukene samlet."
+                    "Build the plan yourself or get a proposal from Coach.",
+                    "Bygg planen selv eller få et forslag fra Coach."
                 ))
                 .font(.system(size: 12))
                 .foregroundStyle(secondary)
