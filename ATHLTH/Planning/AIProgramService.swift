@@ -510,43 +510,179 @@ final class AIProgramService {
         self.client = client
     }
 
-    func generate(_ request: AIProgramRequest) async throws -> AIProgramDraft {
-        try ATHLTHPrivateAITransferPolicy.requireNoKnownHealthContext(
-            containsHealthContext: request.coachStrengthContext != nil ||
-                request.injurySafetyNotes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
-                !(request.excludedMovements ?? []).isEmpty)
-        // Only program *drafts* are generated here; no plan is saved until
-        // the athlete accepts it. One automatic retry on temporary 5xx is
-        // therefore safe and avoids asking the athlete to re-enter answers.
-        for attempt in 0..<2 {
-            do {
-                return try await client.functions.invoke(
-                    ATHLTHIntelligenceRoutingPolicy.groqEndpoint(for: .trainingProgram),
-                    options: FunctionInvokeOptions(body: request, timeoutInterval: 120)
-                )
-            } catch FunctionsError.httpError(let status, let data) {
-                // Invalid AI plans are deterministic failures, not transport
-                // problems. Retrying their 502 immediately can exhaust Groq's
-                // token-per-minute quota and turn a 502 into a 429.
-                let code = (try? JSONDecoder().decode(
-                    CoachServerError.self, from: data
-                ))?.code
-                let transient = status == 503 || status == 504 ||
-                    (status == 502 && code == "AI_PROVIDER_UNAVAILABLE")
-                if transient && attempt == 0 {
-                    try await Task.sleep(nanoseconds: 1_000_000_000)
-                    continue
+    /// No network provider is used for new client-side plans. The local model
+    /// ranks validated recipes; the deterministic scheduler owns every date.
+    func generate(
+        _ request: AIProgramRequest, library: [ExerciseLibraryEntry],
+        savedWorkouts: [PlannedSession], focus: TrainingFocus,
+        gymAvailable: Bool, selectedDateKeys: Set<Int>? = nil
+    ) async throws -> AIProgramDraft {
+        guard (1...52).contains(request.weekCount),
+              (1...7).contains(request.sessionsPerWeek),
+              !library.isEmpty else { throw AIProgramError.invalidRequest }
+        let allowedDays = Set(request.preferredDays.filter { (1...7).contains($0) })
+        guard !allowedDays.isEmpty else { throw AIProgramError.invalidRequest }
+        let availableIDs = Set(library.map(\.id))
+        let excluded = Set((request.excludedMovements ?? []).map(ATHLTHExerciseReferenceResolver.key))
+        let unavailable = Set((request.unavailableEquipment ?? []).map(ATHLTHExerciseReferenceResolver.key))
+        let bodyweight = Set(["bodyweight", "body weight", "none", "no equipment", "kroppsvekt"].map(ATHLTHExerciseReferenceResolver.key))
+        let minutes = min(180, max(5, request.sessionDurationMinutes))
+        let focusKey = String(describing: focus).lowercased()
+        let isRunning = focusKey == "running"
+        let isWalking = focusKey == "walking"
+        let isStrength = focusKey == "strength"
+        let isMixed = focusKey == "hybrid" || focusKey == "generalfitness"
+
+        // Unstructured medical restrictions cannot be made safe by a generic
+        // fallback. Ask the athlete to resolve them instead of inventing advice.
+        if request.injurySafetyNotes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false &&
+            excluded.isEmpty { throw AIProgramError.unsafeProgram }
+
+        func accepts(_ workout: PlannedSession) -> Bool {
+            let kind = workout.kind
+            if isRunning && kind != .running { return false }
+            if isWalking && kind != .walking { return false }
+            if isStrength && kind != .strength { return false }
+            if isMixed && ![WorkoutKind.running, .walking, .strength].contains(kind) { return false }
+            if !isRunning && !isWalking && !isStrength && !isMixed && kind != .walking { return false }
+            let blocks = workout.resolvedWorkoutBlocks
+            guard !blocks.isEmpty,
+                  ATHLTHCoachLibraryGate.hasOnlyLibraryReferences(workout, ids: availableIDs) else { return false }
+            for block in blocks {
+                let name = ATHLTHExerciseReferenceResolver.key(block.title)
+                if excluded.contains(where: { !$0.isEmpty && name.contains($0) }) { return false }
+                if block.kind == .exercise {
+                    guard let snapshot = block.exerciseSnapshot else { return false }
+                    let equipment = Set(snapshot.equipment.map(ATHLTHExerciseReferenceResolver.key))
+                    if !unavailable.isDisjoint(with: equipment) { return false }
+                    if !gymAvailable && (equipment.isEmpty || !equipment.isSubset(of: bodyweight)) { return false }
                 }
-                throw Self.userFacingError(status: status, data: data)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                // The underlying SDK may include raw transport details.
-                // Do not present those or potentially private responses.
-                throw AIProgramError.unavailable
+            }
+            return true
+        }
+        var candidates: [PlannedSession] = []
+        func append(_ source: PlannedSession) {
+            var workout = source
+            guard ATHLTHWorkoutExerciseBinding.bind(&workout, library: library).isReady,
+                  accepts(workout) else { return }
+            guard !candidates.contains(where: { $0.title == workout.title && $0.kind == workout.kind }) else { return }
+            candidates.append(workout)
+        }
+        // Approved published recipe families plus the athlete's own workouts.
+        for workout in savedWorkouts.prefix(40) { append(workout) }
+        let catalogChoices: [(String, TrainingPlanCatalogSessionBlueprint)] = [
+            ("race-5k-speed", .easyRun),
+            ("walking-strength-foundation", .walking),
+            ("strength-upper-lower-foundation", .upperBody),
+            ("strength-upper-lower-foundation", .lowerBody),
+            ("strength-two-day-consistency", .fullBodyA),
+            ("strength-two-day-consistency", .fullBodyB),
+            ("home-bodyweight-8w", .home),
+            ("focus-quadriceps", .quads),
+            ("strength-ppl-3", .push),
+            ("strength-ppl-3", .pull),
+            ("strength-ppl-3", .legs)
+        ]
+        for (slug, blueprint) in catalogChoices {
+            guard let entry = ATHLTHCuratedTrainingPlans.entries.first(where: { $0.slug == slug }) else { continue }
+            append(ATHLTHCatalogPlanSessionFactory.session(entry: entry, blueprint: blueprint, week: 1))
+        }
+        // A personal exercise is eligible only through its actual library
+        // identity and conservative existing reps-based prescription.
+        if isStrength || isMixed {
+            let custom = library.filter { entry in
+                guard entry.source == .custom, entry.exercise.snapshot.defaultStrengthTargetKind == .reps else { return false }
+                let gear = Set(entry.exercise.equipment.map(ATHLTHExerciseReferenceResolver.key))
+                let name = ATHLTHExerciseReferenceResolver.key(entry.canonicalName)
+                return !excluded.contains(where: { !$0.isEmpty && name.contains($0) }) &&
+                    unavailable.isDisjoint(with: gear) && (gymAvailable || (!gear.isEmpty && gear.isSubset(of: bodyweight)))
+            }
+            if custom.count >= 2 {
+                let picked = custom.prefix(min(5, max(2, minutes / 7)))
+                let exercises = picked.map { entry in
+                    PlannedExercise(id: UUID(), exerciseID: entry.id,
+                        embeddedExercise: entry.exercise.snapshot, sets: 2, reps: 10,
+                        targetWeightKilograms: nil, targetRPE: nil, restSeconds: 90, notes: nil)
+                }
+                var workout = PlannedSession(id: UUID(),
+                    title: ATHLTHLocalization.choose(english: "Personal library strength", norwegian: "Styrke fra eget bibliotek"),
+                    kind: .strength, scheduledStart: nil, durationMinutes: minutes,
+                    targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+                    routeID: nil, exercises: exercises, notes: nil)
+                ATHLTHUnifiedWorkout.apply(blocks: ATHLTHUnifiedWorkout.editorBlocks(from: workout),
+                    title: workout.title, routeID: nil, estimatedMinutes: minutes, to: &workout)
+                append(workout)
             }
         }
-        throw AIProgramError.unavailable
+        guard !candidates.isEmpty else { throw AIProgramError.invalidProgram }
+        candidates.sort {
+            abs(($0.durationMinutes ?? minutes) - minutes) < abs(($1.durationMinutes ?? minutes) - minutes)
+        }
+        candidates = Array(candidates.prefix(24))
+        let labels = candidates.map { workout in
+            workout.title + " · " + workout.kind.rawValue + " · " +
+                String(workout.durationMinutes ?? minutes) + " min · " +
+                workout.resolvedWorkoutBlocks.prefix(8).map(\.title).joined(separator: ", ")
+        }
+        let context = request.userNotes + "\nGoals: " + request.goals.map(\.title).joined(separator: "; ")
+        let ranked = try await ATHLTHIntelligenceEngine.localPlanningOrder(options: labels, context: context)
+        try Task.checkCancellation()
+        let order = ranked ?? Array(candidates.indices)
+        let selected = order.map { candidates[$0] }
+        let locked = Set(request.existingDays.filter { !$0.existingSessions.isEmpty }.map {
+            ($0.weekNumber - 1) * 7 + $0.dayIndex
+        })
+        let daysEN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        let daysNO = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
+        var weeks: [AIProgramDraftWeek] = []
+        for week in 0..<request.weekCount {
+            let chosen: Set<Int>
+            if let selectedDateKeys {
+                chosen = Set((1...7).filter { selectedDateKeys.contains(week * 7 + $0) })
+            } else {
+                let available = allowedDays.sorted().filter { request.mode != "complete" || !locked.contains(week * 7 + $0) }
+                let already = request.mode == "complete" ? (1...7).filter { locked.contains(week * 7 + $0) }.count : 0
+                let count = min(available.count, max(0, request.sessionsPerWeek - already))
+                let rotated = request.varyWeeks && !available.isEmpty
+                    ? Array(available.dropFirst(week % available.count)) + Array(available.prefix(week % available.count))
+                    : available
+                chosen = Set(rotated.prefix(count))
+            }
+            var slot = 0
+            let days = (1...7).map { weekday -> AIProgramDraftDay in
+                var sessions: [AIProgramDraftSession] = []
+                if chosen.contains(weekday) {
+                    let offset = request.varyWeeks ? week : 0
+                    var workout = selected[(slot + offset) % selected.count]
+                    slot += 1
+                    workout.id = UUID()
+                    workout.scheduledStart = nil
+                    // Only retime a single continuous cardio block. Preserve
+                    // the recipe and duration of intervals and strength.
+                    if !request.aiChoosesDuration, var blocks = workout.workoutBlocks,
+                       blocks.count == 1, blocks[0].kind == .run,
+                       blocks[0].distanceMeters == nil {
+                        blocks[0].durationSeconds = Double(minutes * 60)
+                        workout.workoutBlocks = blocks
+                        workout.durationMinutes = minutes
+                    }
+                    sessions = [AIProgramDraftSession(title: workout.title, kind: workout.kind.rawValue,
+                        durationMinutes: workout.durationMinutes, targetDistanceKilometers: workout.targetDistanceKilometers,
+                        targetPaceSecondsPerKilometer: workout.targetPaceSecondsPerKilometer,
+                        notes: workout.notes, exercises: [], authoredWorkout: workout)]
+                }
+                return AIProgramDraftDay(dayIndex: weekday,
+                    title: ATHLTHLocalization.choose(english: daysEN[weekday - 1], norwegian: daysNO[weekday - 1]), sessions: sessions)
+            }
+            weeks.append(AIProgramDraftWeek(weekNumber: week + 1,
+                title: ATHLTHLocalization.choose(english: "Week \(week + 1)", norwegian: "Uke \(week + 1)"), days: days))
+        }
+        let draft = AIProgramDraft(title: ATHLTHLocalization.choose(english: "Coach training plan", norwegian: "Treningsplan fra Coach"),
+            summary: ATHLTHLocalization.choose(english: "Based on existing library workouts.", norwegian: "Basert på økter fra biblioteket."), weeks: weeks)
+        guard ATHLTHPlanDraftValidator.issues(in: draft, expectedWeeks: request.weekCount,
+            allowedDayIndexes: allowedDays, maximumSessionsPerWeek: request.sessionsPerWeek,
+            requireFullWeeks: true, requireExecutableWorkouts: true).isEmpty else { throw AIProgramError.invalidProgram }
+        return draft
     }
 
     static func userFacingError(status: Int, data: Data) -> AIProgramError {
