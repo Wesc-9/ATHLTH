@@ -5800,8 +5800,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeRemainingMeters: routeRemainingMeters
         )
         context.averageHeartRateBPM = averageHeartRate
-        context.ghostTimeDifferenceSeconds = ghostTimeDeltaSeconds
-        context.ghostDistanceDifferenceMeters = ghostDistanceDeltaMeters
+        if let updated = ghostComparisonUpdatedAt,
+           Date().timeIntervalSince(updated) >= 0,
+           Date().timeIntervalSince(updated) <= 15 {
+            context.ghostTimeDifferenceSeconds = ghostTimeDeltaSeconds
+            context.ghostDistanceDifferenceMeters = ghostDistanceDeltaMeters
+        }
         if kind == .running || kind == .walking {
             // Only the active exercise's prescribed zone may trigger a
             // target-zone alert. No inferred zone when not configured.

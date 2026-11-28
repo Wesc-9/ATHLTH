@@ -1615,7 +1615,7 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
                          .remainingExercises, .nextExercise, .previousExerciseSummary,
                          .previousMainSectionSummary, .lastKilometerPace, .targetPaceDifference,
                          .workoutRemainingDistance, .currentEffort, .remainingEfforts, .nextEffort,
-                         .currentSet, .remainingSets: return true
+                         .currentSet, .remainingSets, .ghostTimeDifference, .ghostDistanceDifference: return true
                     default: return false
                     }
                 })

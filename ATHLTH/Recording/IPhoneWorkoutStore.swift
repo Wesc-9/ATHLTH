@@ -5489,7 +5489,10 @@ final class IPhoneWorkoutStore:
             recorded: workout.recordedRunningSteps ?? [],
             routeRemainingMeters: workout.routeRemainingMeters
         )
-        context.averageHeartRateBPM = workout.measuredAverageHeartRate
+        if rules.contains(where: { $0.selectedMetrics.contains(.averageHeartRate) }),
+           #available(iOS 26.0, *), let capture = nativeCapture, capture.workoutID == workout.id {
+            context.averageHeartRateBPM = capture.summary().averageHeartRate
+        }
         context.ghostTimeDifferenceSeconds = workout.ghostTimeDeltaSeconds
         context.ghostDistanceDifferenceMeters = workout.ghostDistanceDeltaMeters
         context.overallPaceSecondsPerKilometer =

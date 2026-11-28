@@ -771,16 +771,18 @@ final class MirroredWorkoutAudioCoach:
         let distance = verifiedDistance ?? 0
         var readout = ATHLTHAudioCoachSportPolicy.supportsRunningSteps(sport)
             ? (snapshot.coachReadoutContext ?? .init(routeRemainingMeters: snapshot.routeRemainingMeters))
-            : .init()
+            : (sport.lowercased() == "strength" ? snapshot.strengthSnapshot.map { ATHLTHCoachReadoutContext.make(strength: $0) } ?? .init() : .init())
         readout.appleLiveHeartRateZones = snapshot.appleLiveHeartRateZones
         readout.averageHeartRateBPM = snapshot.averageHeartRate
         readout.ghostTimeDifferenceSeconds = snapshot.ghostTimeDeltaSeconds
         readout.ghostDistanceDifferenceMeters = snapshot.ghostDistanceDeltaMeters
         return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
-            rules: ATHLTHAudioCoachSportPolicy.eligibleRules(
-                configuration.activeCustomRules, sport: sport,
-                measuredDistanceSupported: measuredDistanceSupported
-            ),
+            rules: sport.lowercased() == "strength"
+                ? ATHLTHAudioCoachSportPolicy.eligibleStrengthRules(configuration.activeCustomRules)
+                : ATHLTHAudioCoachSportPolicy.eligibleRules(
+                    configuration.activeCustomRules, sport: sport,
+                    measuredDistanceSupported: measuredDistanceSupported
+                ),
             distanceMeters: distance,
             elapsedSeconds: snapshot.elapsedTime,
             paceSecondsPerKilometer: resolvedPace(snapshot),
