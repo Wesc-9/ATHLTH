@@ -350,6 +350,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var healthKitDistanceLastUpdatedAt: Date?
     private var coachHeartRateSampleAt: Date?
     private var coachPaceSampleAt: Date?
+    private let coachCadenceSensor = ATHLTHCoachCadenceSensor()
     private var lastGoalEncouragementAt: Date?
 
     /// The same sensor freshness gate used by live target alerts and coach.
@@ -1246,6 +1247,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         guard coachSpeechPaused != paused else { return }
         coachSpeechPaused = paused
+        if paused { coachCadenceSensor.stop() }
         coachCueQueue.reset()
         guidancePriorityGate.reset()
         if paused {
@@ -4595,6 +4597,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            strengthSession?.timedSetCountdown?.isRunning == true {
             pauseTimedStrengthSet(allowIPhoneOnly: true)
         }
+        coachCadenceSensor.stop()
         manualPauseActive = true
         automaticPauseActive = false
         autoPauseDetector.reset(
@@ -5800,6 +5803,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeRemainingMeters: routeRemainingMeters
         )
         context.averageHeartRateBPM = averageHeartRate
+        coachCadenceSensor.apply(to: &context)
         if let updated = ghostComparisonUpdatedAt,
            Date().timeIntervalSince(updated) >= 0,
            Date().timeIntervalSince(updated) <= 15 {
@@ -6012,6 +6016,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func evaluateAudioCoach() {
+        let cadenceAllowed = state == .running && !automaticPauseActive && !coachSpeechPaused &&
+            audioCoachConfiguration.enabled && (kind == .running || kind == .walking) &&
+            audioCoachConfiguration.activeCustomRules.contains { rule in
+                rule.trigger.isCadenceCondition && (rule.activityFilter ?? .all).matches(
+                    sport: kind.rawValue, context: .init(isEffort: structuredRunningWorkout != nil))
+            }
+        coachCadenceSensor.setEnabled(cadenceAllowed)
         guard state == .running,
               audioCoachConfiguration.enabled
         else {
@@ -9150,6 +9161,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func stopTimer() {
+        coachCadenceSensor.stop()
         publish {
             self.timer?.invalidate()
             self.timer = nil
@@ -10295,6 +10307,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        coachCadenceSensor.stop()
         automaticPauseActive = true
         automaticPauseCount += 1
         workoutSession?.pause()

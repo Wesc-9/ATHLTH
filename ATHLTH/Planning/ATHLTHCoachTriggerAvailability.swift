@@ -102,6 +102,9 @@ struct ATHLTHCoachTriggerAvailability: Equatable {
         if trigger.isStrengthEvent {
             return effectiveActivity == .strength || effectiveActivity == .all
         }
+        if trigger.isCadenceCondition {
+            return [.all, .running, .walking, .intervals].contains(effectiveActivity)
+        }
         if trigger.isGhostCondition {
             return [.all, .running, .walking, .intervals].contains(effectiveActivity) && supportsDistance
         }

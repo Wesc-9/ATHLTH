@@ -601,6 +601,7 @@ final class IPhoneWorkoutStore:
 
     private var lastLocation: CLLocation?
     private var coachPaceSampleAt: Date?
+    private let coachCadenceSensor = ATHLTHCoachCadenceSensor()
     private var lastGoalEncouragementAt: Date?
     private var autoPauseDetector =
         OutdoorAutoPauseDetector()
@@ -1273,6 +1274,9 @@ final class IPhoneWorkoutStore:
         let wasEnabled =
             workout.audioCoachConfiguration?.enabled == true
         let now = Date()
+        if !configuration.enabled || !configuration.activeCustomRules.contains(where: { $0.trigger.isCadenceCondition }) {
+            coachCadenceSensor.stop()
+        }
         workout.audioCoachConfiguration = configuration.deliveryConfiguration
         workout.lastCheckpoint = now
         active = workout
@@ -1332,6 +1336,7 @@ final class IPhoneWorkoutStore:
         }
         guard coachSpeechPaused != paused else { return }
         coachSpeechPaused = paused
+        if paused { coachCadenceSensor.stop() }
         coachCueQueue.reset()
         guidancePriorityGate.reset()
         if paused {
@@ -1668,6 +1673,7 @@ final class IPhoneWorkoutStore:
     }
 
     func pause() {
+        coachCadenceSensor.stop()
         guard var workout = active else {
             return
         }
@@ -1858,6 +1864,7 @@ final class IPhoneWorkoutStore:
         workout: inout PhoneWorkout,
         at date: Date
     ) {
+        coachCadenceSensor.stop()
         guard workout.resumedAt != nil,
               ATHLTHUniversalWorkoutLifecycle.permits(
                   .pause,
@@ -3429,6 +3436,7 @@ final class IPhoneWorkoutStore:
         configuration:
             WatchAudioCoachConfiguration?
     ) {
+        coachCadenceSensor.stop()
         lastGoalEncouragementAt = nil
         soloGhostCueTracker = .init()
         phoneAdaptiveCoach.reset()
@@ -5481,6 +5489,10 @@ final class IPhoneWorkoutStore:
             configuration: configuration
         ) == "no"
         let rules = configuration.activeCustomRules
+        let sport = workout.walking ? "walking" : "running"
+        coachCadenceSensor.setEnabled(configuration.enabled && workout.resumedAt != nil && !coachSpeechPaused && rules.contains { rule in
+            rule.trigger.isCadenceCondition && (rule.activityFilter ?? .all).matches(sport: sport, context: .init(isEffort: workout.structuredRunningWorkout != nil))
+        })
         var context = ATHLTHCoachReadoutContext.make(
             plan: ATHLTHCoachReadoutContext.needsSegmentData(rules) ? workout.structuredRunningWorkout : nil,
             index: currentCoachRunningStepIndex,
@@ -5493,6 +5505,7 @@ final class IPhoneWorkoutStore:
            #available(iOS 26.0, *), let capture = nativeCapture, capture.workoutID == workout.id {
             context.averageHeartRateBPM = capture.summary().averageHeartRate
         }
+        coachCadenceSensor.apply(to: &context)
         context.ghostTimeDifferenceSeconds = workout.ghostTimeDeltaSeconds
         context.ghostDistanceDifferenceMeters = workout.ghostDistanceDeltaMeters
         context.overallPaceSecondsPerKilometer =
@@ -5512,6 +5525,7 @@ final class IPhoneWorkoutStore:
         if let plan = workout.structuredRunningWorkout,
            let stepIndex = workout.structuredStepIndex,
            plan.steps.indices.contains(stepIndex) {
+            context.plannedHeartRateZone = plan.steps[stepIndex].targetHeartRateZone
             context.targetPaceSecondsPerKilometer =
                 plan.steps[stepIndex].targetPaceMinSecondsPerKilometer ??
                 plan.steps[stepIndex].targetPaceMaxSecondsPerKilometer
@@ -5526,7 +5540,9 @@ final class IPhoneWorkoutStore:
             paceSecondsPerKilometer: freshPace,
             heartRateBPM: freshWorkoutHeartRate(),
             norwegian: norwegian,
+            maximumHeartRateBPM: configuration.smartPrompts?.maximumHeartRateBPM,
             context: context,
+            sport: sport,
             lastSlots: &customAudioCoachLastSlots
         )
     }

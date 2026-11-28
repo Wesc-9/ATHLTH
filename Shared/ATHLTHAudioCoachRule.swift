@@ -127,6 +127,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case randomMotivation, nearFinishTime, nearFinishDistance
         case workoutTimeProgress, workoutDistanceProgress, stepTimeProgress
         case ghostAhead, ghostBehind, lastStrengthSet
+        case cadenceBelow, cadenceAbove
         case strengthSetCompleted, lastExerciseSet, strengthRestEnding
         case slowerThanPreviousWorkout
         case elevationGain, uphillDetected
@@ -154,7 +155,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                  .uphillDetected, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget,
                  .slowerThanPreviousWorkout, .workoutTimeProgress, .workoutDistanceProgress,
                  .stepTimeProgress, .ghostAhead, .ghostBehind, .lastStrengthSet,
-                 .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: return true
+                 .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding,
+                 .cadenceBelow, .cadenceAbove: return true
             default: return false
             }
         }
@@ -183,8 +185,9 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             }
         }
         var supportsThresholdConditions: Bool {
-            isHeartRateCondition || isPaceCondition || self == .uphillDetected || isGhostCondition
+            isHeartRateCondition || isPaceCondition || self == .uphillDetected || isGhostCondition || isCadenceCondition
         }
+        var isCadenceCondition: Bool { self == .cadenceBelow || self == .cadenceAbove }
         var isGhostCondition: Bool { self == .ghostAhead || self == .ghostBehind }
         var isProgress: Bool { self == .workoutTimeProgress || self == .workoutDistanceProgress || self == .stepTimeProgress }
         var isStrengthEvent: Bool {
@@ -197,7 +200,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 self != .randomMotivation && self != .nearFinishTime &&
                 self != .nearFinishDistance && self != .uphillDetected &&
                 self != .slowerThanPreviousWorkout && !isGhostCondition &&
-                !isProgress && !isStrengthEvent
+                !isProgress && !isStrengthEvent && !isCadenceCondition
         }
         func summary(interval: Int) -> String {
             let value: Int
@@ -207,6 +210,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .randomMotivation: value = min(max(interval, 120), 900)
             case .nearFinishTime: value = min(max(interval, 10), 1_800)
             case .strengthSetCompleted: value = min(max(interval, 1), 10)
+            case .cadenceBelow, .cadenceAbove: value = min(max(interval, 60), 240)
             case .strengthRestEnding: value = min(max(interval, 5), 60)
             case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: value = min(max(interval, 1), 99)
             case .nearFinishDistance: value = min(max(interval, 25), 5_000)
@@ -219,6 +223,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             default: return title
             }
             switch self {
+            case .cadenceBelow, .cadenceAbove:
+                return title + " · " + String(value) + ATHLTHLocalization.choose(english: " steps/min", norwegian: " steg/min")
             case .strengthSetCompleted:
                 return title + " · " + String(value)
             case .strengthRestEnding:
@@ -261,6 +267,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
             case .ghostAhead: return tr("Move ahead of Ghost", "Kommer foran Ghost")
             case .ghostBehind: return tr("Fall behind Ghost", "Faller bak Ghost")
             case .lastStrengthSet: return tr("Last set of workout", "Siste sett i økten")
+            case .cadenceBelow: return tr("Cadence below", "Stegfrekvens under")
+            case .cadenceAbove: return tr("Cadence above", "Stegfrekvens over")
             case .strengthSetCompleted: return tr("Every completed set(s)", "Hvert fullførte sett")
             case .lastExerciseSet: return tr("Last set of exercise", "Siste sett i øvelsen")
             case .strengthRestEnding: return tr("Before rest ends", "Før hvilepausen er ferdig")
@@ -507,6 +515,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case .randomMotivation: return min(max(interval, 120), 900)
         case .nearFinishTime: return min(max(interval, 10), 1_800)
         case .strengthSetCompleted: return min(max(interval, 1), 10)
+        case .cadenceBelow, .cadenceAbove: return min(max(interval, 60), 240)
         case .strengthRestEnding: return min(max(interval, 5), 60)
         case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: return min(max(interval, 1), 99)
         case .nearFinishDistance: return min(max(interval, 25), 5_000)
@@ -769,6 +778,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 ? "Husk å ta en slurk vann når det passer."
                 : "Remember to take a sip of water when convenient."
         case .motivation:
+            if trigger.isCadenceCondition {
+                guard let cadence = context.measuredCadenceStepsPerMinute,
+                      ATHLTHCoachSensorFreshness.validCadence(cadence, sampledAt: context.cadenceSampleAt) else { return nil }
+                return norwegian ? "Stegfrekvens \(Int(cadence.rounded())) steg i minuttet. Finn en rytme som passer deg."
+                    : "Cadence \(Int(cadence.rounded())) steps per minute. Find a rhythm that suits you."
+            }
             if trigger == .slowerThanPreviousWorkout,
                let reference = historicalWorkoutFirstKilometerSeconds,
                let actual = context.overallPaceSecondsPerKilometer,
@@ -1031,6 +1046,15 @@ enum ATHLTHAudioCoachRuleDelivery {
                 let state: Bool?
                 if rule.trigger == .uphillDetected {
                     state = context.isUphill
+                } else if rule.trigger.isCadenceCondition {
+                    if let cadence = context.measuredCadenceStepsPerMinute,
+                       ATHLTHCoachSensorFreshness.validCadence(cadence, sampledAt: context.cadenceSampleAt) {
+                        let threshold = Double(rule.validatedInterval)
+                        let latched = (lastSlots[rule.id] ?? 0) % 2 == 1
+                        state = rule.trigger == .cadenceBelow
+                            ? cadence < threshold + (latched ? 3 : 0)
+                            : cadence > threshold - (latched ? 3 : 0)
+                    } else { state = nil }
                 } else if rule.trigger.isGhostCondition {
                     if let delta = context.ghostDistanceDifferenceMeters, delta.isFinite, abs(delta) <= 1_000_000 {
                         let signed = rule.trigger == .ghostAhead ? delta : -delta
@@ -1745,6 +1769,8 @@ struct ATHLTHCoachReadoutContext: Codable, Hashable {
     var strengthRestRemainingSeconds: Double? = nil
     var ghostTimeDifferenceSeconds: Double? = nil
     var ghostDistanceDifferenceMeters: Double? = nil
+    var measuredCadenceStepsPerMinute: Double? = nil
+    var cadenceSampleAt: Date? = nil
     var stepName: String?
     var stepIndex: Int?
     var isEffort = false
@@ -2078,7 +2104,7 @@ enum ATHLTHAudioCoachSportPolicy {
         rules.filter { rule in
             guard rule.trigger != .distance,
                   rule.trigger != .nearFinishDistance,
-                  rule.trigger != .workoutDistanceProgress, !rule.trigger.isGhostCondition,
+                  rule.trigger != .workoutDistanceProgress, !rule.trigger.isGhostCondition, !rule.trigger.isCadenceCondition,
                   rule.trigger != .slowerThanPreviousWorkout,
                   rule.trigger != .elevationGain,
                   rule.trigger != .uphillDetected,
@@ -2114,7 +2140,7 @@ enum ATHLTHAudioCoachSportPolicy {
             measuredDistanceSupported
         return rules.filter { rule in
             if rule.trigger.needsStructuredStep ||
-                rule.trigger.isPaceCondition || rule.trigger.isGhostCondition ||
+                rule.trigger.isPaceCondition || rule.trigger.isGhostCondition || rule.trigger.isCadenceCondition ||
                 rule.trigger.isStrengthEvent || rule.trigger == .stepTimeProgress ||
                 rule.trigger == .slowerThanPreviousWorkout ||
                 rule.trigger == .personalRecordConfirmed { return false }

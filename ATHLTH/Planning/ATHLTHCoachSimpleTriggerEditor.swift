@@ -19,7 +19,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
 
     private enum Family: String, CaseIterable, Identifiable {
         case distance, time, section, step, pause, heartZone
-        case motivation, finish, elevation, pace, history, record, progress, ghost, strength
+        case motivation, finish, elevation, pace, history, record, progress, ghost, strength, cadence
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -38,6 +38,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .progress: return ATHLTHLocalization.choose(english: "Milestone", norwegian: "Milepæl")
             case .ghost: return "Ghost Race"
             case .strength: return ATHLTHLocalization.choose(english: "Strength sets", norwegian: "Styrkesett")
+            case .cadence: return ATHLTHLocalization.choose(english: "Cadence", norwegian: "Stegfrekvens")
             }
         }
         var icon: String {
@@ -57,6 +58,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .progress: "flag"
             case .ghost: "figure.run"
             case .strength: "dumbbell"
+            case .cadence: "figure.walk"
             }
         }
     }
@@ -75,6 +77,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .personalRecordConfirmed: .record
         case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: .progress
         case .ghostAhead, .ghostBehind: .ghost
+        case .cadenceBelow, .cadenceAbove: .cadence
         case .lastStrengthSet, .strengthSetCompleted, .lastExerciseSet, .strengthRestEnding: .strength
         case .nearFinishTime: .finish
         case .nearFinishDistance: .finish
@@ -154,6 +157,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
         case .progress: return available(.workoutTimeProgress) || available(.workoutDistanceProgress) || available(.stepTimeProgress)
         case .ghost: return available(.ghostAhead)
         case .strength: return available(.lastStrengthSet) || available(.strengthSetCompleted)
+        case .cadence: return available(.cadenceBelow)
         case .history: return !historicalReferences.isEmpty &&
             available(.slowerThanPreviousWorkout)
         }
@@ -190,6 +194,10 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             interval = 50
         case .ghost: trigger = .ghostAhead; interval = 1
         case .strength: trigger = .lastStrengthSet; interval = 1
+        case .cadence:
+            trigger = .cadenceBelow; interval = activityFilter == .walking ? 100 : 160
+            conditions.sustainedSeconds = 20
+            conditions.repeatDelaySeconds = 120
         case .history: trigger = .slowerThanPreviousWorkout; interval = 1
         }
         eventSelection = .every
@@ -215,6 +223,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             case .nearFinishTime: interval = 30
             case .nearFinishDistance: interval = 100
             case .workoutTimeProgress, .workoutDistanceProgress, .stepTimeProgress: interval = 50
+            case .cadenceBelow, .cadenceAbove: interval = (60...240).contains(interval) ? interval : (activityFilter == .walking ? 100 : 160)
             case .strengthSetCompleted: interval = 1
             case .strengthRestEnding: interval = 15
             case .distance: interval = 1000
@@ -293,7 +302,7 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
             triggerCategory(tr("Heart rate and intensity", "Puls og intensitet"),
                             families: [.heartZone])
             triggerCategory(tr("Pace and performance", "Tempo og prestasjon"),
-                            families: [.pace, .record, .elevation, .history, .ghost])
+                            families: [.pace, .cadence, .record, .elevation, .history, .ghost])
             triggerCategory(tr("Workout and intervals", "Økt og intervaller"),
                             families: [.section, .step, .pause])
             triggerCategory(tr("Strength training", "Styrketrening"), families: [.strength])
@@ -326,6 +335,14 @@ struct ATHLTHCoachSimpleTriggerEditor: View {
                 choice(.ghostAhead)
                 choice(.ghostBehind)
                 Text(tr("Requires fresh Ghost Race distance data.", "Krever ferske distansedata fra Ghost Race."))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            if family == .cadence {
+                choice(.cadenceBelow)
+                choice(.cadenceAbove)
+                Stepper("\(interval) " + tr("steps/min", "steg/min"), value: $interval, in: 60...240, step: 5)
+                Text(tr("Requires a compatible motion sensor and permission. No alert without a fresh measurement.", "Krever kompatibel bevegelsessensor og tillatelse. Ingen varsler uten fersk måling."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
