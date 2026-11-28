@@ -139,7 +139,7 @@ enum ATHLTHCoachAdvancedRequest {
         }
     }
     private static func amounts(_ input: String, units: String, multiplier: Int = 1) -> Set<Int> {
-        Set(captures("(?<![\\d.,])([0-9]{1,5})\\s*(" + units + ")(?!\\p{L})", input)
+        Set(captures("(?<![\\d.,])([0-9]{1,5})\\.?\\s*(" + units + ")(?!\\p{L})", input)
             .compactMap { Int($0[0]) }.map { $0 * multiplier })
     }
     private static func seconds(_ input: String) -> Set<Int> {
@@ -151,7 +151,7 @@ enum ATHLTHCoachAdvancedRequest {
             .union(amounts(input, units: "kilometer|kilometre|kilometers|kilometres|km", multiplier: 1000))
     }
     private static func integers(_ input: String) -> Set<Int> {
-        Set(captures("(?<![\\d.,])([0-9]{1,5})(?![\\d.,])", input).compactMap { Int($0[0]) })
+        Set(captures("(?<![\\d.,])([0-9]{1,5})(?!\\d|[.,]\\d)", input).compactMap { Int($0[0]) })
     }
     private static func paces(_ input: String) -> Set<Int> {
         Set(captures("(?<!\\d)([0-9]{1,2}):([0-5][0-9])(?!\\d)", input).compactMap {
@@ -183,6 +183,16 @@ enum ATHLTHCoachAdvancedRequest {
     static func validate(_ specs: [Spec], input: String,
                          availability: ATHLTHCoachTriggerAvailability) -> [Rule]? {
         guard (1...5).contains(specs.count), !input.isEmpty else { return nil }
+        let lower = " " + input.lowercased() + " "
+        // Do not accept a model that drops explicit unsupported OR logic
+        // or obvious required clauses from the proposed rule batch.
+        guard !lower.contains(" eller "), !lower.contains(" or ") else { return nil }
+        if lower.contains("mellom") && (lower.contains("beskjed") || lower.contains("varsl")) &&
+            !specs.contains(where: { $0.repeatDelaySeconds != nil }) { return nil }
+        if ["maks sone", "maksimal pulssone", "maximum zone", "at most zone"].contains(where: { lower.contains($0) }) &&
+            !specs.contains(where: { $0.maximumZone != nil }) { return nil }
+        if ["under drag", "during efforts", "during intervals"].contains(where: { lower.contains($0) }) &&
+            !specs.contains(where: { $0.scope == .effort }) { return nil }
         var result: [Rule] = []
         for spec in specs {
             guard triggers.contains(spec.trigger), (1...6).contains(spec.metrics.count),

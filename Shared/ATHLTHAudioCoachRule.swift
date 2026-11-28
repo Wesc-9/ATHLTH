@@ -1037,7 +1037,15 @@ enum ATHLTHAudioCoachRuleDelivery {
                 elapsed = elapsedSeconds
                 segment = nil
             case .effort:
-                guard context.isEffort, let index = context.stepIndex else { continue }
+                guard context.isEffort, let index = context.stepIndex else {
+                    // A sustained work-only condition may not bridge even
+                    // a short recovery interval where it cannot be measured.
+                    if rule.trigger.supportsThresholdConditions {
+                        lastSlots.removeValue(forKey: conditionJournalKey(rule.id, tag: 0xA1))
+                        lastSlots.removeValue(forKey: conditionJournalKey(rule.id, tag: 0xA2))
+                    }
+                    continue
+                }
                 distance = context.stepDistanceMeters
                 elapsed = context.stepElapsedSeconds
                 segment = index

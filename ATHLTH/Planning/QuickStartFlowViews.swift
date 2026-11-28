@@ -2586,8 +2586,13 @@ struct RunQuickStartSheet: View {
                             draft: $audioCoachDraft,
                             showRouteOptions: selectedRoute != nil,
                             showStructuredOptions: (mode == .structured && (selectedWorkout != nil || advancedWorkout != nil)) || plannedSession != nil,
-                            triggerAvailability: .basicCoach(activity: .running, hasRoute: selectedRoute != nil,
-                                structured: (mode == .structured && (selectedWorkout != nil || advancedWorkout != nil)) || plannedSession != nil),
+                            triggerAvailability: selectedWorkout.map {
+                                ATHLTHCoachTriggerAvailability.running(
+                                    steps: watchRunningWorkoutTransfer(from: $0).steps,
+                                    hasRoute: guidanceRoute != nil,
+                                    isOutdoor: environment == .outdoor)
+                            } ?? .basicCoach(activity: .running, hasRoute: guidanceRoute != nil,
+                                structured: (mode == .structured && advancedWorkout != nil) || plannedSession != nil),
                             simpleMode: true
                         )
                     } label: {
