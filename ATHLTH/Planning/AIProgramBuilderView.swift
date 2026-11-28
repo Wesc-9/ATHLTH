@@ -2935,7 +2935,8 @@ struct AIProgramBuilderView: View {
                 library: exerciseLibrary.allExercises,
                 savedWorkouts: session.savedWorkoutTemplates,
                 focus: trainingFocus,
-                gymAvailable: gym == "yes" || gym.contains("gym") || gym.contains("treningssenter"))
+                gymAvailable: gym == "yes" || gym.contains("gym") || gym.contains("treningssenter"),
+                allowedEquipment: homeEquipment)
             guard session.signedIn, session.profile.userID == requestOwnerID else { return }
             // AI may propose something on a weekday the user already
             // detailed manually. Overlay the authoritative Studio workout
