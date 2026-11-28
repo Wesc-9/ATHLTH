@@ -150,7 +150,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         var usesLiveContext: Bool {
             switch self {
             case .nearFinishTime, .nearFinishDistance, .elevationGain,
-                 .uphillDetected, .plannedZoneBelow, .plannedZoneOutside,
+                 .uphillDetected, .plannedZoneBelow, .plannedZoneOutside, .plannedZoneBackInTarget,
                  .slowerThanPreviousWorkout, .workoutTimeProgress, .workoutDistanceProgress,
                  .stepTimeProgress, .ghostAhead, .ghostBehind, .lastStrengthSet: return true
             default: return false
