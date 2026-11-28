@@ -13,6 +13,8 @@ enum ATHLTHStudioPlanSyncDecision {
         case unchanged
         case upload(expectedRevision: Int64)
         case download
+        case deleteRemote(expectedRevision: Int64)
+        case deleteLocal
         case conflict
     }
 
@@ -25,10 +27,14 @@ enum ATHLTHStudioPlanSyncDecision {
         switch (localFingerprint, remoteFingerprint) {
         case (nil, nil):
             return .unchanged
-        case (nil, .some):
-            return acknowledged == nil ? .download : .conflict
-        case (.some, nil):
-            return acknowledged == nil ? .upload(expectedRevision: 0) : .conflict
+        case (nil, .some(let remote)):
+            guard let acknowledged else { return .download }
+            guard let remoteRevision, remoteRevision == acknowledged.revision,
+                  remote == acknowledged.fingerprint else { return .conflict }
+            return .deleteRemote(expectedRevision: remoteRevision)
+        case (.some(let local), nil):
+            guard let acknowledged else { return .upload(expectedRevision: 0) }
+            return local == acknowledged.fingerprint ? .deleteLocal : .conflict
         case let (.some(local), .some(remote)):
             if local == remote { return .unchanged }
             guard let acknowledged, let remoteRevision else { return .conflict }

@@ -224,7 +224,19 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
             let allIDs = Set(remoteByID.keys).union(localByID.keys)
 
             // Reconcile sanitized account copies, not private device notes.
-            for planID in allIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+            // Process disabled/deleted plans first so a replacement active
+            // plan can be imported in the same pass without a false overlap.
+            var priority: [UUID: Int] = [:]
+            for id in allIDs {
+                let remoteDocument = try remoteByID[id].flatMap { try decode($0.body_base64, owner: userID, id: id) }
+                let disabled = remoteDocument?.tags.contains("sync:paused") == true ||
+                    remoteDocument?.tags.contains("sync:inactive") == true
+                priority[id] = (disabled || remoteDocument == nil || localByID[id] == nil && acknowledgements[id.uuidString] != nil) ? 0 : 1
+            }
+            for planID in allIDs.sorted(by: {
+                let left = priority[$0] ?? 1, right = priority[$1] ?? 1
+                return left == right ? $0.uuidString < $1.uuidString : left < right
+            }) {
                 guard enabled, accountID == userID else { return }
 
                 let local = localByID[planID]
@@ -284,6 +296,46 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     }
                     acknowledge(planID, revision: remote.revision,
                                 fingerprint: remoteFingerprint ?? "", owner: userID)
+                case let .deleteRemote(expected):
+                    // The user deleted a previously acknowledged plan; only
+                    // remove exactly the unchanged server revision. Standalone
+                    // workouts use their own persistent tombstone protocol.
+                    guard let remotePlan,
+                          !remotePlan.tags.contains("sync:standalone"),
+                          session.accountSyncDocument(withID: planID) == nil,
+                          session.signedIn, session.profile.userID == userID else {
+                        unresolved.append(Conflict(id: planID, title: remotePlan?.title ?? "Training plan"))
+                        continue
+                    }
+                    do {
+                        let removed: [DeletedPlan] = try await client.from(Self.planTable)
+                            .delete()
+                            .eq("user_id", value: userID)
+                            .eq("plan_id", value: planID)
+                            .eq("revision", value: String(expected))
+                            .select("plan_id").execute().value
+                        guard accountID == userID, session.profile.userID == userID else { return }
+                        guard removed.count == 1 else {
+                            unresolved.append(Conflict(id: planID, title: remotePlan.title))
+                            continue
+                        }
+                        remoteIDs.remove(planID)
+                        if session.accountSyncDocument(withID: planID) != nil {
+                            hasNewLocalEdits = true
+                        }
+                    } catch {
+                        unresolved.append(Conflict(id: planID, title: remotePlan.title))
+                    }
+                case .deleteLocal:
+                    // A verified remote absence may remove only the local
+                    // copy that still matches its last acknowledged fingerprint.
+                    guard let local, !local.tags.contains("sync:standalone"),
+                          session.accountSyncDocument(withID: planID) == local,
+                          session.signedIn, session.profile.userID == userID else {
+                        unresolved.append(Conflict(id: planID, title: local?.title ?? "Training plan"))
+                        continue
+                    }
+                    session.deleteAccountSyncDocument(planID)
                 case .conflict:
                     unresolved.append(Conflict(
                         id: planID, title: local?.title ?? remotePlan?.title ?? "Training plan"
@@ -443,8 +495,8 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                     persistAcknowledgements(for: userID)
                 }
             } else if preferRemote {
-                // Remote absence is meaningful only after explicit conflict
-                // review. Never delete local plans automatically in sync().
+                // Conflicting remote absence requires explicit review. An unchanged
+                // acknowledged copy can also be removed during normal sync.
                 if session.accountSyncDocument(withID: planID) != nil {
                     session.deleteAccountSyncDocument(planID)
                 }

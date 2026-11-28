@@ -59,22 +59,26 @@ final class ATHLTHStudioPlanSyncDecisionTests: XCTestCase {
         )
     }
 
-    func testRemoteDeletionCannotBeSilentlyRecreated() {
-        XCTAssertEqual(
-            Decision.choose(
-                localFingerprint: "initial", remoteFingerprint: nil,
-                remoteRevision: nil, acknowledged: acknowledgement
-            ), .conflict
-        )
+    func testRemoteDeletionPropagatesToUnchangedLocalPlan() {
+        XCTAssertEqual(Decision.choose(
+            localFingerprint: "initial", remoteFingerprint: nil,
+            remoteRevision: nil, acknowledged: acknowledgement
+        ), .deleteLocal)
+        XCTAssertEqual(Decision.choose(
+            localFingerprint: "edited", remoteFingerprint: nil,
+            remoteRevision: nil, acknowledged: acknowledgement
+        ), .conflict)
     }
 
-    func testLocalDeletionCannotBeSilentlyRecreated() {
-        XCTAssertEqual(
-            Decision.choose(
-                localFingerprint: nil, remoteFingerprint: "initial",
-                remoteRevision: 4, acknowledged: acknowledgement
-            ), .conflict
-        )
+    func testLocalDeletionPropagatesOnlyToAcknowledgedRemoteRevision() {
+        XCTAssertEqual(Decision.choose(
+            localFingerprint: nil, remoteFingerprint: "initial",
+            remoteRevision: 4, acknowledged: acknowledgement
+        ), .deleteRemote(expectedRevision: 4))
+        XCTAssertEqual(Decision.choose(
+            localFingerprint: nil, remoteFingerprint: "edited",
+            remoteRevision: 5, acknowledged: acknowledgement
+        ), .conflict)
     }
 
     @MainActor

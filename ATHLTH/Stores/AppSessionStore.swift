@@ -1945,6 +1945,7 @@ final class AppSessionStore: ObservableObject {
             scheduledPlans.append(active)
         }
         refreshActivePlanForToday()
+        persistScheduledPlans()
         return true
     }
 
@@ -1959,6 +1960,7 @@ final class AppSessionStore: ObservableObject {
             scheduledPlans.append(active)
         }
         refreshActivePlanForToday()
+        persistScheduledPlans()
         return true
     }
 
@@ -1980,6 +1982,7 @@ final class AppSessionStore: ObservableObject {
         let wasDeactivated = deactivatedTrainingPlanIDs.remove(id) != nil
         guard wasPaused || wasDeactivated else { return true }
         refreshActivePlanForToday()
+        persistScheduledPlans()
         return true
     }
 
